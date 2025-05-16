@@ -1,0 +1,40 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+}
+
+.container {
+    width: 100%;
+    height: 500px; /* 让容器高度等于视窗高度 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.scrollable-content {
+    width: 80%; /* 内容区域的宽度 */
+    height: 80%; /* 内容区域的高度 */
+    overflow-y: scroll; /* 当内容超出高度时显示垂直滚动条 */
+    border: 1px solid #ccc;
+    padding: 20px;
+    box-sizing: border-box;
+    background-color: #f9f9f9;
+}
+
+/* 自定义滚动条样式（可选） */
+.scrollable-content::-webkit-scrollbar {
+    width: 10px; /* 滚动条的宽度 */
+}
+
+.scrollable-content::-webkit-scrollbar-track {
+    background: #f1bb4d; /* 滚动条轨道的颜色 */
+}
+
+.scrollable-content::-webkit-scrollbar-thumb {
+    background: #88640e; /* 滚动条拇指的颜色 */
+}
+
+.scrollable-content::-webkit-scrollbar-thumb:hover {
+    background: #6d501e; /* 滚动条拇指悬停时的颜色 */
+}
