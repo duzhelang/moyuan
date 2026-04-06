@@ -1,0 +1,57 @@
+### Maven ###
+HELP.md
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+**/temp
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### Vue ###
+**/node_modules
+**/dist
+**/.idea
+
+### Python 项目文件 ###
+__pycache__/
+*.py[cod]
+*.pyc
+
+### 【yunyi 项目专属】数据/模型文件（核心！绝不提交） ###
+data/
+OnlinePredict/
+json/
+*.h5
+*.pkl
+*.pth
+*.csv
+# 屏蔽大文件、视频、数据目录
+data/
+*.mp4

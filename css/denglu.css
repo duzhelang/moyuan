@@ -1,0 +1,518 @@
+				body{
+					margin: 0 auto;
+				}
+				.header{
+					width: 100vw;
+					
+					height: 60px;
+					text-decoration:none;
+			border-top-left-radius: 0px;
+			    border-top-right-radius: 0px;
+			    border-bottom-right-radius: 50px;
+			    border-bottom-left-radius: 5px;
+			
+				
+					/* background-color: rgba(22, 100, 200, 0.6); */
+					
+					position: fixed;
+					    top: 0;
+					    left: 0;
+					    right: 0;
+						background: url('../img/dt_3.jpg');
+						background-size: cover;/*完全覆盖，改变比例*/
+						
+						 background-repeat: no-repeat;
+						 background-position: 0px -320px;
+						/* background-position: 0px -560px;/*待调整为固定 */
+						/*background-attachment: fixed;/*背景固定*/
+						/* transform: scale(0.8); */
+					    box-shadow: 0 2px 5px rgba(0,0,0,.2); /* 触顶后增加阴影效果 */
+					z-index: 51;
+				}
+				.header hr{
+					     border: none;
+					     height: 1px;
+					     background-color: #dedede;
+						  margin-top: -2px;
+						      margin-bottom: -3px;
+						  }
+						.header .hr{
+							border: none;
+							height: 1px;
+							background-color: #303030;
+							 margin-top: -11px;
+							     margin-bottom: -3px;
+						}  
+					.header .top_genglu{
+						width: 100%;
+						height: 50px;
+						display: flex;
+						justify-content: space-between;
+					}
+					.header .top_genglu .logo {
+					    font-size: 34px;
+						color: #000;
+					    vertical-align: middle;
+					}
+					.header .top_genglu .logo a{
+					/* width: 115px; */
+					    font-size: 34px;
+						color: #000;
+					    vertical-align: middle;
+						display: flex;
+						text-align: center;}
+						
+					.header .top_genglu .logo img {
+					    width: 50px;
+					    height: 50px;
+					  float: left;
+						
+					}
+				
+				/*二维码*/
+				.top_genglu .top_txt {
+				 	display: flex;
+					align-items: center;
+					margin-right: 20px;
+					font-size: 25px;
+				 }
+				 
+				 .header .top_genglu .shijian{
+				 	 color: white;
+				 	 background-color: rgba(200, 200, 200, 0.3);
+				 	 margin-right: 50px;
+				 }
+				.header .top_genglu .txt1 {
+				    width: 90px;
+				    float: right;
+				    color: whitesmoke;
+				   
+				    font-size: 20px;
+				
+					position: relative;
+					 z-index: 50;          
+				}
+					.header .top_genglu .txt2 {
+					    width: 90px;
+					    float: right;
+					    color: whitesmoke;
+					   
+					    font-size: 20px;
+						position: relative;
+					    z-index: 50;
+					}
+							 .top_genglu .erw img{
+								width: 100px;
+								height: 100px;
+								float: left;
+								/position: fixed;
+							}
+							.header .top_genglu .txt1 .erw{
+								display: none;/*隐藏*/
+								width: 100px;
+								height: 100px;
+								margin-left: -12px;
+								overflow: hidden;/*恢复父元素高度*/
+								position: absolute;
+								z-index: 50;
+							}
+							.header .top_genglu .txt2 .erw{
+								display: none;/*隐藏*/
+								width: 100px;
+								height: 100px;
+								margin-left: -12px;
+								overflow: hidden;/*恢复父元素高度*/
+								position: absolute;
+								z-index: 50;
+							}
+							.header .top_genglu .txt1:hover .erw{
+								display: block;/*显示*/
+								background: blue;
+								
+							}
+							.header .top_genglu .txt1:hover{
+								font-size: 21px;
+							}
+							.header .top_genglu .txt2:hover .erw{
+								display: block;/*显示*/
+								background: blue;
+							}
+							.header .top_genglu .txt2:hover{
+								font-size: 22px;
+							}
+/*登录的*/
+.dl_zhuti{
+				margin:100px 10px;
+				text-align: center;
+				display: flex;
+				/* position: absolute; */
+				    justify-content: center;
+				    align-items: center;
+					position: relative;
+					z-index: 50;
+			}
+			.zhong img{
+				width: 430px;
+				height: 280px;
+			}
+			.zhong h1{
+				font-size:50px;
+				font-weight: 600;
+				margin: 10px auto;
+				/* text-stroke: 1px black;/*字体边框*/
+				/*text-shadow: 0 0 10px white;/*字体外发光*/
+				/*-webkit-text-stroke: 1px white;/*字体边框..浏览器兼容*/ 
+			}
+			.zhong{
+				backdrop-filter: blur(1.5px); /*模糊*/
+				 box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+				/* 玻璃效果 */
+				/* background: linear-gradient(to bottom,rgba(255, 255, 255, 0.5),rgba(255, 255, 255, 0.8),rgba(255, 255, 255, 0.3)); */
+				/* 渐变 */
+				width: 600px;
+				height: 380px;
+				/* border: 1px solid gainsboro; */
+				border-radius: 27px;
+				/* background-color: rgba(255, 255, 255, 0.4); */
+				background-color: rgba(227,196,165,0.7);
+				/* background: url('../img/lb_ (5).jpg'); */
+				/*background-size: contain;/*保持比例，可能出现空白*/
+				background-size: cover;/*完全覆盖，改变比例*/
+				 background-repeat: no-repeat;
+				 background-position: 0px 0px; 
+				 display: flex;
+			}
+			.zhong .dlzt_tx_div{
+				display: flex;
+				flex-direction: column;
+				    justify-content: space-around;
+				    align-items: center;
+				width: 35%;
+				height: 40%;
+				position: relative;
+				top: -30px;
+			}
+			.zhong .dlzt_tx_div input{
+				display: block;
+				border: 1px solid #ccc;
+				
+				border-radius: 35px 0 35px 0;
+				padding: 2px 30px;
+				width:75px;
+				height: 30px;
+				
+				color: #000;
+				color: #ffffff;
+				background-color: rgba(255, 255, 255, 0.5);
+				font-size: 20px;
+				font-family: cursive;/*草书*/
+				
+			}
+			.zhong .dlzt_tx_div img{
+				display: block;
+				border-radius: 50%;
+				margin: 10px;
+				width: 80px;
+				height: 80px;
+				position: relative;
+				z-index: 50;
+			}
+			
+			/* 忘记密码和注册链接样式 */
+			   .forgot-password,
+			    .register-link {
+				   font-size:20px;
+			      text-align: center;
+			      margin-top: 0px;
+			    }
+			 .forgot-password .fuzhu,
+			    .register-link .fuzhu{
+				   
+				   background-color: rgba(204, 204, 204, 0.7);
+			      line-height: 0px;
+				  /* text-stroke: 1px black;/*字体边框*/ 
+				  text-shadow: 0 0 10px white;/*字体外发光*/
+				  /* -webkit-text-stroke: 1px black;/*字体边框..浏览器兼容*/ 
+			      color: #55aaff;
+			    }
+				 .register-link{
+					
+					position: absolute;
+					bottom: -100px;
+					right: 60px;
+				}
+			   .forgot-password .fuzhu:hover,
+			   .register-link .fuzhu:hover{
+			      text-decoration: none;
+			      color: #007BFF;
+			    }
+				
+			
+			.zhong_shuxian{
+				width: 1px;
+				height: 300px;
+				background-color: #e0e0e0;
+			}
+			
+			.zhong .dlzt_wz_div{
+				width: 55%;
+				/* height: 100%; */
+			}
+			.zhong .dlzt_wz_div h1{
+				 /*text-shadow: 0 0 10px white;/*字体外发光*/
+				  text-shadow: 8px 2px 3px rgba(254, 254, 254, 0.4); /* 水平、垂直阴影偏移量为2px，模糊半径4px，阴影颜色为半透明黑色 */
+		
+			}
+			.dl_shurukuang{
+				width: 250px;
+				    height: 33px;
+				    border-radius: 10px;
+				    border: none;
+					
+					background-color: rgba(255, 255, 255, 0.5);
+				
+			}
+			.a1,.a2,.a3{
+				height: 50px;
+				font-size: 20px;
+				display: flex;
+			}
+
+			.a3 .dl_anjian {
+			    display: flex;
+			    width: 200px;
+				height: 43px;
+				font-size: 25px;
+			    padding: 5px;
+			   border-radius: 5px;
+			    background-color: #007BFF;
+			    color: white;
+			    border: none;
+			    cursor: pointer;
+			}
+			
+			.a3 .dl_anjian:hover {
+			    background-color: #0056b3;
+			}
+			.fu input{
+				width: 80px;
+				font-size: 24px;
+				background: #9acd32;
+				color: rgb(100,100,100);
+				margin-top: 15px;
+				float: right;
+				border: 2px solid gainsboro;
+				border-radius: 20px;
+			}
+			.fu input:hover{
+				background: #779d26;
+
+			}
+	/* 共有*/.dlzc_ditu_div{
+		position: absolute;
+		z-index: 50;
+		top: 678px;
+		    /* bottom: 0px; */
+			width: 100%;
+			height: 60px;
+			background: url('../img/dt_1.jpg')  no-repeat 0px -360px / cover;
+	} 
+	
+	/* .dlzc_ditu{ 
+				position: absolute;
+				left: 0px;
+				    bottom: 0px;
+					width: 100%;
+					height: 60px;
+			} /*待定*/
+
+/*注册的*/
+			.container{
+				margin:100px 10px;
+				width: 100%;
+					/* height: 720px; */
+					/*background: url(images/bg.gif);*/
+					/* margin: 0 auto; */
+					background: url('');
+					background-repeat: no-repeat;
+					background-position:0px 0px ;
+			}
+			.zc_main{
+			display: flex;
+			width: 100%;
+			position: relative;
+			text-align: center;
+			/* margin-top: 80px; */
+			}
+			.zc_main .biao{
+				/* text-align: center; */
+				margin-top: 75px;
+				font-size: 26px;
+				z-index: 50;
+				display: flex;
+ background: url('../img/dt_0.jpg');
+ /*background-size: contain;/*保持比例，可能出现空白*/
+ background-size: cover;/*完全覆盖，改变比例*/
+  background-repeat: no-repeat;
+ background-position: 0px 0px; 
+			}
+			.zc_main .biao tr td{
+				/*color: skyblue;*/
+				color: cornflowerblue;
+				color: black;
+				background-color: rgba(225, 225, 225, 0.2);
+				border-radius: 8px;
+			}
+			/*.biao input:first-child{
+				width: 300px;
+				    height: 23px;
+				    border-radius: 10px;
+				    border: none;
+			}*/
+			/*.biao input:nth-child(2){
+				width: 100px;
+				    height: 23px;
+				    border-radius: 10px;
+				    border: none;
+			}
+			.biao input:nth-child(3){
+				width: 100px;
+				    height: 23px;
+				    border-radius: 10px;
+				    border: none;
+			}*/
+			.biao caption h2{
+				height: 50px;
+				margin: 0px;
+			}
+			.biao select{
+				width: 260px;
+				    height: 23px;
+				    border-radius: 5px;
+				    border: none;
+					background-color: rgba(100, 100, 100,0.6);
+			}
+			 .wb{
+				width: 300px;
+				height: 30px;
+				    
+				border: none;
+				border-radius: 10px;
+				
+			}
+			.biao .xb{
+				width: 50px;
+				    height: 23px;
+				    border-radius: 5px;
+				    border: none;background-color: rgba(100, 100, 100,0.6);
+			}
+			.biao .xq{
+				width: 40px;
+				    height: 23px;
+				    border-radius: 5px;
+				    border: none;background-color: rgba(100, 100, 100,0.6);
+			}
+			.biao .cz{
+				width: 100px;
+				    height: 33px;
+				    border-radius: 5px;
+				    border: none;
+					cursor: pointer;/*手型*/
+			}
+			 .tj{
+				width: 200px;
+				    height: 43px;
+				    border-radius: 5px;
+				    border: none;
+					font-size: 25px;
+					cursor: pointer;/*手型*/
+			}
+			.tj:hover,.cz:hover{
+				background-color: aliceblue;
+			}
+			.dwb{
+				width: 250px;
+				    height: 33px;
+				    border-radius: 10px;
+				    border: none;
+				background-color: rgba(100, 100, 100,0.4);
+			}
+			a:hover{
+				color: #007BFF;
+			}
+			/* input {
+			    width: 300px;
+			    height: 50px;
+			    padding: 0 15px;
+			    
+			    font-size: 17px;
+			    font-weight: 200;
+			    background-color: transparent;
+			    border-bottom: 5px solid #fff;
+			    border-top-color: transparent;
+			    border-left-color: transparent;
+			    border-right-color: transparent;
+			    font-family: 'Raleway', sans-serif;
+			    margin: 0 auto 20px;
+			    display: block;
+			    outline: none;
+				} */
+			input#password1, input#password2 {
+			    width: 300px;
+			    height: 50px;
+			    padding: 0 15px;
+			    /* color: #fff; */
+			    font-size: 17px;
+			    font-weight: 200;
+			    background-color: transparent;
+			    border-bottom: 5px solid #fff;
+			    border-top-color: transparent;
+			    border-left-color: transparent;
+			    border-right-color: transparent;
+			    font-family: 'Raleway', sans-serif;
+			    margin: 0 auto 20px;
+			    display: block;
+			    outline: none;
+				}
+			/*.biao input:nth-child(6){
+				width: 800px;
+				height: 30px;
+				font-size: 30px;
+				border: 1px solid gainsboro;
+				border-radius: 5px;
+			}
+			.biao input:nth-child(5){
+				width: 80px;
+				height: 50px;
+				font-size: 30px;
+				border: 1px solid gainsboro;
+				border-radius: 5px;
+				
+			}*/
+			
+			textarea{
+				border: 1px solid gainsboro;
+				border-radius: 5px;
+
+				background-color: rgba(255, 255, 255, 0.8);
+			}
+			
+			input:hover{
+				/* opacity: 0.9; */
+			}
+			textarea:hover{
+				opacity: 0.9;
+			}
+			
+			/* 提示字·伪代码样式 */
+			textarea::-webkit-textarea-placeholder{
+				color: #999;
+				            font-size: 14px;
+				            font-style: italic;
+			}
+			input::-webkit-input-placeholder{
+				color: #000000;
+				font-size: 14px;
+				font-style: italic;
+				/* opacity: 0.5; */
+			}
