@@ -1,57 +1,64 @@
-### Maven ###
-HELP.md
+# ==================== 编译产物 ====================
+# Java编译文件
+*.class
+# Maven/Gradle构建目录
 target/
-!.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
-**/temp
-
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
 build/
-!**/src/main/**/build/
-!**/src/test/**/build/
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+# 打包文件
+*.jar
+*.war
+*.zip
+*.tar.gz
 
-### VS Code ###
+# ==================== 环境与配置 ====================
+# Spring Boot配置（排除通用配置，保留环境专属配置）
+application-dev.yml
+application-test.yml
+application-prod.yml
+*.env
+.env
+.env.local
+# 数据库连接配置（敏感信息）
+db-config.properties
+# 会话/缓存文件
+*.session
+*.cache
+
+# ==================== 日志与临时文件 ====================
+# 日志目录/文件
+logs/
+*.log
+temp/
+tmp/
+# JVM崩溃日志
+hs_err_pid*
+replay_pid*
+
+# ==================== IDE/编辑器配置 ====================
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+# VS Code
 .vscode/
+*.swp
+*.swo
+# Eclipse
+.project
+.classpath
+.settings/
+# 系统文件
+.DS_Store
+Thumbs.db
 
-### Vue ###
-**/node_modules
-**/dist
-**/.idea
-
-### Python 项目文件 ###
-__pycache__/
-*.py[cod]
-*.pyc
-
-### 【yunyi 项目专属】数据/模型文件（核心！绝不提交） ###
-data/
-OnlinePredict/
-json/
-*.h5
-*.pkl
-*.pth
+# ==================== 项目专属过滤 ====================
+# 订单统计临时生成的Excel/CSV文件
+*.xlsx
 *.csv
-# 屏蔽大文件、视频、数据目录
-data/
-*.mp4
+# 商家/用户会话临时数据
+session-data/
+# 第三方SDK临时文件（如百度AI/支付SDK）
+sdk-tmp/
