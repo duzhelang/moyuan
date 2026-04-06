@@ -321,7 +321,7 @@ display: block;
 }
 
 .luntan_jxsz ul {
-	background-color: ;
+	/*background-color: ;*/
 	border: 2px solid gainsboro;
 	border-radius: 5px;
 	font-size: 25px;
@@ -337,7 +337,7 @@ display: flex;
 	border-radius: 5px;
 	font-size: 25px;
 	margin: 5px;
-	background-color: ;
+	/*background-color: ;*/
 	/* width: 150px;
 	height: 40px; */
 

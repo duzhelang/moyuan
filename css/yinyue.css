@@ -72,14 +72,19 @@ audio{
       	display: none;
       }
 
+      /* 注意：现代浏览器通常不允许直接通过 CSS 修改原生 audio 控件的内部样式（如进度条颜色、播放按钮背景等）。
+         以下伪元素选择器在大多数现代 Chrome/Edge 版本中已不再支持或行为不一致。
+         如果需要自定义音频控件样式，建议使用 JavaScript 创建自定义控件。
+      */
+      /*
       audio::-webkit-media-controls-progress-bar-played-part {
-      	background - color: #007bff;
+      	background-color: #007bff;
       }
 
-      /*进度条*/
       audio::-webkit-media-controls-play-button {
-      	background - color: #007bff;
+      	background-color: #007bff;
       }
+      */
 
     #laba1 {
       	display: none;
@@ -110,15 +115,15 @@ audio{
       	height: 30px;
       }
       /*按钮*/
-      var audio=document.getElementById('myAudio');
-      var playButton=document.getElementById('playButton');
+      /*var audio=document.getElementById('myAudio');*/
+      /*var playButton=document.getElementById('playButton');*/
 
-      playButton.addEventListener('click', function () {
-      		if (audio.paused) {
-      			audio.play();
-      		}
+      /*playButton.addEventListener('click', function () {*/
+      /*		if (audio.paused) {*/
+      /*			audio.play();*/
+      /*		}*/
 
-      		else {
-      			audio.pause();
-      		}
-      	});
+      /*		else {*/
+      /*			audio.pause();*/
+      /*		}*/
+      /*	});*/

@@ -1,15 +1,30 @@
 //处理锁定按钮点击事件
-    lock-button.addEventListener('click', function () {
-        isLocked = !isLocked;
-        toggleSidebar.classList.toggle('locked');
-        // mainContent.classList.toggle('locked');
-        if (isLocked) {
-            lock-button.textContent = '解锁';
-        } else {
-            lock-button.textContent = '锁定';
-        }
-    });
-});
+    // 注意：原代码中 lock-button 和 toggleSidebar 变量未定义，且存在多余的闭合括号 });
+    // 根据上下文中的另一段锁定逻辑，这里应该使用正确的 DOM 元素引用。
+    // 假设 lockButton 和 sidebar 是之前已经获取到的 DOM 元素（参考下文代码风格）
+    // 如果 lock-button 是 ID，请使用 document.getElementById('lock-button')
+    // 为了保持与选中代码意图一致并修复语法错误（移除多余的 });），重写如下：
+    
+    // 获取按钮元素（如果上方未定义，需确保此处可访问）
+    var lockBtn = document.getElementById('lock-button'); 
+    if (lockBtn) {
+        lockBtn.addEventListener('click', function () {
+            isLocked = !isLocked;
+            // 切换侧边栏的锁定状态类名，具体类名需根据CSS定义调整，此处保留原意
+            if (typeof toggleSidebar !== 'undefined' && toggleSidebar) {
+                toggleSidebar.classList.toggle('locked');
+            }
+            
+            if (isLocked) {
+                this.textContent = '解锁';
+                // 如果锁定意味着保持打开或特定状态，可在此添加类名操作
+                // sidebar.classList.add('open'); 
+            } else {
+                this.textContent = '锁定';
+                // sidebar.classList.remove('open');
+            }
+        });
+    }
 
 // 锁定按钮点击事件
   document.getElementById('lock-button').addEventListener('click', function() {
