@@ -1,121 +1,207 @@
-二、LICENSE（适配企业 / 内部项目的 MIT 协议）
-云智项目若为企业内部使用或轻量开源，MIT 协议最适配（宽松、无商业限制）：txtMIT License
+# 古今诗话——墨渊 现代诗词管理系统
 
-Copyright (c) 2026 云智项目团队
+## 系统概述
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+这是一个将前端页面中的现代诗词存入数据库并实现前后端加载的系统。系统包含：
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. **前端页面** - 展示和管理现代诗词
+2. **后端API** - 提供数据存储和查询接口
+3. **数据库** - 存储诗词数据
+4. **测试页面** - 验证系统功能
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+## 系统架构
 
+```
+前端页面 (index.html)
+    ↓ API调用
+后端服务 (Spring Boot)
+    ↓ 数据库操作
+MySQL数据库
+```
 
-可将2026 云智项目团队替换为实际的年份 / 团队名称（如公司名称、项目负责人）。
+## 功能特性
 
-三、README.md（云智项目专属说明）
-贴合订单统计接口、商家数据隔离等核心业务，清晰易懂：markdown# 云智 - 订单统计分析系统
-基于Spring Boot开发的订单数据统计分析后端系统，支持多维度时间统计、分组统计，且实现商家数据隔离。
+### 前端功能
+- ✅ 提取页面中的现代诗词
+- ✅ 手动添加新诗词
+- ✅ 查看已存储的诗词列表
+- ✅ 编辑和删除诗词
+- ✅ 实时状态反馈
 
-## 核心功能
-1. 多字段批量时间统计：支持按日/周/月等维度，批量统计多个订单字段（如金额、数量）
-2. 分组统计：按指定字段（如商品类型、商家）分组统计订单数据，过滤有效订单（已支付/发货/完成）
-3. 数据隔离：商家端仅能查看自身订单数据，管理员可查看全量数据
+### 后端功能
+- ✅ RESTful API接口
+- ✅ 诗词CRUD操作
+- ✅ 分页查询
+- ✅ 搜索功能
+- ✅ 统一响应格式
 
-## 技术栈
-- 后端框架：Spring Boot
-- 持久层：MyBatis-Plus
-- 数据库：MySQL
-- 工具：SimpleDateFormat（日期格式化）、HashMap（参数处理）
+### 数据库功能
+- ✅ 诗词表 (poem)
+- ✅ 诗人表 (poet)
+- ✅ 朝代表 (dynasty)
+- ✅ 分类表 (category)
 
-## 快速启动
-### 环境要求
-- JDK 8+
-- MySQL 5.7+
-- Maven 3.6+
+## 快速开始
 
-### 部署步骤
-1. 克隆代码：
-   ```bash
-   git clone [你的仓库地址]
+### 1. 环境要求
+- Java 17+
+- MySQL 8.0+
+- Maven 3.8+
+- 现代浏览器
 
+### 2. 数据库设置
+```sql
+-- 执行数据库初始化脚本
+source backend/src/main/resources/db/init.sql
+```
 
-配置数据库：修改application.yml中的 MySQL 连接信息（url / 用户名 / 密码）
-配置商家权限：确保tableName会话参数与商家账号关联逻辑正确
-编译运行：bash运行mvn clean package
-java -jar target/yunzhi-order-stat.jar
+### 3. 后端启动
+```bash
+cd backend
+mvn spring-boot:run
+```
 
+### 4. 前端访问
+```
+http://localhost:8080/index.html
+```
 
-核心接口
-1. 多字段时间统计
+### 5. 测试页面
+```
+http://localhost:8080/test.html
+```
 
-接口地址：/valueMul/{xColumnName}/{timeStatType}
-请求方式：GET
-参数说明：
-xColumnName：X 轴维度（如 date/month）
-timeStatType：时间统计类型（如 day/week/month）
-yColumnNameMul：多个 Y 轴字段（逗号分隔，如 amount,count）
+## API接口
 
+### 基础URL
+```
+http://localhost:8080/api
+```
 
-返回格式：{code:200, msg:"成功", data:[[{字段1:值, 时间:格式化日期},...],...]}
+### 主要接口
 
-2. 订单分组统计
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/poems/modern` | GET | 获取现代诗词列表 |
+| `/poems/modern/page` | GET | 分页获取现代诗词 |
+| `/poems/{id}` | GET | 获取单个诗词 |
+| `/poems` | POST | 创建新诗词 |
+| `/poems/{id}` | PUT | 更新诗词 |
+| `/poems/{id}` | DELETE | 删除诗词 |
+| `/poems/search` | GET | 搜索诗词 |
 
-接口地址：/group/{columnName}
-请求方式：GET
-参数说明：
-columnName：分组字段（如 shangjiaName/goodsType）
+### 响应格式
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {}
+}
+```
 
+## 使用说明
 
-过滤规则：仅统计状态为「已支付 / 已发货 / 已完成」且 type≠2 的订单
+### 1. 提取页面诗词
+- 点击"提取页面诗词"按钮
+- 系统自动解析"当代·精选"部分的诗词
+- 批量提交到数据库
 
-数据安全
+### 2. 添加新诗词
+- 点击"添加新诗词"按钮
+- 填写诗词信息（标题、内容、作者等）
+- 选择诗词流派
+- 点击提交
 
-商家端通过shangjiazhanghao会话参数隔离数据，仅能查询自身订单
-敏感配置（如数据库密码）需放入环境配置文件，不纳入版本控制
+### 3. 管理诗词
+- 查看诗词列表和统计信息
+- 编辑或删除现有诗词
+- 实时更新显示
 
-许可证
-本项目基于 MIT 协议开源，详见 LICENSE 文件。plaintext
-### 四、.editorconfig（统一团队代码格式）
-适配Java/Spring Boot项目的代码格式规范，避免团队协作格式混乱：
-```editorconfig
-root = true
+## 配置说明
 
-# 全局规则
-[*]
-charset = utf-8
-indent_style = space
-indent_size = 4
-end_of_line = lf
-insert_final_newline = true
-trim_trailing_whitespace = true
+### 后端配置
+```yaml
+# application.yml
+server:
+  port: 8080
+  servlet:
+    context-path: /api
 
-# Java文件专属
-[*.java]
-indent_size = 4
-max_line_length = 120
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/moyuan
+    username: root
+    password: root
+```
 
-# YAML/XML配置文件（Spring Boot常用）
-[*.{yml,yaml,xml}]
-indent_size = 2
+### 前端配置
+```javascript
+// API基础URL
+const API_BASE_URL = 'http://localhost:8080/api';
+```
 
-# 文档文件
-[*.md]
-trim_trailing_whitespace = false
+## 测试验证
 
-总结
+### 1. 功能测试
+访问 `test.html` 页面，测试各项功能：
+- API接口测试
+- 前端功能测试
+- 数据库连接测试
 
-核心文件：.gitignore 精准过滤云智项目的编译产物、敏感配置、日志等；LICENSE 适配企业 / 内部项目的 MIT 协议；README.md 聚焦订单统计核心业务，降低部署 / 协作成本。
-使用方式：将所有文件放在项目根目录，根据实际项目包名、数据库配置调整 README 中的启动命令和接口信息。
-关键适配点：.gitignore 新增了订单业务专属的 Excel/CSV 临时文件、商家会话数据过滤；README 强化了数据隔离、接口规则等云智项目核心特性。
+### 2. 数据验证
+```sql
+-- 查询现代诗词数量
+SELECT COUNT(*) FROM poem WHERE dynasty_id = 13;
+
+-- 查询诗人信息
+SELECT * FROM poet WHERE dynasty_id = 13;
+```
+
+## 常见问题
+
+### Q: 后端启动失败怎么办？
+A: 检查数据库连接配置，确保MySQL服务已启动。
+
+### Q: 前端无法连接后端？
+A: 确保后端服务已启动，检查CORS配置。
+
+### Q: 数据库表不存在？
+A: 执行初始化脚本 `backend/src/main/resources/db/init.sql`
+
+## 开发说明
+
+### 项目结构
+```
+SC_MoYuan2_/
+├── index.html          # 主页面
+├── test.html           # 测试页面
+├── css/                # 样式文件
+├── js/                 # JavaScript文件
+├── backend/            # 后端项目
+│   ├── src/            # 源代码
+│   ├── pom.xml         # Maven配置
+│   └── README.md       # 后端说明
+└── README.md           # 本文件
+```
+
+### 技术栈
+- **前端**: HTML5, CSS3, JavaScript
+- **后端**: Spring Boot 3.2, MyBatis-Plus 3.5
+- **数据库**: MySQL 8.0
+- **构建工具**: Maven 3.8
+
+## 更新日志
+
+### v1.0.0 (2026-05-25)
+- ✅ 实现现代诗词提取功能
+- ✅ 实现诗词CRUD API
+- ✅ 实现前后端数据交互
+- ✅ 创建测试验证页面
+
+## 许可证
+
+MIT License
+
+## 联系方式
+
+如有问题，请联系项目维护者。
