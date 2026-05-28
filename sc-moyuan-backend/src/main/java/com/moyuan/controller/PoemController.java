@@ -1,0 +1,99 @@
+package com.moyuan.controller;
+
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.moyuan.common.R;
+import com.moyuan.entity.Poem;
+import com.moyuan.service.PoemService;
+import com.moyuan.service.UserService;
+import com.moyuan.util.SecurityUtil;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@Tag(name = "诗词接口")
+@RestController
+@RequestMapping("/api/poems")
+@RequiredArgsConstructor
+public class PoemController {
+
+    private final PoemService poemService;
+    private final UserService userService;
+    private final SecurityUtil securityUtil;
+
+    @Operation(summary = "获取诗词列表")
+    @GetMapping
+    public R<Map<String, Object>> getPoemList(
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(required = false) Long dynastyId,
+            @RequestParam(required = false) Long poetId,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) String keyword) {
+        IPage<Poem> page = poemService.getPoemList(pageNum, pageSize, dynastyId, poetId, categoryId, keyword);
+        Map<String, Object> result = new HashMap<>();
+        result.put("list", page.getRecords());
+        result.put("total", page.getTotal());
+        result.put("pageNum", page.getCurrent());
+        result.put("pageSize", page.getSize());
+        return R.success(result);
+    }
+
+    @Operation(summary = "获取诗词详情")
+    @GetMapping("/{id}")
+    public R<Poem> getPoemDetail(@PathVariable Long id) {
+        return R.success(poemService.getPoemDetail(id));
+    }
+
+    @Operation(summary = "点赞/取消点赞")
+    @PostMapping("/{id}/like")
+    public R<Void> toggleLike(@PathVariable Long id) {
+        Long userId = securityUtil.getCurrentUserId();
+        poemService.toggleLike(userId, id);
+        return R.success();
+    }
+
+    @Operation(summary = "检查是否点赞")
+    @GetMapping("/{id}/like")
+    public R<Map<String, Boolean>> isLike(@PathVariable Long id) {
+        Long userId = securityUtil.getCurrentUserId();
+        Map<String, Boolean> result = new HashMap<>();
+        result.put("liked", poemService.isLike(userId, id));
+        return R.success(result);
+    }
+
+    @Operation(summary = "收藏/取消收藏")
+    @PostMapping("/{id}/favorite")
+    public R<Void> toggleFavorite(@PathVariable Long id) {
+        Long userId = securityUtil.getCurrentUserId();
+        userService.toggleFavorite(userId, id);
+        return R.success();
+    }
+
+    @Operation(summary = "检查是否收藏")
+    @GetMapping("/{id}/favorite")
+    public R<Map<String, Boolean>> isFavorite(@PathVariable Long id) {
+        Long userId = securityUtil.getCurrentUserId();
+        Map<String, Boolean> result = new HashMap<>();
+        result.put("favorited", userService.isFavorite(userId, id));
+        return R.success(result);
+    }
+
+    @Operation(summary = "获取我的收藏列表")
+    @GetMapping("/favorites")
+    public R<Map<String, Object>> getFavorites(
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize) {
+        Long userId = securityUtil.getCurrentUserId();
+        IPage<Poem> page = poemService.getFavorites(userId, pageNum, pageSize);
+        Map<String, Object> result = new HashMap<>();
+        result.put("list", page.getRecords());
+        result.put("total", page.getTotal());
+        result.put("pageNum", page.getCurrent());
+        result.put("pageSize", page.getSize());
+        return R.success(result);
+    }
+}
