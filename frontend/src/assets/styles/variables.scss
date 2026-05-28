@@ -1,0 +1,75 @@
+// 主题色
+$primary-color: #8B4513;
+$secondary-color: #D2691E;
+$accent-color: #CD853F;
+$danger-color: #F56C6C;
+$success-color: #67C23A;
+$warning-color: #E6A23C;
+
+// 文本色
+$text-color: #333333;
+$text-color-secondary: #666666;
+$text-color-light: #999999;
+
+// 背景色
+$background-color: #F5F5F5;
+$background-color-light: #FFFFFF;
+$background-color-dark: #2C2C2C;
+
+// 边框
+$border-color: #E8E8E8;
+$border-color-light: #F0F0F0;
+$border-radius-sm: 4px;
+$border-radius-md: 8px;
+$border-radius-lg: 12px;
+$border-radius-xl: 16px;
+
+// 间距
+$spacing-xs: 4px;
+$spacing-sm: 8px;
+$spacing-md: 16px;
+$spacing-lg: 24px;
+$spacing-xl: 32px;
+$spacing-xxl: 48px;
+
+// 字体
+$font-family-base: 'Noto Serif SC', 'Songti SC', serif;
+$font-family-title: 'KaiTi', 'STKaiti', serif;
+$font-size-xs: 12px;
+$font-size-sm: 13px;
+$font-size-base: 14px;
+$font-size-lg: 16px;
+$font-size-xl: 18px;
+$font-size-xxl: 20px;
+$font-size-title: 24px;
+$font-size-hero: 32px;
+
+// 行高
+$line-height-tight: 1.2;
+$line-height-base: 1.5;
+$line-height-loose: 1.8;
+
+// 阴影
+$box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+$box-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+$box-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.15);
+$box-shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.18);
+
+// 过渡
+$transition-fast: 0.2s ease;
+$transition-base: 0.3s ease;
+$transition-slow: 0.5s ease;
+
+// 断点
+$breakpoint-sm: 576px;
+$breakpoint-md: 768px;
+$breakpoint-lg: 992px;
+$breakpoint-xl: 1200px;
+$breakpoint-xxl: 1400px;
+
+// 容器宽度
+$container-sm: 540px;
+$container-md: 720px;
+$container-lg: 960px;
+$container-xl: 1140px;
+$container-xxl: 1320px;
