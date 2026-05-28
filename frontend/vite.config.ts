@@ -41,7 +41,7 @@ export default defineConfig({
   css: {
     preprocessorOptions: {
       scss: {
-        additionalData: `@use "@/assets/styles/variables" as *;\n`,
+        additionalData: `@import "@/assets/styles/variables";\n@import "@/assets/styles/mixins";\n`,
         loadPaths: [resolve(__dirname, 'src/assets/styles')]
       }
     }

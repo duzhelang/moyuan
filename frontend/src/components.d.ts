@@ -9,11 +9,30 @@ declare module 'vue' {
   export interface GlobalComponents {
     AppFooter: typeof import('./components/common/AppFooter.vue')['default']
     AppHeader: typeof import('./components/common/AppHeader.vue')['default']
+    ElAvatar: typeof import('element-plus/es')['ElAvatar']
+    ElButton: typeof import('element-plus/es')['ElButton']
+    ElCard: typeof import('element-plus/es')['ElCard']
+    ElDatePicker: typeof import('element-plus/es')['ElDatePicker']
+    ElEmpty: typeof import('element-plus/es')['ElEmpty']
+    ElForm: typeof import('element-plus/es')['ElForm']
+    ElFormItem: typeof import('element-plus/es')['ElFormItem']
+    ElIcon: typeof import('element-plus/es')['ElIcon']
+    ElInput: typeof import('element-plus/es')['ElInput']
+    ElMenu: typeof import('element-plus/es')['ElMenu']
+    ElMenuItem: typeof import('element-plus/es')['ElMenuItem']
+    ElOption: typeof import('element-plus/es')['ElOption']
+    ElPagination: typeof import('element-plus/es')['ElPagination']
+    ElRadio: typeof import('element-plus/es')['ElRadio']
+    ElRadioGroup: typeof import('element-plus/es')['ElRadioGroup']
+    ElSelect: typeof import('element-plus/es')['ElSelect']
     ErrorMessage: typeof import('./components/common/ErrorMessage.vue')['default']
     ForumPost: typeof import('./components/business/ForumPost.vue')['default']
     LoadingSpinner: typeof import('./components/common/LoadingSpinner.vue')['default']
     PoemCard: typeof import('./components/business/PoemCard.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+  }
+  export interface ComponentCustomProperties {
+    vLoading: typeof import('element-plus/es')['ElLoadingDirective']
   }
 }

@@ -4,7 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePoemStore } from '@/stores/poem'
 import { ElMessage } from 'element-plus'
 import type { Poem, Comment } from '@/types/model'
-import { getComments, createComment, likePoem, favoritePoem } from '@/api/modules/poem'
+import { likePoem, favoritePoem } from '@/api/modules/poem'
+import { getComments, createComment } from '@/api/modules/forum'
 
 const route = useRoute()
 const router = useRouter()

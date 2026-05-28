@@ -1,3 +1,19 @@
+---
+name: local-fullstack-tester
+description: 本地全栈测试 - 测试本地运行的前后端服务联通性
+mode: subagent
+temperature: 0.1
+model: "doubao-seed-code"
+color: "#3b82f6"
+tools:
+  write: false
+  edit: false
+  read: true
+  glob: true
+  grep: true
+  bash: true
+---
+
 # 本地全栈测试智能体
 
 ## 身份
