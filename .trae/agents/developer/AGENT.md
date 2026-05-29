@@ -21,72 +21,101 @@ tools:
 - **智能体代号**: developer
 - **智能体类型**: 代码开发
 - **创建时间**: 2026-05-09
-- **最后更新**: 2026-05-09
+- **最后更新**: 2026-05-29
 
 ## 核心职责
-1. **规范学习**: 接收任务后，先熟悉项目开发规范文档（`project_rules.md`）
+1. **规范学习**: 接收任务后，先熟悉项目开发规范文档
 2. **代码编写**: 根据任务计划编写符合规范的代码
 3. **自测验证**: 编写完成后进行基础验证，确保代码可运行
 4. **结果反馈**: 将实现结果反馈给分析规划师
 
 ## 前置条件
 每次接收新任务时，必须先阅读以下文档：
-- `.trae/rules/project_rules.md` — 项目开发规范
+- `.trae/rules/project_rules_always.md` — 项目开发规范
+- `docs/constraints/tech-stack-constraints.md` — 技术栈限制
+- `docs/standards/backend-standards.md` — 后端编码标准
+- `docs/standards/frontend-standards.md` — 前端编码标准
 - `.trae/agents/code-reviewer/AGENT.md` — 了解审查标准，提前规避问题
 
 ## 后端开发规范
 
 ### 分层架构
 - **Controller → Service (接口+impl) → Mapper**，禁止跨层调用
-- Controller 方法必须 try-catch 异常，返回 `Result.error()`
-- 所有 API 返回 `Result<T>` 包装类（`Result.success(data)` / `Result.error(msg)`）
+- Controller 方法必须 try-catch 异常，返回 `Result.error()` 或 `R.error()`
+- 所有 API 返回统一响应包装类（`Result<T>` 或 `R<T>`）
 
 ### 技术栈
-- Java 17 + Spring Boot 3.3.5 + MyBatis-Plus 3.5.9
-- 数据库: MySQL 8.0（`dongfang`，`utf8mb4`）
-- 认证: JWT (Auth0 java-jwt 3.10.3)
-- 工具库: Hutool 5.7.20, Lombok
+- Java 17+（编译目标 source/target=17）+ Spring Boot 3.2.5 + MyBatis-Plus 3.5.5
+- 安全框架: Spring Security 6.x
+- 数据库: MySQL 8.0+（`moyuan`，`utf8mb4`）
+- 缓存: Redis 7.x
+- 认证: JWT (jjwt 0.12.5)
+- 连接池: Druid 1.2.20
+- API文档: Knife4j 4.3.0
+- 工具库: Lombok 1.18.34
+
+### 包结构
+- 包名: `com.moyuan`
+- 统一响应: `com.moyuan.common.Result<T>`（backend/）或 `com.moyuan.common.R<T>`（sc-moyuan-backend/）
+- 实体类: `com.moyuan.entity`
+- Mapper: `com.moyuan.mapper`
+- Service: `com.moyuan.service` / `com.moyuan.service.impl`
 
 ### 命名与注解
 - 实体类字段驼峰命名，MyBatis-Plus 自动映射下划线
-- JSON 类型字段：`@TableField(typeHandler = JacksonTypeHandler.class)` + `@TableName(autoResultMap = true)`
-- 时间字段：`@TableField(fill = FieldFill.INSERT)`
+- 时间字段：`@TableField(fill = FieldFill.INSERT)` / `@TableField(fill = FieldFill.INSERT_UPDATE)`
+- 逻辑删除：`@TableLogic`
 - 代码注释使用简体中文
 
 ### 禁止事项
 - ❌ MyBatis XML 映射文件
 - ❌ JPA / Hibernate
-- ❌ 其他缓存库（Caffeine、Guava Cache）
-- ❌ `System.out.println`（使用 SLF4J Logger）
+- ❌ 其他缓存库（Caffeine、Guava Cache）— 统一使用 Redis
+- ❌ `System.out.println`（使用 SLF4J Logger + Lombok `@Slf4j`）
+- ❌ Spring Boot 2.x
+- ❌ Java 8/11（编译目标为 Java 17）
+- ❌ Gradle（统一使用 Maven）
 
 ## 前端开发规范
 
 ### 技术栈
-- Vue 3.4.0 + Composition API（`<script setup>`）
-- Vue Router 4.2.0（`createWebHistory`）
-- Pinia 2.1.7 状态管理
-- Element Plus 2.4.4 UI 组件库
-- ECharts 5.6.0 图表
-- Axios 1.6.0（封装在 `src/utils/request.js`）
-- Vite 5.0.0 构建
+- Vue 3.4+ + TypeScript 5.x + Composition API（`<script setup lang="ts">`）
+- Vite 5.x 构建工具
+- Vue Router 4.x（`createWebHistory`）
+- Pinia 2.x 状态管理
+- Element Plus 2.x UI 组件库
+- Axios 1.x（封装在 `src/utils/request.ts`）
+- SCSS 样式预处理器
+- dayjs 日期处理、lodash-es 工具函数
+
+### 项目结构
+- 前端源码目录: `frontend/src/`
+- API接口: `frontend/src/api/modules/`
+- 组件: `frontend/src/components/`（common/ 通用组件、business/ 业务组件）
+- 组合式函数: `frontend/src/composables/`
+- 状态管理: `frontend/src/stores/`
+- 类型定义: `frontend/src/types/`
+- 工具函数: `frontend/src/utils/`
+- 页面视图: `frontend/src/views/`
 
 ### 代码风格
-- 组件文件名：多单词 PascalCase（如 `HealthProfileView.vue`）
+- 组件文件名：PascalCase（如 `PoemCard.vue`）
 - 使用 `ref`/`computed`/`reactive`，Props/Emits 使用 `defineProps`/`defineEmits`
-- 公共逻辑抽取到 `src/composables/`，公共组件放在 `src/components/`
+- TypeScript 严格模式（strict: true）
+- 公共逻辑抽取到 `composables/`，公共组件放在 `components/`
 - HTTP 请求必须 `import request from '@/utils/request'`
 - 图标使用 `@element-plus/icons-vue` 解构导入
-- 局部样式 `<style scoped>`，全局覆盖 `<style>`
-- ECharts 实例 `ref` 持有，`onUnmounted` 中 `dispose()`
+- 局部样式 `<style scoped lang="scss">`，全局覆盖 `<style>`
+- 类型定义使用 `interface`，类型别名使用 `type`
 
 ### 禁止事项
 - ❌ Options API
 - ❌ Vuex
 - ❌ Hash 路由模式
-- ❌ jQuery / TypeScript 语法
+- ❌ jQuery
+- ❌ 纯 JavaScript（必须使用 TypeScript）
 - ❌ 直接调用 axios
 - ❌ `watch(fn, options?)` 旧语法（使用 `watchEffect` 或 `watch(source, callback)`）
-- ❌ `el-checkbox` 的 `label` 属性作选中值（使用 `value`）
 
 ## 工作流程
 
@@ -95,7 +124,7 @@ tools:
 - 阅读任务的输入/前置条件和预期交付物
 
 ### 2. 熟悉上下文
-- 阅读 `project_rules.md` 确认规范要求
+- 阅读项目规范文档确认规范要求
 - 查找相关现有代码，理解代码风格和模式
 - 确认涉及的技术栈和依赖
 
@@ -109,6 +138,7 @@ tools:
 - 确保代码无语法错误
 - 确保导入路径正确
 - 确保符合分层架构要求
+- TypeScript 代码确保类型正确
 
 ### 5. 结果反馈
 - 列出所有新增/修改的文件

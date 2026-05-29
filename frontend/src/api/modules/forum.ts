@@ -2,7 +2,7 @@ import request from '@/utils/request'
 import type { ForumPost, Comment, PageResult } from '@/types/model'
 import type { ForumPostCreateRequest, ForumPostUpdateRequest, CommentCreateRequest } from '@/types/api'
 
-export function getForumPostList(params: { page?: number; size?: number; keyword?: string }) {
+export function getForumPostList(params: { pageNum?: number; pageSize?: number; keyword?: string }) {
   return request.get<PageResult<ForumPost>>('/forum/posts', { params })
 }
 
@@ -26,20 +26,18 @@ export function likeForumPost(id: number) {
   return request.post<void>(`/forum/posts/${id}/like`)
 }
 
-export function getComments(targetId: number, targetType: number, params?: { page?: number; size?: number }) {
-  return request.get<PageResult<Comment>>('/comments', { 
-    params: { targetId, targetType, ...params } 
-  })
+export function getComments(targetId: number, _targetType: number, params?: { pageNum?: number; pageSize?: number }) {
+  return request.get<PageResult<Comment>>(`/forum/posts/${targetId}/comments`, { params })
 }
 
 export function createComment(data: CommentCreateRequest) {
-  return request.post<Comment>('/comments', data)
+  return request.post<Comment>(`/forum/posts/${data.postId}/comments`, data)
 }
 
 export function deleteComment(id: number) {
-  return request.delete<void>(`/comments/${id}`)
+  return request.delete<void>(`/forum/comments/${id}`)
 }
 
 export function likeComment(id: number) {
-  return request.post<void>(`/comments/${id}/like`)
+  return request.post<void>(`/forum/comments/${id}/like`)
 }

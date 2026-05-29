@@ -11,21 +11,25 @@ export function register(data: RegisterRequest) {
 }
 
 export function getUserInfo() {
-  return request.get<User>('/user/info')
+  return request.get<User>('/users/me')
 }
 
 export function updateUser(data: UserUpdateRequest) {
-  return request.put<User>('/user/update', data)
+  return request.put<User>('/users/me', data)
 }
 
 export function updatePassword(data: PasswordUpdateRequest) {
-  return request.put<void>('/user/password', data)
+  return request.put<void>('/users/me/password', data)
 }
 
 export function logout() {
-  return request.post<void>('/auth/logout')
+  return Promise.resolve()
 }
 
 export function getUserList(params: { page?: number; size?: number; keyword?: string }) {
-  return request.get<{ records: User[]; total: number }>('/user/list', { params })
+  return request.get<{ records: User[]; total: number }>('/admin/users', { params })
+}
+
+export function getMyPosts(params?: { pageNum?: number; pageSize?: number }) {
+  return request.get('/users/me/posts', { params })
 }

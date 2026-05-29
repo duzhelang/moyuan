@@ -38,6 +38,7 @@ export interface PoemUpdateRequest extends Partial<PoemCreateRequest> {
 export interface ForumPostCreateRequest {
   title: string
   content: string
+  category?: string
 }
 
 export interface ForumPostUpdateRequest extends Partial<ForumPostCreateRequest> {
@@ -46,9 +47,9 @@ export interface ForumPostUpdateRequest extends Partial<ForumPostCreateRequest> 
 
 export interface CommentCreateRequest {
   content: string
-  targetId: number
-  targetType: number
+  postId: number
   parentId?: number
+  replyToUserId?: number
 }
 
 export interface PasswordUpdateRequest {

@@ -21,7 +21,7 @@ tools:
 - **智能体代号**: backend-architect
 - **智能体类型**: 后端开发
 - **创建时间**: 2026-05-11
-- **最后更新**: 2026-05-11
+- **最后更新**: 2026-05-29
 
 ## 核心职责
 1. **API设计**: 设计RESTful API接口，定义请求/响应格式
@@ -31,32 +31,51 @@ tools:
 
 ## 前置条件
 每次接收新任务时，必须阅读以下文档：
-- `.trae/rules/project_rules.md` — 项目开发规范
-- `docs/standards/后端开发规范.md` — 后端编码标准
+- `.trae/rules/project_rules_always.md` — 项目开发规范
+- `docs/constraints/tech-stack-constraints.md` — 技术栈限制
+- `docs/standards/backend-standards.md` — 后端编码标准
+- `docs/database/schema.md` — 数据库表结构
 
 ## 后端技术栈
-- Java 17 + Spring Boot 3.3.5 + MyBatis-Plus 3.5.9
-- 数据库: MySQL 8.0（`dongfang`，`utf8mb4`）
-- 认证: JWT (Auth0 java-jwt 3.10.3)
-- 工具库: Hutool 5.7.20, Lombok
+- Java 17+（编译目标 source/target=17）+ Spring Boot 3.2.5 + MyBatis-Plus 3.5.5
+- 安全框架: Spring Security 6.x
+- 数据库: MySQL 8.0+（`moyuan`，`utf8mb4`）
+- 缓存: Redis 7.x
+- 认证: JWT (jjwt 0.12.5)
+- 连接池: Druid 1.2.20
+- API文档: Knife4j 4.3.0
+- 工具库: Lombok 1.18.34
 
 ## 设计规范
 
 ### 分层架构
 - **Controller → Service (接口+impl) → Mapper**，禁止跨层调用
-- Controller 方法必须 try-catch 异常，返回 `Result.error()`
-- 统一响应使用 `Result<T>` 包装类
+- Controller 方法必须 try-catch 异常，返回统一响应错误
+- 统一响应使用 `Result<T>`（backend/）或 `R<T>`（sc-moyuan-backend/）包装类
+
+### 包结构
+- 包名: `com.moyuan`
+- 统一响应: `com.moyuan.common.Result<T>` 或 `com.moyuan.common.R<T>`
+- 实体类: `com.moyuan.entity`
+- Mapper: `com.moyuan.mapper`
+- Service: `com.moyuan.service` / `com.moyuan.service.impl`
+- 异常处理: `com.moyuan.exception.BusinessException`
 
 ### 命名规范
 - 实体类字段驼峰命名，MyBatis-Plus 自动映射下划线
-- JSON 类型字段：`@TableField(typeHandler = JacksonTypeHandler.class)` + `@TableName(autoResultMap = true)`
-- 时间字段：`@TableField(fill = FieldFill.INSERT)`
+- 时间字段：`@TableField(fill = FieldFill.INSERT)` / `@TableField(fill = FieldFill.INSERT_UPDATE)`
+- 逻辑删除：`@TableLogic`
+- Controller 使用 `@RestController` + `@RequestMapping`
+- Service 使用 `IService<T>` / `ServiceImpl<M, T>`
 
 ### 禁止事项
 - ❌ MyBatis XML 映射文件
 - ❌ JPA / Hibernate
-- ❌ 其他缓存库（Caffeine、Guava Cache）
-- ❌ `System.out.println`（使用 SLF4J Logger）
+- ❌ 其他缓存库（Caffeine、Guava Cache）— 统一使用 Redis
+- ❌ `System.out.println`（使用 SLF4J Logger + Lombok `@Slf4j`）
+- ❌ Spring Boot 2.x
+- ❌ Java 8/11
+- ❌ Gradle（统一使用 Maven）
 
 ## API设计规范
 
@@ -64,7 +83,7 @@ tools:
 ```json
 {
   "code": 200,
-  "message": "success",
+  "message": "操作成功",
   "data": {}
 }
 ```
@@ -84,7 +103,7 @@ tools:
 
 ### 2. 数据库设计
 - 设计表结构，确定字段类型和约束
-- 创建迁移脚本
+- 创建迁移脚本（`backend/src/main/resources/db/`）
 - 添加必要索引
 
 ### 3. API实现

@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
+import { getMyFavorites, favoritePoem } from '@/api/modules/poem'
+import { getMyPosts } from '@/api/modules/user'
+import { getHistory, clearHistory } from '@/api/modules/history'
+import type { Poem, ForumPost, UserHistory } from '@/types/model'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -121,6 +125,111 @@ const handleLogout = () => {
   ElMessage.success('已退出登录')
 }
 
+const favorites = ref<Poem[]>([])
+const favoritesTotal = ref(0)
+const favoritesPage = ref(1)
+const favoritesSize = ref(10)
+const favoritesLoading = ref(false)
+
+const fetchFavorites = async () => {
+  favoritesLoading.value = true
+  try {
+    const res = await getMyFavorites({
+      pageNum: favoritesPage.value,
+      pageSize: favoritesSize.value
+    })
+    favorites.value = res.data.list
+    favoritesTotal.value = res.data.total
+  } catch (error) {
+    console.error('获取收藏列表失败')
+  } finally {
+    favoritesLoading.value = false
+  }
+}
+
+const handleCancelFavorite = async (poem: Poem) => {
+  try {
+    await favoritePoem(poem.id)
+    ElMessage.success('已取消收藏')
+    fetchFavorites()
+  } catch (error) {
+    ElMessage.error('取消收藏失败')
+  }
+}
+
+const handleFavoritesPageChange = (page: number) => {
+  favoritesPage.value = page
+  fetchFavorites()
+}
+
+const myPosts = ref<ForumPost[]>([])
+const myPostsTotal = ref(0)
+const myPostsPage = ref(1)
+const myPostsSize = ref(10)
+const myPostsLoading = ref(false)
+
+const fetchMyPosts = async () => {
+  myPostsLoading.value = true
+  try {
+    const res = await getMyPosts({
+      pageNum: myPostsPage.value,
+      pageSize: myPostsSize.value
+    })
+    myPosts.value = res.data.list
+    myPostsTotal.value = res.data.total
+  } catch (error) {
+    console.error('获取帖子列表失败')
+  } finally {
+    myPostsLoading.value = false
+  }
+}
+
+const handleMyPostsPageChange = (page: number) => {
+  myPostsPage.value = page
+  fetchMyPosts()
+}
+
+const historyList = ref<any[]>([])
+const historyTotal = ref(0)
+const historyPage = ref(1)
+const historySize = ref(20)
+const historyLoading = ref(false)
+
+const fetchHistory = async () => {
+  historyLoading.value = true
+  try {
+    const res = await getHistory({ pageNum: historyPage.value, pageSize: historySize.value })
+    historyList.value = res.data.list
+    historyTotal.value = res.data.total
+  } catch (error) {
+    console.error('获取浏览历史失败')
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+const handleClearHistory = async () => {
+  try {
+    await clearHistory()
+    ElMessage.success('已清空浏览历史')
+    historyList.value = []
+    historyTotal.value = 0
+  } catch (error) {
+    ElMessage.error('清空失败')
+  }
+}
+
+const handleHistoryPageChange = (page: number) => {
+  historyPage.value = page
+  fetchHistory()
+}
+
+watch(activeTab, (val) => {
+  if (val === 'favorites') fetchFavorites()
+  if (val === 'posts') fetchMyPosts()
+  if (val === 'history') fetchHistory()
+})
+
 onMounted(() => {
   initForm()
 })
@@ -161,6 +270,10 @@ onMounted(() => {
             <el-menu-item index="posts">
               <el-icon><Document /></el-icon>
               <span>我的帖子</span>
+            </el-menu-item>
+            <el-menu-item index="history">
+              <el-icon><Clock /></el-icon>
+              <span>浏览历史</span>
             </el-menu-item>
           </el-menu>
           
@@ -294,14 +407,127 @@ onMounted(() => {
             <template #header>
               <h3>我的收藏</h3>
             </template>
-            <el-empty description="暂无收藏" />
+
+            <div v-loading="favoritesLoading" class="favorites-list">
+              <el-empty v-if="!favoritesLoading && favorites.length === 0" description="暂无收藏" />
+
+              <div
+                v-for="poem in favorites"
+                :key="poem.id"
+                class="favorite-card"
+                @click="router.push(`/poem/${poem.id}`)"
+              >
+                <div class="favorite-header">
+                  <h4 class="favorite-title">{{ poem.title }}</h4>
+                  <el-button
+                    type="danger"
+                    size="small"
+                    plain
+                    @click.stop="handleCancelFavorite(poem)"
+                  >
+                    取消收藏
+                  </el-button>
+                </div>
+                <div class="favorite-meta">
+                  <span v-if="poem.poetName">{{ poem.poetName }}</span>
+                  <span v-if="poem.dynastyName">{{ poem.dynastyName }}</span>
+                </div>
+                <p v-if="poem.content" class="favorite-content">{{ poem.content }}</p>
+              </div>
+            </div>
+
+            <div v-if="favoritesTotal > 0" class="pagination-section">
+              <el-pagination
+                v-model:current-page="favoritesPage"
+                :page-size="favoritesSize"
+                :total="favoritesTotal"
+                layout="prev, pager, next"
+                @current-change="handleFavoritesPageChange"
+              />
+            </div>
           </el-card>
-          
+
           <el-card v-if="activeTab === 'posts'" class="profile-card">
             <template #header>
               <h3>我的帖子</h3>
             </template>
-            <el-empty description="暂无帖子" />
+
+            <div v-loading="myPostsLoading" class="posts-list">
+              <el-empty v-if="!myPostsLoading && myPosts.length === 0" description="暂无帖子" />
+
+              <div
+                v-for="post in myPosts"
+                :key="post.id"
+                class="post-card"
+                @click="router.push(`/forum/${post.id}`)"
+              >
+                <h4 class="post-title">{{ post.title }}</h4>
+                <p class="post-content">{{ post.content }}</p>
+                <div class="post-footer">
+                  <span class="meta-item">
+                    <el-icon><View /></el-icon>
+                    {{ post.viewCount }}
+                  </span>
+                  <span class="meta-item">
+                    <el-icon><Star /></el-icon>
+                    {{ post.likeCount }}
+                  </span>
+                  <span class="meta-item">
+                    <el-icon><ChatDotRound /></el-icon>
+                    {{ post.commentCount }}
+                  </span>
+                  <span class="meta-item post-time">{{ post.createTime }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="myPostsTotal > 0" class="pagination-section">
+              <el-pagination
+                v-model:current-page="myPostsPage"
+                :page-size="myPostsSize"
+                :total="myPostsTotal"
+                layout="prev, pager, next"
+                @current-change="handleMyPostsPageChange"
+              />
+            </div>
+          </el-card>
+
+          <el-card v-if="activeTab === 'history'" class="profile-card">
+            <template #header>
+              <div class="card-header">
+                <h3>浏览历史</h3>
+                <el-button type="danger" text @click="handleClearHistory">清空历史</el-button>
+              </div>
+            </template>
+            <div v-loading="historyLoading">
+              <div v-if="historyList.length" class="history-list">
+                <div
+                  v-for="item in historyList"
+                  :key="item.id"
+                  class="history-item"
+                  @click="router.push(item.targetType === 1 ? `/poem/${item.targetId}` : `/forum/${item.targetId}`)"
+                >
+                  <div class="history-info">
+                    <el-tag :type="item.targetType === 1 ? 'primary' : 'success'" size="small">
+                      {{ item.targetType === 1 ? '诗词' : '帖子' }}
+                    </el-tag>
+                    <span class="history-id">ID: {{ item.targetId }}</span>
+                  </div>
+                  <span class="history-time">{{ item.createdAt }}</span>
+                </div>
+              </div>
+              <el-empty v-else description="暂无浏览记录" />
+              <div class="pagination-section" v-if="historyTotal > historySize">
+                <el-pagination
+                  background
+                  layout="prev, pager, next"
+                  :total="historyTotal"
+                  :page-size="historySize"
+                  :current-page="historyPage"
+                  @current-change="handleHistoryPageChange"
+                />
+              </div>
+            </div>
           </el-card>
         </div>
       </div>
@@ -377,5 +603,142 @@ onMounted(() => {
 .profile-form,
 .password-form {
   max-width: 500px;
+}
+
+.favorites-list,
+.posts-list {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+  min-height: 200px;
+}
+
+.favorite-card {
+  @include card;
+  cursor: pointer;
+}
+
+.favorite-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-sm;
+}
+
+.favorite-title {
+  font-size: $font-size-xl;
+  color: $text-color;
+}
+
+.favorite-meta {
+  display: flex;
+  gap: $spacing-md;
+  margin-bottom: $spacing-sm;
+
+  span {
+    font-size: $font-size-sm;
+    color: $text-color-secondary;
+  }
+}
+
+.favorite-content {
+  font-size: $font-size-base;
+  color: $text-color-secondary;
+  line-height: $line-height-loose;
+  @include text-clamp(2);
+}
+
+.post-card {
+  @include card;
+  cursor: pointer;
+}
+
+.post-title {
+  font-size: $font-size-xl;
+  color: $text-color;
+  margin-bottom: $spacing-sm;
+}
+
+.post-content {
+  font-size: $font-size-base;
+  color: $text-color-secondary;
+  line-height: $line-height-loose;
+  @include text-clamp(2);
+  margin-bottom: $spacing-md;
+}
+
+.post-footer {
+  display: flex;
+  gap: $spacing-lg;
+  padding-top: $spacing-md;
+  border-top: 1px solid $border-color;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+  font-size: $font-size-sm;
+  color: $text-color-secondary;
+}
+
+.post-time {
+  margin-left: auto;
+}
+
+.pagination-section {
+  margin-top: $spacing-xl;
+  display: flex;
+  justify-content: center;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  h3 {
+    margin: 0;
+    font-size: $font-size-xl;
+    color: $text-color;
+  }
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: $spacing-md;
+  border: 1px solid $border-color;
+  border-radius: $border-radius-sm;
+  cursor: pointer;
+  transition: all $transition-base;
+
+  &:hover {
+    border-color: $primary-color;
+    background-color: rgba($primary-color, 0.02);
+  }
+}
+
+.history-info {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.history-id {
+  font-size: $font-size-sm;
+  color: $text-color-secondary;
+}
+
+.history-time {
+  font-size: $font-size-sm;
+  color: $text-color-light;
 }
 </style>

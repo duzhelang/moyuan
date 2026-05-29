@@ -10,7 +10,7 @@ const searchKeyword = ref('')
 
 const handleSearch = () => {
   if (searchKeyword.value.trim()) {
-    router.push({ path: '/poem', query: { keyword: searchKeyword.value } })
+    router.push({ path: '/search', query: { keyword: searchKeyword.value } })
   }
 }
 
@@ -38,7 +38,7 @@ const handleLogout = () => {
       <div class="header-search">
         <el-input
           v-model="searchKeyword"
-          placeholder="搜索诗词..."
+          placeholder="搜索诗词、诗人、帖子..."
           @keyup.enter="handleSearch"
         >
           <template #prefix>
@@ -60,6 +60,9 @@ const handleLogout = () => {
               <el-dropdown-menu>
                 <el-dropdown-item @click="router.push('/user/profile')">
                   个人中心
+                </el-dropdown-item>
+                <el-dropdown-item v-if="userStore.userInfo?.role === 'admin'" @click="router.push('/admin/dashboard')">
+                  后台管理
                 </el-dropdown-item>
                 <el-dropdown-item divided @click="handleLogout">
                   退出登录

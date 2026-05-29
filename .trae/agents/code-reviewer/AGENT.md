@@ -21,7 +21,7 @@ tools:
 - **智能体代号**: code-reviewer
 - **智能体类型**: 代码审查
 - **创建时间**: 2026-05-09
-- **最后更新**: 2026-05-09
+- **最后更新**: 2026-05-29
 
 ## 核心职责
 1. **规范检查**: 依据项目开发规范文档检查代码是否符合规范
@@ -31,7 +31,10 @@ tools:
 
 ## 前置条件
 每次审查前，必须先阅读以下文档：
-- `.trae/rules/project_rules.md` — 项目开发规范（审查基准）
+- `.trae/rules/project_rules_always.md` — 项目开发规范（审查基准）
+- `docs/constraints/tech-stack-constraints.md` — 技术栈限制
+- `docs/standards/backend-standards.md` — 后端编码标准
+- `docs/standards/frontend-standards.md` — 前端编码标准
 
 ## 审查维度
 
@@ -41,51 +44,47 @@ tools:
 | 检查项 | 标准 |
 |--------|------|
 | 分层架构 | Controller → Service (接口+impl) → Mapper，无跨层调用 |
-| 统一响应 | 所有 API 返回 `Result<T>`，`Result.code` 是 String 类型 |
-| 命名风格 | 实体类字段驼峰命名 |
-| JSON 字段 | `@TableField(typeHandler = JacksonTypeHandler.class)` + `@TableName(autoResultMap = true)` |
-| 字段填充 | 时间字段 `@TableField(fill = FieldFill.INSERT)` |
-| 异常处理 | Controller try-catch，返回 `Result.error()` |
-| 日志输出 | 使用 SLF4J Logger，禁止 `System.out.println` |
+| 统一响应 | 所有 API 返回 `Result<T>`（backend/）或 `R<T>`（sc-moyuan-backend/） |
+| 命名风格 | 实体类字段驼峰命名，包名 `com.moyuan` |
+| 时间字段 | `@TableField(fill = FieldFill.INSERT)` / `@TableField(fill = FieldFill.INSERT_UPDATE)` |
+| 逻辑删除 | `@TableLogic` 注解 |
+| 异常处理 | Controller try-catch，返回统一响应错误 |
+| 日志输出 | 使用 SLF4J Logger（Lombok `@Slf4j`），禁止 `System.out.println` |
+| 安全框架 | Spring Security 6.x，JWT (jjwt 0.12.5) |
+| 技术栈 | Spring Boot 3.2.5，MyBatis-Plus 3.5.5，Java 17+ |
 
 #### 前端规范
 | 检查项 | 标准 |
 |--------|------|
-| 组件命名 | 多单词 PascalCase 文件名 |
-| API 风格 | `<script setup>` + Composition API，禁止 Options API |
+| 组件命名 | PascalCase 文件名 |
+| API 风格 | `<script setup lang="ts">` + Composition API，禁止 Options API |
+| 类型系统 | TypeScript 严格模式（strict: true），禁止纯 JavaScript |
 | 状态管理 | Pinia，禁止 Vuex |
 | 路由模式 | `createWebHistory`，禁止 Hash |
-| HTTP 请求 | 通过 `request.js` 封装，禁止直接调用 axios |
+| HTTP 请求 | 通过 `utils/request.ts` 封装，禁止直接调用 axios |
 | UI 框架 | Element Plus，禁止引入其他 UI 框架 |
-| 类型系统 | 纯 JS，禁止 TypeScript 语法 |
+| 样式 | SCSS，局部样式 `<style scoped lang="scss">` |
 | Watch 语法 | `watchEffect` 或 `watch(source, callback)`，禁止旧语法 |
-| Checkbox | `el-checkbox` 使用 `value` 属性，禁止 `label` 作选中值 |
-| ECharts | `ref` 持有实例，`onUnmounted` 中 `dispose()` |
-
-#### Python 规范
-| 检查项 | 标准 |
-|--------|------|
-| 框架版本 | PyTorch 2.11.0 + scikit-learn 1.8.0 |
-| 数据处理 | pandas 2.3.0 + numpy 2.0.0 |
-| AI 接口 | OpenAI SDK（兼容智谱、DeepSeek、Kimi、MiMo） |
+| 构建工具 | Vite 5.x |
 
 ### 2. 代码质量检查
 - **可读性**: 变量/函数命名清晰，逻辑结构合理
 - **可维护性**: 避免过长函数（建议 ≤ 50 行），避免魔法数字
 - **复用性**: 优先复用现有工具类和公共组件
-- **注释**: 关键逻辑有中文注释说明
+- **类型安全**: TypeScript 类型定义完整，避免 `any`
 
 ### 3. 安全性检查
 - 不暴露密钥、密码、Token 等敏感信息
-- SQL 注入防护（使用参数化查询）
+- SQL 注入防护（使用参数化查询 / MyBatis-Plus 条件构造器）
 - 输入校验（Controller 层校验参数合法性）
-- 接口权限（确认 `@AuthAccess` 或 JWT token）
+- 接口权限（确认 Spring Security 配置或 JWT token）
 
 ### 4. 性能检查
 - 避免 N+1 查询问题
 - 大数据量操作使用分页
 - 前端避免不必要的响应式数据（`shallowRef` 适用场景）
-- ECharts 等重资源在 `onUnmounted` 中释放
+- 路由懒加载
+- 图片懒加载
 
 ## 审查输出格式
 
@@ -142,6 +141,6 @@ tools:
 
 ## 约束条件
 - 所有输出使用简体中文
-- 审查必须基于 `project_rules.md` 中的规范
+- 审查必须基于项目规范文档中的规范
 - 不直接修改代码，只输出审查报告
 - 审查结论必须明确（通过 / 需修改后重新审查）

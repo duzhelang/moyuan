@@ -16,6 +16,7 @@ import com.moyuan.mapper.UserFavoriteMapper;
 import com.moyuan.mapper.UserLikeMapper;
 import com.moyuan.service.PoemService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +33,7 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
     private final UserFavoriteMapper userFavoriteMapper;
 
     @Override
+    @Cacheable(value = "poems", key = "'list:' + #dynastyId + ':' + #poetId + ':' + #categoryId + ':' + #keyword + ':' + #pageNum + ':' + #pageSize")
     public IPage<Poem> getPoemList(int pageNum, int pageSize, Long dynastyId, Long poetId, Long categoryId, String keyword) {
         LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Poem::getStatus, 1);
@@ -92,6 +94,7 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
     }
 
     @Override
+    @Cacheable(value = "poems", key = "'favorites:' + #userId + ':' + #pageNum + ':' + #pageSize")
     public IPage<Poem> getFavorites(Long userId, int pageNum, int pageSize) {
         List<Long> poemIds = userFavoriteMapper.selectList(
                 new LambdaQueryWrapper<UserFavorite>()

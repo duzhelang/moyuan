@@ -5,15 +5,30 @@ description: "古今诗话——墨渊项目的系统架构文档路径索引（
 
 # moyuan-architecture — 文档路径索引
 
+## 项目概述
+
+**项目名称**：古今诗话——墨渊（SC_MoYuan2）
+
+**项目定位**：中国古典诗词文化交流平台，集诗词欣赏、诗人介绍、论坛互动、AI辅助创作于一体的综合性文化网站。
+
 ## 检测到的技术栈
 
-- **后端**: Spring Boot 3.x（规划中）
-- **前端**: Vue 3 + Vite
+### 前端技术栈
+- **框架**: Vue 3.x + Vite 5.x
+- **路由**: Vue Router 4.x
+- **状态管理**: Pinia 2.x
+- **UI组件库**: Element Plus 2.x
+- **HTTP客户端**: Axios 1.x
+- **类型系统**: TypeScript 5.x
+
+### 后端技术栈
+- **基础版（backend/）**: Spring Boot 3.2.5 + MyBatis-Plus 3.5.5 + MySQL 8.0+ + Redis 7.x
+- **增强版（sc-moyuan-backend/）**: 基础版 + Spring Security 6.x + JWT 0.12.5 + Knife4j 4.3.0 + Druid 1.2.20
+
+### 数据层
 - **数据库**: MySQL 8.0+
 - **缓存**: Redis 7.x
 - **ORM**: MyBatis-Plus 3.5.x
-- **安全**: Spring Security + JWT
-- **UI**: Element Plus
 
 ## docs/ 目录总览
 
@@ -53,7 +68,7 @@ description: "古今诗话——墨渊项目的系统架构文档路径索引（
 
 | 文档 | 路径 | 内容 |
 |------|------|------|
-| 数据库表结构 | [database/schema.md](../../docs/database/schema.md) | 10 张核心表结构说明（user、poem、poet、dynasty 等） |
+| 数据库表结构 | [database/schema.md](../../docs/database/schema.md) | 11 张核心表结构说明（user、poem、poet、dynasty 等） |
 
 ### API 文档
 
@@ -66,13 +81,29 @@ description: "古今诗话——墨渊项目的系统架构文档路径索引（
 
 | 文档 | 路径 | 内容 |
 |------|------|------|
-| 业务模块 | [business/modules.md](../../docs/business/modules.md) | 7 大业务模块功能说明（首页、诗词、诗人、论坛、AI、搜索、用户） |
+| 业务模块 | [business/modules.md](../../docs/business/modules.md) | 9 大业务模块功能说明（首页、诗词、诗人、论坛、AI、搜索、用户、管理、文件） |
 
 ### 开发指南
 
 | 文档 | 路径 | 内容 |
 |------|------|------|
 | 开发指南 | [guides/development-guide.md](../../docs/guides/development-guide.md) | 环境准备、项目结构、开发流程、部署指南 |
+
+---
+
+## 模块划分
+
+| 模块 | 功能 | 状态 |
+|------|------|------|
+| 首页模块 | 轮播图展示、导航菜单、诗人推荐、作品展示 | 已实现 |
+| 诗词模块 | 诗词浏览、按朝代/流派/诗人分类、诗词详情 | 已实现 |
+| 论坛模块 | 用户发帖、评论互动、精选推荐 | 已实现 |
+| 用户模块 | 用户注册、登录认证、个人中心、收藏管理 | 已实现 |
+| 管理模块 | 系统管理、用户管理、内容管理、数据统计 | 已实现 |
+| 文件模块 | 文件上传、图片管理 | 已实现 |
+| 浏览历史模块 | 记录用户浏览历史、查看历史记录 | 已实现 |
+| AI模块 | 看图写诗、智能分析、诗词推荐 | 规划中 |
+| 搜索模块 | 全文搜索、诗人搜索、诗词搜索 | 已实现 |
 
 ---
 

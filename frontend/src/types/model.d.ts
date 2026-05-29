@@ -8,9 +8,10 @@ export interface User {
   gender?: number
   birthday?: string
   bio?: string
+  role?: string
   status: number
-  createdAt: string
-  updatedAt: string
+  createTime: string
+  updateTime: string
 }
 
 export interface Poem {
@@ -24,24 +25,33 @@ export interface Poem {
   categoryName?: string
   poetId?: number
   poetName?: string
+  translation?: string
+  appreciation?: string
+  background?: string
   viewCount: number
   likeCount: number
   favoriteCount: number
   status: number
   isFeatured: number
-  createdAt: string
-  updatedAt: string
+  isLiked?: boolean
+  isFavorited?: boolean
+  createTime: string
+  updateTime: string
 }
 
 export interface Poet {
   id: number
   name: string
+  courtesyName?: string
+  pseudonym?: string
   dynastyId?: number
   dynastyName?: string
-  birthYear?: string
-  deathYear?: string
+  birthYear?: number
+  deathYear?: number
+  birthplace?: string
   description?: string
   avatar?: string
+  status?: number
   createdAt: string
 }
 
@@ -72,8 +82,16 @@ export interface ForumPost {
   likeCount: number
   commentCount: number
   status: number
+  createTime: string
+  updateTime: string
+}
+
+export interface UserHistory {
+  id: number
+  userId: number
+  targetId: number
+  targetType: number
   createdAt: string
-  updatedAt: string
 }
 
 export interface Comment {
@@ -82,17 +100,17 @@ export interface Comment {
   userId: number
   username: string
   avatar?: string
-  targetId: number
-  targetType: number
+  postId: number
   parentId?: number
+  replyToUserId?: number
   likeCount: number
   status: number
-  createdAt: string
+  createTime: string
 }
 
 export interface PoemListParams {
-  page?: number
-  size?: number
+  pageNum?: number
+  pageSize?: number
   dynastyId?: number
   categoryId?: number
   poetId?: number
@@ -100,9 +118,8 @@ export interface PoemListParams {
 }
 
 export interface PageResult<T> {
-  records: T[]
+  list: T[]
   total: number
-  current: number
-  size: number
-  pages: number
+  pageNum: number
+  pageSize: number
 }

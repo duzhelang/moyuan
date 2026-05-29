@@ -18,11 +18,11 @@ const fetchPosts = async () => {
   loading.value = true
   try {
     const res = await getForumPostList({
-      page: currentPage.value,
-      size: pageSize.value,
+      pageNum: currentPage.value,
+      pageSize: pageSize.value,
       keyword: keyword.value
     })
-    posts.value = res.data.records
+    posts.value = res.data.list
     total.value = res.data.total
   } catch (error) {
     ElMessage.error('获取帖子列表失败')
@@ -98,7 +98,7 @@ onMounted(() => {
               <h3 class="post-title">{{ post.title }}</h3>
               <div class="post-info">
                 <span class="post-author">{{ post.username }}</span>
-                <span class="post-time">{{ post.createdAt }}</span>
+                <span class="post-time">{{ post.createTime }}</span>
               </div>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import type { Router } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
+import { ElMessage } from 'element-plus'
 
 export function setupRouterGuards(router: Router) {
   router.beforeEach(async (to, _from, next) => {
@@ -12,6 +13,12 @@ export function setupRouterGuards(router: Router) {
     
     if (to.meta.requiresAuth && !userStore.isLoggedIn) {
       next({ name: 'Login', query: { redirect: to.fullPath } })
+      return
+    }
+    
+    if (to.meta.requiresAdmin && userStore.userInfo?.role !== 'admin') {
+      ElMessage.error('无权限访问，需要管理员权限')
+      next({ name: 'Home' })
       return
     }
     

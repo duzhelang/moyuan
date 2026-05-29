@@ -2,14 +2,17 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePoemStore } from '@/stores/poem'
+import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import type { Poem, Comment } from '@/types/model'
 import { likePoem, favoritePoem } from '@/api/modules/poem'
-import { getComments, createComment } from '@/api/modules/forum'
+import { getComments, createComment, likeComment } from '@/api/modules/forum'
+import { addHistory } from '@/api/modules/history'
 
 const route = useRoute()
 const router = useRouter()
 const poemStore = usePoemStore()
+const userStore = useUserStore()
 
 const loading = ref(false)
 const poem = computed(() => poemStore.currentPoem)
@@ -27,6 +30,7 @@ const fetchPoem = async () => {
   loading.value = true
   try {
     await poemStore.fetchPoemDetail(poemId.value)
+    addHistory(route.params.id as unknown as number, 1).catch(() => {})
   } catch (error) {
     ElMessage.error('获取诗词详情失败')
     router.push('/poem')
@@ -38,10 +42,10 @@ const fetchPoem = async () => {
 const fetchComments = async () => {
   try {
     const res = await getComments(poemId.value, 1, {
-      page: commentPage.value,
-      size: commentSize.value
+      pageNum: commentPage.value,
+      pageSize: commentSize.value
     })
-    comments.value = res.data.records
+    comments.value = res.data.list
     commentTotal.value = res.data.total
   } catch (error) {
     console.error('获取评论失败:', error)
@@ -49,11 +53,17 @@ const fetchComments = async () => {
 }
 
 const handleLike = async () => {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录')
+    return
+  }
   try {
     await likePoem(poemId.value)
-    ElMessage.success('点赞成功')
     if (poem.value) {
-      poem.value.likeCount++
+      const liked = !poem.value.isLiked
+      poem.value.isLiked = liked
+      poem.value.likeCount += liked ? 1 : -1
+      ElMessage.success(liked ? '点赞成功' : '已取消点赞')
     }
   } catch (error) {
     ElMessage.error('点赞失败')
@@ -61,11 +71,17 @@ const handleLike = async () => {
 }
 
 const handleFavorite = async () => {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录')
+    return
+  }
   try {
     await favoritePoem(poemId.value)
-    ElMessage.success('收藏成功')
     if (poem.value) {
-      poem.value.favoriteCount++
+      const favorited = !poem.value.isFavorited
+      poem.value.isFavorited = favorited
+      poem.value.favoriteCount += favorited ? 1 : -1
+      ElMessage.success(favorited ? '收藏成功' : '已取消收藏')
     }
   } catch (error) {
     ElMessage.error('收藏失败')
@@ -92,6 +108,16 @@ const handleSubmitComment = async () => {
     ElMessage.error('评论失败')
   } finally {
     submittingComment.value = false
+  }
+}
+
+const handleCommentLike = async (comment: Comment) => {
+  try {
+    await likeComment(comment.id)
+    comment.likeCount++
+    ElMessage.success('点赞成功')
+  } catch (error) {
+    ElMessage.error('点赞失败')
   }
 }
 
@@ -146,13 +172,13 @@ onMounted(() => {
         </div>
         
         <div class="poem-actions">
-          <el-button type="primary" @click="handleLike">
+          <el-button :type="poem.isLiked ? 'danger' : 'primary'" @click="handleLike">
             <el-icon><Star /></el-icon>
-            点赞 ({{ poem.likeCount }})
+            {{ poem.isLiked ? '已点赞' : '点赞' }} ({{ poem.likeCount }})
           </el-button>
-          <el-button type="warning" @click="handleFavorite">
+          <el-button :type="poem.isFavorited ? 'danger' : 'warning'" @click="handleFavorite">
             <el-icon><CollectionTag /></el-icon>
-            收藏 ({{ poem.favoriteCount }})
+            {{ poem.isFavorited ? '已收藏' : '收藏' }} ({{ poem.favoriteCount }})
           </el-button>
           <span class="view-count">
             <el-icon><View /></el-icon>
@@ -206,7 +232,7 @@ onMounted(() => {
               <p>{{ comment.content }}</p>
             </div>
             <div class="comment-actions">
-              <el-button text size="small">
+              <el-button text size="small" @click="handleCommentLike(comment)">
                 <el-icon><Star /></el-icon>
                 {{ comment.likeCount }}
               </el-button>

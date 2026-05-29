@@ -3,7 +3,8 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { ForumPost, Comment } from '@/types/model'
-import { getForumPostById, likeForumPost, getComments, createComment } from '@/api/modules/forum'
+import { getForumPostById, likeForumPost, getComments, createComment, likeComment } from '@/api/modules/forum'
+import { addHistory } from '@/api/modules/history'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,6 +26,7 @@ const fetchPost = async () => {
   try {
     const res = await getForumPostById(postId.value)
     post.value = res.data
+    addHistory(route.params.id as unknown as number, 2).catch(() => {})
   } catch (error) {
     ElMessage.error('获取帖子详情失败')
     router.push('/forum')
@@ -36,10 +38,10 @@ const fetchPost = async () => {
 const fetchComments = async () => {
   try {
     const res = await getComments(postId.value, 2, {
-      page: commentPage.value,
-      size: commentSize.value
+      pageNum: commentPage.value,
+      pageSize: commentSize.value
     })
-    comments.value = res.data.records
+    comments.value = res.data.list
     commentTotal.value = res.data.total
   } catch (error) {
     console.error('获取评论失败:', error)
@@ -81,6 +83,16 @@ const handleSubmitComment = async () => {
   }
 }
 
+const handleCommentLike = async (comment: Comment) => {
+  try {
+    await likeComment(comment.id)
+    comment.likeCount++
+    ElMessage.success('点赞成功')
+  } catch (error) {
+    ElMessage.error('点赞失败')
+  }
+}
+
 const handleCommentPageChange = (page: number) => {
   commentPage.value = page
   fetchComments()
@@ -111,7 +123,7 @@ onMounted(() => {
             </el-avatar>
             <div class="meta-info">
               <span class="meta-author">{{ post.username }}</span>
-              <span class="meta-time">{{ post.createdAt }}</span>
+              <span class="meta-time">{{ post.createTime }}</span>
             </div>
           </div>
         </div>
@@ -181,7 +193,7 @@ onMounted(() => {
               <p>{{ comment.content }}</p>
             </div>
             <div class="comment-actions">
-              <el-button text size="small">
+              <el-button text size="small" @click="handleCommentLike(comment)">
                 <el-icon><Star /></el-icon>
                 {{ comment.likeCount }}
               </el-button>

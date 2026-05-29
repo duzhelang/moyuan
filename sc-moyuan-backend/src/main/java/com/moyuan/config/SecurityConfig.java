@@ -57,16 +57,18 @@ public class SecurityConfig {
                     "/swagger-resources/**",
                     "/api/auth/**",
                     "/api/poems",
-                    "/api/poems/*",
+                    "/api/poems/**",
                     "/api/poets",
-                    "/api/poets/*",
+                    "/api/poets/**",
                     "/api/dynasties",
-                    "/api/dynasties/*",
+                    "/api/dynasties/**",
                     "/api/categories",
-                    "/api/categories/*",
+                    "/api/categories/**",
                     "/api/forum/posts",
-                    "/api/forum/posts/*",
-                    "/api/search"
+                    "/api/forum/posts/**",
+                    "/api/forum/comments/**",
+                    "/api/search",
+                    "/uploads/**"
                 ).permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()

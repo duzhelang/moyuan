@@ -23,7 +23,7 @@ const goToDetail = () => {
         <h3 class="post-title">{{ post.title }}</h3>
         <div class="post-info">
           <span class="post-author">{{ post.username }}</span>
-          <span class="post-time">{{ post.createdAt }}</span>
+          <span class="post-time">{{ post.createTime }}</span>
         </div>
       </div>
     </div>

@@ -14,4 +14,5 @@ public interface ForumPostService extends IService<ForumPost> {
     void deletePost(Long userId, Long postId);
     void toggleLike(Long userId, Long postId);
     boolean isLike(Long userId, Long postId);
+    IPage<ForumPost> getPostsByUserId(Long userId, int pageNum, int pageSize);
 }

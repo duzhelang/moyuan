@@ -13,14 +13,14 @@ export function useForum() {
   const pageSize = ref(10)
   const commentTotal = ref(0)
 
-  async function fetchPostList(params: { page?: number; size?: number; keyword?: string }) {
+  async function fetchPostList(params: { pageNum?: number; pageSize?: number; keyword?: string }) {
     loading.value = true
     try {
       const response = await getForumPostList(params)
-      posts.value = response.data.records
+      posts.value = response.data.list
       total.value = response.data.total
-      currentPage.value = response.data.current
-      pageSize.value = response.data.size
+      currentPage.value = response.data.pageNum
+      pageSize.value = response.data.pageSize
     } catch (error) {
       console.error('获取帖子列表失败:', error)
       throw error
@@ -42,10 +42,10 @@ export function useForum() {
     }
   }
 
-  async function fetchComments(targetId: number, targetType: number, params?: { page?: number; size?: number }) {
+  async function fetchComments(targetId: number, targetType: number, params?: { pageNum?: number; pageSize?: number }) {
     try {
       const response = await getComments(targetId, targetType, params)
-      comments.value = response.data.records
+      comments.value = response.data.list
       commentTotal.value = response.data.total
     } catch (error) {
       console.error('获取评论失败:', error)

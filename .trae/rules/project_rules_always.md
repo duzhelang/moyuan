@@ -1,11 +1,9 @@
 ---
 alwaysApply: true
-description: 必用规则
+description: 必用规则 - 轻量级路径索引
 ---
 
-# 古今诗话——墨渊 项目必用规则
-
-> 每次任务执行时必须遵循。详细配置见各专用文件。
+# 墨渊项目路径索引
 
 ## 编码前置检查
 
@@ -13,25 +11,32 @@ description: 必用规则
 2. **编码规范**：调用 `karpathy-guidelines` skill 避免常见编码错误
 3. **文档查阅**：调用 `doc-reader` skill 查阅项目技术文档
 
-## 配置与文档索引
+## 强制触发速查
+
+| 场景 | 必须触发 |
+|------|----------|
+| 多步骤/复杂需求/长任务 | `analysis-planner` 或 `writing-plans` |
+| 存在书面执行计划 | `executing-plans` 或 `subagent-driven-development` |
+| 3+ 独立任务 | `dispatching-parallel-agents` |
+| 代码编写完成后 | `code-reviewer` |
+| 代码变更完成后 | `doc-manager` |
+| 声称完成前 | `verification-before-completion` |
+| 遇到异常/bug | `systematic-debugging` |
+
+> 详细规则见 [skills-trigger-rules.md](skills-trigger-rules.md)。
+
+## 任务持久化
 
 | 内容 | 路径 |
 |------|------|
-| 项目架构文档定位 | `moyuan-architecture` skill |
-| 数据资产文档定位 | `moyuan-data-assets` skill |
-| 技术栈与开发规范 | `docs/constraints/tech-stack-constraints.md` |
-| 智能体配置 | [agents-config.md](agents-config.md) |
-| 技能触发规则 | [skills-trigger-rules.md](skills-trigger-rules.md) |
+| 进行中任务 | `.trae/tasks/{日期}-{序号}-{简短名称}.md`（每个长任务独立文件） |
+| 已完成归档 | 任务完成后从 `tasks/` 移动到记忆目录 |
+| 记忆存储 | `.trae/memories/{年-月}/{日}/{时间}-{uuid}.md` |
 
-## 智能体协作流程
+**任务生命周期**：创建任务方案 → 写入 `.trae/tasks/` → 多智能体协作执行 → 完成后归档到 `.trae/memories/` 并从 `tasks/` 删除
 
-分析规划师 → 代码开发 → 代码审查 → 文档管理 → 分析规划师汇总
+## 文档自动更新
 
-> 详细配置见 [agents-config.md](agents-config.md)
+代码变更涉及 API 端点、数据库表结构、前端类型定义时，必须同步更新 `docs/` 下对应文档，并更新相关skill配置（`moyuan-architecture`、`moyuan-data-assets`、`doc-manager`）。
 
-## 任务与持久化
-
-| 类型 | 路径 |
-|------|------|
-| 任务文件 | `task.md`（项目根目录） |
-| 记忆存储 | `.trae/memories/xx-xx(年-月)/xx(日)/xxxx(时间)-uuid.md` |
+> 本文件为轻量级路径索引。详细配置参数、策略及完整路径体系见 [config-index.md](config-index.md)。

@@ -21,7 +21,7 @@ tools:
 - **智能体代号**: api-test-pro
 - **智能体类型**: 测试
 - **创建时间**: 2026-05-11
-- **最后更新**: 2026-05-11
+- **最后更新**: 2026-05-29
 
 ## 核心职责
 1. **接口测试**: 测试RESTful API的请求/响应正确性
@@ -31,9 +31,10 @@ tools:
 
 ## 前置条件
 每次接收任务时，必须阅读：
-- `.trae/rules/project_rules.md` — 项目开发规范
+- `.trae/rules/project_rules_always.md` — 项目开发规范
 - `docs/api/endpoints.md` — API端点文档
-- `docs/api/unified-response.md` — 统一响应规范
+- `docs/api/auth.md` — 认证接口文档
+- `docs/constraints/tech-stack-constraints.md` — 技术栈限制
 
 ## 测试规范
 
@@ -44,21 +45,31 @@ tools:
 | 异常流程 | 缺少参数、参数格式错误、越权访问 |
 | 边界测试 | 参数长度边界、数值边界、分页边界 |
 | 关联测试 | 依赖上下游的接口调用链 |
+| 认证测试 | JWT Token 有效性、过期处理、权限验证 |
 
 ### 统一响应验证
 ```json
-// 成功响应
-{ "code": 200, "message": "success", "data": {} }
+// backend/ 模块
+{ "code": 200, "message": "操作成功", "data": {} }
+
+// sc-moyuan-backend/ 模块
+{ "code": 200, "message": "操作成功", "data": {} }
 
 // 错误响应
 { "code": 500, "message": "error message", "data": null }
 ```
 
+### 认证测试
+- 登录接口: `POST /api/auth/login`
+- Token 传递: `Authorization: Bearer <token>`
+- Token 过期处理
+- 无 Token 访问受保护接口
+
 ### 性能基准
 | 指标 | 标准 |
 |------|------|
 | 响应时间 | < 200ms（P95） |
-| 吞吐量 | > 1000 req/s |
+| 吞吐量 | > 500 req/s |
 | 错误率 | < 0.1% |
 | 并发数 | > 200 同时连接 |
 

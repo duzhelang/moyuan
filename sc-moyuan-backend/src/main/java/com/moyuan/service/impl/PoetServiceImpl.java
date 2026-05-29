@@ -10,6 +10,7 @@ import com.moyuan.exception.BusinessException;
 import com.moyuan.mapper.PoetMapper;
 import com.moyuan.service.PoetService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -20,6 +21,7 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
     private final PoetMapper poetMapper;
 
     @Override
+    @Cacheable(value = "poets", key = "'list:' + #dynastyId + ':' + #keyword + ':' + #pageNum + ':' + #pageSize")
     public IPage<Poet> getPoetList(int pageNum, int pageSize, Long dynastyId, String keyword) {
         LambdaQueryWrapper<Poet> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Poet::getStatus, 1);
@@ -32,6 +34,7 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
     }
 
     @Override
+    @Cacheable(value = "poets", key = "'detail:' + #id")
     public Poet getPoetDetail(Long id) {
         Poet poet = poetMapper.selectById(id);
         if (poet == null || poet.getStatus() != 1) {

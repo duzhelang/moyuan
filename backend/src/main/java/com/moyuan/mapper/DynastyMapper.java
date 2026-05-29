@@ -1,9 +1,0 @@
-package com.moyuan.mapper;
-
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.moyuan.entity.Dynasty;
-import org.apache.ibatis.annotations.Mapper;
-
-@Mapper
-public interface DynastyMapper extends BaseMapper<Dynasty> {
-}

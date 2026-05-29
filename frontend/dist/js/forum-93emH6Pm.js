@@ -1,0 +1,1 @@
+import{s as o}from"./index-CM1anuT_.js";function n(t){return o.get("/forum/posts",{params:t})}function m(t){return o.get(`/forum/posts/${t}`)}function u(t){return o.post(`/forum/posts/${t}/like`)}function a(t,s,e){return o.get("/comments",{params:{targetId:t,targetType:s,...e}})}function c(t){return o.post("/comments",t)}export{m as a,n as b,c,a as g,u as l};

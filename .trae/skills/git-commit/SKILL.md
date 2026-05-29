@@ -18,10 +18,12 @@ This skill automates the git commit workflow for task-based development.
 
 ### 1. Get Task Context
 
-Before committing, retrieve the current task information from task.md:
+Before committing, retrieve the current task information from `.trae/tasks/`:
 
-- Find the task marked as "进行中" (in progress)
+- Scan `.trae/tasks/` for files matching the pattern `{YYYYMMDD}-{序号}-{名称}.md`
+- Find the task file whose frontmatter `status` is "进行中" (in progress)
 - Use the task title and summary as commit context
+- If multiple tasks are in progress, ask user to specify which task this commit belongs to
 - If no task is in progress, ask user for commit description
 
 ### 2. Check Documentation Sync
@@ -79,7 +81,7 @@ Use the following commit message format:
 ```
 [Task: <task-title>] <brief-description>
 
-<task-summary-from-task.md>
+<task-summary-from-.trae/tasks/{当前任务文件}.md>
 ```
 
 Example:
@@ -124,9 +126,10 @@ If push fails due to authentication:
 ## Integration with Task Management
 
 This skill works with the task management system:
-- Reads task.md for current task information
+- Scans `.trae/tasks/` for task files matching `{YYYYMMDD}-{序号}-{名称}.md` pattern
+- Each task is an independent file with its own frontmatter (title, status, summary)
 - Uses task title and summary for commit messages
-- After successful commit, can update task progress
+- After successful commit, can update task progress in the specific task file
 
 ## Examples
 

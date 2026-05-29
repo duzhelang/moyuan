@@ -29,8 +29,8 @@ const fetchPoems = async () => {
   loading.value = true
   try {
     await poemStore.fetchPoemList({
-      page: currentPage.value,
-      size: pageSize.value,
+      pageNum: currentPage.value,
+      pageSize: pageSize.value,
       dynastyId: filters.value.dynastyId,
       categoryId: filters.value.categoryId,
       keyword: filters.value.keyword

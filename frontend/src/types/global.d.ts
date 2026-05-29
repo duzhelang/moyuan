@@ -16,5 +16,6 @@ declare module 'vue-router' {
     hidden?: boolean
     icon?: string
     roles?: string[]
+    requiresAdmin?: boolean
   }
 }

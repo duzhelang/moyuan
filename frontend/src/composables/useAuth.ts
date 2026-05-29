@@ -7,6 +7,7 @@ export function useAuth() {
   const userStore = useUserStore()
 
   const isLoggedIn = computed(() => userStore.isLoggedIn)
+  const isAdmin = computed(() => userStore.userInfo?.role === 'admin')
   const username = computed(() => userStore.username)
   const avatar = computed(() => userStore.avatar)
   const userInfo = computed(() => userStore.userInfo)
@@ -30,6 +31,7 @@ export function useAuth() {
 
   return {
     isLoggedIn,
+    isAdmin,
     username,
     avatar,
     userInfo,

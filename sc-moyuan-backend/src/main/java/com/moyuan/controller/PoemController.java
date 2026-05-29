@@ -1,8 +1,12 @@
 package com.moyuan.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.moyuan.common.R;
+import com.moyuan.common.ResultCode;
 import com.moyuan.entity.Poem;
+import com.moyuan.exception.BusinessException;
+import com.moyuan.mapper.PoemMapper;
 import com.moyuan.service.PoemService;
 import com.moyuan.service.UserService;
 import com.moyuan.util.SecurityUtil;
@@ -12,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Tag(name = "诗词接口")
@@ -21,6 +26,7 @@ import java.util.Map;
 public class PoemController {
 
     private final PoemService poemService;
+    private final PoemMapper poemMapper;
     private final UserService userService;
     private final SecurityUtil securityUtil;
 
@@ -40,6 +46,29 @@ public class PoemController {
         result.put("pageNum", page.getCurrent());
         result.put("pageSize", page.getSize());
         return R.success(result);
+    }
+
+    @Operation(summary = "获取随机诗词")
+    @GetMapping("/random")
+    public R<Poem> getRandomPoem() {
+        LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Poem::getStatus, 1)
+                .last("ORDER BY RAND() LIMIT 1");
+        Poem poem = poemMapper.selectOne(wrapper);
+        if (poem == null) {
+            throw new BusinessException(ResultCode.POEM_NOT_FOUND);
+        }
+        return R.success(poem);
+    }
+
+    @Operation(summary = "获取每日推荐诗词")
+    @GetMapping("/daily")
+    public R<List<Poem>> getDailyPoems() {
+        LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Poem::getStatus, 1)
+                .orderByDesc(Poem::getViewCount)
+                .last("LIMIT 3");
+        return R.success(poemMapper.selectList(wrapper));
     }
 
     @Operation(summary = "获取诗词详情")

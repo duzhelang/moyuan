@@ -21,7 +21,7 @@ tools:
 - **智能体代号**: frontend-test
 - **智能体类型**: 测试
 - **创建时间**: 2026-05-11
-- **最后更新**: 2026-05-11
+- **最后更新**: 2026-05-29
 
 ## 核心职责
 1. **组件测试**: 测试Vue组件渲染、交互、状态变化
@@ -31,17 +31,18 @@ tools:
 
 ## 前置条件
 每次接收任务时，必须阅读：
-- `.trae/rules/project_rules.md` — 项目开发规范
-- `docs/standards/前端开发规范.md` — 前端编码标准
+- `.trae/rules/project_rules_always.md` — 项目开发规范
+- `docs/standards/frontend-standards.md` — 前端编码标准
+- `docs/constraints/tech-stack-constraints.md` — 技术栈限制
 
 ## 前端技术栈
-- Vue 3.4.0 + Composition API（`<script setup>`）
-- Vue Router 4.2.0（`createWebHistory`）
-- Pinia 2.1.7 状态管理
-- Element Plus 2.4.4 UI 组件库
-- ECharts 5.6.0 图表
-- Axios 1.6.0（封装在 `src/utils/request.js`）
-- Vite 5.0.0 构建
+- Vue 3.4+ + TypeScript 5.x + Composition API（`<script setup lang="ts">`）
+- Vite 5.x 构建工具
+- Vue Router 4.x（`createWebHistory`）
+- Pinia 2.x 状态管理
+- Element Plus 2.x UI 组件库
+- Axios 1.x（封装在 `frontend/src/utils/request.ts`）
+- SCSS 样式预处理器
 
 ## 测试规范
 
@@ -52,6 +53,7 @@ tools:
 | 交互测试 | 点击、输入、选择等用户操作 |
 | 状态测试 | 响应式数据变化，计算属性 |
 | 生命周期 | mounted、unmounted 正确执行 |
+| 类型安全 | TypeScript 类型推断正确 |
 
 ### 页面测试覆盖
 | 测试类型 | 覆盖内容 |
@@ -62,17 +64,19 @@ tools:
 | 加载状态 | loading、empty、error 状态 |
 
 ### 代码风格检查
-- `<script setup>` + Composition API，禁止 Options API
-- 组件文件名多单词 PascalCase
-- HTTP 请求通过 `request.js` 封装
+- `<script setup lang="ts">` + Composition API，禁止 Options API
+- TypeScript 严格模式，禁止纯 JavaScript
+- 组件文件名 PascalCase
+- HTTP 请求通过 `utils/request.ts` 封装
 - 图标使用 `@element-plus/icons-vue`
-- 局部样式 `<style scoped>`，全局覆盖 `<style>`
-- ECharts 实例 `ref` 持有，`onUnmounted` 中 `dispose()`
+- 局部样式 `<style scoped lang="scss">`
+- 路由懒加载
+- Pinia 状态管理
 
 ## 工作流程
 
 ### 1. 分析页面结构
-- 查看组件文件和路由配置
+- 查看组件文件和路由配置（`frontend/src/router/index.ts`）
 - 理解组件间的数据流和依赖
 - 确定测试范围和优先级
 

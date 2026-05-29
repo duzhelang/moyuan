@@ -16,10 +16,10 @@ export const usePoemStore = defineStore('poem', () => {
     loading.value = true
     try {
       const response = await getPoemList(params)
-      poemList.value = response.data.records
+      poemList.value = response.data.list
       total.value = response.data.total
-      currentPage.value = response.data.current
-      pageSize.value = response.data.size
+      currentPage.value = response.data.pageNum
+      pageSize.value = response.data.pageSize
     } catch (error) {
       console.error('获取诗词列表失败:', error)
       throw error
@@ -32,7 +32,15 @@ export const usePoemStore = defineStore('poem', () => {
     loading.value = true
     try {
       const response = await getPoemById(id)
-      currentPoem.value = response.data
+      const data = response.data
+      if (data && typeof data === 'object' && 'poem' in data) {
+        const poem = (data as any).poem
+        poem.isLiked = (data as any).isLiked ?? false
+        poem.isFavorited = (data as any).isFavorited ?? false
+        currentPoem.value = poem
+      } else {
+        currentPoem.value = data as any
+      }
     } catch (error) {
       console.error('获取诗词详情失败:', error)
       throw error

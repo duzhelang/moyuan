@@ -1,0 +1,91 @@
+digraph ER_Diagram {
+    bgcolor="#1a1a2e"
+    rankdir=TB
+    node [shape=record, style=filled, fillcolor="#16213e", fontcolor="#e0e0e0", fontname="Microsoft YaHei", fontsize=11, color="#4a90e2", penwidth=1.5]
+    edge [color="#4a90e2", fontcolor="#00d2ff", fontname="Microsoft YaHei", fontsize=9, arrowsize=0.8]
+    
+    labelloc="t"
+    label="墨渊（MoYuan）- 数据库 ER 关系图\n11 张核心表 | MySQL 8.0+"
+    fontcolor="#ffffff"
+    fontsize=16
+    fontname="Microsoft YaHei Bold"
+    
+    subgraph cluster_poem_domain {
+        label="诗词核心域"
+        labeljust=l
+        style=filled
+        fillcolor="#0d1b2a"
+        color="#4a90e2"
+        fontcolor="#4a90e2"
+        fontsize=12
+        
+        dynasty [label="{ dynasty\n朝代表 | {<pk> id (主键)\n| name (朝代名称, 唯一)\n| start_year (开始年份)\n| end_year (结束年份)\n| description (朝代简介)\n| sort_order (排序顺序)\n| create_time (创建时间)\n| update_time (更新时间) } }"]
+        
+        poet [label="{ poet\n诗人表 | {<pk> id (主键)\n| name (诗人姓名)\n| courtesy_name (字)\n| pseudonym (号)\n| <fk> dynasty_id (朝代ID, 外键)\n| birth_year (出生年份)\n| death_year (去世年份)\n| birthplace (出生地)\n| biography (生平简介)\n| avatar (头像URL)\n| status (状态)\n| create_time (创建时间)\n| update_time (更新时间)\n| deleted (逻辑删除) } }"]
+        
+        category [label="{ category\n诗词分类表 | {<pk> id (主键)\n| name (分类名称)\n| <fk> parent_id (父分类ID, 自关联)\n| description (分类描述)\n| icon (分类图标)\n| sort_order (排序顺序)\n| status (状态)\n| create_time (创建时间)\n| update_time (更新时间) } }"]
+        
+        poem [label="{ poem\n诗词表 (核心) | {<pk> id (主键)\n| title (诗词标题)\n| content (诗词内容)\n| <fk> poet_id (诗人ID, 外键)\n| <fk> dynasty_id (朝代ID, 外键)\n| <fk> category_id (分类ID, 外键)\n| translation (译文)\n| appreciation (赏析)\n| background (创作背景)\n| source (来源)\n| view_count (浏览次数)\n| like_count (点赞次数)\n| favorite_count (收藏次数)\n| status (状态)\n| is_featured (是否精选)\n| create_time (创建时间)\n| update_time (更新时间)\n| deleted (逻辑删除) } }"]
+    }
+    
+    subgraph cluster_user_social {
+        label="用户社交域"
+        labeljust=l
+        style=filled
+        fillcolor="#0d1b2a"
+        color="#a855f7"
+        fontcolor="#a855f7"
+        fontsize=12
+        
+        user [label="{ user\n用户表 | {<pk> id (主键)\n| username (用户名, 唯一)\n| password (密码, BCrypt加密)\n| email (邮箱, 唯一)\n| phone (手机号)\n| nickname (昵称)\n| avatar (头像URL)\n| bio (个人简介)\n| status (状态)\n| last_login_time (最后登录时间)\n| last_login_ip (最后登录IP)\n| create_time (创建时间)\n| update_time (更新时间)\n| deleted (逻辑删除) } }"]
+        
+        forum_post [label="{ forum_post\n论坛帖子表 | {<pk> id (主键)\n| title (帖子标题)\n| content (帖子内容)\n| <fk> user_id (发帖用户ID, 外键)\n| category (帖子分类)\n| view_count (浏览次数)\n| like_count (点赞次数)\n| comment_count (评论数量)\n| is_top (是否置顶)\n| is_featured (是否精选)\n| status (状态)\n| last_comment_time (最后评论时间)\n| create_time (创建时间)\n| update_time (更新时间)\n| deleted (逻辑删除) } }"]
+        
+        comment [label="{ comment\n评论表 | {<pk> id (主键)\n| content (评论内容)\n| <fk> user_id (评论用户ID, 外键)\n| <fk> post_id (帖子ID, 外键)\n| <fk> parent_id (父评论ID, 自关联)\n| reply_to_user_id (回复目标用户ID)\n| like_count (点赞次数)\n| status (状态)\n| create_time (创建时间)\n| update_time (更新时间)\n| deleted (逻辑删除) } }"]
+    }
+    
+    subgraph cluster_user_behavior {
+        label="用户行为域"
+        labeljust=l
+        style=filled
+        fillcolor="#0d1b2a"
+        color="#00d2ff"
+        fontcolor="#00d2ff"
+        fontsize=12
+        
+        user_favorite [label="{ user_favorite\n用户收藏表 | {<pk> id (主键)\n| <fk> user_id (用户ID, 外键)\n| target_id (收藏目标ID)\n| target_type (收藏类型)\n  1:诗词 2:帖子 3:诗人\n| create_time (创建时间) } }"]
+        
+        user_like [label="{ user_like\n用户点赞表 | {<pk> id (主键)\n| <fk> user_id (用户ID, 外键)\n| target_id (点赞目标ID)\n| target_type (点赞类型)\n  1:诗词 2:帖子 3:评论\n| create_time (创建时间) } }"]
+        
+        user_history [label="{ user_history\n浏览历史表 | {<pk> id (主键)\n| <fk> user_id (用户ID, 外键)\n| target_id (浏览目标ID)\n| target_type (浏览类型)\n  1:诗词 2:诗人 3:帖子\n| create_time (创建时间) } }"]
+    }
+    
+    subgraph cluster_system {
+        label="系统运维域"
+        labeljust=l
+        style=filled
+        fillcolor="#0d1b2a"
+        color="#22c55e"
+        fontcolor="#22c55e"
+        fontsize=12
+        
+        operation_log [label="{ operation_log\n操作日志表 | {<pk> id (主键)\n| <fk> user_id (操作用户ID, 可为空)\n| username (操作用户名)\n| operation (操作类型)\n| method (请求方法)\n| params (请求参数)\n| ip (请求IP)\n| duration (请求时长, 毫秒)\n| status (操作状态)\n| error_msg (错误信息)\n| create_time (创建时间) } }"]
+    }
+    
+    dynasty -> poet [label="  1:N 朝代→诗人\ndynasty_id", style=solid]
+    dynasty -> poem [label="  1:N 朝代→诗词\ndynasty_id", style=solid]
+    poet -> poem [label="  1:N 诗人→诗词\npoet_id", style=solid]
+    category -> poem [label="  1:N 分类→诗词\ncategory_id", style=solid]
+    category -> category [label="  自关联\nparent_id", style=dashed, constraint=false]
+    
+    user -> forum_post [label="  1:N 用户→帖子\nuser_id", style=solid]
+    user -> comment [label="  1:N 用户→评论\nuser_id", style=solid]
+    forum_post -> comment [label="  1:N 帖子→评论\npost_id", style=solid]
+    comment -> comment [label="  自关联\nparent_id", style=dashed, constraint=false]
+    
+    user -> user_favorite [label="  1:N 多态关联\nuser_id", style=dashed]
+    user -> user_like [label="  1:N 多态关联\nuser_id", style=dashed]
+    user -> user_history [label="  1:N 多态关联\nuser_id", style=dashed]
+    
+    user -> operation_log [label="  1:N 可为NULL\nuser_id", style=dashed]
+}

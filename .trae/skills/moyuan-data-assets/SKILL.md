@@ -27,7 +27,7 @@ description: "古今诗话——墨渊项目的数据资产文档路径索引（
 
 | 文档 | 路径 | 内容 |
 |------|------|------|
-| 表结构 | [database/schema.md](../../docs/database/schema.md) | 10 张表的结构说明、字段定义、索引设计 |
+| 表结构 | [database/schema.md](../../docs/database/schema.md) | 11 张表的结构说明、字段定义、索引设计 |
 | 数据库规范 | [standards/database-standards.md](../../docs/standards/database-standards.md) | 表结构设计规范、索引设计规范、SQL编写规范 |
 
 ### API文档
@@ -45,18 +45,49 @@ description: "古今诗话——墨渊项目的数据资产文档路径索引（
 
 ### 数据库表清单
 
-| 表名 | 说明 | 主要字段 |
-|------|------|----------|
-| user | 用户表 | id, username, password, email, nickname, avatar |
-| poet | 诗人表 | id, name, courtesy_name, pseudonym, dynasty_id |
-| dynasty | 朝代表 | id, name, start_year, end_year |
-| category | 诗词分类表 | id, name, parent_id, description |
-| poem | 诗词表 | id, title, content, poet_id, dynasty_id, category_id |
-| forum_post | 论坛帖子表 | id, title, content, user_id, category |
-| comment | 评论表 | id, content, user_id, post_id, parent_id |
-| user_favorite | 用户收藏表 | id, user_id, target_id, target_type |
-| user_like | 用户点赞表 | id, user_id, target_id, target_type |
-| operation_log | 操作日志表 | id, user_id, operation, method, params |
+| 序号 | 表名 | 说明 | 主要字段 | 建表脚本 |
+|------|------|------|----------|----------|
+| 1 | user | 用户表 | id, username, password, email, nickname, avatar, phone, bio, status | init.sql |
+| 2 | poet | 诗人表 | id, name, courtesy_name, pseudonym, dynasty_id, birth_year, death_year, biography | init.sql |
+| 3 | dynasty | 朝代表 | id, name, start_year, end_year, description, sort_order | init.sql |
+| 4 | category | 诗词分类表 | id, name, parent_id, description, icon, sort_order | init.sql |
+| 5 | poem | 诗词表 | id, title, content, poet_id, dynasty_id, category_id, translation, appreciation, background | init.sql |
+| 6 | forum_post | 论坛帖子表 | id, title, content, user_id, category, view_count, like_count, comment_count | init.sql |
+| 7 | comment | 评论表 | id, content, user_id, post_id, parent_id, reply_to_user_id, like_count | init.sql |
+| 8 | user_favorite | 用户收藏表 | id, user_id, target_id, target_type | init.sql |
+| 9 | user_like | 用户点赞表 | id, user_id, target_id, target_type | init.sql |
+| 10 | user_history | 用户浏览历史表 | id, user_id, target_id, target_type | migration_002_user_history.sql |
+| 11 | operation_log | 操作日志表 | id, user_id, username, operation, method, params, ip, duration, status, error_msg | 📋 仅文档定义 |
+
+### ER 关系图
+
+```
+dynasty ──────────────────────────────┐
+  │                                   │
+  │ dynasty_id (FK)                   │
+  ▼                                   │
+poet ──────────┐                      │
+  │            │ poet_id (FK)         │
+  │            ▼                      │ dynasty_id (FK)
+  │          poem ◄───────────────────┘
+  │            │
+  │            │ category_id (FK)
+  │            ▼
+  │         category（支持层级：parent_id → 自关联）
+  │
+  │
+user ──┬── forum_post（user_id FK）
+       │      │
+       │      │ post_id (FK)
+       │      ▼
+       ├── comment（user_id FK, post_id FK, 支持多级回复：parent_id 自关联）
+       │
+       ├── user_favorite（多态：target_type → poem/post/poet）
+       │
+       ├── user_like（多态：target_type → poem/post/comment）
+       │
+       └── operation_log（user_id FK，可为NULL）
+```
 
 ---
 

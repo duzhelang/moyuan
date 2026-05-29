@@ -129,4 +129,12 @@ public class ForumPostServiceImpl extends ServiceImpl<ForumPostMapper, ForumPost
                         .eq(UserLike::getTargetId, postId)
                         .eq(UserLike::getTargetType, TargetType.POST.getCode())) > 0;
     }
+
+    @Override
+    public IPage<ForumPost> getPostsByUserId(Long userId, int pageNum, int pageSize) {
+        LambdaQueryWrapper<ForumPost> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ForumPost::getUserId, userId)
+               .orderByDesc(ForumPost::getCreateTime);
+        return forumPostMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
+    }
 }
