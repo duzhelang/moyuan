@@ -20,6 +20,8 @@ application-prod.yml
 *.env
 .env
 .env.local
+# 敏感配置目录（API密钥、数据库密码等）
+secrets/
 # 数据库连接配置（敏感信息）
 db-config.properties
 # 会话/缓存文件
@@ -60,6 +62,10 @@ node_modules/
 
 # ==================== 归档目录 ====================
 archive/
+_archive/
+
+# ==================== 本地目录（通过 .git/info/exclude 管理） ====================
+# .trae/ 和 docs/ 已迁移至 .git/info/exclude 管理，不随仓库提交
 
 # ==================== 项目专属过滤 ====================
 # 订单统计临时生成的Excel/CSV文件
