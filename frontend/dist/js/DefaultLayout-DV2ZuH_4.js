@@ -1,1 +1,0 @@
-import{_ as e}from"./index-CM1anuT_.js";import{a4 as r,j as t,ac as c}from"./vue-Czk-Z7f4.js";import"./elementPlus-BBy1w2ew.js";const n={};function a(s,_){const o=c("router-view");return r(),t(o)}const i=e(n,[["render",a]]);export{i as default};

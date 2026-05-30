@@ -142,6 +142,12 @@ const routes: RouteRecordRaw[] = [
         name: 'AdminLogs',
         component: () => import('@/views/admin/logs.vue'),
         meta: { title: '操作日志', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'ai-models',
+        name: 'AdminAiModels',
+        component: () => import('@/views/admin/ai-models.vue'),
+        meta: { title: 'AI模型管理', requiresAuth: true, requiresAdmin: true }
       }
     ]
   },

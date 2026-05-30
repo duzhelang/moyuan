@@ -6,8 +6,11 @@ server:
 spring:
   profiles:
     active: dev
+    include: secrets
   application:
     name: moyuan-backend
+  main:
+    allow-circular-references: true
 
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml

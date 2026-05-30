@@ -30,6 +30,7 @@ const imageFile = ref<File | null>(null)
 const imagePreview = ref('')
 const poemResult = ref('')
 const poemLoading = ref(false)
+const visionModel = ref('glm-4.6v-flash')
 
 const analyzeInput = ref('')
 const analyzeResult = ref('')
@@ -122,7 +123,7 @@ const handleWritePoem = async () => {
   poemResult.value = ''
 
   try {
-    const res = await writePoemFromImage(imageFile.value, aiModel.value)
+    const res = await writePoemFromImage(imageFile.value, aiModel.value, visionModel.value)
     poemResult.value = res.data.poem
   } catch (error) {
     ElMessage.error('看图写诗失败，请稍后重试')
@@ -326,6 +327,13 @@ onMounted(async () => {
                 </el-upload>
               </div>
               <div class="poem-result">
+                <div class="vision-model-select">
+                  <span class="select-label">视觉模型：</span>
+                  <el-select v-model="visionModel" size="small">
+                    <el-option label="GLM-4V-Flash" value="glm-4v-flash" />
+                    <el-option label="GLM-4.6V-Flash" value="glm-4.6v-flash" />
+                  </el-select>
+                </div>
                 <el-button
                   type="primary"
                   :loading="poemLoading"
@@ -809,6 +817,19 @@ onMounted(async () => {
     font-size: $font-size-base;
     color: $text-color;
     margin-bottom: $spacing-sm;
+  }
+}
+
+.vision-model-select {
+  display: flex;
+  align-items: center;
+  margin-bottom: $spacing-md;
+
+  .select-label {
+    font-size: $font-size-sm;
+    color: $text-color-secondary;
+    margin-right: $spacing-sm;
+    white-space: nowrap;
   }
 }
 

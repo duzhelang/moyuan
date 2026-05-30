@@ -8,5 +8,7 @@ public interface AiService {
 
     String writePoemFromImage(MultipartFile image, String model);
 
+    String writePoemFromImage(MultipartFile image, String model, String visionModel);
+
     String analyzePoem(String poem, String model);
 }

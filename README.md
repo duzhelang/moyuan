@@ -174,24 +174,40 @@ A: 执行初始化脚本 `backend/src/main/resources/db/init.sql`
 ### 项目结构
 ```
 SC_MoYuan2_/
-├── index.html          # 主页面
-├── test.html           # 测试页面
-├── css/                # 样式文件
-├── js/                 # JavaScript文件
-├── backend/            # 后端项目
-│   ├── src/            # 源代码
-│   ├── pom.xml         # Maven配置
-│   └── README.md       # 后端说明
-└── README.md           # 本文件
+├── frontend/              # Vue 3 前端项目
+│   ├── src/               # 源代码
+│   ├── public/            # 静态资源
+│   ├── package.json       # 前端依赖配置
+│   └── vite.config.ts     # Vite 配置
+├── sc-moyuan-backend/     # Spring Boot 后端项目
+│   ├── src/               # 源代码
+│   └── pom.xml            # Maven 配置
+├── img/                   # 图片资源（前端引用）
+├── _archive/              # 归档目录（旧版文件）
+│   └── old-static-site/   # 旧版静态网站文件
+├── index.html             # 旧版主页面（已归档）
+├── pom.xml                # Maven 父项目配置
+├── start.bat              # 启动脚本
+├── init-db.bat            # 数据库初始化脚本
+└── README.md              # 本文件
 ```
 
 ### 技术栈
-- **前端**: HTML5, CSS3, JavaScript
-- **后端**: Spring Boot 3.2, MyBatis-Plus 3.5
-- **数据库**: MySQL 8.0
-- **构建工具**: Maven 3.8
+- **前端**: Vue 3, TypeScript, Vite, Element Plus, Pinia
+- **后端**: Spring Boot 3.2, MyBatis-Plus 3.5, Spring Security, JWT
+- **数据库**: MySQL 8.0, Redis 7.x
+- **构建工具**: Maven 3.8, Node.js
 
 ## 更新日志
+
+### v1.2.1 (2026-05-30)
+- ✅ 项目根目录整理：迁移废弃文件夹至归档目录
+  - 迁移旧版静态网站文件（css/, html/, js/, zt/）至 `_archive/old-static-site/`
+  - 迁移测试和演示文件（test.html, yinyuebofang.html）
+  - 迁移开发笔记文件（备忘录.txt, 备忘录_附1.jpg）
+  - 清理前端构建产物（frontend/dist/）
+  - 更新 .gitignore 添加归档目录
+  - 更新项目结构文档
 
 ### v1.2.0 (2026-05-29)
 - ✅ 新增文件上传功能（FileController + ImageUpload组件）

@@ -295,3 +295,36 @@ INSERT IGNORE INTO `poem` (`title`, `content`, `poet_id`, `dynasty_id`, `categor
 ('沉影迷叠千层障', '沉影迷叠千层障，乱云归处是它乡。\n酒酣仍识昔日客，心迷难辨眼前芳。\n纵把凡锦比仙缎，不需经年多思量。\n一笑即随羊角去，九风还作万华芳。', 1, 13, 2, '常平逼王', 1, 1),
 ('一剪梅.无题', '一别三秋未招摇，\n山也迢迢，水也昭昭。\n何人再添新衣袍，\n笑意盈绕，喜上眉梢。\n忆昔花开岁月好，\n蜂字飘摇，蝶字舞蹈。\n而今方知云未晓，\n风又飘飘，雨又萧萧。', 1, 13, 2, '常平逼王', 1, 1),
 ('清平乐.情(道姑)', '幽情迷朦，三年怀一梦，一遭尘世皆为恒，无怨无悔无憎。\n来日打马南屏，忆昔紫夜流萤，纵剑吴钩霜雪，锦夜孤灯长明。', 1, 13, 4, '初芒', 1, 1);
+
+-- ============================================================
+-- AI 模型配置表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `ai_model` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `name` VARCHAR(50) NOT NULL COMMENT '模型标识',
+  `display_name` VARCHAR(100) NOT NULL COMMENT '显示名称',
+  `provider` VARCHAR(50) NOT NULL COMMENT '提供商',
+  `model_type` ENUM('text', 'vision', 'both') NOT NULL DEFAULT 'text' COMMENT '模型类型',
+  `api_url` VARCHAR(255) NOT NULL COMMENT 'API地址',
+  `api_key` VARCHAR(255) NOT NULL COMMENT 'API密钥',
+  `model_id` VARCHAR(100) NOT NULL COMMENT '模型ID',
+  `vision_model_id` VARCHAR(100) DEFAULT NULL COMMENT '视觉模型ID',
+  `max_tokens` INT DEFAULT 1024 COMMENT '最大token数',
+  `extra_config` JSON DEFAULT NULL COMMENT '额外配置',
+  `is_enabled` TINYINT NOT NULL DEFAULT 1 COMMENT '是否启用：0-禁用，1-启用',
+  `is_default` TINYINT NOT NULL DEFAULT 0 COMMENT '是否默认：0-否，1-是',
+  `sort_order` INT NOT NULL DEFAULT 0 COMMENT '排序顺序',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_ai_model_name` (`name`),
+  KEY `idx_ai_model_provider` (`provider`),
+  KEY `idx_ai_model_enabled` (`is_enabled`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI模型配置表';
+
+-- 初始数据：国内可连接的AI模型
+INSERT IGNORE INTO `ai_model` (`name`, `display_name`, `provider`, `model_type`, `api_url`, `api_key`, `model_id`, `vision_model_id`, `max_tokens`, `is_enabled`, `is_default`, `sort_order`) VALUES
+('zhipu', '智谱AI', 'zhipu', 'both', 'https://open.bigmodel.cn/api/paas/v4/chat/completions', 'your-zhipu-api-key', 'glm-4', 'glm-4.6v-flash', 1024, 0, 0, 1),
+('deepseek', 'DeepSeek', 'deepseek', 'text', 'https://api.deepseek.com/v1/chat/completions', 'your-deepseek-api-key', 'deepseek-chat', NULL, 1024, 0, 0, 2),
+('kimi', 'Kimi', 'kimi', 'text', 'https://api.moonshot.cn/v1/chat/completions', 'your-kimi-api-key', 'moonshot-v1-8k', NULL, 1024, 0, 0, 3),
+('nvidia', 'NVIDIA NIM', 'nvidia', 'text', 'https://integrate.api.nvidia.com/v1/chat/completions', 'your-nvidia-api-key', 'meta/llama-4-scout', NULL, 1024, 0, 0, 4);

@@ -37,13 +37,15 @@ public class AiController {
     @PostMapping("/write-poem")
     public R<Map<String, String>> writePoemFromImage(
             @RequestParam("image") MultipartFile image,
-            @RequestParam(value = "model", defaultValue = "zhipu") String model) {
+            @RequestParam(value = "model", defaultValue = "zhipu") String model,
+            @RequestParam(value = "visionModel", required = false) String visionModel) {
 
-        String poem = aiService.writePoemFromImage(image, model);
+        String poem = aiService.writePoemFromImage(image, model, visionModel);
 
         return R.success(Map.of(
                 "poem", poem,
-                "model", model
+                "model", model,
+                "visionModel", visionModel != null ? visionModel : "default"
         ));
     }
 

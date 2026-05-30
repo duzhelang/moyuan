@@ -17,6 +17,7 @@ import com.moyuan.mapper.UserMapper;
 import com.moyuan.service.UserService;
 import com.moyuan.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     private final UserMapper userMapper;
     private final UserFavoriteMapper userFavoriteMapper;
+    @Lazy
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
