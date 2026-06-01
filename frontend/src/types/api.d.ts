@@ -12,8 +12,8 @@ export interface LoginRequest {
 export interface RegisterRequest {
   username: string
   password: string
-  email: string
-  phone?: string
+  email?: string
+  nickname?: string
 }
 
 export interface TokenResponse {

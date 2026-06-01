@@ -62,6 +62,14 @@ public class SecurityConfig {
                     "/api/forum/posts",
                     "/api/forum/posts/**",
                     "/api/forum/comments/**",
+                    "/api/poet-featured",
+                    "/api/poet-featured/**",
+                    "/api/home-navigation",
+                    "/api/home-navigation/**",
+                    "/api/vision",
+                    "/api/vision/**",
+                    "/api/ai",
+                    "/api/ai/**",
                     "/api/search",
                     "/uploads/**"
                 ).permitAll()

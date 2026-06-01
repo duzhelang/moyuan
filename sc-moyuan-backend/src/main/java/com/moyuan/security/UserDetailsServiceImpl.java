@@ -22,6 +22,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         if (user == null) {
             throw new UsernameNotFoundException("用户不存在：" + username);
         }
-        return new LoginUser(user, "USER");
+        String role = user.getRole() != null ? user.getRole().toUpperCase() : "USER";
+        return new LoginUser(user, role);
     }
 }

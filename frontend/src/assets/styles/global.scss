@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'YingBiXingShu';
+  src: url('/fonts/yingbixingshu.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -44,7 +52,15 @@ button {
 }
 
 input, textarea, select {
-  font-family: inherit;
+  font-family: $font-family-input;
+  letter-spacing: 0.5px;
+}
+
+.el-input__inner,
+.el-textarea__inner {
+  font-family: $font-family-input !important;
+  letter-spacing: 0.5px;
+  line-height: 1.5;
 }
 
 h1, h2, h3, h4, h5, h6 {

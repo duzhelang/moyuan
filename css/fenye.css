@@ -1,0 +1,63 @@
+/* styles.css */
+body, html {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+}
+
+.container {
+    display: flex;
+    height: 100vh; /* 让容器高度等于视窗高度 */
+}
+
+.sidebar {
+    width: 250px; /* 固定宽度 */
+    background-color: #f4f4f4;
+    padding: 15px;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 0;
+}
+
+.sidebar h2 {
+    margin-top: 0;
+}
+
+.sidebar ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.sidebar li {
+    margin-bottom: 10px;
+}
+
+.sidebar a {
+    text-decoration: none;
+    color: #007BFF;
+}
+
+.content {
+    flex-grow: 1; /* 主要内容区占据剩余空间 */
+    padding: 20px;
+    overflow-y: auto; /* 允许内容滚动 */
+}
+#section1{
+	height: 500px;
+}
+#section2{
+	height: 500px;
+}
+#section3{
+	height: 500px;
+}
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .container {
+        flex-direction: column; /* 在小屏幕上堆叠显示 */
+    }
+    .sidebar {
+        width: 100%; /* 宽度变为100% */
+        position: static; /* 移除粘性定位 */
+    }
+}

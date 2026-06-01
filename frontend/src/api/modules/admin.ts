@@ -114,3 +114,43 @@ export function getAdminStatsTrend() {
 export function getAdminLogs(params?: { page?: number; size?: number; keyword?: string; startTime?: string; endTime?: string }) {
   return request.get<{ records: any[]; total: number }>('/admin/logs', { params })
 }
+
+export function getAdminPoetFeatured(params: { page?: number; size?: number }) {
+  return request.get<{ records: any[]; total: number }>('/admin/poet-featured', { params })
+}
+
+export function getAdminPoetFeaturedById(id: number) {
+  return request.get<any>(`/admin/poet-featured/${id}`)
+}
+
+export function createAdminPoetFeatured(data: any) {
+  return request.post<any>('/admin/poet-featured', data)
+}
+
+export function updateAdminPoetFeatured(id: number, data: any) {
+  return request.put<any>(`/admin/poet-featured/${id}`, data)
+}
+
+export function deleteAdminPoetFeatured(id: number) {
+  return request.delete<void>(`/admin/poet-featured/${id}`)
+}
+
+export function getHomeNavigationList(params?: { type?: string }) {
+  return request.get<any[]>('/home-navigation', { params })
+}
+
+export function getAdminHomeNavigation(params: { page?: number; size?: number; type?: string }) {
+  return request.get<{ records: any[]; total: number }>('/admin/home-navigation/manage', { params })
+}
+
+export function createHomeNavigation(data: any) {
+  return request.post<any>('/admin/home-navigation', data)
+}
+
+export function updateHomeNavigation(id: number, data: any) {
+  return request.put<any>(`/admin/home-navigation/${id}`, data)
+}
+
+export function deleteHomeNavigation(id: number) {
+  return request.delete<void>(`/admin/home-navigation/${id}`)
+}

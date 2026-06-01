@@ -140,4 +140,11 @@ onMounted(() => {
 :deep(.el-select) {
   width: 100%;
 }
+
+:deep(.el-input__inner),
+:deep(.el-textarea__inner) {
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  letter-spacing: 0.5px;
+  line-height: 1.5;
+}
 </style>

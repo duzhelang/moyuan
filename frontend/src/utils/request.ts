@@ -25,6 +25,25 @@ service.interceptors.request.use(
   }
 )
 
+const PUBLIC_PATHS = [
+  '/poems',
+  '/poets',
+  '/dynasties',
+  '/categories',
+  '/forum/posts',
+  '/forum/comments',
+  '/poet-featured',
+  '/home-navigation',
+  '/vision',
+  '/ai',
+  '/search',
+  '/auth'
+]
+
+function isPublicRequest(url: string = ''): boolean {
+  return PUBLIC_PATHS.some(path => url.includes(path))
+}
+
 service.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {
     const { code, message } = response.data
@@ -37,12 +56,15 @@ service.interceptors.response.use(
   (error) => {
     if (error.response) {
       const { status } = error.response
+      const requestUrl = error.config?.url || ''
       switch (status) {
         case 401:
-          ElMessage.error('登录已过期，请重新登录')
-          const userStore = useUserStore()
-          userStore.logout()
-          window.location.href = '/user/login'
+          if (!isPublicRequest(requestUrl)) {
+            ElMessage.error('登录已过期，请重新登录')
+            const userStore = useUserStore()
+            userStore.logout()
+            window.location.href = '/user/login'
+          }
           break
         case 403:
           ElMessage.error('没有权限访问')

@@ -200,6 +200,16 @@ SC_MoYuan2_/
 
 ## 更新日志
 
+### v1.3.0 (2026-06-02)
+- ✅ 新增诗人推荐功能（协同过滤算法，基于收藏/点赞/浏览历史）
+- ✅ 新增首页导航管理（后端HomeNavigationController + 前端管理页面）
+- ✅ 新增精选诗人管理（后端PoetFeaturedController + 前端管理页面）
+- ✅ 新增诗话视野模块（VisionArticleController + 文章列表/详情页）
+- ✅ 新增测试框架（Vitest）和单元测试示例
+- ✅ 新增AuthHeader、QrCodeLink等通用组件
+- ✅ 优化首页布局和交互体验
+- ✅ 更新数据库初始化脚本和种子数据
+
 ### v1.2.1 (2026-05-30)
 - ✅ 项目根目录整理：迁移废弃文件夹至归档目录
   - 迁移旧版静态网站文件（css/, html/, js/, zt/）至 `_archive/old-static-site/`

@@ -235,6 +235,12 @@ onMounted(() => {
   .el-input {
     width: 180px;
   }
+
+  :deep(.el-input__inner) {
+    font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: 0.5px;
+    line-height: 1.5;
+  }
 }
 
 .poem-grid {

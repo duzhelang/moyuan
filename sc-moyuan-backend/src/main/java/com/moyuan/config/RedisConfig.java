@@ -29,6 +29,7 @@ public class RedisConfig {
         om.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
         BasicPolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
                 .allowIfSubType("com.moyuan.")
+                .allowIfSubType("com.baomidou.")
                 .allowIfSubType("java.util.")
                 .allowIfSubType("java.time.")
                 .build();

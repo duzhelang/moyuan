@@ -12,7 +12,10 @@ html, body {
   border: 0;
   width: 100%;
   min-height: 100vh;
-  overflow-x: hidden;
+}
+
+body {
+  overflow-x: clip;
 }
 
 #app {

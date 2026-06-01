@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
+import AuthHeader from '@/components/common/AuthHeader.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
 
 const loading = ref(false)
-const currentTime = ref('')
 
 const form = reactive({
   username: '',
@@ -22,23 +22,6 @@ const form = reactive({
   email: '',
   phone: '',
   agreement: false
-})
-
-const updateTime = () => {
-  const now = new Date()
-  currentTime.value = now.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  })
-}
-
-onMounted(() => {
-  updateTime()
-  setInterval(updateTime, 1000)
 })
 
 const handleReset = () => {
@@ -60,15 +43,21 @@ const handleSubmit = async () => {
     ElMessage.warning('请输入用户名和密码')
     return
   }
+  if (form.password.length < 6) {
+    ElMessage.warning('密码长度不能少于6位')
+    return
+  }
   if (form.password !== form.confirmPassword) {
     ElMessage.warning('两次输入密码不一致')
     return
   }
   loading.value = true
   try {
-    await userStore.login({
+    await userStore.register({
       username: form.username,
-      password: form.password
+      password: form.password,
+      email: form.email || undefined,
+      nickname: form.username
     })
     ElMessage.success('注册成功')
     router.push('/')
@@ -82,33 +71,7 @@ const handleSubmit = async () => {
 
 <template>
   <div class="dl_container">
-    <div class="header">
-      <div class="top_genglu">
-        <div class="logo" title="首页">
-          <a href="/" target="_blank">
-            <img src="/img/tubiao (1).jpg" />
-            <div class="txt">墨渊</div>
-          </a>
-        </div>
-        <div class="top_txt">
-          <div class="shijian" title="现在时间">
-            {{ currentTime }}
-          </div>
-          <div class="txt1">了解我们
-            <div class="erw">
-              <img src="/img/微信二维.jpg" />
-            </div>
-          </div>
-          <div class="txt2">联系我们
-            <div class="erw">
-              <img src="/img/微信二维.jpg" />
-            </div>
-          </div>
-        </div>
-      </div>
-      <hr class="hr" />
-      <hr />
-    </div>
+    <AuthHeader />
 
     <div class="body">
       <div class="dl_tubiao">
@@ -121,8 +84,8 @@ const handleSubmit = async () => {
 
       <div class="zc_main">
         <div class="biao">
-          <table border="0" cellspacing="2" align="center">
           <form @submit.prevent="handleSubmit">
+            <table border="0" cellspacing="2" align="center">
               <caption>
                 <h2>信&nbsp;&nbsp;&nbsp;&nbsp;息</h2>
               </caption>
@@ -132,11 +95,11 @@ const handleSubmit = async () => {
               </tr>
               <tr>
                 <td align="right">密码：</td>
-                <td><input type="password" class="lock" name="password" placeholder="密码" id="password1" required="" v-model="form.password"></td>
+                <td><input type="password" class="lock" name="password" placeholder="密码" id="password1" required v-model="form.password"></td>
               </tr>
               <tr>
                 <td align="right">确认密码：</td>
-                <td><input type="password" class="lock" name="confirm-password" placeholder="确认密码" id="password2" required="" v-model="form.confirmPassword"></td>
+                <td><input type="password" class="lock" name="confirm-password" placeholder="确认密码" id="password2" required v-model="form.confirmPassword"></td>
               </tr>
               <tr>
                 <td align="right">性别：</td>
@@ -224,8 +187,8 @@ const handleSubmit = async () => {
                 <td align="right"><input type="button" value="重置" class="cz" @click="handleReset" /></td>
                 <td align="center"><input type="submit" value="提交" class="tj" :disabled="loading" /></td>
               </tr>
+            </table>
           </form>
-          </table>
         </div>
       </div>
     </div>
@@ -242,220 +205,91 @@ const handleSubmit = async () => {
 }
 
 .dl_container {
-  min-height: 100vh;
+  height: 100vh;
   background: url('/img/dt_0.0.jpg') no-repeat -155px 0 / cover;
   position: relative;
   font-family: cursive;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
-.header {
-  width: 100vw;
-  height: 60px;
-  text-decoration: none;
-  border-top-left-radius: 0px;
-  border-top-right-radius: 0px;
-  border-bottom-right-radius: 50px;
-  border-bottom-left-radius: 5px;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  background: url('/img/dt_3.jpg');
-  background-size: cover;
-  background-repeat: no-repeat;
-  background-position: 0px -320px;
-  box-shadow: 0 2px 5px rgba(0,0,0,.2);
-  z-index: 51;
+.dl_container::-webkit-scrollbar {
+  width: 8px;
 }
 
-.header hr {
-  border: none;
-  height: 1px;
-  background-color: #dedede;
-  margin-top: -2px;
-  margin-bottom: -3px;
+.dl_container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
 }
 
-.header .hr {
-  border: none;
-  height: 1px;
-  background-color: #303030;
-  margin-top: -11px;
-  margin-bottom: -3px;
+.dl_container::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
 }
 
-.header .top_genglu {
-  width: 100%;
-  height: 50px;
-  display: flex;
-  justify-content: space-between;
-}
-
-.header .top_genglu .logo {
-  font-size: 34px;
-  color: #000;
-  vertical-align: middle;
-}
-
-.header .top_genglu .logo a {
-  font-size: 34px;
-  color: #000;
-  vertical-align: middle;
-  display: flex;
-  text-align: center;
-  text-decoration: none;
-}
-
-.header .top_genglu .logo .txt {
-  display: flex;
-  align-items: center;
-}
-
-.header .top_genglu .logo img {
-  width: 50px;
-  height: 50px;
-  float: left;
-}
-
-.top_genglu .top_txt {
-  display: flex;
-  align-items: center;
-  margin-right: 20px;
-  font-size: 25px;
-}
-
-.header .top_genglu .shijian {
-  color: white;
-  background-color: rgba(200, 200, 200, 0.3);
-  margin-right: 50px;
-  font-size: 14px;
-  padding: 2px 10px;
-}
-
-.header .top_genglu .txt1 {
-  width: 90px;
-  float: right;
-  color: whitesmoke;
-  font-size: 20px;
-  position: relative;
-  z-index: 50;
-  cursor: pointer;
-}
-
-.header .top_genglu .txt2 {
-  width: 90px;
-  float: right;
-  color: whitesmoke;
-  font-size: 20px;
-  position: relative;
-  z-index: 50;
-  cursor: pointer;
-}
-
-.top_genglu .erw img {
-  width: 100px;
-  height: 100px;
-  float: left;
-}
-
-.header .top_genglu .txt1 .erw {
-  display: none;
-  width: 100px;
-  height: 100px;
-  margin-left: -12px;
-  overflow: hidden;
-  position: absolute;
-  z-index: 50;
-  top: 100%;
-  left: 0;
-}
-
-.header .top_genglu .txt2 .erw {
-  display: none;
-  width: 100px;
-  height: 100px;
-  margin-left: -12px;
-  overflow: hidden;
-  position: absolute;
-  z-index: 50;
-  top: 100%;
-  left: 0;
-}
-
-.header .top_genglu .txt1:hover .erw {
-  display: block;
-  background: blue;
-}
-
-.header .top_genglu .txt1:hover {
-  font-size: 21px;
-}
-
-.header .top_genglu .txt2:hover .erw {
-  display: block;
-  background: blue;
-}
-
-.header .top_genglu .txt2:hover {
-  font-size: 22px;
+.dl_container::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .body {
-  width: 1512.8px;
-  overflow-x: hidden;
+  width: 100%;
+  max-width: 1512px;
   margin: 0 auto;
-  padding-top: 60px;
+  padding-top: 55px;
+  padding-bottom: 80px;
+  min-height: calc(100vh - 55px);
 }
 
 .dl_tubiao {
-  height: 1px;
+  height: 0;
   position: relative;
 }
 
 .dl_tubiao img {
-  position: absolute;
+  position: fixed;
+  pointer-events: none;
 }
 
 .dl_zhuang_s1_ {
-  position: absolute;
-  top: 90px;
-  z-index: 10;
-  left: 220px;
+  position: fixed;
+  top: 75px;
+  z-index: 1;
+  left: 150px;
   width: 180px;
   height: 350px;
 }
 
 .zc_zhuang_s2 {
-  position: absolute;
-  top: 410px;
-  z-index: 10;
-  left: 280px;
+  position: fixed;
+  top: 440px;
+  z-index: 1;
+  left: 200px;
   width: 100px;
   height: 100px;
 }
 
 .dl_zhuang_s3 {
-  position: absolute;
+  position: fixed;
   width: 200px;
-  z-index: 10;
+  z-index: 1;
   height: 300px;
-  bottom: 50px;
-  left: 1328px;
+  top: 70px;
+  right: 20px;
 }
 
 .zc_zhuang_s4 {
-  position: absolute;
-  top: 400px;
-  z-index: 10;
-  left: 1060px;
+  position: fixed;
+  bottom: 250px;
+  z-index: 1;
+  right: -50px;
   width: 468px;
   height: 300px;
 }
 
 .dl_zhuang_s5 {
-  position: absolute;
-  bottom: 20px;
-  z-index: 10;
+  position: fixed;
+  bottom: 25px;
+  z-index: 1;
+  left: 20px;
   width: 200px;
   height: 300px;
 }
@@ -466,10 +300,12 @@ const handleSubmit = async () => {
   position: relative;
   text-align: center;
   justify-content: center;
+  z-index: 10;
 }
 
 .zc_main .biao {
-  margin-top: 75px;
+  margin-top: 40px;
+  margin-bottom: 40px;
   font-size: 26px;
   z-index: 50;
   display: flex;
@@ -478,6 +314,7 @@ const handleSubmit = async () => {
   background-repeat: no-repeat;
   background-position: 0px 0px;
   border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .zc_main .biao table {
@@ -488,7 +325,8 @@ const handleSubmit = async () => {
   color: black;
   background-color: rgba(225, 225, 225, 0.2);
   border-radius: 8px;
-  padding: 4px 8px;
+  padding: 6px 10px;
+  white-space: nowrap;
 }
 
 .biao caption h2 {
@@ -513,7 +351,9 @@ const handleSubmit = async () => {
   height: 30px;
   border: none;
   border-radius: 10px;
-  font-family: cursive;
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  letter-spacing: 0.5px;
+  line-height: 1.5;
   padding: 0 5px;
   font-size: 16px;
 }
@@ -523,7 +363,9 @@ const handleSubmit = async () => {
   height: 30px;
   border: none;
   border-radius: 10px;
-  font-family: cursive;
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  letter-spacing: 0.5px;
+  line-height: 1.5;
   padding: 0 5px;
   font-size: 16px;
   background-color: transparent;
@@ -612,9 +454,11 @@ input::-webkit-input-placeholder {
 }
 
 .dlzc_ditu_div {
-  position: absolute;
+  position: fixed;
   z-index: 50;
   bottom: 0;
+  left: 0;
+  right: 0;
   width: 100%;
   height: 60px;
   background: url('/img/dt_1.jpg') no-repeat 0px -360px / cover;

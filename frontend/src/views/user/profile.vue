@@ -5,7 +5,7 @@ import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { getMyFavorites, favoritePoem } from '@/api/modules/poem'
-import { getMyPosts } from '@/api/modules/user'
+import { getMyPosts, getUserStats } from '@/api/modules/user'
 import { getHistory, clearHistory } from '@/api/modules/history'
 import type { Poem, ForumPost, UserHistory } from '@/types/model'
 
@@ -15,6 +15,13 @@ const userStore = useUserStore()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
 const activeTab = ref('profile')
+
+const userStats = ref({
+  favoriteCount: 0,
+  postCount: 0,
+  historyCount: 0,
+  likeCount: 0
+})
 
 const form = reactive({
   nickname: '',
@@ -77,6 +84,15 @@ const initForm = () => {
     form.gender = userStore.userInfo.gender || 0
     form.birthday = userStore.userInfo.birthday || ''
     form.bio = userStore.userInfo.bio || ''
+  }
+}
+
+const fetchUserStats = async () => {
+  try {
+    const res = await getUserStats()
+    userStats.value = res.data
+  } catch (error) {
+    console.error('获取用户统计信息失败')
   }
 }
 
@@ -232,6 +248,12 @@ watch(activeTab, (val) => {
 
 onMounted(() => {
   initForm()
+  fetchUserStats()
+  
+  const tab = router.currentRoute.value.query.tab as string
+  if (tab && ['profile', 'password', 'favorites', 'posts', 'history'].includes(tab)) {
+    activeTab.value = tab
+  }
 })
 </script>
 
@@ -243,11 +265,26 @@ onMounted(() => {
       <div class="profile-content">
         <div class="profile-sidebar">
           <div class="user-card">
-            <el-avatar :src="userStore.avatar" :size="80">
+            <el-avatar :src="userStore.avatar" :size="100" class="user-avatar-large">
               {{ userStore.username?.charAt(0)?.toUpperCase() }}
             </el-avatar>
-            <h3 class="username">{{ userStore.username }}</h3>
+            <h3 class="username">{{ userStore.userInfo?.nickname || userStore.username }}</h3>
             <p class="user-bio">{{ form.bio || '这个人很懒，什么都没留下' }}</p>
+            
+            <div class="user-stats">
+              <div class="stat-item" @click="activeTab = 'favorites'">
+                <span class="stat-number">{{ userStats.favoriteCount }}</span>
+                <span class="stat-label">收藏</span>
+              </div>
+              <div class="stat-item" @click="activeTab = 'posts'">
+                <span class="stat-number">{{ userStats.postCount }}</span>
+                <span class="stat-label">帖子</span>
+              </div>
+              <div class="stat-item" @click="activeTab = 'history'">
+                <span class="stat-number">{{ userStats.historyCount }}</span>
+                <span class="stat-label">浏览</span>
+              </div>
+            </div>
           </div>
           
           <el-menu
@@ -571,16 +608,57 @@ onMounted(() => {
   margin-bottom: $spacing-lg;
 }
 
+.user-avatar-large {
+  border: 4px solid $primary-color;
+  box-shadow: $box-shadow-lg;
+  margin-bottom: $spacing-md;
+}
+
 .username {
   font-size: $font-size-xl;
   color: $text-color;
   margin-top: $spacing-md;
   margin-bottom: $spacing-xs;
+  font-weight: 600;
 }
 
 .user-bio {
   font-size: $font-size-sm;
   color: $text-color-secondary;
+  margin-bottom: $spacing-lg;
+}
+
+.user-stats {
+  display: flex;
+  justify-content: space-around;
+  padding-top: $spacing-lg;
+  border-top: 1px solid $border-color;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  padding: $spacing-sm;
+  border-radius: $border-radius-md;
+  transition: all $transition-base;
+  
+  &:hover {
+    background-color: rgba($primary-color, 0.05);
+  }
+}
+
+.stat-number {
+  font-size: $font-size-xxl;
+  font-weight: 600;
+  color: $primary-color;
+}
+
+.stat-label {
+  font-size: $font-size-xs;
+  color: $text-color-secondary;
+  margin-top: $spacing-xs;
 }
 
 .profile-menu {
@@ -603,6 +681,13 @@ onMounted(() => {
 .profile-form,
 .password-form {
   max-width: 500px;
+
+  :deep(.el-input__inner),
+  :deep(.el-textarea__inner) {
+    font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: 0.5px;
+    line-height: 1.5;
+  }
 }
 
 .favorites-list,

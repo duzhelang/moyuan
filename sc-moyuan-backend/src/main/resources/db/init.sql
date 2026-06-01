@@ -1,8 +1,7 @@
 -- ============================================================
--- 古今诗话——墨渊 数据库初始化脚本
--- 版本：v2.0（合并版）
--- 日期：2026-05-29
--- 说明：合并 init.sql + schema.sql + data.sql + migration_002
+-- 版本：v3.0（全量合并版）
+-- 日期：2026-06-01
+-- 说明：全量合并所有表结构和初始数据，删除过渡迁移脚本
 --       所有建表使用 IF NOT EXISTS，数据使用 INSERT IGNORE
 -- ============================================================
 
@@ -244,6 +243,49 @@ CREATE TABLE IF NOT EXISTS `user_history` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户浏览历史表';
 
 -- ============================================================
+-- 12. 精选诗人卡片表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `poet_featured` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `poet_id` BIGINT DEFAULT NULL COMMENT '关联诗人ID',
+  `name` VARCHAR(50) NOT NULL COMMENT '诗人姓名',
+  `dynasty` VARCHAR(50) DEFAULT NULL COMMENT '朝代',
+  `description` VARCHAR(500) DEFAULT NULL COMMENT '简介',
+  `biography` TEXT DEFAULT NULL COMMENT '详细生平',
+  `image_url` VARCHAR(255) DEFAULT NULL COMMENT '意境图URL',
+  `sort_order` INT NOT NULL DEFAULT 0 COMMENT '排序顺序',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  PRIMARY KEY (`id`),
+  KEY `idx_poet_featured_status` (`status`),
+  KEY `idx_poet_featured_sort` (`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='精选诗人卡片表';
+
+-- ============================================================
+-- 13. 首页导航数据表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `home_navigation` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `type` VARCHAR(20) NOT NULL COMMENT '类型：works-作品，genres-流派，dynasties-朝代',
+  `title` VARCHAR(100) NOT NULL COMMENT '标题',
+  `subtitle` VARCHAR(200) DEFAULT NULL COMMENT '副标题/描述',
+  `image_url` VARCHAR(500) DEFAULT NULL COMMENT '图片URL',
+  `link_id` BIGINT DEFAULT NULL COMMENT '关联ID（诗词ID、分类ID、朝代ID等）',
+  `link_type` VARCHAR(20) DEFAULT NULL COMMENT '链接类型：poem-诗词，category-分类，dynasty-朝代',
+  `sort_order` INT NOT NULL DEFAULT 0 COMMENT '排序',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1-启用，0-禁用',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  PRIMARY KEY (`id`),
+  KEY `idx_home_navigation_type` (`type`),
+  KEY `idx_home_navigation_sort_order` (`sort_order`),
+  KEY `idx_home_navigation_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='首页导航数据表';
+
+-- ============================================================
 -- 初始数据：朝代
 -- ============================================================
 INSERT IGNORE INTO `dynasty` (`name`, `start_year`, `end_year`, `description`, `sort_order`) VALUES
@@ -328,3 +370,98 @@ INSERT IGNORE INTO `ai_model` (`name`, `display_name`, `provider`, `model_type`,
 ('deepseek', 'DeepSeek', 'deepseek', 'text', 'https://api.deepseek.com/v1/chat/completions', 'your-deepseek-api-key', 'deepseek-chat', NULL, 1024, 0, 0, 2),
 ('kimi', 'Kimi', 'kimi', 'text', 'https://api.moonshot.cn/v1/chat/completions', 'your-kimi-api-key', 'moonshot-v1-8k', NULL, 1024, 0, 0, 3),
 ('nvidia', 'NVIDIA NIM', 'nvidia', 'text', 'https://integrate.api.nvidia.com/v1/chat/completions', 'your-nvidia-api-key', 'meta/llama-4-scout', NULL, 1024, 0, 0, 4);
+
+-- ============================================================
+-- 初始数据：测试用户
+-- ============================================================
+INSERT IGNORE INTO `user` (`username`, `password`, `email`, `nickname`, `role`, `status`) VALUES
+('admin', '$2b$12$kMElb/13aTqGl9pfrD4CqOfA8rVJ3ahUcRBPfTHihcQ4D6.5gKWB6', 'admin@moyuan.com', '系统管理员', 'admin', 1),
+('test', '$2b$10$7WF/nU54ij0NgOYQzcbvWOIUsfCBQ28BeEq9rc.buaUcl0zaR.9PO', 'test@moyuan.com', '测试用户', 'user', 1),
+('text', '$2b$10$7WF/nU54ij0NgOYQzcbvWOIUsfCBQ28BeEq9rc.buaUcl0zaR.9PO', 'text@moyuan.com', '文本用户', 'user', 1);
+
+-- ============================================================
+-- 初始数据：精选诗人
+-- ============================================================
+INSERT IGNORE INTO `poet_featured` (`poet_id`, `name`, `dynasty`, `description`, `biography`, `image_url`, `sort_order`) VALUES
+(1, '李清照', '宋代', '（1084年—1155年），号易安居士，齐州章丘人。宋代婉约派代表词人。', '李清照善于以简洁自然的语言表达真挚的情感，使词作通俗易懂却又意味深长。她的词作情感表达细腻入微，无论是少女的娇羞、对爱情的渴望，还是后期的国仇家恨、孤独愁苦，都能让读者产生强烈的共鸣。', '/img/cd_suolue (10).jpg', 1),
+(2, '杜牧', '唐代', '（803年—852年），字牧之，京兆万年（今陕西省西安市）人。唐朝文学家、诗人。', '杜牧为人性情刚直，不拘小节，不屑逢迎。自负经略之才，诗文均有盛名。文以《阿房宫赋》为最著，诗作明丽隽永，绝句诗尤受人称赞，世称小杜。与李商隐齐名，合称"小李杜"。', '/img/cd_suolue (11).jpg', 2),
+(3, '苏轼', '宋代', '（1037年—1101年），字子瞻，号东坡居士，世称苏东坡、苏仙、坡仙。', '苏轼的思想融合了儒、释、道三家。儒家思想使他积极入世，关心民生疾苦；道家思想让他在面对困境时能保持内心的超脱和豁达；佛家思想则使他在历经磨难后，获得心灵的慰藉和宁静。', '/img/cd_suolue (12).jpg', 3),
+(4, '上官婉儿', '唐代', '（664年—710年）是唐代一位极具影响力的女官和诗人。与蔡文姬、李清照、卓文君并称中国古代四大才女。', '她代朝廷品评天下诗文，大力提倡辞藻华丽、用律严谨的文风，使得当时宫廷内外都流行这种诗歌风格，对唐朝文坛的繁荣和诗歌艺术水平的提高作出了重要贡献。', '/img/cd_suolue (9).jpg', 4),
+(5, '辛弃疾', '宋代', '（1140年—1207年），字幼安，号稼轩，历城（今山东济南）人。南宋豪放派词人。', '辛弃疾一生以恢复为志，以功业自许，却命运多舛、壮志难酬。但他始终没有动摇恢复中原的信念，而是把满腔激情和对国家兴亡、民族命运的关切、忧虑，全部寄寓于词作之中。', '/img/cd_suolue (7).jpg', 5),
+(6, '李白', '唐代', '（701年—762年），字太白，号青莲居士，唐代伟大的浪漫主义诗人。', '李白的诗雄奇飘逸，艺术成就极高。他讴歌祖国山河与美丽的自然风光，风格雄奇奔放，俊逸清新，富有浪漫主义精神，达到了内容与艺术的完美统一。', '/img/cd_suolue (8).jpg', 6);
+
+-- ============================================================
+-- 初始数据：首页导航-作品
+-- ============================================================
+INSERT IGNORE INTO `home_navigation` (`type`, `title`, `subtitle`, `image_url`, `link_id`, `link_type`, `sort_order`) VALUES
+('works', '黄鹤楼', '唐代:崔颢', 'h6.jpg', 42, 'poem', 1),
+('works', '春宫怨', '唐代:杜荀鹤', 'h6.2.jpg', 51, 'poem', 2),
+('works', '秋日赴阙题潼关驿楼', '唐代:杜荀鹤', 'h6.3.jpg', 62, 'poem', 3),
+('works', '次北固山下', '唐代:许浑', 'h6.4.jpg', 73, 'poem', 4),
+('works', '静夜思', '唐代:李白', 'h6.jpg', 84, 'poem', 5),
+('works', '登鹳雀楼', '唐代:王之涣', 'h6.2.jpg', 95, 'poem', 6),
+('works', '春晓', '唐代:孟浩然', 'h6.3.jpg', 106, 'poem', 7),
+('works', '悯农', '唐代:李绅', 'h6.4.jpg', 117, 'poem', 8);
+
+-- ============================================================
+-- 初始数据：首页导航-流派
+-- ============================================================
+INSERT IGNORE INTO `home_navigation` (`type`, `title`, `subtitle`, `image_url`, `link_id`, `link_type`, `sort_order`) VALUES
+('genres', '边塞·豪放', NULL, 'h6_liupai_4.png', 1, 'category', 1),
+('genres', '唐宋八大家', NULL, 'h6_liupai_1.jpg', 2, 'category', 2),
+('genres', '竹林七贤', NULL, 'h6_liupai_3.png', 3, 'category', 3),
+('genres', '元曲四大家', NULL, 'h6_liupai_2.jpg', 4, 'category', 4),
+('genres', '婉约派', NULL, 'h6_liupai_5.jpg', 5, 'category', 5),
+('genres', '豪放派', NULL, 'h6_liupai_6.jpg', 6, 'category', 6),
+('genres', '田园诗派', NULL, 'h6_liupai_7.jpg', 7, 'category', 7),
+('genres', '山水诗派', NULL, 'h6_liupai_8.jpg', 8, 'category', 8);
+
+-- ============================================================
+-- 初始数据：首页导航-朝代
+-- ============================================================
+INSERT IGNORE INTO `home_navigation` (`type`, `title`, `subtitle`, `image_url`, `link_id`, `link_type`, `sort_order`) VALUES
+('dynasties', '先秦', '蒹葭苍苍，白露为霜。', 'h6_chaodai_1.jpg', 1, 'dynasty', 1),
+('dynasties', '两汉', '青青园中葵，朝露待日晞。', 'h6_chaodai_1.jpg', 2, 'dynasty', 2),
+('dynasties', '唐朝', '秋风清，秋月明。', 'h6_chaodai_2.jpg', 3, 'dynasty', 3),
+('dynasties', '宋朝', '十年生死两茫茫，不思量，自难忘。', 'h6_chaodai_3.jpg', 4, 'dynasty', 4),
+('dynasties', '元朝', '枯藤老树昏鸦，小桥流水人家。', 'cd_suolue (4).jpg', 5, 'dynasty', 5),
+('dynasties', '南北朝', '滚滚长江东逝水，浪花淘尽英雄。', 'h6_chaodai_2.jpg', 6, 'dynasty', 6),
+('dynasties', '金朝', '人生若只如初见，何事秋风悲画扇。', 'h6_chaodai_3.jpg', 7, 'dynasty', 7),
+('dynasties', '明清', '春花秋月何时了？往事知多少。', 'cd_suolue (4).jpg', 8, 'dynasty', 8);
+
+-- ============================================================
+-- 诗话视野文章表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `vision_article` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `title` VARCHAR(200) NOT NULL COMMENT '文章标题',
+  `summary` VARCHAR(500) DEFAULT NULL COMMENT '文章摘要',
+  `content` TEXT NOT NULL COMMENT '文章正文',
+  `cover_image` VARCHAR(500) DEFAULT NULL COMMENT '封面图片URL',
+  `author` VARCHAR(50) DEFAULT NULL COMMENT '作者',
+  `category` VARCHAR(50) DEFAULT NULL COMMENT '文章分类',
+  `view_count` INT NOT NULL DEFAULT 0 COMMENT '浏览次数',
+  `like_count` INT NOT NULL DEFAULT 0 COMMENT '点赞次数',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-草稿，1-已发布',
+  `is_featured` TINYINT NOT NULL DEFAULT 0 COMMENT '是否推荐：0-否，1-是',
+  `sort_order` INT NOT NULL DEFAULT 0 COMMENT '排序顺序',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0-未删除，1-已删除',
+  PRIMARY KEY (`id`),
+  KEY `idx_vision_article_status` (`status`),
+  KEY `idx_vision_article_category` (`category`),
+  KEY `idx_vision_article_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='诗话视野文章表';
+
+INSERT IGNORE INTO `vision_article` (`title`, `summary`, `content`, `author`, `category`, `view_count`, `like_count`, `is_featured`, `sort_order`) VALUES
+('穿越千年的诗意对话：唐诗宋词中的文化传承与创新', '探索唐诗宋词如何在当代社会中继续发挥文化影响力，从古典到现代的文化传承脉络。', '唐诗宋词是中国文学史上最璀璨的两颗明珠。从李白的豪放飘逸到杜甫的沉郁顿挫，从苏轼的豪迈旷达到李清照的婉约细腻，这些诗词不仅是文学的瑰宝，更是中华民族精神文化的根基。\n\n在当代社会，唐诗宋词依然以各种形式影响着我们的生活。从影视作品中的诗词引用，到日常交流中的意境表达，古典诗词的文化基因已经深深融入了中华文明的血脉之中。\n\n本文将从文化传承、创新发展、教育应用三个维度，探讨唐诗宋词在当代社会中的生命力和影响力。', '张文远', '文化传承', 328, 45, 1, 1),
+('意象之美：如何通过自然景观来抒发人文情怀', '解读中国古典诗词中自然意象与人文情感的完美交融。', '中国古典诗词讲究"借景抒情"、"托物言志"。从"大漠孤烟直，长河落日圆"的壮阔，到"小荷才露尖尖角，早有蜻蜓立上头"的清新，诗人通过对自然景观的描绘，寄托了深厚的人文情怀。\n\n月亮寄托思乡之情，梅花象征高洁品格，松竹代表坚贞不屈——这些意象已经超越了自然本身，成为中华文化特有的精神符号。\n\n本文将带领读者深入品味这些经典意象背后的文化密码。', '李墨涵', '诗词赏析', 256, 38, 1, 2),
+('从"床前明月光"到"明月几时有"：月亮在古诗词中的意象变迁', '梳理古诗词中"月亮"意象从先秦到宋代的演变轨迹与文化意蕴。', '月亮是中国古诗词中出现频率最高的意象之一。从《诗经》中的"月出皎兮"到李白的"床前明月光"，再到苏轼的"明月几时有"，月亮承载了不同时代诗人的情感与思考。\n\n在先秦时期，月亮是自然崇拜的对象；在魏晋南北朝，月亮成为文人寄托忧思的媒介；到唐代，月亮意象达到巅峰，李白、杜甫、王维等诗人赋予月亮丰富多彩的文化内涵；宋代的苏轼更是将月亮意象推向了哲理的高度。\n\n本文将以时间为线索，梳理月亮意象在中国古诗词中的千年变迁。', '王诗词', '诗词赏析', 412, 62, 1, 3),
+('诗词中的哲学思考：从杜甫到苏轼的忧国忧民情怀', '探讨杜甫和苏轼诗词中蕴含的深刻哲学思想与人文关怀。', '杜甫被称为"诗圣"，苏轼被誉为"千古第一文人"。他们的诗词不仅在艺术上达到了极高的成就，更蕴含着深刻的哲学思考和忧国忧民的情怀。\n\n杜甫的"安得广厦千万间，大庇天下寒士俱欢颜"体现了儒家的仁爱精神；苏轼的"回首向来萧瑟处，归去，也无风雨也无晴"则展现了道家的超脱智慧。\n\n本文将从哲学角度重新审视两位伟大诗人的作品，探讨其中蕴含的人生智慧和社会关怀。', '陈思齐', '文化传承', 189, 31, 0, 4),
+('诗词创作工作坊：提升你的押韵与对仗技巧', '面向诗词爱好者的实用创作指南，详解格律、押韵与对仗的核心技巧。', '中国古典诗词的格律之美，体现在严谨的押韵和精妙的对仗之中。掌握这些技巧，不仅能帮助我们更好地欣赏古典诗词，也能激发创作灵感。\n\n押韵是诗词的音乐性基础。古体诗的押韵相对自由，近体诗则要求严格的韵脚规范。对仗则要求上下句字数相等、词性相对、意义相关。\n\n本文将通过大量实例，循序渐进地讲解押韵和对仗的基本规则与进阶技巧，帮助诗词爱好者迈出创作的第一步。', '赵雅文', '创作技巧', 156, 22, 0, 5),
+('诗词与书法：传统艺术的双重魅力', '品鉴诗词文学与书法艺术的完美融合，感受中国传统艺术的独特韵味。', '诗词与书法，是中国传统文化中最具代表性的两门艺术。当诗词遇上书法，文字的意境之美与线条的艺术之美交相辉映，产生了独特的审美体验。\n\n从王羲之书写《兰亭集序》到颜真卿的《祭侄文稿》，从苏轼的《寒食帖》到黄庭坚的《松风阁诗帖》，历代书法家以诗词为载体，创造了无数传世名作。\n\n本文将带领读者走进诗词与书法交融的艺术世界，感受传统艺术的双重魅力。', '林书雅', '艺术鉴赏', 203, 29, 0, 6),
+('诗词教育在当代：如何在学校和社会中推广古诗词', '探讨古诗词教育的现状、挑战与创新推广方式。', '近年来，随着《中国诗词大会》等节目的热播，古诗词再次成为社会关注的焦点。如何在当代教育体系中更好地推广古诗词，成为教育工作者面临的重要课题。\n\n当前诗词教育面临的主要挑战包括：教学方式单一、学生兴趣不足、与现实生活脱节等。创新的教学方法，如情境教学、跨学科融合、数字化工具应用等，正在为诗词教育注入新的活力。\n\n本文将分析诗词教育的现状与挑战，并提出切实可行的推广策略。', '刘育华', '教育推广', 134, 18, 0, 7),
+('国际视野下的中国诗词：翻译与传播的挑战', '分析中国古典诗词在国际传播中面临的翻译难题与文化隔阂。', '中国古典诗词以其独特的语言艺术和深厚的文化内涵，吸引了越来越多的海外读者。然而，诗词的国际传播面临着语言障碍和文化差异的双重挑战。\n\n诗歌翻译被称为"翻译中的翻译"，因为诗词不仅要传达字面意义，还要保留韵律、意境和文化内涵。从翟理斯到宇文所安，一代又一代的汉学家在诗词翻译领域做出了卓越的贡献。\n\n本文将探讨中国诗词国际传播的历程、翻译策略以及未来发展方向。', '周翰林', '文化传播', 178, 25, 0, 8),
+('诗词与现代生活：寻找古典与现代的平衡点', '探索古典诗词在现代生活中的应用场景与精神价值。', '在快节奏的现代生活中，古典诗词似乎离我们越来越远。但实际上，诗词的智慧和美感从未远离我们的生活。\n\n从旅行途中的即兴吟咏，到朋友圈的文案引用；从婚礼上的诗词祝福，到节日里的传统吟诵——古典诗词以其独特的方式融入了现代人的生活场景。\n\n更重要的是，诗词中蕴含的人生智慧和审美情趣，能帮助我们在喧嚣的现代生活中找到内心的宁静。', '孙明远', '文化传承', 221, 34, 0, 9),
+('诗词论坛互动专区：分享你的原创诗词，赢取点评与建议', '欢迎来到诗词爱好者的创作交流平台，展示才华、互相切磋。', '诗词论坛是古今诗话平台为诗词爱好者打造的互动交流空间。在这里，你可以发布自己的原创诗词作品，也可以对他人的作品进行点评和讨论。\n\n无论你是初学者还是资深爱好者，这里都是展示才华、交流心得的理想平台。我们的社区鼓励建设性的讨论和真诚的交流，让每一位诗词爱好者都能在这里找到归属感。\n\n快来加入我们，与志同道合的诗友一起分享创作的快乐吧！', '古今诗话编辑部', '社区互动', 145, 20, 0, 10);

@@ -22,6 +22,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
 import java.time.LocalDateTime;
 
 @Service
@@ -53,7 +57,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         userMapper.insert(user);
 
         String token = jwtUtil.generateToken(user.getId(), user.getUsername());
-        return new TokenResponse(token, 86400000L);
+        return new TokenResponse(token, jwtUtil.getExpiration());
     }
 
     @Override
@@ -70,10 +74,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
 
         user.setLastLoginTime(LocalDateTime.now());
+        user.setLastLoginIp(getClientIp());
         userMapper.updateById(user);
 
         String token = jwtUtil.generateToken(user.getId(), user.getUsername());
-        return new TokenResponse(token, 86400000L);
+        return new TokenResponse(token, jwtUtil.getExpiration());
     }
 
     @Override
@@ -143,5 +148,30 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                         .eq(UserFavorite::getUserId, userId)
                         .eq(UserFavorite::getTargetId, poemId)
                         .eq(UserFavorite::getTargetType, TargetType.POEM.getCode())) > 0;
+    }
+
+    private String getClientIp() {
+        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attributes == null) {
+            return "unknown";
+        }
+        HttpServletRequest request = attributes.getRequest();
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("Proxy-Client-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("X-Real-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }

@@ -33,3 +33,7 @@ export function getUserList(params: { page?: number; size?: number; keyword?: st
 export function getMyPosts(params?: { pageNum?: number; pageSize?: number }) {
   return request.get('/users/me/posts', { params })
 }
+
+export function getUserStats() {
+  return request.get('/users/me/stats')
+}

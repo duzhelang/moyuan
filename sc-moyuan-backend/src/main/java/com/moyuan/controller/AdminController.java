@@ -37,6 +37,8 @@ public class AdminController {
     private final OperationLogMapper operationLogMapper;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
+    private final PoetFeaturedMapper poetFeaturedMapper;
+    private final HomeNavigationMapper homeNavigationMapper;
 
     // ========== 统计数据 ==========
 
@@ -367,6 +369,103 @@ public class AdminController {
     @DeleteMapping("/poets/{id}")
     public R<Void> deletePoet(@PathVariable Long id) {
         poetMapper.deleteById(id);
+        return R.success();
+    }
+
+    // ========== 精选诗人管理 ==========
+
+    @Operation(summary = "获取精选诗人列表")
+    @GetMapping("/poet-featured")
+    public R<?> listPoetFeatured(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        LambdaQueryWrapper<PoetFeatured> wrapper = new LambdaQueryWrapper<>();
+        wrapper.orderByAsc(PoetFeatured::getSortOrder)
+               .orderByDesc(PoetFeatured::getCreateTime);
+        return R.success(poetFeaturedMapper.selectPage(new Page<>(page, size), wrapper));
+    }
+
+    @Operation(summary = "获取精选诗人详情")
+    @GetMapping("/poet-featured/{id}")
+    public R<PoetFeatured> getPoetFeatured(@PathVariable Long id) {
+        PoetFeatured poetFeatured = poetFeaturedMapper.selectById(id);
+        if (poetFeatured == null) {
+            return R.error("精选诗人不存在");
+        }
+        return R.success(poetFeatured);
+    }
+
+    @Operation(summary = "创建精选诗人")
+    @PostMapping("/poet-featured")
+    public R<PoetFeatured> createPoetFeatured(@RequestBody PoetFeatured poetFeatured) {
+        poetFeaturedMapper.insert(poetFeatured);
+        return R.success(poetFeatured);
+    }
+
+    @Operation(summary = "更新精选诗人")
+    @PutMapping("/poet-featured/{id}")
+    public R<PoetFeatured> updatePoetFeatured(@PathVariable Long id, @RequestBody PoetFeatured poetFeatured) {
+        poetFeatured.setId(id);
+        poetFeaturedMapper.updateById(poetFeatured);
+        return R.success(poetFeatured);
+    }
+
+    @Operation(summary = "删除精选诗人")
+    @DeleteMapping("/poet-featured/{id}")
+    public R<Void> deletePoetFeatured(@PathVariable Long id) {
+        poetFeaturedMapper.deleteById(id);
+        return R.success();
+    }
+
+    // ========== 首页导航管理 ==========
+
+    @Operation(summary = "获取首页导航列表")
+    @GetMapping("/home-navigation")
+    public R<?> listHomeNavigation(
+            @RequestParam(required = false) String type) {
+        LambdaQueryWrapper<HomeNavigation> wrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.hasText(type)) {
+            wrapper.eq(HomeNavigation::getType, type);
+        }
+        wrapper.eq(HomeNavigation::getStatus, 1)
+               .orderByAsc(HomeNavigation::getSortOrder);
+        return R.success(homeNavigationMapper.selectList(wrapper));
+    }
+
+    @Operation(summary = "管理端获取首页导航列表")
+    @GetMapping("/home-navigation/manage")
+    public R<?> listHomeNavigationManage(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String type) {
+        LambdaQueryWrapper<HomeNavigation> wrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.hasText(type)) {
+            wrapper.eq(HomeNavigation::getType, type);
+        }
+        wrapper.orderByAsc(HomeNavigation::getType)
+               .orderByAsc(HomeNavigation::getSortOrder);
+        return R.success(homeNavigationMapper.selectPage(new Page<>(page, size), wrapper));
+    }
+
+    @Operation(summary = "创建首页导航")
+    @PostMapping("/home-navigation")
+    public R<HomeNavigation> createHomeNavigation(@RequestBody HomeNavigation homeNavigation) {
+        homeNavigationMapper.insert(homeNavigation);
+        return R.success(homeNavigation);
+    }
+
+    @Operation(summary = "更新首页导航")
+    @PutMapping("/home-navigation/{id}")
+    public R<HomeNavigation> updateHomeNavigation(@PathVariable Long id, @RequestBody HomeNavigation homeNavigation) {
+        homeNavigation.setId(id);
+        homeNavigationMapper.updateById(homeNavigation);
+        return R.success(homeNavigation);
+    }
+
+    @Operation(summary = "删除首页导航")
+    @DeleteMapping("/home-navigation/{id}")
+    public R<Void> deleteHomeNavigation(@PathVariable Long id) {
+        homeNavigationMapper.deleteById(id);
         return R.success();
     }
 

@@ -23,6 +23,10 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
+    public long getExpiration() {
+        return expiration;
+    }
+
     public String generateToken(Long userId, String username) {
         return Jwts.builder()
                 .subject(userId.toString())

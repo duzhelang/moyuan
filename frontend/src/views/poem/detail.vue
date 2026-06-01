@@ -363,6 +363,12 @@ onMounted(() => {
 
 .comment-form {
   margin-bottom: $spacing-xl;
+
+  :deep(.el-textarea__inner) {
+    font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: 0.5px;
+    line-height: 1.6;
+  }
 }
 
 .submit-button {

@@ -3,34 +3,28 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
+import AuthHeader from '@/components/common/AuthHeader.vue'
+import { getItem, setItem, removeItem } from '@/utils/storage'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 
 const loading = ref(false)
-const currentTime = ref('')
+const rememberMe = ref(false)
 
 const form = reactive({
   username: '',
   password: ''
 })
 
-const updateTime = () => {
-  const now = new Date()
-  currentTime.value = now.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  })
-}
-
 onMounted(() => {
-  updateTime()
-  setInterval(updateTime, 1000)
+  const savedAccount = getItem<{ username: string; password: string }>('remembered_account')
+  if (savedAccount) {
+    form.username = savedAccount.username
+    form.password = savedAccount.password
+    rememberMe.value = true
+  }
 })
 
 const handleLogin = async () => {
@@ -44,9 +38,17 @@ const handleLogin = async () => {
       username: form.username,
       password: form.password
     })
-    ElMessage.success('登录成功')
+    if (rememberMe.value) {
+      setItem('remembered_account', { username: form.username, password: form.password })
+    } else {
+      removeItem('remembered_account')
+    }
     const redirect = route.query.redirect as string
-    router.push(redirect || '/')
+    if (userStore.userInfo?.role === 'admin' && !redirect) {
+      router.push('/admin/dashboard')
+    } else {
+      router.push(redirect || '/')
+    }
   } catch (error) {
     ElMessage.error('登录失败，请检查用户名和密码')
   } finally {
@@ -58,40 +60,14 @@ const goToRegister = () => {
   router.push('/user/register')
 }
 
-const goToAdmin = () => {
-  router.push('/admin')
+const fillAdminUsername = () => {
+  form.username = userStore.lastAdminUsername
 }
 </script>
 
 <template>
   <div class="dl_container">
-    <div class="header">
-      <div class="top_genglu">
-        <div class="logo" title="首页">
-          <a href="/" target="_blank">
-            <img src="/img/tubiao (1).jpg" />
-            <div class="txt">墨渊</div>
-          </a>
-        </div>
-        <div class="top_txt">
-          <div class="shijian" title="现在时间">
-            {{ currentTime }}
-          </div>
-          <div class="txt1">了解我们
-            <div class="erw">
-              <img src="/img/微信二维.jpg" />
-            </div>
-          </div>
-          <div class="txt2">联系我们
-            <div class="erw">
-              <img src="/img/微信二维.jpg" />
-            </div>
-          </div>
-        </div>
-      </div>
-      <hr class="hr"/>
-      <hr />
-    </div>
+    <AuthHeader />
 
     <div class="body">
       <div class="dl_tubiao">
@@ -124,14 +100,27 @@ const goToAdmin = () => {
                 <label for="password">密&nbsp;&nbsp;码:</label>
                 <input type="password" id="password" class="dl_shurukuang" placeholder="请输入密码" required v-model="form.password">
               </div>
+              <div class="remember-row">
+                <label class="remember-label">
+                  <input type="checkbox" v-model="rememberMe" class="remember-checkbox">
+                  <span class="remember-text">记住密码</span>
+                </label>
+              </div>
               <div class="a3">
                 <button class="dl_anjian" type="submit" :disabled="loading">
                   {{ loading ? '登录中...' : '登录' }}
                 </button>
               </div>
             </form>
-            <div class="fu">
-              <input type="button" value="管理员入口" title="管理员入口" @click="goToAdmin">
+            <div v-if="userStore.lastAdminUsername" class="admin-quick-entry">
+              <el-tag 
+                type="warning" 
+                effect="plain" 
+                class="admin-tag"
+                @click="fillAdminUsername"
+              >
+                管理员快捷登录
+              </el-tag>
             </div>
           </div>
         </div>
@@ -150,220 +139,91 @@ const goToAdmin = () => {
 }
 
 .dl_container {
-  min-height: 100vh;
+  height: 100vh;
   background: url('/img/dt_0.0.jpg') no-repeat -155px 0 / cover;
   position: relative;
   font-family: cursive;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
-.header {
-  width: 100vw;
-  height: 60px;
-  text-decoration: none;
-  border-top-left-radius: 0px;
-  border-top-right-radius: 0px;
-  border-bottom-right-radius: 50px;
-  border-bottom-left-radius: 5px;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  background: url('/img/dt_3.jpg');
-  background-size: cover;
-  background-repeat: no-repeat;
-  background-position: 0px -320px;
-  box-shadow: 0 2px 5px rgba(0,0,0,.2);
-  z-index: 51;
+.dl_container::-webkit-scrollbar {
+  width: 8px;
 }
 
-.header hr {
-  border: none;
-  height: 1px;
-  background-color: #dedede;
-  margin-top: -2px;
-  margin-bottom: -3px;
+.dl_container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
 }
 
-.header .hr {
-  border: none;
-  height: 1px;
-  background-color: #303030;
-  margin-top: -11px;
-  margin-bottom: -3px;
+.dl_container::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
 }
 
-.header .top_genglu {
-  width: 100%;
-  height: 50px;
-  display: flex;
-  justify-content: space-between;
-}
-
-.header .top_genglu .logo {
-  font-size: 34px;
-  color: #000;
-  vertical-align: middle;
-}
-
-.header .top_genglu .logo a {
-  font-size: 34px;
-  color: #000;
-  vertical-align: middle;
-  display: flex;
-  text-align: center;
-  text-decoration: none;
-}
-
-.header .top_genglu .logo .txt {
-  display: flex;
-  align-items: center;
-}
-
-.header .top_genglu .logo img {
-  width: 50px;
-  height: 50px;
-  float: left;
-}
-
-.top_genglu .top_txt {
-  display: flex;
-  align-items: center;
-  margin-right: 20px;
-  font-size: 25px;
-}
-
-.header .top_genglu .shijian {
-  color: white;
-  background-color: rgba(200, 200, 200, 0.3);
-  margin-right: 50px;
-  font-size: 14px;
-  padding: 2px 10px;
-}
-
-.header .top_genglu .txt1 {
-  width: 90px;
-  float: right;
-  color: whitesmoke;
-  font-size: 20px;
-  position: relative;
-  z-index: 50;
-  cursor: pointer;
-}
-
-.header .top_genglu .txt2 {
-  width: 90px;
-  float: right;
-  color: whitesmoke;
-  font-size: 20px;
-  position: relative;
-  z-index: 50;
-  cursor: pointer;
-}
-
-.top_genglu .erw img {
-  width: 100px;
-  height: 100px;
-  float: left;
-}
-
-.header .top_genglu .txt1 .erw {
-  display: none;
-  width: 100px;
-  height: 100px;
-  margin-left: -12px;
-  overflow: hidden;
-  position: absolute;
-  z-index: 50;
-  top: 100%;
-  left: 0;
-}
-
-.header .top_genglu .txt2 .erw {
-  display: none;
-  width: 100px;
-  height: 100px;
-  margin-left: -12px;
-  overflow: hidden;
-  position: absolute;
-  z-index: 50;
-  top: 100%;
-  left: 0;
-}
-
-.header .top_genglu .txt1:hover .erw {
-  display: block;
-  background: blue;
-}
-
-.header .top_genglu .txt1:hover {
-  font-size: 21px;
-}
-
-.header .top_genglu .txt2:hover .erw {
-  display: block;
-  background: blue;
-}
-
-.header .top_genglu .txt2:hover {
-  font-size: 22px;
+.dl_container::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .body {
-  width: 1512.8px;
-  overflow-x: hidden;
+  width: 100%;
+  max-width: 1512px;
   margin: 0 auto;
-  padding-top: 60px;
+  padding-top: 55px;
+  padding-bottom: 80px;
+  min-height: calc(100vh - 55px);
 }
 
 .dl_tubiao {
-  height: 1px;
+  height: 0;
   position: relative;
 }
 
 .dl_tubiao img {
-  position: absolute;
+  position: fixed;
+  pointer-events: none;
 }
 
 .dl_zhuang_s1 {
-  position: absolute;
+  position: fixed;
   top: 75px;
-  z-index: 10;
+  z-index: 1;
   left: 150px;
   width: 1200px;
   height: 400px;
 }
 
 .dl_zhuang_s2 {
-  position: absolute;
+  position: fixed;
   top: 35px;
-  z-index: 10;
+  z-index: 1;
   left: -20px;
   width: 300px;
   height: 200px;
 }
 
 .dl_zhuang_s3 {
-  position: absolute;
+  position: fixed;
   width: 200px;
-  z-index: 10;
+  z-index: 1;
   height: 300px;
-  bottom: 50px;
-  left: 1328px;
+  top: 70px;
+  right: 20px;
 }
 
 .dl_zhuang_s4 {
-  position: absolute;
-  top: 400px;
-  z-index: 10;
-  left: 0px;
+  position: fixed;
+  bottom: 250px;
+  z-index: 1;
+  right: -50px;
   width: 503px;
   height: 300px;
 }
 
 .dl_zhuang_s5 {
-  position: absolute;
-  bottom: 20px;
-  z-index: 10;
+  position: fixed;
+  bottom: 70px;
+  z-index: 1;
+  left: 20px;
   width: 200px;
   height: 300px;
 }
@@ -488,7 +348,9 @@ const goToAdmin = () => {
   border-radius: 10px;
   border: none;
   background-color: rgba(255, 255, 255, 0.5);
-  font-family: cursive;
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  letter-spacing: 0.5px;
+  line-height: 1.5;
   padding: 0 5px;
   font-size: 16px;
   outline: none;
@@ -507,6 +369,34 @@ const goToAdmin = () => {
   margin-right: 10px;
   font-size: 20px;
   font-family: cursive;
+}
+
+.remember-row {
+  height: 30px;
+  padding-left: 80px;
+  display: flex;
+  align-items: center;
+}
+
+.remember-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  gap: 6px;
+}
+
+.remember-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #007BFF;
+}
+
+.remember-text {
+  font-size: 14px;
+  font-family: cursive;
+  color: #555;
+  user-select: none;
 }
 
 .a3 {
@@ -538,28 +428,28 @@ const goToAdmin = () => {
   cursor: not-allowed;
 }
 
-.fu input {
-  width: 80px;
-  font-size: 24px;
-  background: #9acd32;
-  color: rgb(100,100,100);
-  margin-top: 15px;
-  float: right;
-  border: 2px solid gainsboro;
-  border-radius: 20px;
-  cursor: pointer;
-  font-family: cursive;
-  padding: 0 5px;
+.admin-quick-entry {
+  margin-top: 12px;
+  text-align: right;
 }
 
-.fu input:hover {
-  background: #779d26;
+.admin-tag {
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.admin-tag:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(230, 162, 60, 0.3);
 }
 
 .dlzc_ditu_div {
-  position: absolute;
+  position: fixed;
   z-index: 50;
   bottom: 0;
+  left: 0;
+  right: 0;
   width: 100%;
   height: 60px;
   background: url('/img/dt_1.jpg') no-repeat 0px -360px / cover;

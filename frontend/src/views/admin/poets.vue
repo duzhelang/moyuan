@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAdminPoets, createAdminPoet, updateAdminPoet, deleteAdminPoet } from '@/api/modules/admin'
 import { getDynastyList } from '@/api/modules/dynasty'
+import ImageUpload from '@/components/common/ImageUpload.vue'
 
 const tableData = ref<any[]>([])
 const total = ref(0)
@@ -12,6 +13,9 @@ const loading = ref(false)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const dynasties = ref<any[]>([])
+const uploadDialogVisible = ref(false)
+const uploadFileList = ref<any[]>([])
+const uploadingBatch = ref(false)
 
 const form = ref({
   id: 0,
@@ -23,6 +27,7 @@ const form = ref({
   deathYear: null as number | null,
   birthplace: '',
   biography: '',
+  avatar: '',
   status: 1
 })
 
@@ -54,7 +59,7 @@ const getDynastyName = (id: number) => {
 
 const handleAdd = () => {
   isEdit.value = false
-  form.value = { id: 0, name: '', courtesyName: '', pseudonym: '', dynastyId: undefined, birthYear: null, deathYear: null, birthplace: '', biography: '', status: 1 }
+  form.value = { id: 0, name: '', courtesyName: '', pseudonym: '', dynastyId: undefined, birthYear: null, deathYear: null, birthplace: '', biography: '', avatar: '', status: 1 }
   dialogVisible.value = true
 }
 
@@ -94,9 +99,54 @@ const handleSave = async () => {
   }
 }
 
+const openBatchAvatarUpload = () => {
+  uploadFileList.value = []
+  uploadDialogVisible.value = true
+}
+
+const handleBatchUpload = async () => {
+  if (uploadFileList.value.length === 0) {
+    ElMessage.warning('请先选择图片')
+    return
+  }
+  uploadingBatch.value = true
+  let successCount = 0
+  for (const item of uploadFileList.value) {
+    try {
+      const rawFile = item.raw || item
+      const { uploadFile } = await import('@/api/modules/file')
+      const res = await uploadFile(rawFile)
+      const url = res.data.url
+      const namePart = (rawFile.name || '').replace(/\.[^.]+$/, '')
+      const matchedPoet = poetsForAvatar.value.find(p => p.name === namePart || namePart.includes(p.name))
+      if (matchedPoet) {
+        await updateAdminPoet(matchedPoet.id, { ...matchedPoet, avatar: url })
+        successCount++
+      }
+    } catch (e) {
+      console.error('上传失败', e)
+    }
+  }
+  uploadingBatch.value = false
+  uploadDialogVisible.value = false
+  ElMessage.success(`批量上传完成，成功匹配 ${successCount} 位诗人头像`)
+  fetchData()
+}
+
+const poetsForAvatar = ref<any[]>([])
+const loadPoetsForAvatar = async () => {
+  try {
+    const res = await getAdminPoets({ page: 1, size: 999 })
+    poetsForAvatar.value = res.data.records
+  } catch (e) {
+    console.error(e)
+  }
+}
+
 onMounted(() => {
   fetchData()
   fetchDynasties()
+  loadPoetsForAvatar()
 })
 </script>
 
@@ -108,12 +158,22 @@ onMounted(() => {
       <template #header>
         <div style="display: flex; justify-content: space-between; align-items: center">
           <span>诗人列表</span>
-          <el-button type="primary" size="small" @click="handleAdd">新增诗人</el-button>
+          <div>
+            <el-button size="small" @click="openBatchAvatarUpload">批量上传头像</el-button>
+            <el-button type="primary" size="small" @click="handleAdd">新增诗人</el-button>
+          </div>
         </div>
       </template>
 
       <el-table :data="tableData" v-loading="loading" stripe style="width: 100%">
         <el-table-column prop="id" label="ID" width="60" />
+        <el-table-column label="头像" width="80">
+          <template #default="{ row }">
+            <el-avatar :src="row.avatar" :size="40">
+              {{ row.name?.charAt(0) }}
+            </el-avatar>
+          </template>
+        </el-table-column>
         <el-table-column prop="name" label="姓名" width="120" />
         <el-table-column prop="courtesyName" label="字" width="100" />
         <el-table-column prop="pseudonym" label="号" width="100" />
@@ -137,8 +197,11 @@ onMounted(() => {
       </div>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑诗人' : '新增诗人'" width="550px">
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑诗人' : '新增诗人'" width="550px" append-to-body>
       <el-form :model="form" label-width="80px">
+        <el-form-item label="头像">
+          <ImageUpload v-model="form.avatar" :maxSize="2" />
+        </el-form-item>
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="姓名" required>
@@ -191,11 +254,53 @@ onMounted(() => {
         <el-button type="primary" :loading="loading" @click="handleSave">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="uploadDialogVisible" title="批量上传诗人头像" width="500px" append-to-body>
+      <div class="batch-upload-tip">
+        <p>请将头像图片命名为诗人姓名（如"李白.jpg"），系统会自动匹配诗人并更新头像。</p>
+      </div>
+      <el-upload
+        v-model:file-list="uploadFileList"
+        multiple
+        :auto-upload="false"
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        list-type="picture-card"
+      >
+        <el-icon><Plus /></el-icon>
+      </el-upload>
+      <template #footer>
+        <el-button @click="uploadDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="uploadingBatch" @click="handleBatchUpload">开始上传</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <style scoped lang="scss">
-.page-title { font-size: 24px; margin-bottom: 20px; color: #333; }
-.table-card { border-radius: 8px; }
-.pagination-wrapper { display: flex; justify-content: flex-end; margin-top: 16px; }
+.page-title {
+  font-size: 24px;
+  margin-bottom: 20px;
+  color: #333;
+}
+.table-card {
+  border-radius: 8px;
+}
+.pagination-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+.batch-upload-tip {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(139, 69, 19, 0.05), rgba(210, 105, 30, 0.05));
+  border-radius: 8px;
+  border: 1px solid rgba(139, 69, 19, 0.1);
+  p {
+    margin: 0;
+    font-size: 13px;
+    color: #666;
+    line-height: 1.6;
+  }
+}
 </style>

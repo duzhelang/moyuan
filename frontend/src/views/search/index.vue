@@ -175,6 +175,12 @@ onMounted(() => {
 .search-input {
   max-width: 600px;
   margin: 0 auto;
+
+  :deep(.el-input__inner) {
+    font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: 0.5px;
+    line-height: 1.5;
+  }
 }
 
 .result-list {

@@ -16,6 +16,7 @@ public class User {
     private String nickname;
     private String avatar;
     private String bio;
+    private String role;
     private Integer status;
     private LocalDateTime lastLoginTime;
     private String lastLoginIp;

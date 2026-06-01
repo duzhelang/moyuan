@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { User } from '@/types/model'
-import { login as loginApi, getUserInfo, logout as logoutApi, updateUser as updateUserApi, updatePassword as updatePasswordApi } from '@/api/modules/user'
-import type { LoginRequest, UserUpdateRequest, PasswordUpdateRequest } from '@/types/api'
+import { login as loginApi, register as registerApi, getUserInfo, updateUser as updateUserApi, updatePassword as updatePasswordApi } from '@/api/modules/user'
+import type { LoginRequest, RegisterRequest, UserUpdateRequest, PasswordUpdateRequest } from '@/types/api'
 
 export const useUserStore = defineStore('user', () => {
   const token = ref<string>(localStorage.getItem('token') || '')
@@ -11,9 +11,17 @@ export const useUserStore = defineStore('user', () => {
   const isLoggedIn = computed(() => !!token.value)
   const username = computed(() => userInfo.value?.username || '')
   const avatar = computed(() => userInfo.value?.avatar || '')
+  const lastAdminUsername = computed(() => localStorage.getItem('lastAdminUsername') || '')
 
   async function login(params: LoginRequest) {
     const response = await loginApi(params)
+    token.value = response.data.token
+    localStorage.setItem('token', response.data.token)
+    await fetchUserInfo()
+  }
+
+  async function register(params: RegisterRequest) {
+    const response = await registerApi(params)
     token.value = response.data.token
     localStorage.setItem('token', response.data.token)
     await fetchUserInfo()
@@ -23,6 +31,9 @@ export const useUserStore = defineStore('user', () => {
     try {
       const response = await getUserInfo()
       userInfo.value = response.data
+      if (response.data.role === 'admin') {
+        localStorage.setItem('lastAdminUsername', response.data.username)
+      }
     } catch (error) {
       console.error('获取用户信息失败:', error)
       logout()
@@ -55,7 +66,9 @@ export const useUserStore = defineStore('user', () => {
     isLoggedIn,
     username,
     avatar,
+    lastAdminUsername,
     login,
+    register,
     fetchUserInfo,
     logout,
     setToken,

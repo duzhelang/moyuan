@@ -60,6 +60,18 @@ const routes: RouteRecordRaw[] = [
         name: 'Search',
         component: () => import('@/views/search/index.vue'),
         meta: { title: '搜索结果' }
+      },
+      {
+        path: 'vision',
+        name: 'VisionList',
+        component: () => import('@/views/vision/list.vue'),
+        meta: { title: '诗话视野', keepAlive: true }
+      },
+      {
+        path: 'vision/:id',
+        name: 'VisionDetail',
+        component: () => import('@/views/vision/detail.vue'),
+        meta: { title: '文章详情' }
       }
     ]
   },
@@ -132,6 +144,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '诗人管理', requiresAuth: true, requiresAdmin: true }
       },
       {
+        path: 'poet-featured',
+        name: 'AdminPoetFeatured',
+        component: () => import('@/views/admin/poet-featured.vue'),
+        meta: { title: '精选诗人管理', requiresAuth: true, requiresAdmin: true }
+      },
+      {
         path: 'forum-posts',
         name: 'AdminForumPosts',
         component: () => import('@/views/admin/forum-posts.vue'),
@@ -148,6 +166,12 @@ const routes: RouteRecordRaw[] = [
         name: 'AdminAiModels',
         component: () => import('@/views/admin/ai-models.vue'),
         meta: { title: 'AI模型管理', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'home-navigation',
+        name: 'AdminHomeNavigation',
+        component: () => import('@/views/admin/home-navigation.vue'),
+        meta: { title: '首页导航管理', requiresAuth: true, requiresAdmin: true }
       }
     ]
   },

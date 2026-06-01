@@ -123,3 +123,20 @@ export interface PageResult<T> {
   pageNum: number
   pageSize: number
 }
+
+export interface VisionArticle {
+  id: number
+  title: string
+  summary?: string
+  content: string
+  coverImage?: string
+  author?: string
+  category?: string
+  viewCount: number
+  likeCount: number
+  status: number
+  isFeatured: number
+  sortOrder: number
+  createTime: string
+  updateTime: string
+}
