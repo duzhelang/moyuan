@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
-
-const isCollapsed = computed(() => false)
 
 const adminMenus = [
   { path: '/admin/dashboard', name: 'dashboard', icon: 'DataAnalysis', label: '控制台' },

@@ -50,6 +50,11 @@ export interface Poet {
   deathYear?: number
   birthplace?: string
   description?: string
+  biography?: string
+  lifeStory?: string
+  influence?: string
+  evaluation?: string
+  anecdotes?: string
   avatar?: string
   status?: number
   createdAt: string
@@ -115,6 +120,7 @@ export interface PoemListParams {
   categoryId?: number
   poetId?: number
   keyword?: string
+  sortBy?: 'latest' | 'popular' | 'likes'
 }
 
 export interface PageResult<T> {

@@ -11,13 +11,19 @@ const routes: RouteRecordRaw[] = [
         path: '',
         name: 'Home',
         component: () => import('@/views/home/index.vue'),
-        meta: { title: '首页', keepAlive: true }
+        meta: { title: '首页', keepAlive: true, hideHeader: true }
       },
       {
         path: 'poem',
         name: 'PoemList',
         component: () => import('@/views/poem/list.vue'),
         meta: { title: '诗词列表', keepAlive: true }
+      },
+      {
+        path: 'poem/create',
+        name: 'PoemCreate',
+        component: () => import('@/views/poem/create.vue'),
+        meta: { title: '发布新诗', requiresAuth: true }
       },
       {
         path: 'poem/:id',
@@ -36,6 +42,12 @@ const routes: RouteRecordRaw[] = [
         name: 'PoetDetail',
         component: () => import('@/views/poet/detail.vue'),
         meta: { title: '诗人详情' }
+      },
+      {
+        path: 'communicate',
+        name: 'Communicate',
+        component: () => import('@/views/communicate/index.vue'),
+        meta: { title: '交流广场', keepAlive: true }
       },
       {
         path: 'forum',
@@ -186,7 +198,7 @@ const routes: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
-  scrollBehavior(to, from, savedPosition) {
+  scrollBehavior(_to, _from, savedPosition) {
     if (savedPosition) {
       return savedPosition
     }

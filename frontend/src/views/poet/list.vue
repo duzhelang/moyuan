@@ -76,7 +76,10 @@ onMounted(() => {
 <template>
   <div class="poet-list-page">
     <div class="container">
-      <h1 class="page-title">诗人风采</h1>
+      <div class="page-header">
+        <h1 class="page-title">诗人风采</h1>
+        <p class="page-subtitle">穿越千年时光，领略文人墨客的风采与情怀</p>
+      </div>
 
       <div class="filter-section">
         <el-card class="filter-card">
@@ -167,12 +170,24 @@ onMounted(() => {
   padding: $spacing-xl 0;
 }
 
+.page-header {
+  text-align: center;
+  margin-bottom: $spacing-xl;
+}
+
 .page-title {
   text-align: center;
   font-size: $font-size-title;
   color: $primary-color;
   font-family: $font-family-title;
-  margin-bottom: $spacing-xl;
+  margin-bottom: $spacing-xs;
+}
+
+.page-subtitle {
+  font-size: $font-size-sm;
+  color: $text-color-light;
+  font-family: $font-family-base;
+  margin: 0;
 }
 
 .filter-section {

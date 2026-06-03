@@ -27,16 +27,33 @@ export const useUserStore = defineStore('user', () => {
     await fetchUserInfo()
   }
 
-  async function fetchUserInfo() {
+  async function fetchUserInfo(retryCount = 0) {
+    const maxRetries = 2
+    
     try {
       const response = await getUserInfo()
       userInfo.value = response.data
       if (response.data.role === 'admin') {
         localStorage.setItem('lastAdminUsername', response.data.username)
       }
-    } catch (error) {
-      console.error('获取用户信息失败:', error)
-      logout()
+    } catch (error: any) {
+      const status = error?.response?.status
+      const isNetworkError = !error?.response && error?.code !== 'ECONNABORTED'
+      const isServerError = status >= 500
+      const isTimeout = error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')
+      
+      if ((isNetworkError || isServerError || isTimeout) && retryCount < maxRetries) {
+        console.warn(`获取用户信息失败，${1 + retryCount}/${maxRetries} 次重试...`, error?.message)
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
+        return fetchUserInfo(retryCount + 1)
+      }
+      
+      if (status === 401) {
+        console.warn('Token 已过期，自动退出登录')
+        logout()
+      } else {
+        console.error('获取用户信息失败:', error?.message || error)
+      }
     }
   }
 

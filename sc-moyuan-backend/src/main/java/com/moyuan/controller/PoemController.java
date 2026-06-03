@@ -71,6 +71,19 @@ public class PoemController {
         return R.success(poemMapper.selectList(wrapper));
     }
 
+    @Operation(summary = "创建诗词（用户发布）")
+    @PostMapping
+    public R<Poem> createPoem(@RequestBody Poem poem) {
+        Long userId = securityUtil.getCurrentUserId();
+        poem.setViewCount(0);
+        poem.setLikeCount(0);
+        poem.setFavoriteCount(0);
+        poem.setStatus(1);
+        poem.setIsFeatured(0);
+        poemMapper.insert(poem);
+        return R.success(poem);
+    }
+
     @Operation(summary = "获取诗词详情")
     @GetMapping("/{id}")
     public R<Poem> getPoemDetail(@PathVariable Long id) {

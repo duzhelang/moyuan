@@ -37,6 +37,10 @@ CREATE TABLE IF NOT EXISTS `poet` (
   `death_year` INT DEFAULT NULL COMMENT '去世年份',
   `birthplace` VARCHAR(100) DEFAULT NULL COMMENT '出生地',
   `biography` TEXT DEFAULT NULL COMMENT '生平简介',
+  `life_story` TEXT DEFAULT NULL COMMENT '人物生平',
+  `influence` TEXT DEFAULT NULL COMMENT '主要影响',
+  `evaluation` TEXT DEFAULT NULL COMMENT '历史评价',
+  `anecdotes` TEXT DEFAULT NULL COMMENT '轶事典故',
   `avatar` VARCHAR(255) DEFAULT NULL COMMENT '头像URL',
   `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -112,6 +116,7 @@ CREATE TABLE IF NOT EXISTS `user` (
   `gender` TINYINT DEFAULT 0 COMMENT '性别：0-未知，1-男，2-女',
   `birthday` DATE DEFAULT NULL COMMENT '生日',
   `bio` VARCHAR(500) DEFAULT NULL COMMENT '个人简介',
+  `interests` VARCHAR(500) DEFAULT NULL COMMENT '兴趣选项（逗号分隔）',
   `role` VARCHAR(20) NOT NULL DEFAULT 'user' COMMENT '角色：user-普通用户，admin-管理员',
   `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
   `last_login_time` DATETIME DEFAULT NULL COMMENT '最后登录时间',
@@ -314,13 +319,26 @@ INSERT IGNORE INTO `category` (`name`, `parent_id`, `description`, `sort_order`)
 ('五言律诗', 2, '五言律诗', 1),
 ('七言律诗', 2, '七言律诗', 2),
 ('五言绝句', 2, '五言绝句', 3),
-('七言绝句', 2, '七言绝句', 4);
+('七言绝句', 2, '七言绝句', 4),
+('怀古诗', 1, '以历史事件、历史人物、历史陈迹为题材，借登高望远、咏叹史实、怀念古迹来达到感慨兴衰、寄托哀思、托古讽今等目的', 1),
+('咏物诗', 1, '以某一具体事物为描写对象，抓住其某些特征着意描摹，借以表达思想感情', 2),
+('边塞诗', 1, '以边疆地区军民生活和自然风光为题材，表现边塞风光、戍边将士生活和战争场面', 3),
+('山水田园诗', 1, '以描写自然风光、农村景物以及安逸恬淡的隐居生活为主，表达对自然的热爱和对田园生活的向往', 4),
+('送别诗', 1, '以送别为题材，表达离别之情和对友人的惜别之意', 5),
+('闺怨诗', 1, '以描写古代妇女的生活和情感为主，表达闺中女子的愁思和怨恨', 6),
+('咏史诗', 1, '以历史为题材，借古讽今，抒发作者对历史的感慨和对现实的思考', 7),
+('悼亡诗', 1, '以悼念亡故之人为主，表达作者对逝者的哀思和怀念之情', 8),
+('田园诗', 1, '以田园生活为题材，描写农村风光、农耕生活和农民的淳朴情感', 9);
 
 -- ============================================================
 -- 初始数据：诗人
 -- ============================================================
 INSERT IGNORE INTO `poet` (`name`, `dynasty_id`, `biography`, `status`) VALUES
-('常平逼王', 13, '现代诗人，作品多表现个人情感与生活感悟', 1);
+('常平逼王', 13, '现代诗人，作品多表现个人情感与生活感悟', 1),
+('陆游', 8, '（1125年—1210年），字务观，号放翁，越州山阴（今浙江绍兴）人。南宋文学家、史学家、爱国诗人。一生笔耕不辍，诗词文俱有很高成就，其诗语言平易晓畅、章法整饬谨严，兼具李白的雄奇奔放与杜甫的沉郁悲凉，尤以饱含爱国热情对后世影响深远。', 1),
+('唐婉', 8, '（约1128年—约1156年），字蕙仙，越州山阴（今浙江绍兴）人。南宋才女，陆游的前妻。自幼聪慧，才华横溢，擅长诗词。与陆游的爱情悲剧令人扼腕，其《钗头凤·世情薄》传诵千古。', 1),
+('李煜', 7, '（937年—978年），初名从嘉，字重光，号钟隐、莲峰居士，彭城（今江苏徐州）人。南唐末代君主，世称南唐后主。精书法、工绘画、通音律，诗文均有一定造诣，尤以词的成就最高。其词作在晚唐五代词中别树一帜，对后世词坛影响深远。', 1),
+('森垚', 13, '现代诗人，作品风格独特，善于运用古典意象表达现代情感。', 1);
 
 -- ============================================================
 -- 初始数据：诗词
@@ -336,7 +354,38 @@ INSERT IGNORE INTO `poem` (`title`, `content`, `poet_id`, `dynasty_id`, `categor
 ('回首一九已成空', '回首一九已成空，展望二零佳意浓。\n世事岂敢轻年少，天意哪可断前程。\n唐猊又着战意显，三尺重出徙侣从。\n烂柯沉木枉悲夫，夫且若怡也可容。', 1, 13, 2, '常平逼王', 1, 1),
 ('沉影迷叠千层障', '沉影迷叠千层障，乱云归处是它乡。\n酒酣仍识昔日客，心迷难辨眼前芳。\n纵把凡锦比仙缎，不需经年多思量。\n一笑即随羊角去，九风还作万华芳。', 1, 13, 2, '常平逼王', 1, 1),
 ('一剪梅.无题', '一别三秋未招摇，\n山也迢迢，水也昭昭。\n何人再添新衣袍，\n笑意盈绕，喜上眉梢。\n忆昔花开岁月好，\n蜂字飘摇，蝶字舞蹈。\n而今方知云未晓，\n风又飘飘，雨又萧萧。', 1, 13, 2, '常平逼王', 1, 1),
-('清平乐.情(道姑)', '幽情迷朦，三年怀一梦，一遭尘世皆为恒，无怨无悔无憎。\n来日打马南屏，忆昔紫夜流萤，纵剑吴钩霜雪，锦夜孤灯长明。', 1, 13, 4, '初芒', 1, 1);
+('清平乐.情(道姑)', '幽情迷朦，三年怀一梦，一遭尘世皆为恒，无怨无悔无憎。\n来日打马南屏，忆昔紫夜流萤，纵剑吴钩霜雪，锦夜孤灯长明。', 1, 13, 4, '初芒', 1, 1),
+('钗头凤·世情薄', '世情薄，人情恶，雨送黄昏花易落。晓风干，泪痕残，欲笺心事，独语斜阑。难，难，难！\n人成各，今非昨，病魂常似秋千索。角声寒，夜阑珊，怕人寻问，咽泪装欢。瞒，瞒，瞒！', 3, 8, 3, '唐婉词', 1, 1),
+('钗头凤·红酥手', '红酥手，黄縢酒，满城春色宫墙柳。东风恶，欢情薄。一怀愁绪，几年离索。错、错、错。\n春如旧，人空瘦，泪痕红浥鲛绡透。桃花落，闲池阁。山盟虽在，锦书难托。莫、莫、莫。', 2, 8, 3, '陆游词', 1, 1),
+('长相思·一重山', '一重山，两重山，山远天高烟水寒，相思枫叶丹。\n菊花开，菊花残，塞雁高飞人未还，一帘风月闲。', 4, 7, 3, '李煜词', 1, 1),
+('白夜月望', '经日积灰新作旧，魂安大腹杯弓痛。\n可怜嫦娥广寒丑，才识沧桑无激流。', 5, 13, 2, '森垚', 1, 1);
+
+-- ============================================================
+-- 更新诗词翻译和赏析
+-- ============================================================
+UPDATE `poem` SET
+`translation` = '世事炎凉，人情险恶，黄昏时分风雨摧残花儿凋落。晨风吹干了泪水，泪痕犹存，想要写下心事，独自倚着栏杆自言自语。难啊，难啊，难！\n如今各自分离，今非昔比，多病的灵魂好似秋千般摇摆不定。号角声凄寒，夜色将尽，生怕被人寻问，只能咽下泪水强颜欢笑。瞒啊，瞒啊，瞒！',
+`appreciation` = '这首词是唐婉在沈园与陆游重逢后所作。词的上片写自己在人世间的悲惨处境：世情薄、人情恶，黄昏雨落花凋零，晓风干泪痕残，满腹心事无人可诉。下片写与陆游分别后的痛苦：人成各、今非昨，病魂如秋千索，角声寒夜阑珊，怕人询问只能咽泪装欢。三个"难"字和三个"瞒"字，道尽了词人内心的痛苦与无奈。',
+`background` = '唐婉与陆游本是恩爱夫妻，因陆母不满被迫离异。后陆游另娶，唐婉改嫁赵士程。多年后二人在沈园偶遇，陆游在墙上题写了《钗头凤·红酥手》，唐婉见后悲痛不已，和了这首《钗头凤·世情薄》。不久后唐婉便郁郁而终。'
+WHERE `title` = '钗头凤·世情薄' AND `poet_id` = 3;
+
+UPDATE `poem` SET
+`translation` = '红润酥腻的手，捧着黄縢封的美酒，满城荡漾着春天的景色，宫墙边柳树摇曳。东风多么可恶，把欢情吹得那样稀薄。满怀的忧愁情绪，几年来的离别相索。错啊，错啊，错！\n春天依然如旧，人却白白地变得消瘦，泪水湿透了手帕。桃花凋落在寂静的池塘楼阁上。山盟海誓虽然还在，可是锦书再也难以寄托。莫啊，莫啊，莫！',
+`appreciation` = '这首词是陆游在沈园偶遇前妻唐婉后题写在园壁上的。词的上片通过"红酥手""黄縢酒""宫墙柳"等意象，回忆了昔日的美好时光，而后笔锋一转，"东风恶"三字写出了被迫分离的无奈。下片写重逢时的情景，"春如旧，人空瘦"对比鲜明，"泪痕红浥鲛绡透"写尽了离别后的相思之苦。三个"错"字和三个"莫"字，饱含了词人对这段感情的无限感慨。',
+`background` = '陆游与唐婉本是表兄妹，婚后感情甚笃。但陆母认为陆游沉溺于儿女情长，荒疏了功业，遂强迫二人离异。陆游另娶王氏，唐婉改嫁赵士程。公元1155年，陆游礼部会试失利后到沈园游玩，偶遇唐婉夫妇。唐婉征得赵士程同意后，派人给陆游送去了酒肴。陆游感慨万千，乘醉在园壁上题写了这首《钗头凤》。'
+WHERE `title` = '钗头凤·红酥手' AND `poet_id` = 2;
+
+UPDATE `poem` SET
+`translation` = '一重又一重的山峦，山峦连绵不断，山远天高，烟雾笼罩着寒水，相思之情如同火红的枫叶。\n菊花盛开，菊花凋零，塞外的大雁高高飞过，远行的人却还没有回来，只有帘外的风月依旧悠闲。',
+`appreciation` = '这首词以"一重山，两重山"起笔，用重叠的山峦象征相思的绵延不断。"山远天高烟水寒"描绘了一幅辽远凄清的画面，烘托出相思之人的孤寂心境。"相思枫叶丹"以枫叶的红艳比喻相思的炽热。下片"菊花开，菊花残"暗示时光流逝，相思日久。"塞雁高飞人未还"写远人不归的惆怅，结句"一帘风月闲"以景结情，将无尽的思念融入清风明月之中，余韵悠长。',
+`background` = '这首词是李煜前期的作品，描写了闺中思妇对远行之人的深切思念。词中以重山、烟水、枫叶、菊花、塞雁、风月等意象，构建了一幅深秋思妇图，表达了对远方亲人的无限牵挂。'
+WHERE `title` = '长相思·一重山' AND `poet_id` = 4;
+
+UPDATE `poem` SET
+`translation` = '日子一天天过去，新事物也会变成旧事物，灵魂安放在大腹便便的身躯里，如同杯弓蛇影般痛苦。可怜那嫦娥在广寒宫中孤独寂寞，才明白沧桑变幻中并无激流涌动。',
+`appreciation` = '这首诗以独特的视角审视人生与时间的流逝。"经日积灰新作旧"表达了时光荏苒、万物更迭的感慨；"魂安大腹杯弓痛"用"杯弓蛇影"的典故暗喻内心的疑虑与痛苦；"可怜嫦娥广寒丑"反用嫦娥奔月的神话，写出孤独者的凄凉；"才识沧桑无激流"则在历经沧桑后归于平静，表达了对人生无常的深刻体悟。',
+`background` = '现代诗人森垚的作品，以古典意象承载现代人的精神困境，在传统与现代之间寻找诗意的平衡点。'
+WHERE `title` = '白夜月望' AND `poet_id` = 5;
 
 -- ============================================================
 -- AI 模型配置表
@@ -378,6 +427,18 @@ INSERT IGNORE INTO `user` (`username`, `password`, `email`, `nickname`, `role`, 
 ('admin', '$2b$12$kMElb/13aTqGl9pfrD4CqOfA8rVJ3ahUcRBPfTHihcQ4D6.5gKWB6', 'admin@moyuan.com', '系统管理员', 'admin', 1),
 ('test', '$2b$10$7WF/nU54ij0NgOYQzcbvWOIUsfCBQ28BeEq9rc.buaUcl0zaR.9PO', 'test@moyuan.com', '测试用户', 'user', 1),
 ('text', '$2b$10$7WF/nU54ij0NgOYQzcbvWOIUsfCBQ28BeEq9rc.buaUcl0zaR.9PO', 'text@moyuan.com', '文本用户', 'user', 1);
+
+-- ============================================================
+-- 初始数据：论坛示例帖子
+-- ============================================================
+INSERT IGNORE INTO `forum_post` (`title`, `content`, `user_id`, `view_count`, `like_count`, `comment_count`, `is_top`, `status`) VALUES
+('欢迎来到诗汇论坛', '这里是古今诗话的交流园地，无论你是诗词爱好者还是初学者，都欢迎在这里分享你的作品、讨论诗词鉴赏心得、交流创作灵感。\n\n让我们一起在诗词的韵律中感受中华文化的博大精深！', 1, 256, 42, 8, 1, 1),
+('浅谈李白诗歌中的浪漫主义精神', '李白的诗歌以其豪放飘逸、想象丰富而著称。"飞流直下三千尺，疑是银河落九天"，这样的诗句展现了诗人超凡的想象力和对自然的热爱。\n\n李白的浪漫主义不仅体现在对自然的描绘上，更体现在他对自由的追求和对权贵的蔑视。"安能摧眉折腰事权贵，使我不得开心颜"，这种精神至今仍然激励着我们。\n\n大家最喜欢李白的哪首诗呢？欢迎分享你的看法。', 2, 189, 35, 12, 0, 1),
+('李清照词中的女性意识', '李清照作为宋代婉约派的代表词人，她的作品中展现出了独特的女性视角和细腻的情感表达。\n\n"寻寻觅觅，冷冷清清，凄凄惨惨戚戚"，这十四个叠字将孤独与愁苦表达得淋漓尽致。而"知否，知否，应是绿肥红瘦"则展现了她对生活细节的敏锐观察。\n\n李清照的词不仅是文学的瑰宝，更是研究宋代女性生活和情感世界的重要资料。', 3, 156, 28, 6, 0, 1),
+('如何欣赏近体诗的格律之美', '近体诗包括律诗和绝句，讲究平仄、对仗和押韵。对于初学者来说，理解格律是欣赏近体诗的第一步。\n\n以杜甫的《登高》为例："风急天高猿啸哀，渚清沙白鸟飞回。无边落木萧萧下，不尽长江滚滚来。"这首诗不仅意境深远，而且格律严谨，被誉为"古今七律第一"。\n\n建议大家多读多背，慢慢体会格律之美。', 2, 134, 22, 9, 0, 1),
+('分享一首我最近写的诗', '秋夜独坐\n\n窗外秋风起，\n庭前落叶黄。\n孤灯照书案，\n思绪入苍茫。\n\n这是前几天秋夜独坐时的即兴之作，虽然笔法稚嫩，但却是真情实感的流露。欢迎各位诗友指正！', 3, 98, 15, 4, 0, 1),
+('苏轼的人生智慧与诗词境界', '苏轼一生坎坷，却始终保持着豁达乐观的人生态度。"竹杖芒鞋轻胜马，谁怕？一蓑烟雨任平生"，这种超然物外的境界令人敬佩。\n\n他的诗词不仅有豪放派的大气磅礴，也有细腻入微的生活情趣。"日啖荔枝三百颗，不辞长作岭南人"，即使被贬谪，也能发现生活中的美好。\n\n苏轼的人生态度值得我们学习：在逆境中保持乐观，在顺境中不忘初心。', 1, 210, 38, 15, 0, 1),
+('现代诗歌与古典诗词的对话', '在当今时代，现代诗歌和古典诗词各有其独特的魅力。古典诗词讲究格律和意境，现代诗歌则更注重自由表达和个性张扬。\n\n但两者并非对立，而是可以相互借鉴、相互融合。许多现代诗人从古典诗词中汲取营养，创作出既有古典韵味又有现代气息的优秀作品。\n\n大家如何看待现代诗歌与古典诗词的关系？', 2, 87, 12, 3, 0, 1);
 
 -- ============================================================
 -- 初始数据：精选诗人
@@ -465,3 +526,75 @@ INSERT IGNORE INTO `vision_article` (`title`, `summary`, `content`, `author`, `c
 ('国际视野下的中国诗词：翻译与传播的挑战', '分析中国古典诗词在国际传播中面临的翻译难题与文化隔阂。', '中国古典诗词以其独特的语言艺术和深厚的文化内涵，吸引了越来越多的海外读者。然而，诗词的国际传播面临着语言障碍和文化差异的双重挑战。\n\n诗歌翻译被称为"翻译中的翻译"，因为诗词不仅要传达字面意义，还要保留韵律、意境和文化内涵。从翟理斯到宇文所安，一代又一代的汉学家在诗词翻译领域做出了卓越的贡献。\n\n本文将探讨中国诗词国际传播的历程、翻译策略以及未来发展方向。', '周翰林', '文化传播', 178, 25, 0, 8),
 ('诗词与现代生活：寻找古典与现代的平衡点', '探索古典诗词在现代生活中的应用场景与精神价值。', '在快节奏的现代生活中，古典诗词似乎离我们越来越远。但实际上，诗词的智慧和美感从未远离我们的生活。\n\n从旅行途中的即兴吟咏，到朋友圈的文案引用；从婚礼上的诗词祝福，到节日里的传统吟诵——古典诗词以其独特的方式融入了现代人的生活场景。\n\n更重要的是，诗词中蕴含的人生智慧和审美情趣，能帮助我们在喧嚣的现代生活中找到内心的宁静。', '孙明远', '文化传承', 221, 34, 0, 9),
 ('诗词论坛互动专区：分享你的原创诗词，赢取点评与建议', '欢迎来到诗词爱好者的创作交流平台，展示才华、互相切磋。', '诗词论坛是古今诗话平台为诗词爱好者打造的互动交流空间。在这里，你可以发布自己的原创诗词作品，也可以对他人的作品进行点评和讨论。\n\n无论你是初学者还是资深爱好者，这里都是展示才华、交流心得的理想平台。我们的社区鼓励建设性的讨论和真诚的交流，让每一位诗词爱好者都能在这里找到归属感。\n\n快来加入我们，与志同道合的诗友一起分享创作的快乐吧！', '古今诗话编辑部', '社区互动', 145, 20, 0, 10);
+
+-- ============================================================
+-- 访问日志表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `visit_log` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id` BIGINT DEFAULT NULL COMMENT '用户ID（未登录为NULL）',
+  `ip` VARCHAR(50) NOT NULL COMMENT '访问IP',
+  `user_agent` VARCHAR(500) DEFAULT NULL COMMENT '浏览器UA',
+  `path` VARCHAR(200) DEFAULT NULL COMMENT '访问路径',
+  `visit_date` DATE DEFAULT NULL COMMENT '访问日期',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_visit_log_create_time` (`create_time`),
+  KEY `idx_visit_log_visit_date` (`visit_date`),
+  KEY `idx_visit_log_ip` (`ip`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='访问日志表';
+
+-- ============================================================
+-- 文件元数据表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `file_metadata` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `file_key` VARCHAR(255) NOT NULL COMMENT '存储路径（相对uploads）',
+  `original_name` VARCHAR(255) DEFAULT NULL COMMENT '原始文件名',
+  `file_type` VARCHAR(50) NOT NULL COMMENT '文件类型：avatar/poem/forum/ai_generated/vision/config/export/temp/backup/audit/watermark/cache',
+  `mime_type` VARCHAR(100) DEFAULT NULL COMMENT 'MIME类型',
+  `size` BIGINT NOT NULL DEFAULT 0 COMMENT '文件大小（字节）',
+  `md5` VARCHAR(32) DEFAULT NULL COMMENT '文件MD5',
+  `width` INT DEFAULT NULL COMMENT '图片宽度',
+  `height` INT DEFAULT NULL COMMENT '图片高度',
+  `related_id` BIGINT DEFAULT NULL COMMENT '关联的用户ID/诗词ID/帖子ID',
+  `related_type` VARCHAR(50) DEFAULT NULL COMMENT '关联类型：user/poem/forum/vision/article',
+  `storage_type` VARCHAR(20) NOT NULL DEFAULT 'local' COMMENT '存储类型：local/oss',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_file_key` (`file_key`),
+  KEY `idx_file_type` (`file_type`),
+  KEY `idx_related` (`related_type`, `related_id`),
+  KEY `idx_md5` (`md5`),
+  KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件元数据表';
+
+-- ============================================================
+-- AI生成图片记录表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `ai_image_record` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `session_id` VARCHAR(100) DEFAULT NULL COMMENT '会话ID',
+  `user_id` BIGINT DEFAULT NULL COMMENT '用户ID',
+  `model_name` VARCHAR(50) NOT NULL COMMENT '模型名称',
+  `prompt` TEXT NOT NULL COMMENT '生成提示词',
+  `negative_prompt` TEXT DEFAULT NULL COMMENT '负面提示词',
+  `image_url` VARCHAR(500) NOT NULL COMMENT '图片URL',
+  `image_key` VARCHAR(255) DEFAULT NULL COMMENT '图片存储路径',
+  `width` INT DEFAULT NULL COMMENT '图片宽度',
+  `height` INT DEFAULT NULL COMMENT '图片高度',
+  `seed` BIGINT DEFAULT NULL COMMENT '随机种子',
+  `steps` INT DEFAULT NULL COMMENT '生成步数',
+  `cfg_scale` DECIMAL(5,2) DEFAULT NULL COMMENT 'CFG缩放',
+  `generation_time` INT DEFAULT NULL COMMENT '生成耗时（毫秒）',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-删除，1-正常',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_session_id` (`session_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_model_name` (`model_name`),
+  KEY `idx_create_time` (`create_time`),
+  CONSTRAINT `fk_ai_image_record_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI生成图片记录表';

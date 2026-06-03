@@ -2,12 +2,12 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { ElMessage } from 'element-plus'
-import type { FormInstance, FormRules } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import type { FormInstance, FormRules, UploadProps, UploadFile } from 'element-plus'
 import { getMyFavorites, favoritePoem } from '@/api/modules/poem'
 import { getMyPosts, getUserStats } from '@/api/modules/user'
 import { getHistory, clearHistory } from '@/api/modules/history'
-import type { Poem, ForumPost, UserHistory } from '@/types/model'
+import type { Poem, ForumPost } from '@/types/model'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -15,6 +15,10 @@ const userStore = useUserStore()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
 const activeTab = ref('profile')
+const avatarUploading = ref(false)
+const showPasswordDialog = ref(false)
+const showDeviceDialog = ref(false)
+const showSecurityLogDialog = ref(false)
 
 const userStats = ref({
   favoriteCount: 0,
@@ -22,6 +26,33 @@ const userStats = ref({
   historyCount: 0,
   likeCount: 0
 })
+
+const settings = reactive({
+  systemNotification: true,
+  businessNotification: true,
+  emailNotification: false,
+  smsNotification: false,
+  theme: 'light',
+  sidebarMode: 'expanded',
+  fontSize: 14,
+  language: 'zh'
+})
+
+const privacy = reactive({
+  modelOptimization: true,
+  statisticalAnalysis: true
+})
+
+const mockDevices = ref([
+  { id: 1, name: 'Windows PC - Chrome', ip: '192.168.1.100', location: '上海市', lastLogin: '2024-01-15 10:30:00' },
+  { id: 2, name: 'iPhone 15 - Safari', ip: '192.168.1.101', location: '上海市', lastLogin: '2024-01-14 18:45:00' }
+])
+
+const mockSecurityLogs = ref([
+  { id: 1, content: '密码修改成功', time: '2024-01-15 10:30:00' },
+  { id: 2, content: '登录成功', time: '2024-01-14 18:45:00' },
+  { id: 3, content: '登录成功', time: '2024-01-13 09:15:00' }
+])
 
 const form = reactive({
   nickname: '',
@@ -40,7 +71,7 @@ const passwordForm = reactive({
 
 const passwordFormRef = ref<FormInstance>()
 
-const validateConfirmPassword = (rule: any, value: string, callback: any) => {
+const validateConfirmPassword = (_rule: any, value: string, callback: any) => {
   if (value === '') {
     callback(new Error('请再次输入密码'))
   } else if (value !== passwordForm.newPassword) {
@@ -94,6 +125,69 @@ const fetchUserStats = async () => {
   } catch (error) {
     console.error('获取用户统计信息失败')
   }
+}
+
+const handleAvatarSuccess: UploadProps['onSuccess'] = (response) => {
+  if (response.code === 200) {
+    userStore.updateUser({ avatar: response.data.url })
+    ElMessage.success('头像更新成功')
+  } else {
+    ElMessage.error('头像上传失败')
+  }
+  avatarUploading.value = false
+}
+
+const beforeAvatarUpload = (file: UploadFile) => {
+  const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png'
+  const isLt2M = file.size! / 1024 / 1024 < 2
+
+  if (!isJpgOrPng) {
+    ElMessage.error('头像只能是 JPG/PNG 格式!')
+    return false
+  }
+  if (!isLt2M) {
+    ElMessage.error('头像大小不能超过 2MB!')
+    return false
+  }
+  avatarUploading.value = true
+  return true
+}
+
+const handleResetProfile = () => {
+  ElMessageBox.confirm('确定要重置所有修改吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(() => {
+    initForm()
+    ElMessage.success('已重置')
+  }).catch(() => {})
+}
+
+const handleSaveSettings = () => {
+  ElMessage.success('设置已保存')
+}
+
+const handleResetSettings = () => {
+  ElMessageBox.confirm('确定要重置为默认设置吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(() => {
+    settings.systemNotification = true
+    settings.businessNotification = true
+    settings.emailNotification = false
+    settings.smsNotification = false
+    settings.theme = 'light'
+    settings.sidebarMode = 'expanded'
+    settings.fontSize = 14
+    settings.language = 'zh'
+    ElMessage.success('已重置为默认设置')
+  }).catch(() => {})
+}
+
+const handleExportData = (format: 'pdf' | 'excel') => {
+  ElMessage.success(`正在导出 ${format.toUpperCase()} 文件...`)
 }
 
 const handleUpdateProfile = async () => {
@@ -246,12 +340,16 @@ watch(activeTab, (val) => {
   if (val === 'history') fetchHistory()
 })
 
+const handleTabChange = (key: string) => {
+  activeTab.value = key
+}
+
 onMounted(() => {
   initForm()
   fetchUserStats()
   
   const tab = router.currentRoute.value.query.tab as string
-  if (tab && ['profile', 'password', 'favorites', 'posts', 'history'].includes(tab)) {
+  if (tab && ['profile', 'security', 'favorites', 'posts', 'history', 'settings', 'privacy', 'admin'].includes(tab)) {
     activeTab.value = tab
   }
 })
@@ -265,10 +363,28 @@ onMounted(() => {
       <div class="profile-content">
         <div class="profile-sidebar">
           <div class="user-card">
-            <el-avatar :src="userStore.avatar" :size="100" class="user-avatar-large">
-              {{ userStore.username?.charAt(0)?.toUpperCase() }}
-            </el-avatar>
+            <el-upload
+              class="avatar-uploader"
+              action="/api/files/upload"
+              :show-file-list="false"
+              :on-success="handleAvatarSuccess"
+              :before-upload="beforeAvatarUpload"
+              accept="image/jpeg,image/png"
+            >
+              <el-avatar :src="userStore.avatar" :size="100" class="user-avatar-large" v-loading="avatarUploading">
+                {{ userStore.username?.charAt(0)?.toUpperCase() }}
+              </el-avatar>
+              <div class="avatar-overlay">
+                <el-icon><Camera /></el-icon>
+                <span>更换头像</span>
+              </div>
+            </el-upload>
             <h3 class="username">{{ userStore.userInfo?.nickname || userStore.username }}</h3>
+            <p class="user-role">
+              <el-tag :type="userStore.userInfo?.role === 'admin' ? 'danger' : 'primary'" size="small">
+                {{ userStore.userInfo?.role === 'admin' ? '管理员' : '普通用户' }}
+              </el-tag>
+            </p>
             <p class="user-bio">{{ form.bio || '这个人很懒，什么都没留下' }}</p>
             
             <div class="user-stats">
@@ -296,9 +412,9 @@ onMounted(() => {
               <el-icon><User /></el-icon>
               <span>个人信息</span>
             </el-menu-item>
-            <el-menu-item index="password">
+            <el-menu-item index="security">
               <el-icon><Lock /></el-icon>
-              <span>修改密码</span>
+              <span>账号安全</span>
             </el-menu-item>
             <el-menu-item index="favorites">
               <el-icon><Star /></el-icon>
@@ -311,6 +427,18 @@ onMounted(() => {
             <el-menu-item index="history">
               <el-icon><Clock /></el-icon>
               <span>浏览历史</span>
+            </el-menu-item>
+            <el-menu-item index="settings">
+              <el-icon><Setting /></el-icon>
+              <span>系统偏好</span>
+            </el-menu-item>
+            <el-menu-item index="privacy">
+              <el-icon><Shield /></el-icon>
+              <span>数据隐私</span>
+            </el-menu-item>
+            <el-menu-item index="admin" v-if="userStore.userInfo?.role === 'admin'">
+              <el-icon><Tools /></el-icon>
+              <span>系统管理</span>
             </el-menu-item>
           </el-menu>
           
@@ -336,6 +464,10 @@ onMounted(() => {
               label-width="100px"
               class="profile-form"
             >
+              <el-form-item label="用户名">
+                <el-input :value="userStore.username" disabled />
+              </el-form-item>
+              
               <el-form-item label="昵称" prop="nickname">
                 <el-input v-model="form.nickname" placeholder="请输入昵称" />
               </el-form-item>
@@ -377,6 +509,10 @@ onMounted(() => {
                 />
               </el-form-item>
               
+              <el-form-item label="注册时间">
+                <el-input :value="userStore.userInfo?.createTime" disabled />
+              </el-form-item>
+              
               <el-form-item>
                 <el-button
                   type="primary"
@@ -385,59 +521,57 @@ onMounted(() => {
                 >
                   保存修改
                 </el-button>
+                <el-button @click="handleResetProfile">重置</el-button>
               </el-form-item>
             </el-form>
           </el-card>
           
-          <el-card v-if="activeTab === 'password'" class="profile-card">
+          <el-card v-if="activeTab === 'security'" class="profile-card">
             <template #header>
-              <h3>修改密码</h3>
+              <h3>账号安全中心</h3>
             </template>
             
-            <el-form
-              ref="passwordFormRef"
-              :model="passwordForm"
-              :rules="passwordRules"
-              label-width="100px"
-              class="password-form"
-            >
-              <el-form-item label="原密码" prop="oldPassword">
-                <el-input
-                  v-model="passwordForm.oldPassword"
-                  type="password"
-                  placeholder="请输入原密码"
-                  show-password
-                />
-              </el-form-item>
+            <div class="security-section">
+              <div class="security-item">
+                <div class="security-info">
+                  <h4>登录密码</h4>
+                  <p>定期修改密码可以保护账号安全</p>
+                </div>
+                <el-button type="primary" @click="showPasswordDialog = true">修改密码</el-button>
+              </div>
               
-              <el-form-item label="新密码" prop="newPassword">
-                <el-input
-                  v-model="passwordForm.newPassword"
-                  type="password"
-                  placeholder="请输入新密码"
-                  show-password
-                />
-              </el-form-item>
+              <div class="security-item">
+                <div class="security-info">
+                  <h4>绑定手机号</h4>
+                  <p>已绑定：{{ userStore.userInfo?.phone || '未绑定' }}</p>
+                </div>
+                <el-button disabled>开发中</el-button>
+              </div>
               
-              <el-form-item label="确认密码" prop="confirmPassword">
-                <el-input
-                  v-model="passwordForm.confirmPassword"
-                  type="password"
-                  placeholder="请再次输入新密码"
-                  show-password
-                />
-              </el-form-item>
+              <div class="security-item">
+                <div class="security-info">
+                  <h4>绑定邮箱</h4>
+                  <p>已绑定：{{ userStore.userInfo?.email || '未绑定' }}</p>
+                </div>
+                <el-button disabled>开发中</el-button>
+              </div>
               
-              <el-form-item>
-                <el-button
-                  type="primary"
-                  :loading="loading"
-                  @click="handleUpdatePassword"
-                >
-                  修改密码
-                </el-button>
-              </el-form-item>
-            </el-form>
+              <div class="security-item">
+                <div class="security-info">
+                  <h4>登录设备管理</h4>
+                  <p>查看和管理登录过的设备</p>
+                </div>
+                <el-button @click="showDeviceDialog = true">查看设备</el-button>
+              </div>
+              
+              <div class="security-item">
+                <div class="security-info">
+                  <h4>安全日志</h4>
+                  <p>查看账号安全相关操作记录</p>
+                </div>
+                <el-button @click="showSecurityLogDialog = true">查看日志</el-button>
+              </div>
+            </div>
           </el-card>
           
           <el-card v-if="activeTab === 'favorites'" class="profile-card">
@@ -566,9 +700,221 @@ onMounted(() => {
               </div>
             </div>
           </el-card>
+
+          <el-card v-if="activeTab === 'settings'" class="profile-card">
+            <template #header>
+              <h3>系统偏好设置</h3>
+            </template>
+            
+            <div class="settings-section">
+              <div class="settings-group">
+                <h4>消息通知设置</h4>
+                <div class="setting-item">
+                  <span>系统通知</span>
+                  <el-switch v-model="settings.systemNotification" />
+                </div>
+                <div class="setting-item">
+                  <span>业务通知</span>
+                  <el-switch v-model="settings.businessNotification" />
+                </div>
+                <div class="setting-item">
+                  <span>邮件通知</span>
+                  <el-switch v-model="settings.emailNotification" />
+                </div>
+                <div class="setting-item">
+                  <span>短信通知</span>
+                  <el-switch v-model="settings.smsNotification" />
+                </div>
+              </div>
+              
+              <div class="settings-group">
+                <h4>界面主题设置</h4>
+                <div class="setting-item">
+                  <span>主题模式</span>
+                  <el-radio-group v-model="settings.theme">
+                    <el-radio-button label="light">浅色</el-radio-button>
+                    <el-radio-button label="dark">深色</el-radio-button>
+                    <el-radio-button label="system">跟随系统</el-radio-button>
+                  </el-radio-group>
+                </div>
+                <div class="setting-item">
+                  <span>侧边栏模式</span>
+                  <el-radio-group v-model="settings.sidebarMode">
+                    <el-radio-button label="expanded">展开</el-radio-button>
+                    <el-radio-button label="collapsed">收起</el-radio-button>
+                  </el-radio-group>
+                </div>
+                <div class="setting-item">
+                  <span>字体大小</span>
+                  <el-slider v-model="settings.fontSize" :min="12" :max="20" :step="1" show-input />
+                </div>
+              </div>
+              
+              <div class="settings-group">
+                <h4>语言设置</h4>
+                <div class="setting-item">
+                  <span>界面语言</span>
+                  <el-select v-model="settings.language" placeholder="选择语言">
+                    <el-option label="中文" value="zh" />
+                    <el-option label="English" value="en" />
+                  </el-select>
+                </div>
+              </div>
+              
+              <div class="settings-actions">
+                <el-button type="primary" @click="handleSaveSettings">保存设置</el-button>
+                <el-button @click="handleResetSettings">重置默认</el-button>
+              </div>
+            </div>
+          </el-card>
+
+          <el-card v-if="activeTab === 'privacy'" class="profile-card">
+            <template #header>
+              <h3>数据与隐私管理</h3>
+            </template>
+            
+            <div class="privacy-section">
+              <div class="privacy-item">
+                <div class="privacy-info">
+                  <h4>个人数据导出</h4>
+                  <p>导出您的个人数据，包括收藏、帖子、浏览记录等</p>
+                </div>
+                <div class="privacy-actions">
+                  <el-button @click="handleExportData('pdf')">导出 PDF</el-button>
+                  <el-button @click="handleExportData('excel')">导出 Excel</el-button>
+                </div>
+              </div>
+              
+              <div class="privacy-item">
+                <div class="privacy-info">
+                  <h4>数据使用授权</h4>
+                  <p>允许平台使用匿名数据改进服务</p>
+                </div>
+                <div class="privacy-actions">
+                  <div class="setting-item">
+                    <span>模型优化</span>
+                    <el-switch v-model="privacy.modelOptimization" />
+                  </div>
+                  <div class="setting-item">
+                    <span>统计分析</span>
+                    <el-switch v-model="privacy.statisticalAnalysis" />
+                  </div>
+                </div>
+              </div>
+              
+              <div class="privacy-item">
+                <div class="privacy-info">
+                  <h4>隐私政策</h4>
+                  <p>查看平台隐私政策</p>
+                </div>
+                <el-button disabled>开发中</el-button>
+              </div>
+              
+              <div class="privacy-item">
+                <div class="privacy-info">
+                  <h4>账号注销</h4>
+                  <p>注销账号将删除所有数据，此操作不可恢复</p>
+                </div>
+                <el-button type="danger" disabled>暂未开放</el-button>
+              </div>
+            </div>
+          </el-card>
+
+          <el-card v-if="activeTab === 'admin' && userStore.userInfo?.role === 'admin'" class="profile-card">
+            <template #header>
+              <h3>系统快捷操作</h3>
+            </template>
+            
+            <div class="admin-section">
+              <div class="admin-item" @click="router.push('/admin/users')">
+                <el-icon><User /></el-icon>
+                <span>用户管理</span>
+              </div>
+              <div class="admin-item" @click="router.push('/admin/roles')">
+                <el-icon><UserFilled /></el-icon>
+                <span>角色管理</span>
+              </div>
+              <div class="admin-item" @click="router.push('/admin/menus')">
+                <el-icon><Menu /></el-icon>
+                <span>菜单管理</span>
+              </div>
+              <div class="admin-item" @click="router.push('/admin/models')">
+                <el-icon><Cpu /></el-icon>
+                <span>模型管理</span>
+              </div>
+            </div>
+          </el-card>
         </div>
       </div>
     </div>
+    
+    <el-dialog v-model="showPasswordDialog" title="修改密码" width="400px">
+      <el-form
+        ref="passwordFormRef"
+        :model="passwordForm"
+        :rules="passwordRules"
+        label-width="100px"
+      >
+        <el-form-item label="原密码" prop="oldPassword">
+          <el-input
+            v-model="passwordForm.oldPassword"
+            type="password"
+            placeholder="请输入原密码"
+            show-password
+          />
+        </el-form-item>
+        
+        <el-form-item label="新密码" prop="newPassword">
+          <el-input
+            v-model="passwordForm.newPassword"
+            type="password"
+            placeholder="请输入新密码"
+            show-password
+          />
+        </el-form-item>
+        
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input
+            v-model="passwordForm.confirmPassword"
+            type="password"
+            placeholder="请再次输入新密码"
+            show-password
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showPasswordDialog = false">取消</el-button>
+        <el-button type="primary" :loading="loading" @click="handleUpdatePassword">确定</el-button>
+      </template>
+    </el-dialog>
+    
+    <el-dialog v-model="showDeviceDialog" title="登录设备管理" width="600px">
+      <div class="device-list">
+        <div v-for="device in mockDevices" :key="device.id" class="device-item">
+          <div class="device-info">
+            <el-icon :size="24"><Monitor /></el-icon>
+            <div>
+              <h4>{{ device.name }}</h4>
+              <p>{{ device.ip }} · {{ device.location }}</p>
+              <p class="device-time">最后登录：{{ device.lastLogin }}</p>
+            </div>
+          </div>
+          <el-button type="danger" text size="small">下线</el-button>
+        </div>
+      </div>
+    </el-dialog>
+    
+    <el-dialog v-model="showSecurityLogDialog" title="安全日志" width="600px">
+      <div class="security-log-list">
+        <div v-for="log in mockSecurityLogs" :key="log.id" class="log-item">
+          <div class="log-info">
+            <el-icon :size="16"><InfoFilled /></el-icon>
+            <span>{{ log.content }}</span>
+          </div>
+          <span class="log-time">{{ log.time }}</span>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -825,5 +1171,258 @@ onMounted(() => {
 .history-time {
   font-size: $font-size-sm;
   color: $text-color-light;
+}
+
+.user-role {
+  margin: $spacing-xs 0;
+}
+
+.avatar-uploader {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  
+  .avatar-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity $transition-base;
+    color: #fff;
+    font-size: $font-size-sm;
+    
+    .el-icon {
+      font-size: 20px;
+      margin-bottom: $spacing-xs;
+    }
+  }
+  
+  &:hover .avatar-overlay {
+    opacity: 1;
+  }
+}
+
+.security-section {
+  .security-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $spacing-lg 0;
+    border-bottom: 1px solid $border-color;
+    
+    &:last-child {
+      border-bottom: none;
+    }
+    
+    .security-info {
+      h4 {
+        margin: 0 0 $spacing-xs;
+        font-size: $font-size-base;
+        color: $text-color;
+      }
+      
+      p {
+        margin: 0;
+        font-size: $font-size-sm;
+        color: $text-color-secondary;
+      }
+    }
+  }
+}
+
+.settings-section {
+  .settings-group {
+    margin-bottom: $spacing-xl;
+    
+    h4 {
+      font-size: $font-size-lg;
+      color: $text-color;
+      margin-bottom: $spacing-lg;
+      padding-bottom: $spacing-sm;
+      border-bottom: 1px solid $border-color;
+    }
+  }
+  
+  .setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $spacing-md 0;
+    
+    span {
+      font-size: $font-size-base;
+      color: $text-color;
+    }
+  }
+  
+  .settings-actions {
+    margin-top: $spacing-xl;
+    display: flex;
+    gap: $spacing-md;
+  }
+}
+
+.privacy-section {
+  .privacy-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $spacing-lg 0;
+    border-bottom: 1px solid $border-color;
+    
+    &:last-child {
+      border-bottom: none;
+    }
+    
+    .privacy-info {
+      flex: 1;
+      
+      h4 {
+        margin: 0 0 $spacing-xs;
+        font-size: $font-size-base;
+        color: $text-color;
+      }
+      
+      p {
+        margin: 0;
+        font-size: $font-size-sm;
+        color: $text-color-secondary;
+      }
+    }
+    
+    .privacy-actions {
+      display: flex;
+      gap: $spacing-md;
+      align-items: center;
+      
+      .setting-item {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        
+        span {
+          font-size: $font-size-sm;
+          color: $text-color-secondary;
+        }
+      }
+    }
+  }
+}
+
+.admin-section {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: $spacing-lg;
+  
+  .admin-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: $spacing-xl;
+    border: 1px solid $border-color;
+    border-radius: $border-radius-md;
+    cursor: pointer;
+    transition: all $transition-base;
+    
+    &:hover {
+      border-color: $primary-color;
+      background-color: rgba($primary-color, 0.02);
+    }
+    
+    .el-icon {
+      font-size: 32px;
+      color: $primary-color;
+      margin-bottom: $spacing-md;
+    }
+    
+    span {
+      font-size: $font-size-base;
+      color: $text-color;
+    }
+  }
+}
+
+.device-list {
+  .device-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $spacing-lg 0;
+    border-bottom: 1px solid $border-color;
+    
+    &:last-child {
+      border-bottom: none;
+    }
+    
+    .device-info {
+      display: flex;
+      align-items: center;
+      gap: $spacing-md;
+      
+      .el-icon {
+        color: $primary-color;
+      }
+      
+      h4 {
+        margin: 0 0 $spacing-xs;
+        font-size: $font-size-base;
+        color: $text-color;
+      }
+      
+      p {
+        margin: 0;
+        font-size: $font-size-sm;
+        color: $text-color-secondary;
+      }
+      
+      .device-time {
+        font-size: $font-size-xs;
+        color: $text-color-light;
+      }
+    }
+  }
+}
+
+.security-log-list {
+  .log-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $spacing-md 0;
+    border-bottom: 1px solid $border-color;
+    
+    &:last-child {
+      border-bottom: none;
+    }
+    
+    .log-info {
+      display: flex;
+      align-items: center;
+      gap: $spacing-sm;
+      
+      .el-icon {
+        color: $text-color-secondary;
+      }
+      
+      span {
+        font-size: $font-size-base;
+        color: $text-color;
+      }
+    }
+    
+    .log-time {
+      font-size: $font-size-sm;
+      color: $text-color-secondary;
+    }
+  }
 }
 </style>

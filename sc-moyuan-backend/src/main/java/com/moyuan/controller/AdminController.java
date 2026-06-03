@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.moyuan.common.R;
 import com.moyuan.entity.*;
 import com.moyuan.mapper.*;
+import com.moyuan.service.VisitLogService;
 import com.moyuan.service.ForumPostService;
 import com.moyuan.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,6 +40,7 @@ public class AdminController {
     private final PasswordEncoder passwordEncoder;
     private final PoetFeaturedMapper poetFeaturedMapper;
     private final HomeNavigationMapper homeNavigationMapper;
+    private final VisitLogMapper visitLogMapper;
 
     // ========== 统计数据 ==========
 
@@ -513,6 +515,67 @@ public class AdminController {
     public R<Void> deleteForumPost(@PathVariable Long id) {
         forumPostService.removeById(id);
         return R.success();
+    }
+
+    // ========== 访问统计 ==========
+
+    @Operation(summary = "获取访问统计数据")
+    @GetMapping("/stats/visits")
+    public R<Map<String, Object>> getVisitStats() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime todayStart = now.toLocalDate().atStartOfDay();
+        LocalDateTime weekStart = now.toLocalDate().minusDays(7).atStartOfDay();
+        LocalDateTime monthStart = now.toLocalDate().minusDays(30).atStartOfDay();
+
+        long todayVisits = visitLogMapper.selectCount(
+                new LambdaQueryWrapper<VisitLog>().ge(VisitLog::getCreateTime, todayStart));
+        long weekVisits = visitLogMapper.selectCount(
+                new LambdaQueryWrapper<VisitLog>().ge(VisitLog::getCreateTime, weekStart));
+        long monthVisits = visitLogMapper.selectCount(
+                new LambdaQueryWrapper<VisitLog>().ge(VisitLog::getCreateTime, monthStart));
+        long totalVisits = visitLogMapper.selectCount(null);
+
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("todayVisits", todayVisits);
+        stats.put("weekVisits", weekVisits);
+        stats.put("monthVisits", monthVisits);
+        stats.put("totalVisits", totalVisits);
+        return R.success(stats);
+    }
+
+    @Operation(summary = "获取访问趋势")
+    @GetMapping("/stats/visits/trend")
+    public R<Map<String, Object>> getVisitTrend(@RequestParam(defaultValue = "7") int days) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd");
+
+        List<String> dates = IntStream.rangeClosed(0, days - 1)
+                .mapToObj(i -> LocalDate.now().minusDays(days - 1 - i).format(formatter))
+                .toList();
+
+        LocalDateTime startTime = LocalDateTime.now().minusDays(days).toLocalDate().atStartOfDay();
+        List<VisitLog> visitLogs = visitLogMapper.selectList(
+                new LambdaQueryWrapper<VisitLog>().ge(VisitLog::getCreateTime, startTime));
+
+        Map<String, Long> visitsByDate = visitLogs.stream()
+                .collect(Collectors.groupingBy(
+                        v -> v.getCreateTime().format(formatter),
+                        Collectors.counting()));
+
+        Map<String, Long> uniqueVisitorsByDate = visitLogs.stream()
+                .collect(Collectors.groupingBy(
+                        v -> v.getCreateTime().format(formatter),
+                        Collectors.mapping(VisitLog::getIp, Collectors.toSet())))
+                .entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> (long) e.getValue().size()));
+
+        List<Long> visitCounts = dates.stream().map(d -> visitsByDate.getOrDefault(d, 0L)).toList();
+        List<Long> uniqueVisitorCounts = dates.stream().map(d -> uniqueVisitorsByDate.getOrDefault(d, 0L)).toList();
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("dates", dates);
+        result.put("visits", visitCounts);
+        result.put("uniqueVisitors", uniqueVisitorCounts);
+        return R.success(result);
     }
 
     // ========== 操作日志 ==========

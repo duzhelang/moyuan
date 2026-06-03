@@ -66,6 +66,13 @@ public class UserController {
         return R.success(result);
     }
 
+    @Operation(summary = "获取当前用户的统计信息")
+    @GetMapping("/me/stats")
+    public R<Map<String, Object>> getUserStats() {
+        Long userId = securityUtil.getCurrentUserId();
+        return R.success(userService.getUserStats(userId));
+    }
+
     @Operation(summary = "获取用户信息")
     @GetMapping("/{id}")
     public R<User> getUser(@PathVariable Long id) {

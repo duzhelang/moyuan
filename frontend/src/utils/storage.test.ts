@@ -9,7 +9,9 @@ import {
   removeToken
 } from './storage'
 
-const mockLocalStorage = {
+const mockLocalStorage: Record<string, any> & {
+  store: Record<string, string>
+} = {
   store: {} as Record<string, string>,
   getItem: vi.fn((key: string) => mockLocalStorage.store[key] || null),
   setItem: vi.fn((key: string, value: string) => {

@@ -26,12 +26,12 @@ export function likeForumPost(id: number) {
   return request.post<void>(`/forum/posts/${id}/like`)
 }
 
-export function getComments(targetId: number, _targetType: number, params?: { pageNum?: number; pageSize?: number }) {
-  return request.get<PageResult<Comment>>(`/forum/posts/${targetId}/comments`, { params })
+export function getComments(targetId: number, targetType: number, params?: { pageNum?: number; pageSize?: number }) {
+  return request.get<PageResult<Comment>>('/forum/comments', { params: { targetId, targetType, ...params } })
 }
 
 export function createComment(data: CommentCreateRequest) {
-  return request.post<Comment>(`/forum/posts/${data.postId}/comments`, data)
+  return request.post<Comment>('/forum/comments', data)
 }
 
 export function deleteComment(id: number) {

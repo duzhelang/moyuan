@@ -186,7 +186,7 @@ onMounted(() => {
               </el-avatar>
               <div class="comment-meta">
                 <span class="comment-author">{{ comment.username }}</span>
-                <span class="comment-time">{{ comment.createdAt }}</span>
+                <span class="comment-time">{{ comment.createTime }}</span>
               </div>
             </div>
             <div class="comment-content">

@@ -3,6 +3,7 @@ package com.moyuan.dto.request;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import java.util.List;
 
 @Data
 public class RegisterRequest {
@@ -16,4 +17,5 @@ public class RegisterRequest {
 
     private String email;
     private String nickname;
+    private List<String> interests;
 }

@@ -57,7 +57,8 @@ const handleSubmit = async () => {
       username: form.username,
       password: form.password,
       email: form.email || undefined,
-      nickname: form.username
+      nickname: form.username,
+      interests: form.interests.length > 0 ? form.interests : undefined
     })
     ElMessage.success('注册成功')
     router.push('/')
@@ -187,6 +188,7 @@ const handleSubmit = async () => {
                 <td align="right"><input type="button" value="重置" class="cz" @click="handleReset" /></td>
                 <td align="center"><input type="submit" value="提交" class="tj" :disabled="loading" /></td>
               </tr>
+              </tbody>
             </table>
           </form>
         </div>
@@ -348,81 +350,147 @@ const handleSubmit = async () => {
 
 .wb {
   width: 300px;
-  height: 30px;
-  border: none;
+  height: 36px;
+  border: 2px solid rgba(100, 100, 100, 0.3);
   border-radius: 10px;
   font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
   letter-spacing: 0.5px;
   line-height: 1.5;
-  padding: 0 5px;
+  padding: 0 12px;
   font-size: 16px;
+  background-color: rgba(255, 255, 255, 0.8);
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.wb:focus {
+  border-color: #007BFF;
+  background-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.wb:hover {
+  border-color: rgba(100, 100, 100, 0.5);
 }
 
 .lock {
   width: 300px;
-  height: 30px;
-  border: none;
+  height: 36px;
+  border: 2px solid rgba(100, 100, 100, 0.3);
   border-radius: 10px;
   font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
   letter-spacing: 0.5px;
   line-height: 1.5;
-  padding: 0 5px;
+  padding: 0 12px;
   font-size: 16px;
-  background-color: transparent;
+  background-color: rgba(255, 255, 255, 0.8);
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.lock:focus {
+  border-color: #007BFF;
+  background-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.lock:hover {
+  border-color: rgba(100, 100, 100, 0.5);
 }
 
 .biao .xb {
   width: 50px;
   height: 23px;
   border-radius: 5px;
-  border: none;
-  background-color: rgba(100, 100, 100, 0.6);
+  border: 2px solid rgba(100, 100, 100, 0.3);
+  background-color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.biao .xb:checked {
+  background-color: #007BFF;
+  border-color: #007BFF;
 }
 
 .biao .xq {
   width: 40px;
   height: 23px;
   border-radius: 5px;
-  border: none;
-  background-color: rgba(100, 100, 100, 0.6);
+  border: 2px solid rgba(100, 100, 100, 0.3);
+  background-color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.biao .xq:checked {
+  background-color: #007BFF;
+  border-color: #007BFF;
 }
 
 .biao .cz {
   width: 100px;
-  height: 33px;
-  border-radius: 5px;
-  border: none;
+  height: 36px;
+  border-radius: 8px;
+  border: 2px solid rgba(100, 100, 100, 0.3);
   cursor: pointer;
   font-family: cursive;
   font-size: 16px;
+  background-color: rgba(255, 255, 255, 0.8);
+  transition: all 0.3s ease;
+}
+
+.biao .cz:hover {
+  background-color: rgba(255, 255, 255, 0.95);
+  border-color: #007BFF;
+  color: #007BFF;
 }
 
 .tj {
   width: 200px;
   height: 43px;
-  border-radius: 5px;
+  border-radius: 8px;
   border: none;
   font-size: 25px;
   cursor: pointer;
   font-family: cursive;
   background-color: #007BFF;
   color: white;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
 }
 
-.tj:hover, .cz:hover {
-  background-color: aliceblue;
+.tj:hover {
+  background-color: #0056b3;
+  box-shadow: 0 6px 16px rgba(0, 123, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.tj:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
 }
 
 .tj:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+  background-color: #6c757d;
+  box-shadow: none;
+  transform: none;
 }
 
 .w3-agree {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
   font-size: 16px;
+}
+
+.w3-agree input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #007BFF;
 }
 
 .w3-agree a {
@@ -436,15 +504,46 @@ const handleSubmit = async () => {
 .biao a {
   color: #007BFF;
   font-size: 16px;
+  transition: color 0.3s ease;
 }
 
 .biao a:hover {
-  color: #007BFF;
+  color: #0056b3;
   text-decoration: underline;
 }
 
 input:hover {
   opacity: 1;
+}
+
+input::-webkit-input-placeholder {
+  color: #999;
+  font-size: 14px;
+  font-style: italic;
+}
+
+.biao select {
+  width: 260px;
+  height: 36px;
+  border-radius: 8px;
+  border: 2px solid rgba(100, 100, 100, 0.3);
+  background-color: rgba(255, 255, 255, 0.8);
+  font-family: cursive;
+  font-size: 16px;
+  padding: 0 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.biao select:focus {
+  border-color: #007BFF;
+  background-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.biao select:hover {
+  border-color: rgba(100, 100, 100, 0.5);
 }
 
 input::-webkit-input-placeholder {

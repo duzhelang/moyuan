@@ -70,9 +70,9 @@ function getTypeLabel(type: string) {
 }
 
 const getTypeTag = (type: string) => {
-  if (type === 'vision') return 'warning'
-  if (type === 'both') return 'success'
-  return ''
+  if (type === 'vision') return 'warning' as const
+  if (type === 'both') return 'success' as const
+  return 'primary' as const
 }
 
 async function loadModels() {

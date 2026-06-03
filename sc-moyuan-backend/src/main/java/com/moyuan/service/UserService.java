@@ -8,6 +8,8 @@ import com.moyuan.dto.request.UserUpdateRequest;
 import com.moyuan.dto.response.TokenResponse;
 import com.moyuan.entity.User;
 
+import java.util.Map;
+
 public interface UserService extends IService<User> {
     TokenResponse register(RegisterRequest request);
     TokenResponse login(LoginRequest request);
@@ -16,4 +18,5 @@ public interface UserService extends IService<User> {
     void updatePassword(Long userId, PasswordUpdateRequest request);
     void toggleFavorite(Long userId, Long poemId);
     boolean isFavorite(Long userId, Long poemId);
+    Map<String, Object> getUserStats(Long userId);
 }

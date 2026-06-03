@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { usePoemStore } from '@/stores/poem'
 import type { Poem, PoemListParams } from '@/types/model'
 

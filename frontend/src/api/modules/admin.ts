@@ -1,5 +1,4 @@
 import request from '@/utils/request'
-import type { ApiResponse } from '@/types/api'
 import type { User } from '@/types/model'
 
 export function getUserList(params: { page?: number; size?: number; keyword?: string }) {
@@ -109,6 +108,23 @@ export function getAdminStatsTrend() {
     posts: number[]
     users: number[]
   }>('/admin/stats/trend')
+}
+
+export function getVisitStats() {
+  return request.get<{
+    todayVisits: number
+    weekVisits: number
+    monthVisits: number
+    totalVisits: number
+  }>('/admin/stats/visits')
+}
+
+export function getVisitTrend(days?: number) {
+  return request.get<{
+    dates: string[]
+    visits: number[]
+    uniqueVisitors: number[]
+  }>('/admin/stats/visits/trend', { params: { days } })
 }
 
 export function getAdminLogs(params?: { page?: number; size?: number; keyword?: string; startTime?: string; endTime?: string }) {

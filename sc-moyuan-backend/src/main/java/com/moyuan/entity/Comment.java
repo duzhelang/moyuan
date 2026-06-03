@@ -11,7 +11,8 @@ public class Comment {
     private Long id;
     private String content;
     private Long userId;
-    private Long postId;
+    private Long targetId;
+    private Integer targetType;
     private Long parentId;
     private Long replyToUserId;
     private Integer likeCount;

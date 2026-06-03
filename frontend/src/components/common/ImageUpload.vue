@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
-import type { UploadProps, UploadFile } from 'element-plus'
+import type { UploadProps } from 'element-plus'
 import { uploadFile } from '@/api/modules/file'
 
 const props = withDefaults(defineProps<{
   modelValue?: string
   maxSize?: number
+  fileType?: string
+  relatedId?: number
+  relatedType?: string
 }>(), {
   modelValue: '',
   maxSize: 5
@@ -39,7 +42,7 @@ const beforeUpload: UploadProps['beforeUpload'] = (file) => {
 const customUpload = async (options: any) => {
   uploading.value = true
   try {
-    const res = await uploadFile(options.file)
+    const res = await uploadFile(options.file, props.fileType, props.relatedId, props.relatedType)
     imageUrl.value = res.data.url
     emit('update:modelValue', res.data.url)
     ElMessage.success('上传成功')

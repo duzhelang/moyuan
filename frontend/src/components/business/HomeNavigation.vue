@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getHomeNavigationList } from '@/api/modules/admin'
 
@@ -17,11 +17,14 @@ interface NavigationItem {
 const props = defineProps<{
   type: 'works' | 'genres' | 'dynasties'
   title: string
+  animation?: 'wave' | 'fade' | 'slide'
 }>()
 
 const VISIBLE_COUNT = 4
 const WAVE_DELAY = 350
+const PLACEHOLDER_IMAGE = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='290' height='150' viewBox='0 0 290 150'><rect width='290' height='150' fill='%23e3c4a5'/><text x='145' y='82' font-family='KaiTi,STKaiti,serif' font-size='32' fill='%238b6f47' text-anchor='middle' dominant-baseline='middle'>墨渊</text></svg>`
 
+const animationType = computed(() => props.animation || (props.type === 'genres' ? 'fade' : 'wave'))
 const cycleInterval = props.type === 'dynasties' ? 10000 : props.type === 'genres' ? 8000 : 6000
 
 const router = useRouter()
@@ -29,9 +32,23 @@ const allItems = ref<NavigationItem[]>([])
 const visibleItems = ref<NavigationItem[]>([])
 const breathing = ref([false, false, false, false])
 const fading = ref([false, false, false, false])
+const sliding = ref([false, false, false, false])
 const switchTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const isHovering = ref(false)
 const isSwitching = ref(false)
+const failedImageIds = ref<Record<number, boolean>>({})
+const isFastMode = ref(false)
+const recentlyShownIds = ref<Set<number>>(new Set())
+
+const getImageSrc = (item: NavigationItem): string => {
+  if (failedImageIds.value[item.id]) return PLACEHOLDER_IMAGE
+  if (!item.imageUrl) return PLACEHOLDER_IMAGE
+  return `/img/${item.imageUrl}`
+}
+
+const handleImageError = (item: NavigationItem) => {
+  failedImageIds.value = { ...failedImageIds.value, [item.id]: true }
+}
 
 const dedupItems = (items: NavigationItem[]): NavigationItem[] => {
   const seen = new Set<number>()
@@ -71,17 +88,38 @@ const pickRandomItems = () => {
   }
   const shuffled = shuffleArray(allItems.value)
   visibleItems.value = shuffled.slice(0, VISIBLE_COUNT)
+  recentlyShownIds.value = new Set(visibleItems.value.map(i => i.id))
 }
 
 const getNextItem = (currentIndex: number): NavigationItem => {
-  const candidates = allItems.value.filter(item => !visibleItems.value.some(v => v.id === item.id))
-  if (candidates.length === 0) return visibleItems.value[currentIndex]
-  return candidates[Math.floor(Math.random() * candidates.length)]
+  const currentVisibleIds = new Set(visibleItems.value.map(v => v.id))
+  const excludeIds = new Set([...currentVisibleIds, ...recentlyShownIds.value])
+
+  const freshCandidates = allItems.value.filter(item => !excludeIds.has(item.id))
+  if (freshCandidates.length > 0) {
+    const chosen = freshCandidates[Math.floor(Math.random() * freshCandidates.length)]
+    recentlyShownIds.value = new Set([...recentlyShownIds.value, chosen.id])
+    return chosen
+  }
+
+  const visibleOnlyCandidates = allItems.value.filter(item => !currentVisibleIds.has(item.id))
+  if (visibleOnlyCandidates.length > 0) {
+    recentlyShownIds.value = new Set()
+    const chosen = visibleOnlyCandidates[Math.floor(Math.random() * visibleOnlyCandidates.length)]
+    recentlyShownIds.value = new Set([chosen.id])
+    return chosen
+  }
+
+  return visibleItems.value[currentIndex]
 }
 
-const waveSwitch = (direction: 'left' | 'right' | 'random' = 'random') => {
+const waveSwitch = (direction: 'left' | 'right' | 'random' = 'random', fast = false) => {
   if (isSwitching.value) return
   isSwitching.value = true
+
+  const waveDelay = fast ? 120 : WAVE_DELAY
+  const breathIn = fast ? 150 : 350
+  const breathOut = fast ? 150 : 300
 
   let order: number[]
   if (direction === 'left') {
@@ -107,15 +145,18 @@ const waveSwitch = (direction: 'left' | 'right' | 'random' = 'random') => {
           if (step === order.length - 1) {
             isSwitching.value = false
           }
-        }, 300)
-      }, 350)
-    }, step * WAVE_DELAY)
+        }, breathOut)
+      }, breathIn)
+    }, step * waveDelay)
   })
 }
 
-const fadeSwitch = (direction: 'left' | 'right' | 'random' = 'random') => {
+const fadeSwitch = (direction: 'left' | 'right' | 'random' = 'random', fast = false) => {
   if (isSwitching.value) return
   isSwitching.value = true
+
+  const stepDelay = fast ? 80 : 200
+  const fadeTime = fast ? 150 : 400
 
   const order = direction === 'left' ? [3, 2, 1, 0] : direction === 'right' ? [0, 1, 2, 3] : [0, 1, 2, 3]
 
@@ -130,22 +171,54 @@ const fadeSwitch = (direction: 'left' | 'right' | 'random' = 'random') => {
           if (step === order.length - 1) {
             isSwitching.value = false
           }
-        }, 400)
-      }, 400)
-    }, step * 200)
+        }, fadeTime)
+      }, fadeTime)
+    }, step * stepDelay)
   })
 }
 
-const switchCards = (direction: 'left' | 'right' | 'random' = 'random') => {
-  if (props.type === 'genres') {
-    fadeSwitch(direction)
+const slideSwitch = (direction: 'left' | 'right' | 'random' = 'random', fast = false) => {
+  if (isSwitching.value) return
+  isSwitching.value = true
+
+  const stepDelay = fast ? 100 : 250
+  const slideTime = fast ? 200 : 500
+
+  const order = direction === 'left' ? [3, 2, 1, 0] : direction === 'right' ? [0, 1, 2, 3] : [0, 1, 2, 3]
+
+  order.forEach((idx, step) => {
+    setTimeout(() => {
+      sliding.value[idx] = true
+      setTimeout(() => {
+        const newItem = getNextItem(idx)
+        visibleItems.value[idx] = newItem
+        setTimeout(() => {
+          sliding.value[idx] = false
+          if (step === order.length - 1) {
+            isSwitching.value = false
+          }
+        }, slideTime)
+      }, slideTime)
+    }, step * stepDelay)
+  })
+}
+
+const switchCards = (direction: 'left' | 'right' | 'random' = 'random', fast = false) => {
+  if (fast) isFastMode.value = true
+  if (animationType.value === 'fade') {
+    fadeSwitch(direction, fast)
+  } else if (animationType.value === 'slide') {
+    slideSwitch(direction, fast)
   } else {
-    waveSwitch(direction)
+    waveSwitch(direction, fast)
+  }
+  if (fast) {
+    setTimeout(() => { isFastMode.value = false }, 1200)
   }
 }
 
 const handleArrowClick = (direction: 'left' | 'right') => {
-  switchCards(direction)
+  switchCards(direction, true)
 }
 
 const handleMouseEnter = () => {
@@ -159,8 +232,10 @@ const handleMouseLeave = () => {
 const handleClick = (item: NavigationItem) => {
   if (item.linkType === 'poem') {
     router.push(`/poem/${item.linkId}`)
+  } else if (item.linkType === 'poet') {
+    router.push(`/poet/${item.linkId}`)
   } else if (item.linkType === 'category') {
-    router.push({ path: '/poem', query: { category: String(item.linkId) } })
+    router.push({ path: '/poem', query: { categoryId: String(item.linkId) } })
   } else if (item.linkType === 'dynasty') {
     router.push({ path: '/poem', query: { dynastyId: String(item.linkId) } })
   }
@@ -197,15 +272,15 @@ onUnmounted(() => {
       <button class="arrow-btn arrow-right" @click.stop="handleArrowClick('right')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
       </button>
-      <div class="nav-grid">
+      <div class="nav-grid" :class="{ 'fast-mode': isFastMode }">
         <template v-for="(item, idx) in visibleItems" :key="(item?.id ?? idx) + '-' + idx">
         <div
           v-if="item"
           class="nav-card"
-          :class="{ breathing: breathing[idx], fading: fading[idx] }"
+          :class="{ breathing: breathing[idx], fading: fading[idx], sliding: sliding[idx] }"
           @click="handleClick(item)"
         >
-          <img :src="'/img/' + item.imageUrl" :alt="item.title">
+          <img :src="getImageSrc(item)" :alt="item.title" @error="handleImageError(item)">
           <li>{{ item.title }}</li>
           <p v-if="item.subtitle">{{ item.subtitle }}</p>
         </div>
@@ -224,6 +299,7 @@ onUnmounted(() => {
 }
 
 .nav-title {
+  font-family: cursive;
   font-size: 50px;
   font-weight: 600;
   color: #333;
@@ -324,6 +400,14 @@ onUnmounted(() => {
   transform-origin: center bottom;
 }
 
+.fast-mode .nav-card {
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.fast-mode .nav-card.sliding {
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
 .nav-grid > .nav-card {
   display: block !important;
   flex-direction: initial !important;
@@ -354,6 +438,15 @@ onUnmounted(() => {
   transform: scale(0.95);
 }
 
+.nav-card.sliding {
+  opacity: 0;
+  transform: translateX(60px) scale(0.9);
+}
+
+.nav-card.sliding:hover {
+  transform: translateX(60px) scale(0.9);
+}
+
 .nav-card img {
   border-radius: 5% !important;
   width: 290px !important;
@@ -361,6 +454,10 @@ onUnmounted(() => {
   object-fit: cover !important;
   display: block !important;
   transition: linear 0.3s;
+}
+
+.fast-mode .nav-card img {
+  transition: linear 0.15s;
 }
 
 .nav-card:hover img {

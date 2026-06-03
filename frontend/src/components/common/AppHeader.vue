@@ -7,6 +7,8 @@ import { ElMessage } from 'element-plus'
 const router = useRouter()
 const userStore = useUserStore()
 const currentTime = ref('')
+const mobileMenuVisible = ref(false)
+const isMobile = ref(window.innerWidth <= 768)
 
 const asset = (path: string) => path
 
@@ -24,9 +26,14 @@ const updateTime = () => {
 
 let timeTimer: ReturnType<typeof setInterval> | null = null
 
+const checkMobile = () => {
+  isMobile.value = window.innerWidth <= 768
+}
+
 onMounted(() => {
   updateTime()
   timeTimer = setInterval(updateTime, 1000)
+  window.addEventListener('resize', checkMobile)
   if (userStore.isLoggedIn && !userStore.userInfo) {
     userStore.fetchUserInfo()
   }
@@ -34,12 +41,14 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (timeTimer) clearInterval(timeTimer)
+  window.removeEventListener('resize', checkMobile)
 })
 
 const handleLogout = async () => {
   try {
     await userStore.logout()
     ElMessage.success('已退出登录')
+    mobileMenuVisible.value = false
     router.push('/')
   } catch {
     ElMessage.error('退出失败')
@@ -47,15 +56,28 @@ const handleLogout = async () => {
 }
 
 const goToProfile = () => {
+  mobileMenuVisible.value = false
   router.push('/user/profile')
 }
 
 const goToLogin = () => {
+  mobileMenuVisible.value = false
   router.push('/user/login')
 }
 
 const goToRegister = () => {
+  mobileMenuVisible.value = false
   router.push('/user/register')
+}
+
+const goToAdmin = () => {
+  mobileMenuVisible.value = false
+  router.push('/admin/dashboard')
+}
+
+const goToCreatePoem = () => {
+  mobileMenuVisible.value = false
+  router.push('/poem/create')
 }
 
 const handleUserCommand = (command: string) => {
@@ -71,6 +93,9 @@ const handleUserCommand = (command: string) => {
       break
     case 'history':
       router.push('/user/profile?tab=history')
+      break
+    case 'createPoem':
+      router.push('/poem/create')
       break
     case 'admin':
       router.push('/admin/dashboard')
@@ -92,13 +117,13 @@ const handleUserCommand = (command: string) => {
         </router-link>
       </div>
       
-      <div class="header-center">
+      <div class="header-center" v-if="!isMobile">
         <div class="time-display" title="现在时间">
           {{ currentTime }}
         </div>
       </div>
       
-      <div class="header-right">
+      <div class="header-right" v-if="!isMobile">
         <div class="contact-item">
           <span class="contact-text">了解我们</span>
           <div class="qr-popup">
@@ -114,7 +139,7 @@ const handleUserCommand = (command: string) => {
         <div class="divider"></div>
         <div class="user-actions">
           <template v-if="userStore.isLoggedIn">
-            <el-dropdown trigger="click" @command="handleUserCommand">
+            <el-dropdown trigger="click" teleported @command="handleUserCommand">
               <div class="user-info">
                 <el-avatar 
                   :src="userStore.avatar" 
@@ -145,6 +170,10 @@ const handleUserCommand = (command: string) => {
                     <el-icon><Clock /></el-icon>
                     浏览历史
                   </el-dropdown-item>
+                  <el-dropdown-item command="createPoem">
+                    <el-icon><Edit /></el-icon>
+                    发布新诗
+                  </el-dropdown-item>
                   <el-dropdown-item v-if="userStore.userInfo?.role === 'admin'" divided command="admin">
                     <el-icon><Setting /></el-icon>
                     后台管理
@@ -164,7 +193,62 @@ const handleUserCommand = (command: string) => {
           </template>
         </div>
       </div>
+
+      <div class="mobile-menu-btn" v-if="isMobile" @click="mobileMenuVisible = true">
+        <el-icon :size="24"><Menu /></el-icon>
+      </div>
     </div>
+
+    <el-drawer
+      v-model="mobileMenuVisible"
+      title="菜单"
+      direction="rtl"
+      size="70%"
+      :show-close="true"
+    >
+      <div class="mobile-menu-content">
+        <div class="mobile-user-section" v-if="userStore.isLoggedIn">
+          <el-avatar :src="userStore.avatar" :size="48">
+            {{ userStore.username?.charAt(0)?.toUpperCase() }}
+          </el-avatar>
+          <div class="mobile-user-info">
+            <span class="mobile-user-name">{{ userStore.userInfo?.nickname || userStore.username }}</span>
+            <span class="mobile-user-role">{{ userStore.userInfo?.role === 'admin' ? '管理员' : '用户' }}</span>
+          </div>
+        </div>
+        
+        <el-divider v-if="userStore.isLoggedIn" />
+        
+        <div class="mobile-menu-list">
+          <div class="mobile-menu-item" @click="goToProfile">
+            <el-icon><User /></el-icon>
+            <span>个人中心</span>
+          </div>
+          <div class="mobile-menu-item" @click="goToCreatePoem" v-if="userStore.isLoggedIn">
+            <el-icon><Edit /></el-icon>
+            <span>发布新诗</span>
+          </div>
+          <div class="mobile-menu-item" @click="goToAdmin" v-if="userStore.userInfo?.role === 'admin'">
+            <el-icon><Setting /></el-icon>
+            <span>后台管理</span>
+          </div>
+        </div>
+        
+        <el-divider />
+        
+        <div class="mobile-menu-actions">
+          <template v-if="userStore.isLoggedIn">
+            <el-button type="danger" @click="handleLogout" class="mobile-logout-btn">
+              退出登录
+            </el-button>
+          </template>
+          <template v-else>
+            <el-button type="primary" @click="goToLogin">登录</el-button>
+            <el-button @click="goToRegister">注册</el-button>
+          </template>
+        </div>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -225,9 +309,8 @@ const handleUserCommand = (command: string) => {
 .header-center {
   display: flex;
   align-items: center;
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  flex: 1;
+  justify-content: center;
 }
 
 .time-display {
@@ -379,5 +462,95 @@ const handleUserCommand = (command: string) => {
 .separator {
   color: rgba(255, 255, 255, 0.4);
   font-size: 14px;
+}
+
+.mobile-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #fff;
+  padding: 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+  
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+.mobile-menu-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.mobile-user-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.mobile-user-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-user-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.mobile-user-role {
+  font-size: 12px;
+  color: #999;
+}
+
+.mobile-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobile-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 8px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background-color: #f5f5f5;
+  }
+  
+  .el-icon {
+    font-size: 18px;
+    color: #666;
+  }
+  
+  span {
+    font-size: 15px;
+    color: #333;
+  }
+}
+
+.mobile-menu-actions {
+  margin-top: auto;
+  padding: 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  
+  .el-button {
+    width: 100%;
+  }
+}
+
+.mobile-logout-btn {
+  margin-top: 8px;
 }
 </style>

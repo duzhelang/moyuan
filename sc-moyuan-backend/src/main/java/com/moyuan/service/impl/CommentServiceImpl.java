@@ -32,10 +32,11 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
     private final UserLikeMapper userLikeMapper;
 
     @Override
-    public IPage<Comment> getCommentsByPostId(Long postId, int pageNum, int pageSize) {
+    public IPage<Comment> getCommentsByTarget(Long targetId, Integer targetType, int pageNum, int pageSize) {
         return commentMapper.selectPage(new Page<>(pageNum, pageSize),
                 new LambdaQueryWrapper<Comment>()
-                        .eq(Comment::getPostId, postId)
+                        .eq(Comment::getTargetId, targetId)
+                        .eq(Comment::getTargetType, targetType)
                         .eq(Comment::getStatus, 1)
                         .eq(Comment::getParentId, 0)
                         .orderByDesc(Comment::getCreateTime));
@@ -44,25 +45,23 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
     @Override
     @Transactional
     public Comment createComment(Long userId, CommentCreateRequest request) {
-        ForumPost post = forumPostMapper.selectById(request.getPostId());
-        if (post == null || post.getStatus() != 1) {
-            throw new BusinessException(ResultCode.POST_NOT_FOUND);
-        }
-
         Comment comment = new Comment();
         comment.setContent(request.getContent());
         comment.setUserId(userId);
-        comment.setPostId(request.getPostId());
+        comment.setTargetId(request.getTargetId());
+        comment.setTargetType(request.getTargetType());
         comment.setParentId(request.getParentId() != null ? request.getParentId() : 0L);
         comment.setReplyToUserId(request.getReplyToUserId());
         comment.setLikeCount(0);
         comment.setStatus(1);
         commentMapper.insert(comment);
 
-        forumPostMapper.update(null, new LambdaUpdateWrapper<ForumPost>()
-                .eq(ForumPost::getId, request.getPostId())
-                .setSql("comment_count = comment_count + 1")
-                .set(ForumPost::getLastCommentTime, LocalDateTime.now()));
+        if (request.getTargetType() == 2) {
+            forumPostMapper.update(null, new LambdaUpdateWrapper<ForumPost>()
+                    .eq(ForumPost::getId, request.getTargetId())
+                    .setSql("comment_count = comment_count + 1")
+                    .set(ForumPost::getLastCommentTime, LocalDateTime.now()));
+        }
 
         return comment;
     }
@@ -76,10 +75,12 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         }
         commentMapper.deleteById(commentId);
 
-        forumPostMapper.update(null, new LambdaUpdateWrapper<ForumPost>()
-                .eq(ForumPost::getId, comment.getPostId())
-                .gt(ForumPost::getCommentCount, 0)
-                .setSql("comment_count = comment_count - 1"));
+        if (comment.getTargetType() == 2) {
+            forumPostMapper.update(null, new LambdaUpdateWrapper<ForumPost>()
+                    .eq(ForumPost::getId, comment.getTargetId())
+                    .gt(ForumPost::getCommentCount, 0)
+                    .setSql("comment_count = comment_count - 1"));
+        }
     }
 
     @Override

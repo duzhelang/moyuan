@@ -3,6 +3,8 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAdminHomeNavigation, createHomeNavigation, updateHomeNavigation, deleteHomeNavigation } from '@/api/modules/admin'
 
+const NAV_ANIMATION_KEY = 'home_nav_animation_config'
+
 const tableData = ref<any[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -11,6 +13,30 @@ const loading = ref(false)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const filterType = ref('')
+
+const animationOptions = [
+  { label: '波浪', value: 'wave' },
+  { label: '淡入', value: 'fade' },
+  { label: '滑入', value: 'slide' }
+]
+
+const animationConfig = ref<Record<string, string>>({
+  works: 'wave',
+  genres: 'fade',
+  dynasties: 'slide'
+})
+
+const loadAnimationConfig = () => {
+  try {
+    const saved = localStorage.getItem(NAV_ANIMATION_KEY)
+    if (saved) animationConfig.value = { ...animationConfig.value, ...JSON.parse(saved) }
+  } catch {}
+}
+
+const saveAnimationConfig = () => {
+  localStorage.setItem(NAV_ANIMATION_KEY, JSON.stringify(animationConfig.value))
+  ElMessage.success('动画配置已保存')
+}
 
 const form = ref({
   id: 0,
@@ -119,12 +145,50 @@ const getLinkTypeLabel = (linkType: string) => {
   return option ? option.label : linkType
 }
 
-onMounted(fetchData)
+onMounted(() => {
+  loadAnimationConfig()
+  fetchData()
+})
 </script>
 
 <template>
   <div class="page-container">
     <h2 class="page-title">首页导航管理</h2>
+
+    <el-card class="animation-card">
+      <template #header>
+        <div class="card-header">
+          <span>动画效果配置</span>
+          <el-button type="primary" size="small" @click="saveAnimationConfig">保存配置</el-button>
+        </div>
+      </template>
+      <el-row :gutter="24">
+        <el-col :span="8">
+          <div class="animation-item">
+            <span class="animation-label">作品模块</span>
+            <el-select v-model="animationConfig.works" style="width: 100%">
+              <el-option v-for="opt in animationOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+            </el-select>
+          </div>
+        </el-col>
+        <el-col :span="8">
+          <div class="animation-item">
+            <span class="animation-label">流派模块</span>
+            <el-select v-model="animationConfig.genres" style="width: 100%">
+              <el-option v-for="opt in animationOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+            </el-select>
+          </div>
+        </el-col>
+        <el-col :span="8">
+          <div class="animation-item">
+            <span class="animation-label">朝代模块</span>
+            <el-select v-model="animationConfig.dynasties" style="width: 100%">
+              <el-option v-for="opt in animationOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+            </el-select>
+          </div>
+        </el-col>
+      </el-row>
+    </el-card>
 
     <el-card class="filter-card">
       <el-row :gutter="16" align="middle">
@@ -244,6 +308,29 @@ onMounted(fetchData)
   font-size: 24px;
   margin-bottom: 20px;
   color: #333;
+}
+
+.animation-card {
+  margin-bottom: 16px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+}
+
+.animation-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.animation-label {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
 }
 
 .filter-card {

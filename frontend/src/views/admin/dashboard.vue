@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { getAdminStats, getAdminStatsTrend } from '@/api/modules/admin'
+import { getAdminStats, getAdminStatsTrend, getVisitStats, getVisitTrend } from '@/api/modules/admin'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
-import { LineChart, PieChart } from 'echarts/charts'
+import { LineChart, PieChart, BarChart } from 'echarts/charts'
 import {
   TitleComponent,
   TooltipComponent,
@@ -12,7 +12,7 @@ import {
   GridComponent
 } from 'echarts/components'
 
-use([CanvasRenderer, LineChart, PieChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent])
+use([CanvasRenderer, LineChart, PieChart, BarChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent])
 
 const stats = ref<Record<string, number>>({})
 const loading = ref(true)
@@ -24,6 +24,19 @@ const trendData = ref<{ dates: string[]; poems: number[]; posts: number[]; users
 })
 const trendLoading = ref(true)
 
+const visitStats = ref({
+  todayVisits: 0,
+  weekVisits: 0,
+  monthVisits: 0,
+  totalVisits: 0
+})
+const visitLoading = ref(true)
+const visitTrendData = ref<{ dates: string[]; visits: number[]; uniqueVisitors: number[] }>({
+  dates: [],
+  visits: [],
+  uniqueVisitors: []
+})
+
 const statCards = [
   { key: 'userCount', label: '用户总数', icon: 'User', color: '#1890ff' },
   { key: 'poemCount', label: '诗词总数', icon: 'Reading', color: '#52c41a' },
@@ -31,6 +44,13 @@ const statCards = [
   { key: 'dynastyCount', label: '朝代总数', icon: 'Clock', color: '#722ed1' },
   { key: 'poetCount', label: '诗人总数', icon: 'EditPen', color: '#eb2f96' },
   { key: 'postCount', label: '帖子总数', icon: 'ChatLineSquare', color: '#13c2c2' }
+]
+
+const visitCards = [
+  { key: 'todayVisits', label: '今日访问', icon: 'View', color: '#1890ff' },
+  { key: 'weekVisits', label: '本周访问', icon: 'DataLine', color: '#52c41a' },
+  { key: 'monthVisits', label: '本月访问', icon: 'Calendar', color: '#faad14' },
+  { key: 'totalVisits', label: '总访问量', icon: 'TrendCharts', color: '#722ed1' }
 ]
 
 const lineChartOption = computed(() => ({
@@ -76,6 +96,19 @@ const pieChartOption = computed(() => {
   }
 })
 
+const visitChartOption = computed(() => ({
+  title: { text: '近7天访问趋势', left: 'center' },
+  tooltip: { trigger: 'axis' },
+  legend: { data: ['访问量', '独立访客'], bottom: 0 },
+  grid: { left: '3%', right: '4%', bottom: '12%', top: '15%', containLabel: true },
+  xAxis: { type: 'category', boundaryGap: false, data: visitTrendData.value.dates },
+  yAxis: { type: 'value' },
+  series: [
+    { name: '访问量', type: 'bar', data: visitTrendData.value.visits, color: '#1890ff', barWidth: '40%' },
+    { name: '独立访客', type: 'line', smooth: true, data: visitTrendData.value.uniqueVisitors, color: '#52c41a' }
+  ]
+}))
+
 onMounted(async () => {
   try {
     const res = await getAdminStats()
@@ -93,6 +126,19 @@ onMounted(async () => {
     console.error('获取趋势数据失败', error)
   } finally {
     trendLoading.value = false
+  }
+
+  try {
+    const [visitRes, trendRes] = await Promise.all([
+      getVisitStats(),
+      getVisitTrend(7)
+    ])
+    visitStats.value = visitRes.data
+    visitTrendData.value = trendRes.data
+  } catch (error) {
+    console.error('获取访问统计数据失败', error)
+  } finally {
+    visitLoading.value = false
   }
 })
 </script>
@@ -117,6 +163,22 @@ onMounted(async () => {
       </el-col>
     </el-row>
 
+    <el-row :gutter="20" class="visit-row">
+      <el-col v-for="card in visitCards" :key="card.key" :xs="12" :sm="6">
+        <el-card class="stat-card" shadow="hover" :body-style="{ padding: '20px' }">
+          <div class="stat-content">
+            <div class="stat-icon" :style="{ backgroundColor: card.color + '20', color: card.color }">
+              <el-icon :size="24"><component :is="card.icon" /></el-icon>
+            </div>
+            <div class="stat-info">
+              <p class="stat-label">{{ card.label }}</p>
+              <p class="stat-value">{{ visitLoading ? '...' : (visitStats[card.key as keyof typeof visitStats] || 0) }}</p>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
     <el-row :gutter="20" class="chart-row">
       <el-col :xs="24" :lg="12">
         <el-card v-loading="trendLoading" class="chart-card" shadow="hover">
@@ -126,6 +188,14 @@ onMounted(async () => {
       <el-col :xs="24" :lg="12">
         <el-card v-loading="loading" class="chart-card" shadow="hover">
           <v-chart :option="pieChartOption" style="height: 400px" autoresize />
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-row :gutter="20" class="chart-row">
+      <el-col :xs="24">
+        <el-card v-loading="visitLoading" class="chart-card" shadow="hover">
+          <v-chart :option="visitChartOption" style="height: 400px" autoresize />
         </el-card>
       </el-col>
     </el-row>
@@ -171,6 +241,10 @@ onMounted(async () => {
     font-weight: 600;
     color: #333;
     margin: 0;
+  }
+
+  .visit-row {
+    margin-top: 8px;
   }
 
   .chart-row {

@@ -9,14 +9,55 @@ import { getFeaturedVisionArticles } from '@/api/modules/visionArticle'
 import { ElMessage } from 'element-plus'
 import type { ForumPost, VisionArticle } from '@/types/model'
 import { useUserStore } from '@/stores/user'
+import { getItem } from '@/utils/storage'
 import PoetCard from '@/components/business/PoetCard.vue'
 import HomeNavigation from '@/components/business/HomeNavigation.vue'
+import DailyPoetry from '@/components/business/DailyPoetry.vue'
 import QrCodeLink from '@/components/common/QrCodeLink.vue'
+
+const NAV_ANIMATION_KEY = 'home_nav_animation_config'
 
 const router = useRouter()
 const userStore = useUserStore()
 
 const hotPosts = ref<ForumPost[]>([])
+
+const animationConfig = ref<Record<string, string>>({
+  works: 'wave',
+  genres: 'fade',
+  dynasties: 'slide'
+})
+
+const loadAnimationConfig = () => {
+  try {
+    const saved = localStorage.getItem(NAV_ANIMATION_KEY)
+    if (saved) animationConfig.value = { ...animationConfig.value, ...JSON.parse(saved) }
+  } catch {}
+}
+
+const showLoginDropdown = ref(false)
+const loginDropdownTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+const searchQuery = ref('')
+const searchType = ref<'internal' | 'external'>('internal')
+const quickLoginForm = ref({
+  username: '',
+  password: ''
+})
+
+const handleLoginDropdownEnter = () => {
+  if (loginDropdownTimer.value) {
+    clearTimeout(loginDropdownTimer.value)
+    loginDropdownTimer.value = null
+  }
+  showLoginDropdown.value = true
+}
+
+const handleLoginDropdownLeave = () => {
+  loginDropdownTimer.value = setTimeout(() => {
+    showLoginDropdown.value = false
+    loginDropdownTimer.value = null
+  }, 3000)
+}
 
 const aiModel = ref('zhipu')
 const visionModel = ref('glm-4.6v-flash')
@@ -45,25 +86,112 @@ const imageUploadRef = ref<HTMLInputElement | null>(null)
 
 const asset = (path: string) => path
 
+const POET_VISIBLE_COUNT = 4
+const PLACEHOLDER_POET: PoetFeatured = {
+  id: -1, poetId: null, name: '敬请期待', dynasty: '',
+  description: '更多诗人正在收录中...', biography: '',
+  imageUrl: '', sortOrder: 0, status: 1
+}
+
 const poetsData = ref<PoetFeatured[]>([])
+const poetPool = ref<PoetFeatured[]>([])
+const displayedPoetIds = ref<Set<number>>(new Set())
 const poetRefreshTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const visionArticles = ref<VisionArticle[]>([])
+const visionCurrentPage = ref(1)
+const visionPageSize = ref(5)
+const visionTotal = ref(0)
+
+interface PoemCard {
+  date: string
+  title?: string
+  content: string
+  author: string
+  image: string
+}
+
+const ancientPoems: PoemCard[] = [
+  { date: '唐代', title: '静夜思', content: '床前明月光，疑是地上霜。举头望明月，低头思故乡。', author: '李白', image: '/img/lt_jx (1).jpg' },
+  { date: '唐代', title: '登鹳雀楼', content: '白日依山尽，黄河入海流。欲穷千里目，更上一层楼。', author: '王之涣', image: '/img/lt_jx (2).jpg' },
+  { date: '唐代', title: '春晓', content: '春眠不觉晓，处处闻啼鸟。夜来风雨声，花落知多少。', author: '孟浩然', image: '/img/lt_jx (3).jpg' },
+  { date: '唐代', title: '悯农', content: '锄禾日当午，汗滴禾下土。谁知盘中餐，粒粒皆辛苦。', author: '李绅', image: '/img/lt_jx (4).jpg' },
+  { date: '唐代', title: '望庐山瀑布', content: '日照香炉生紫烟，遥看瀑布挂前川。飞流直下三千尺，疑是银河落九天。', author: '李白', image: '/img/lt_jx (1).jpg' },
+  { date: '宋代', title: '水调歌头', content: '明月几时有？把酒问青天。不知天上宫阙，今夕是何年。', author: '苏轼', image: '/img/lt_jx (2).jpg' },
+  { date: '唐代', title: '黄鹤楼送孟浩然之广陵', content: '故人西辞黄鹤楼，烟花三月下扬州。孤帆远影碧空尽，唯见长江天际流。', author: '李白', image: '/img/lt_jx (3).jpg' },
+  { date: '唐代', title: '相思', content: '红豆生南国，春来发几枝。愿君多采撷，此物最相思。', author: '王维', image: '/img/lt_jx (4).jpg' },
+  { date: '宋代', title: '念奴娇·赤壁怀古', content: '大江东去，浪淘尽，千古风流人物。故垒西边，人道是，三国周郎赤壁。', author: '苏轼', image: '/img/lt_jx (1).jpg' },
+  { date: '唐代', title: '将进酒', content: '君不见，黄河之水天上来，奔流到海不复回。君不见，高堂明镜悲白发，朝如青丝暮成雪。', author: '李白', image: '/img/lt_jx (2).jpg' }
+]
+
+const contemporaryPoems: PoemCard[] = [
+  { date: '2019年6月24日', content: '愿如花已落千行，未闻花语浅别殇。幽僻心境漫过少，唯有诗语解锁缰。金甲未脱抬眼望，怒剑难收向疆场。笑祝功成人与事，再鼓一旬又何妨。', author: '常平逼王', image: '/img/lt_jx (4).jpg' },
+  { date: '2019年6月24日', content: '愿如花已落千行，未闻花语浅别殇。幽僻心境漫过少，唯有诗语解锁缰。金甲未脱抬眼望，怒剑难收向疆场。笑祝功成人与事，再鼓一旬又何妨。', author: '常平逼王', image: '/img/lt_jx (1).jpg' },
+  { date: '2018年9月1日', title: '西江月.未语', content: '华灯初照白路，夜来树影凄楚，俳徊只与月相伴，茫然一片迷雾。离人兀自心扬，未语难避哀伤，只若通明过后，真心但化霓裳。', author: '常平逼王', image: '/img/lt_jx (2).jpg' },
+  { date: '2018年9月24日', title: '忆江南.哀', content: '秋风寒，落红自凋残。未识伊人愁几许，伊人兀自笑颜开。吾心不胜哀！', author: '常平逼王', image: '/img/lt_jx (3).jpg' },
+  { date: '2022年4月5日', content: '东风吹起白蝴蝶，散入云幕尽青烟。但觉离魂归来少，春日暖暖艳阳天。松柏长青久可立，香印再燃意更坚。思情尽付潇湘处，绵远流长年复年。', author: '常平逼王', image: '/img/lt_jx (4).jpg' },
+  { date: '2018年4月22日', title: '清平乐.梦怀', content: '雨落窗外，淅声渐消潺，一帘凝愁入梦来，若雾浸湿枕畔。经年离愁之初，再会此情更苦，最是万千惆怅，与白共登天目！', author: '常平逼王', image: '/img/lt_jx (4).jpg' },
+  { date: '2018年5月20日', title: '乌夜啼.叹城府', content: '淡雾兀遮明眸，更添愁，独倚玉阑不觉泪空流。人情恶，谁易错，自长酌，一心明月向沟成污浊。', author: '常平逼王', image: '/img/lt_jx (4).jpg' },
+  { date: '2019年2月4日', content: '新桃映红把福迎，银烛高照万家兴。火尾连排上清夜，笑语欢声动耳惊。奈何遣词功夫浅，此夜此景休论明。唯愿持酒歌一曲，与君同乐一身轻', author: '常平逼王', image: '/img/lt_jx (4).jpg' },
+  { date: '2020年1月25日', content: '回首一九已成空，展望二零佳意浓。世事岂敢轻年少，天意哪可断前程。唐猊又着战意显，三尺重出徙侣从。烂柯沉木枉悲夫，夫且若怡也可容。', author: '常平逼王', image: '/img/lt_jx (4).jpg' },
+  { date: '2021年4月3日', content: '沉影迷叠千层障，乱云归处是它乡。酒酣仍识昔日客，心迷难辨眼前芳。纵把凡锦比仙缎，不需经年多思量。一笑即随羊角去，九风还作万华芳。', author: '常平逼王', image: '/img/lt_jx (4).jpg' },
+  { date: '2023年1月4日', title: '一剪梅.无题', content: '一别三秋未招摇，山也迢迢，水也昭昭。何人再添新衣袍，笑意盈绕，喜上眉梢。忆昔花开岁月好，蜂字飘摇，蝶字舞蹈。而今方知云未晓，风又飘飘，雨又萧萧。', author: '常平逼王', image: '/img/lt_jx (4).jpg' }
+]
+
+const shuffleArray = <T,>(arr: T[]): T[] => {
+  const copy = [...arr]
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[copy[i], copy[j]] = [copy[j], copy[i]]
+  }
+  return copy
+}
+
+const dedupPoets = (items: PoetFeatured[]): PoetFeatured[] => {
+  const seen = new Set<number>()
+  return items.filter(item => {
+    const key = item.poetId ?? item.id
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+const selectCoordinatedPoets = (pool: PoetFeatured[], excludeIds: Set<number>): PoetFeatured[] => {
+  const candidates = pool.filter(p => !excludeIds.has(p.poetId ?? p.id))
+  if (candidates.length >= POET_VISIBLE_COUNT) {
+    return shuffleArray(candidates).slice(0, POET_VISIBLE_COUNT)
+  }
+  const fallback = shuffleArray(pool)
+  const result: PoetFeatured[] = [...candidates]
+  for (const item of fallback) {
+    if (result.length >= POET_VISIBLE_COUNT) break
+    const key = item.poetId ?? item.id
+    if (!result.some(r => (r.poetId ?? r.id) === key)) {
+      result.push(item)
+    }
+  }
+  while (result.length < POET_VISIBLE_COUNT) {
+    result.push({ ...PLACEHOLDER_POET, id: -1 - result.length })
+  }
+  return result
+}
+
+const refreshPoetsDisplay = () => {
+  const selected = selectCoordinatedPoets(poetPool.value, displayedPoetIds.value)
+  poetsData.value = selected
+  displayedPoetIds.value = new Set(selected.map(p => p.poetId ?? p.id))
+}
 
 const fetchRandomPoets = async () => {
   try {
-    const res = await getRandomPoetFeatured(4)
-    const unique: PoetFeatured[] = []
-    const seen = new Set<number>()
-    for (const item of res.data) {
-      const key = item.poetId ?? item.id
-      if (!seen.has(key)) {
-        seen.add(key)
-        unique.push(item)
-      }
-    }
-    poetsData.value = unique.slice(0, 4)
+    const res = await getRandomPoetFeatured(8)
+    poetPool.value = dedupPoets(res.data || [])
+    refreshPoetsDisplay()
   } catch {
     console.error('获取精选诗人失败')
+    if (poetsData.value.length === 0) {
+      poetsData.value = Array.from({ length: POET_VISIBLE_COUNT }, (_, i) => ({ ...PLACEHOLDER_POET, id: -1 - i }))
+    }
   }
 }
 
@@ -176,6 +304,39 @@ const handleLogout = async () => {
   }
 }
 
+const handleUserCommand = (command: string) => {
+  switch (command) {
+    case 'profile':
+      router.push('/user/profile')
+      break
+    case 'favorites':
+      router.push('/user/profile?tab=favorites')
+      break
+    case 'history':
+      router.push('/user/profile?tab=history')
+      break
+    case 'admin':
+      router.push('/admin/dashboard')
+      break
+    case 'logout':
+      handleLogout()
+      break
+  }
+}
+
+const handleSearch = () => {
+  const q = searchQuery.value.trim()
+  if (!q) {
+    ElMessage.warning('请输入搜索内容')
+    return
+  }
+  if (searchType.value === 'internal') {
+    router.push({ path: '/search', query: { keyword: q } })
+  } else {
+    window.open(`https://www.baidu.com/s?wd=${encodeURIComponent(q + ' 诗词')}`, '_blank')
+  }
+}
+
 const handleScroll = () => {
   showRightTools.value = window.scrollY > 300
   isNavFixed.value = window.scrollY > 650
@@ -186,6 +347,7 @@ const showTime = () => {
 }
 
 onMounted(async () => {
+  loadAnimationConfig()
   showTime()
   clockTimer.value = setInterval(showTime, 1000)
   ltTimer.value = setInterval(nextSlide, 4000)
@@ -198,8 +360,14 @@ onMounted(async () => {
 
   window.addEventListener('scroll', handleScroll)
 
+  const savedAccount = getItem<{ username: string; password: string }>('remembered_account')
+  if (savedAccount) {
+    quickLoginForm.value.username = savedAccount.username
+    quickLoginForm.value.password = savedAccount.password
+  }
+
   fetchRandomPoets()
-  poetRefreshTimer.value = setInterval(fetchRandomPoets, 30000)
+  poetRefreshTimer.value = setInterval(fetchRandomPoets, 20000)
 
   try {
     const postRes = await getForumPostList({ pageNum: 1, pageSize: 5 }).catch(() => ({ data: { list: [] as ForumPost[] } }))
@@ -208,18 +376,35 @@ onMounted(async () => {
     console.error('首页数据加载失败')
   }
 
+  fetchVisionArticles()
+})
+
+const fetchVisionArticles = async () => {
   try {
-    const visionRes = await getFeaturedVisionArticles({ pageNum: 1, pageSize: 6 }).catch(() => ({ data: { list: [] as VisionArticle[] } }))
+    const visionRes = await getFeaturedVisionArticles({
+      pageNum: visionCurrentPage.value,
+      pageSize: visionPageSize.value
+    }).catch(() => ({ data: { list: [] as VisionArticle[], total: 0 } }))
     visionArticles.value = visionRes.data?.list || []
+    visionTotal.value = visionRes.data?.total || 0
   } catch {
     console.error('诗话视野数据加载失败')
   }
-})
+}
+
+const handleVisionPageChange = (page: number) => {
+  visionCurrentPage.value = page
+  fetchVisionArticles()
+}
 
 onUnmounted(() => {
   if (ltTimer.value) clearInterval(ltTimer.value)
   if (shiwenTimer.value) clearInterval(shiwenTimer.value)
   if (poetRefreshTimer.value) clearInterval(poetRefreshTimer.value)
+  if (loginDropdownTimer.value) {
+    clearTimeout(loginDropdownTimer.value)
+    loginDropdownTimer.value = null
+  }
   if (clockTimer.value) {
     clearInterval(clockTimer.value)
     clockTimer.value = null
@@ -241,9 +426,30 @@ onUnmounted(() => {
         <div class="shijian" title="现在时间">{{ currentTime }}</div>
         <QrCodeLink text="了解我们" qrImage="/img/微信二维.jpg" alt="扫一扫查看" />
         <QrCodeLink text="联系我们" qrImage="/img/微信二维.jpg" alt="扫一扫联系" />
-        <router-link to="/user/login" class="top-link top-link-login">登录</router-link>
-        <span class="top-divider">|</span>
-        <router-link to="/user/register" class="top-link top-link-register">注册</router-link>
+        <template v-if="userStore.isLoggedIn">
+          <el-dropdown trigger="click" @command="handleUserCommand">
+            <div class="top-user-info">
+              <el-avatar :src="userStore.avatar" :size="28">
+                {{ userStore.username?.charAt(0)?.toUpperCase() }}
+              </el-avatar>
+              <span class="top-user-name">{{ userStore.userInfo?.nickname || userStore.username }}</span>
+            </div>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="profile">个人中心</el-dropdown-item>
+                <el-dropdown-item command="favorites">我的收藏</el-dropdown-item>
+                <el-dropdown-item command="history">浏览历史</el-dropdown-item>
+                <el-dropdown-item v-if="userStore.userInfo?.role === 'admin'" command="admin">后台管理</el-dropdown-item>
+                <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </template>
+        <template v-else>
+          <router-link to="/user/login" class="top-link top-link-login">登录</router-link>
+          <span class="top-divider">|</span>
+          <router-link to="/user/register" class="top-link top-link-register">注册</router-link>
+        </template>
       </div>
     </div>
     <div v-show="showRightTools" class="youce_fangbiao">
@@ -268,6 +474,7 @@ onUnmounted(() => {
         <div class="toptub1"><a href="#luntan" title="交流论坛"><img src="/img/top_tubiao4.png"></a></div>
         <div class="toptub2" title="菜单"><a href="#sy_fljs"><img src="/img/top_tubiao2.png"></a></div>
         <div class="toptub3" title="搜索"><a href="javascript:void(0)"><img src="/img/top_tubiao1.png"></a></div>
+        <div class="toptub4" title="去登录"><a href="/user/login"><img src="/img/top_tubiao3.png"></a></div>
       </div>
       <div id="lb_jt_z" class="lb_jiantou_left" @click="prevSlide">
         <img :src="asset('/img/jianzu (3).png')" alt="">
@@ -292,58 +499,67 @@ onUnmounted(() => {
     <hr>
     <div :class="['daohang', { fixed: isNavFixed }]">
       <ul>
-        <li><a href="/forum" target="_blank">进入论坛</a></li>
-        <li>古体诗词
+        <li @click="router.push('/')">
+          <el-icon><HomeFilled /></el-icon>
+          <span>首页</span>
+        </li>
+        <li @click="router.push('/poem')">
+          <el-icon><Document /></el-icon>
+          <span>诗词库</span>
           <ul>
-            <li>怀古诗</li>
-            <li>咏物感怀</li>
-            <li>边塞风云</li>
-            <li>山水田园</li>
-            <li>赠友送别</li>
-            <li>闲适隐逸</li>
-            <li>···</li>
+            <li @click.stop="router.push('/poem')">全部诗词</li>
+            <li @click.stop="router.push('/poem')">古体诗词</li>
+            <li @click.stop="router.push('/poem')">现代诗歌</li>
+            <li @click.stop="router.push('/poem')">外国诗歌</li>
           </ul>
         </li>
-        <li>现代诗歌
+        <li @click="router.push('/poet')">
+          <el-icon><UserFilled /></el-icon>
+          <span>诗人馆</span>
           <ul>
-            <li>人生派</li>
-            <li>七月派</li>
-            <li>朦胧派</li>
-            <li>现实主义诗派</li>
-            <li>新时代派</li>
-            <li>流萤诗派</li>
-            <li>···</li>
+            <li @click.stop="router.push('/poet')">诗人风采</li>
+            <li @click.stop="router.push('/poet')">朝代浏览</li>
+            <li @click.stop="router.push('/poet')">流派探索</li>
           </ul>
         </li>
-        <li>外国诗歌
-          <ul>
-            <li>俄罗斯</li>
-            <li>法国</li>
-            <li>英国</li>
-            <li>日本</li>
-          </ul>
+        <li @click="router.push('/vision')">
+          <el-icon><Reading /></el-icon>
+          <span>诗话视野</span>
         </li>
-        <li>当代青年
-          <ul>
-            <li>九刀</li>
-            <li>初芒</li>
-            <li>精工庞华</li>
-            <li>清幽雅丽</li>
-          </ul>
+        <li @click="router.push('/communicate')">
+          <el-icon><ChatDotRound /></el-icon>
+          <span>交流广场</span>
         </li>
-        <li>关于我们
-          <ul>
-            <li>查看详情</li>
-            <li>联系我们</li>
-            <li>错误指正</li>
-          </ul>
+        <li @click="router.push('/forum')">
+          <el-icon><Notebook /></el-icon>
+          <span>诗汇论坛</span>
         </li>
-        <li id="xdl_kaiguan">个人中心
+        <li
+          v-if="userStore.isLoggedIn"
+          class="nav-publish-btn"
+          @click="router.push('/poem/create')"
+        >
+          <el-icon><EditPen /></el-icon>
+          <span>发布</span>
+        </li>
+        <li
+          id="xdl_kaiguan"
+          @mouseenter="handleLoginDropdownEnter"
+          @mouseleave="handleLoginDropdownLeave"
+        >
+          <el-icon><User /></el-icon>
+          <span>{{ userStore.isLoggedIn ? '我的' : '登录' }}</span>
           <div class="dl_icon_wrapper">
             <img class="dl_icon dl_icon_default" src="/img/dl_tb1.png" alt="">
             <img class="dl_icon dl_icon_hover" src="/img/dl_tb2.png" alt="">
           </div>
-          <div id="sy_xdlchuang" class="sy_xdlchuang">
+          <div
+            id="sy_xdlchuang"
+            class="sy_xdlchuang"
+            v-show="showLoginDropdown"
+            @mouseenter="handleLoginDropdownEnter"
+            @mouseleave="handleLoginDropdownLeave"
+          >
             <template v-if="userStore.isLoggedIn">
               <div class="user-menu-container">
                 <div class="user-menu-header">
@@ -381,11 +597,11 @@ onUnmounted(() => {
                 <h2 class="login-title">登&nbsp;&nbsp;&nbsp;&nbsp;录</h2>
                 <div class="lieb">
                   <label for="username" class="dl_ts">用户名:</label>
-                  <input type="text" id="username" class="input-field" placeholder="请输入用户名">
+                  <input type="text" id="username" v-model="quickLoginForm.username" class="input-field" placeholder="请输入用户名">
                 </div>
                 <div class="lieb">
                   <label for="password" class="dl_ts">密&nbsp;&nbsp;码:</label>
-                  <input type="password" id="password" class="input-field" placeholder="请输入密码" required>
+                  <input type="password" id="password" v-model="quickLoginForm.password" class="input-field" placeholder="请输入密码" required>
                 </div>
                 <button type="button" class="login-button" @click="router.push('/user/login')">登录</button>
                 <div class="forgot-password">
@@ -398,14 +614,38 @@ onUnmounted(() => {
             </template>
           </div>
         </li>
-      </ul>
-    </div>
-    <div :class="['sousuo', { fixed: isNavFixed }]">
-      <form id="sousuo0" @submit.prevent="router.push('/search')">
-        <input type="text" placeholder="输入搜索内容" name="search">
-        <button type="submit">搜索</button>
-      </form>
-    </div>
+        </ul>
+      </div>
+      <div :class="['search-section', { fixed: isNavFixed }]">
+        <div class="search-wrapper">
+          <form class="search-form" @submit.prevent="handleSearch">
+            <input
+              type="text"
+              :placeholder="searchType === 'internal' ? '搜索诗词、诗人、文章...' : '搜索全网诗词相关内容...'"
+              v-model="searchQuery"
+              @keydown.enter="handleSearch"
+            >
+          </form>
+          <div class="search-tabs">
+            <button
+              :class="['search-tab', { active: searchType === 'internal' }]"
+              @click="searchType = 'internal'"
+            >
+              站内
+            </button>
+            <button
+              :class="['search-tab', { active: searchType === 'external' }]"
+              @click="searchType = 'external'"
+            >
+              全网
+            </button>
+          </div>
+          <button type="button" class="search-submit-btn" @click="handleSearch">
+            <el-icon><Search /></el-icon>
+            <span>搜索</span>
+          </button>
+        </div>
+      </div>
 
     <div class="shiwen-wrapper">
       <div class="lbye_shiwen">
@@ -425,12 +665,14 @@ onUnmounted(() => {
       <img class="zhuang_s2" :src="asset('/img/fy_tubiao (6).png')" alt="">
       <img class="zhuang_s5" :src="asset('/img/zichu(1).png')" alt="">
       <img class="zhuang_s7" :src="asset('/img/tuobiao (4).png')" alt="">
-      <img class="zhuang_s11" :src="asset('/img/lt_bg6.jpg')" alt="">
       <img class="zhuang_s3" :src="asset('/img/canci.png')" alt="">
       <img class="zhuang_s4" :src="asset('/img/gn_ (2).png')" alt="">
       <img class="zhuang_s4_top" :src="asset('/img/gn_ (2).png')" alt="">
+      <img class="zhuang_s9" :src="asset('/img/wz_tubiao (2).png')" alt="">
     </div>
 
+    <hr>
+    <DailyPoetry />
     <hr>
     <h1 class="sy_fljx">分类精赏</h1>
 
@@ -446,13 +688,13 @@ onUnmounted(() => {
 
       <div class="cd_fenge"></div>
 
-      <HomeNavigation type="works" title="作品" />
+      <HomeNavigation type="works" title="作品" :animation="animationConfig.works as 'wave' | 'fade' | 'slide'" />
 
       <div class="cd_fenge"></div>
 
-      <HomeNavigation type="genres" title="流派" />
+      <HomeNavigation type="genres" title="流派" :animation="animationConfig.genres as 'wave' | 'fade' | 'slide'" />
 
-      <HomeNavigation type="dynasties" title="朝代" />
+      <HomeNavigation type="dynasties" title="朝代" :animation="animationConfig.dynasties as 'wave' | 'fade' | 'slide'" />
 
       <div class="cd_fenge"></div>
       <h2>展风拓潮</h2>
@@ -521,124 +763,180 @@ onUnmounted(() => {
       <div class="z_right">
         <h4>诗话视野</h4>
         <hr>
-        <template v-if="visionArticles.length > 0">
-          <div
-            v-for="(article, index) in visionArticles"
-            :key="article.id"
-            class="vision-article-item"
-          >
-            <p @click="router.push(`/vision/${article.id}`)" class="vision-article-title">
-              ---{{ index + 1 }}. "{{ article.title }}"
-            </p>
-            <a class="shsy_gdxq" @click.prevent="router.push(`/vision/${article.id}`)">&lt;更多详情&gt;</a>
+        <template v-for="(item, index) in visionArticles" :key="'va-' + item.id">
+          <div class="vision-item" @click="router.push(`/vision/${item.id}`)">
+            <p class="vision-title">---{{ (visionCurrentPage - 1) * visionPageSize + index + 1 }}. "{{ item.title }}"</p>
+            <p v-if="item.summary" class="vision-summary">{{ item.summary }}</p>
+            <div class="vision-meta">
+              <span v-if="item.author" class="vision-author">{{ item.author }}</span>
+              <span v-if="item.category" class="vision-category">{{ item.category }}</span>
+              <span class="vision-views">{{ item.viewCount }} 阅读</span>
+              <span class="vision-likes">{{ item.likeCount }} 点赞</span>
+            </div>
+            <a class="shsy_gdxq" @click.stop="router.push(`/vision/${item.id}`)">&lt;查看详情&gt;</a>
           </div>
         </template>
-        <template v-else>
-          <p>暂无文章内容</p>
-        </template>
+        <div class="vision-pagination" v-if="visionTotal > visionPageSize">
+          <el-pagination
+            small
+            layout="prev, pager, next"
+            :total="visionTotal"
+            :page-size="visionPageSize"
+            :current-page="visionCurrentPage"
+            @current-change="handleVisionPageChange"
+          />
+        </div>
         <hr>
         <a class="shsy_gdxq" @click.prevent="router.push('/vision')">&lt;查看全部&gt;</a>
       </div>
     </div>
 
-    <img class="zhuang_s" :src="asset('/img/gn_ (2).png')" alt="">
-    <img class="zhuang_s6" :src="asset('/img/zichu (4).png')" alt="">
     <img class="zhuang_s8" :src="asset('/img/YIJI_tuobiao (5).png')" alt="">
-    <img class="zhuang_s9" :src="asset('/img/wz_tubiao (2).png')" alt="">
     <img class="zhuang_s10" :src="asset('/img/tuobiao (2).png')" alt="">
-    <h1>诗汇论坛</h1>
-    <div class="luntan" id="luntan">
-      <div class="luntan_title">
-        <h1>论 坛</h1>
-        <h2>沟通 | 分享 | 探索 | 成长</h2>
-      </div>
-      <div class="luntan_ss">
-        <div class="sy_ss_0_lt">
-          <input type="text" class="sy_ss_lt" placeholder="搜索你感兴趣的内容">
-          <div class="sy_ss_tp_lt">
-            <img :src="asset('/img/tuobiao (4).png')" alt="">
-          </div>
+    <div class="forum_poem_layout">
+      <div class="luntan" id="luntan">
+        <div class="luntan_title">
+          <h1>论 坛</h1>
+          <h2>沟通 | 分享 | 探索 | 成长</h2>
         </div>
-      </div>
-      <div class="luntan_gundong">
-        <marquee behavior="scroll" direction="left" scrollamount="5">
-          论坛是我们心灵的栖息地，在诗词的韵律中找到共鸣，在分享与探索中共同成长！
-        </marquee>
-      </div>
-      <div class="luntan_anniu">
-        <ul>
-          <li><router-link to="/forum">首页</router-link></li>
-          <li><router-link to="/forum">全部</router-link></li>
-          <li><router-link to="/forum">热帖</router-link></li>
-          <li><router-link to="/forum">精华</router-link></li>
-          <li><router-link to="/forum">畅言</router-link></li>
-        </ul>
-      </div>
-      <div class="luntan_jxh">
-        <div class="jxh_left">
-          <div class="jxh_left_title">
-            <span>精选板块</span>
-          </div>
-          <div class="jxh_left_nr">
-            <div class="jxh_left_nr0">
-              <router-link to="/forum">
-                <img :src="asset('/img/lt_jx (1).jpg')" alt="">
-              </router-link>
-            </div>
-            <div class="jxh_left_nr1">
-              <router-link to="/forum">
-                <span class="jxh_left_nr1_title">古诗词鉴赏</span>
-              </router-link>
-              <span class="jxh_left_nr1_d">古诗词鉴赏是一个深邃而美妙的领域，它带领我们穿越时光的长河，品味那些流传千年的文字之美。</span>
-            </div>
-          </div>
-          <div class="jxh_left_nr">
-            <div class="jxh_left_nr0">
-              <router-link to="/forum">
-                <img :src="asset('/img/lt_jx (2).jpg')" alt="">
-              </router-link>
-            </div>
-            <div class="jxh_left_nr1">
-              <router-link to="/forum">
-                <span class="jxh_left_nr1_title">古诗词分享</span>
-              </router-link>
-              <span class="jxh_left_nr1_d">诗词分享是一座桥梁，连接着古今的心灵，让我们共同品味诗词之美，传承文化之韵。</span>
-            </div>
-          </div>
-          <div class="jxh_left_nr">
-            <div class="jxh_left_nr0">
-              <router-link to="/forum">
-                <img :src="asset('/img/lt_jx (3).jpg')" alt="">
-              </router-link>
-            </div>
-            <div class="jxh_left_nr1">
-              <router-link to="/forum">
-                <span class="jxh_left_nr1_title">新星闪耀</span>
-              </router-link>
-              <span class="jxh_left_nr1_d">新一代青年笔下流淌着千年的韵律，以古风新韵续写着不朽的篇章。</span>
+        <div class="luntan_ss">
+          <div class="sy_ss_0_lt">
+            <input type="text" class="sy_ss_lt" placeholder="搜索你感兴趣的内容">
+            <div class="sy_ss_tp_lt">
+              <img :src="asset('/img/tuobiao (4).png')" alt="">
             </div>
           </div>
         </div>
-        <div class="jxh_right">
-          <div class="jxh_right_title">
-            <span>畅言寓所</span>
+        <div class="luntan_gundong">
+          <div class="marquee-content">
+            论坛是我们心灵的栖息地，在诗词的韵律中找到共鸣，在分享与探索中共同成长！
           </div>
-          <div
-            v-for="post in hotPosts.slice(0, 3)"
-            :key="post.id"
-            class="jxh_right_nr"
-            @click="router.push(`/forum/${post.id}`)"
-          >
-            <span class="jxh_right_nr_title">{{ post.title }}</span>
-            <span class="jxh_right_nr_d">{{ post.username }} · {{ post.viewCount }}阅读</span>
+        </div>
+        <div class="luntan_anniu">
+          <ul>
+            <li><router-link to="/forum">首页</router-link></li>
+            <li><router-link to="/forum">全部</router-link></li>
+            <li><router-link to="/forum">热帖</router-link></li>
+            <li><router-link to="/forum">精华</router-link></li>
+            <li><router-link to="/forum">畅言</router-link></li>
+          </ul>
+        </div>
+        <div class="luntan_pin_layout">
+          <div class="luntan_pin_top">
+            <div class="jxh_left">
+              <div class="jxh_left_title">
+                <span>精选板块</span>
+              </div>
+              <div class="jxh_left_nr">
+                <div class="jxh_left_nr0">
+                  <router-link to="/forum">
+                    <img :src="asset('/img/lt_jx (1).jpg')" alt="">
+                  </router-link>
+                </div>
+                <div class="jxh_left_nr1">
+                  <router-link to="/forum">
+                    <span class="jxh_left_nr1_title">古诗词鉴赏</span>
+                  </router-link>
+                  <span class="jxh_left_nr1_d">古诗词鉴赏是一个深邃而美妙的领域，它带领我们穿越时光的长河，品味那些流传千年的文字之美。</span>
+                </div>
+              </div>
+              <div class="jxh_left_nr">
+                <div class="jxh_left_nr0">
+                  <router-link to="/forum">
+                    <img :src="asset('/img/lt_jx (2).jpg')" alt="">
+                  </router-link>
+                </div>
+                <div class="jxh_left_nr1">
+                  <router-link to="/forum">
+                    <span class="jxh_left_nr1_title">古诗词分享</span>
+                  </router-link>
+                  <span class="jxh_left_nr1_d">诗词分享是一座桥梁，连接着古今的心灵，让我们共同品味诗词之美，传承文化之韵。</span>
+                </div>
+              </div>
+              <div class="jxh_left_nr">
+                <div class="jxh_left_nr0">
+                  <router-link to="/forum">
+                    <img :src="asset('/img/lt_jx (3).jpg')" alt="">
+                  </router-link>
+                </div>
+                <div class="jxh_left_nr1">
+                  <router-link to="/forum">
+                    <span class="jxh_left_nr1_title">新星闪耀</span>
+                  </router-link>
+                  <span class="jxh_left_nr1_d">新一代青年笔下流淌着千年的韵律，以古风新韵续写着不朽的篇章。</span>
+                </div>
+              </div>
+            </div>
+            <div class="jxh_right">
+              <div class="jxh_right_title">
+                <span>畅言寓所</span>
+              </div>
+              <div
+                v-for="post in hotPosts.slice(0, 3)"
+                :key="post.id"
+                class="jxh_right_nr"
+                @click="router.push(`/forum/${post.id}`)"
+              >
+                <span class="jxh_right_nr_title">{{ post.title }}</span>
+                <span class="jxh_right_nr_d">{{ post.username }} · {{ post.viewCount }}阅读</span>
+              </div>
+              <div v-if="hotPosts.length === 0" class="jxh_right_nr">
+                <span class="jxh_right_nr_title">欢迎来到论坛交流</span>
+                <span class="jxh_right_nr_d">暂无帖子</span>
+              </div>
+              <router-link to="/forum" class="jxh_right_anniu">
+                <span>查看更多</span>
+              </router-link>
+            </div>
           </div>
-          <div v-if="hotPosts.length === 0" class="jxh_right_nr">
-            <span class="jxh_right_nr_title">欢迎来到论坛交流</span>
-            <span class="jxh_right_nr_d">暂无帖子</span>
+        </div>
+      </div>
+
+      <div class="poem_selection_container">
+        <div class="poem_selection_left">
+          <h2 class="luntan_section_title">古诗词推选</h2>
+          <div class="luntan_jx">
+            <div class="luntan_jx_title">历史的印痕</div>
+            <div class="luntan_jx_scroll">
+              <div
+                v-for="(poem, idx) in ancientPoems"
+                :key="'ancient-' + idx"
+                class="poem_card"
+              >
+                <img :src="asset(poem.image)" :alt="poem.title || '诗词配图'">
+                <div class="jingxuan_pl">
+                  <p>
+                    <span class="poem_date">{{ poem.date }}</span><br>
+                    <span v-if="poem.title" class="poem_title">{{ poem.title }}</span>
+                    {{ poem.content }}<br><span class="poem_author">{{ poem.author }}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-          <router-link to="/forum" class="jxh_right_anniu">
-            <span>查看更多</span>
-          </router-link>
+        </div>
+
+        <div class="poem_selection_right">
+          <h2 class="luntan_section_title">当代·精选</h2>
+          <div class="luntan_ddjx">
+            <div class="luntan_jx_title">时代画像</div>
+            <div class="luntan_jx_scroll">
+              <div
+                v-for="(poem, idx) in contemporaryPoems"
+                :key="'contemporary-' + idx"
+                class="poem_card"
+              >
+                <img :src="asset(poem.image)" :alt="poem.title || '诗词配图'">
+                <div class="jingxuan_pl">
+                  <p>
+                    <span class="poem_date">{{ poem.date }}</span><br>
+                    <span v-if="poem.title" class="poem_title">{{ poem.title }}</span>
+                    {{ poem.content }}<br><span class="poem_author">{{ poem.author }}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -660,6 +958,13 @@ onUnmounted(() => {
   box-sizing: border-box;
 }
 
+.home-page h1,
+.home-page h2,
+.home-page h4,
+.home-page .ai_title {
+  font-family: cursive;
+}
+
 .top {
   width: 100%;
   height: 50px;
@@ -679,20 +984,40 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   text-decoration: none;
+  transition: transform 0.2s ease;
+}
+
+.top .logo a:hover {
+  transform: scale(1.03);
 }
 
 .top .logo_img {
-  width: 40px;
-  height: 40px;
+  width: 45px;
+  height: 45px;
   border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.top .logo a:hover .logo_img {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transform: scale(1.06);
 }
 
 .logo-txt {
-  font-size: 26px;
-  color: #fff;
+  font-size: 30px;
+  color: #2c2c2c;
   margin-left: 8px;
-  font-weight: 600;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  font-weight: bold;
+  font-family: cursive;
+  text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
+  transition: all 0.2s ease;
+}
+
+.top .logo a:hover .logo-txt {
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.4), 1px 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .top_txt {
@@ -734,6 +1059,30 @@ onUnmounted(() => {
   color: rgba(255, 255, 255, 0.5);
   font-size: 16px;
   user-select: none;
+}
+
+.top-user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.top-user-info:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.top-user-name {
+  color: #fff;
+  font-size: 14px;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 html {
@@ -864,11 +1213,11 @@ html {
 }
 
 .daohang {
-  width: 100%;
+  width: 80%;
   height: 58px;
-  margin: 0;
+  margin: 0 auto;
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
   align-items: center;
   position: relative;
   z-index: 50;
@@ -879,15 +1228,18 @@ html {
   display: flex;
   font-weight: 600;
   background-color: rgba(100, 100, 100, 0.75);
-  font-size: 28px;
+  font-size: 15px;
   border-radius: 7px;
   margin: 0 auto;
   padding: 0;
 }
 
 .daohang > ul > li {
-  float: left;
-  width: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 160px;
   height: 38px;
   line-height: 38px;
   text-align: center;
@@ -897,15 +1249,16 @@ html {
   position: relative;
   cursor: pointer;
   list-style: none;
+  transition: all 0.3s ease;
+  font-size: 15px;
 }
 
-.daohang > ul > li > a {
-  color: wheat;
-  text-decoration: none;
-}
-
-.daohang > ul > li > a:hover {
+.daohang > ul > li:hover {
   color: yellow;
+}
+
+.daohang > ul > li > .el-icon {
+  font-size: 18px;
 }
 
 .daohang > ul > li > ul {
@@ -914,9 +1267,9 @@ html {
   top: 38px;
   left: -1px;
   z-index: 51;
-  font-size: 20px;
+  font-size: 14px;
   background: rgba(80, 80, 80, 0.85);
-  width: 170px;
+  min-width: 160px;
   border: 1px solid gainsboro;
   border-radius: 7px;
   padding: 0;
@@ -944,8 +1297,16 @@ html {
 
 .daohang > ul > li > ul > li:hover {
   color: yellow;
-  font-size: 22px;
   background-color: rgba(100, 100, 100, 0.5);
+}
+
+.nav-publish-btn {
+  background: rgba(70, 130, 200, 0.6) !important;
+  color: #fff !important;
+}
+
+.nav-publish-btn:hover {
+  background: rgba(80, 145, 220, 0.8) !important;
 }
 
 .daohang.fixed {
@@ -962,15 +1323,145 @@ html {
   z-index: 61;
 }
 
-.sousuo.fixed {
+.search-section {
+  width: 80%;
+  margin: 0 auto;
+  padding: 12px 0;
   display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  z-index: 49;
+}
+
+.search-section.fixed {
   position: fixed;
   top: 50px;
   left: 0;
   right: 0;
   width: 100%;
   z-index: 50;
-  padding: 0 10%;
+  background: rgba(245, 240, 232, 0.95);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  padding: 8px 0;
+}
+
+.search-wrapper {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  width: 65%;
+  max-width: 900px;
+  height: 44px;
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(139, 69, 19, 0.12);
+  transition: box-shadow 0.3s ease;
+}
+
+.search-wrapper:hover {
+  box-shadow: 0 4px 18px rgba(139, 69, 19, 0.2);
+}
+
+.search-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: 100%;
+}
+
+.search-tab {
+  padding: 0 14px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-left: 1px solid rgba(200, 184, 160, 0.5);
+  background: #f0e8d8;
+  color: #8B6914;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  white-space: nowrap;
+  letter-spacing: 1px;
+}
+
+.search-tab:first-child {
+  border-left: 1px solid rgba(200, 184, 160, 0.5);
+  border-bottom: 1px solid rgba(200, 184, 160, 0.3);
+}
+
+.search-tab:last-child {
+  border-top: 1px solid rgba(200, 184, 160, 0.3);
+}
+
+.search-tab:hover {
+  background: #e8dcc8;
+  color: #6B4513;
+}
+
+.search-tab.active {
+  background: #8B4513;
+  color: #fff;
+}
+
+.search-form {
+  display: flex;
+  flex: 1;
+  height: 44px;
+  border: none;
+  overflow: hidden;
+}
+
+.search-form input {
+  flex: 1;
+  height: 44px;
+  padding: 0 18px;
+  border: none;
+  background: #faf6f0;
+  font-size: 14px;
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: #333;
+  outline: none;
+  transition: background 0.25s ease;
+}
+
+.search-form input:focus {
+  background: #fff;
+}
+
+.search-form input::placeholder {
+  color: #a09585;
+  font-style: normal;
+}
+
+.search-submit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 22px;
+  height: 44px;
+  background: linear-gradient(135deg, #8B4513, #A0522D);
+  border: none;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  white-space: nowrap;
+  letter-spacing: 1px;
+}
+
+.search-submit-btn:hover {
+  background: linear-gradient(135deg, #A0522D, #8B4513);
+}
+
+.search-submit-btn:active {
+  transform: scale(0.97);
 }
 
 #xdl_kaiguan {
@@ -1022,12 +1513,7 @@ html {
   right: 0;
   top: 38px;
   z-index: 51;
-  display: none;
   cursor: pointer;
-}
-
-#xdl_kaiguan:hover .sy_xdlchuang {
-  display: block;
 }
 
 .login-container {
@@ -1210,117 +1696,9 @@ html {
   color: #f56c6c;
 }
 
-.sousuo {
-  width: 80%;
-  height: 50px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-}
 
-.sousuo form {
-  display: flex;
-  gap: 0;
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s ease;
-}
 
-.sousuo form:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  transform: translateY(-1px);
-}
 
-.sousuo input[type="text"] {
-  width: 240px;
-  height: 40px;
-  background-color: rgba(20, 20, 25, 0.85);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-right: none;
-  border-radius: 20px 0 0 20px;
-  padding: 0 16px;
-  font-size: 14px;
-  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
-  letter-spacing: 0.5px;
-  line-height: 1.5;
-  outline: none;
-  transition: all 0.3s ease;
-}
-
-.sousuo input[type="text"]::placeholder {
-  color: rgba(255, 255, 255, 0.4);
-  font-style: italic;
-}
-
-.sousuo input[type="text"]:focus {
-  background-color: rgba(30, 30, 35, 0.9);
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-.sousuo button {
-  width: 70px;
-  height: 40px;
-  background-color: rgba(100, 90, 75, 0.7);
-  color: #f5f0e8;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 0 20px 20px 0;
-  cursor: pointer;
-  font-size: 14px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-  font-weight: 500;
-  transition: all 0.3s ease;
-}
-
-.sousuo button:hover {
-  background-color: rgba(139, 115, 85, 0.8);
-  color: #fff;
-}
-
-.sousuo button:active {
-  transform: scale(0.95);
-}
-
-.flip-box .l2 img {
-  border-radius: 1%;
-  width: 250px;
-  height: 240px;
-  display: block;
-  transition: linear 0.3s;
-}
-
-.h6_li .l1 {
-  width: 295px;
-  height: 200px;
-  text-align: center;
-  overflow: hidden;
-}
-
-.h6_li .l1 img {
-  border-radius: 5%;
-  width: 290px;
-  height: 150px;
-  display: block;
-  transition: linear 0.3s;
-}
-
-.h6_li .l1 img:hover {
-  transform: scale(1.05);
-  border-radius: 20%;
-}
-
-.h6_li .l1 li {
-  display: block;
-  text-align: center;
-}
-
-.h6_li .l1 p {
-  font-size: 18px;
-  position: relative;
-  left: 90px;
-}
 
 .nav-card img {
   border-radius: 5%;
@@ -1336,19 +1714,7 @@ html {
   border-radius: 20%;
 }
 
-.luntan_jx img,
-.luntan_ddjx img {
-  width: 200px;
-  height: 150px;
-  margin: 10px 15px;
-  border: 2px solid gainsboro;
-  border-radius: 7px;
-}
 
-.jingxuan_pl img {
-  width: 100px;
-  height: 100px;
-}
 
 .zhuang_s1 {
   width: 136px;
@@ -1375,10 +1741,11 @@ html {
   top: 520px;
   right: 30px;
   left: auto;
-  z-index: 1;
+  z-index: 0;
   transform: rotate(60deg);
-  opacity: 0.7;
+  opacity: 0.5;
   filter: drop-shadow(5px 10px 15px rgba(0, 0, 0, 0.15));
+  pointer-events: none;
 }
 
 .zhuang_s4 {
@@ -1394,7 +1761,7 @@ html {
   width: 100%;
   height: 50px;
   position: absolute;
-  top: -172px;
+  top: -185px;
   left: 0;
   z-index: 25;
 }
@@ -1422,7 +1789,7 @@ html {
   height: 350px;
   position: absolute;
   top: 2600px;
-  left: 28.4%;
+  left: 58%;
   z-index: 1;
   opacity: 0.6;
 }
@@ -1449,8 +1816,11 @@ html {
   width: 210px;
   height: 406px;
   position: absolute;
-  top: 4080px;
+  top: 2400px;
   left: 82.6%;
+  z-index: 1;
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .zhuang_s10 {
@@ -1474,7 +1844,7 @@ html {
   position: absolute;
   top: 1891px;
   left: 51.1%;
-  z-index: -1;
+  z-index: 0;
 }
 
 .sy_top_daohang_biao {
@@ -1521,15 +1891,29 @@ html {
   height: 200px;
 }
 
+.forum_poem_layout {
+  display: flex;
+  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: 0 auto;
+  position: relative;
+}
+
 .luntan {
   display: flex;
   flex-wrap: wrap;
   flex-direction: column;
   position: relative;
-  width: 75%;
+  width: 60%;
   margin: 0 auto;
   background-color: rgba(80, 80, 80, 0.1);
   border-radius: 15px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  overflow: visible;
+  z-index: 1;
 }
 
 .luntan_title {
@@ -1605,7 +1989,22 @@ html {
   color: yellow;
   background-color: rgba(100, 100, 100, 0.5);
   padding: 5px 0;
-  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.marquee-content {
+  display: inline-block;
+  animation: marquee-scroll 15s linear infinite;
+}
+
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
 }
 
 .luntan_anniu {
@@ -1645,6 +2044,50 @@ html {
   width: 100%;
   padding: 15px;
   gap: 20px;
+}
+
+.luntan_pin_layout {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 20px;
+}
+
+.luntan_pin_top {
+  display: flex;
+  width: 100%;
+  padding: 15px;
+  gap: 20px;
+}
+
+.poem_selection_container {
+  display: flex;
+  width: 90%;
+  margin: 30px auto 0;
+  gap: 30px;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: visible;
+  z-index: 1;
+  justify-content: center;
+}
+
+.poem_selection_left {
+  flex: 1;
+  min-width: 0;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.poem_selection_right {
+  flex: 1;
+  min-width: 0;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .jxh_left {
@@ -1791,10 +2234,125 @@ html {
 }
 
 .z_right {
-  overflow-y: visible;
-  height: auto;
+  overflow-y: auto;
+  height: 600px;
   flex-shrink: 0;
   width: 500px;
+  background-image: url('/img/lt_bg6.jpg');
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  border-radius: 0;
+  padding: 20px;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 2;
+}
+
+.z_right::-webkit-scrollbar {
+  width: 8px;
+}
+
+.z_right::-webkit-scrollbar-track {
+  background: rgba(139, 69, 19, 0.1);
+  border-radius: 4px;
+}
+
+.z_right::-webkit-scrollbar-thumb {
+  background: rgba(139, 69, 19, 0.4);
+  border-radius: 4px;
+}
+
+.z_right::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 69, 19, 0.6);
+}
+
+.z_right::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.7);
+  border-radius: 0;
+  z-index: -1;
+}
+
+.vision-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(5px);
+}
+
+.vision-item:hover {
+  background: rgba(255, 255, 255, 0.6);
+  transform: translateX(4px);
+}
+
+.vision-title {
+  font-size: 14px;
+  color: #2c1810;
+  font-weight: 600;
+  margin: 0 0 6px;
+  line-height: 1.5;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+}
+
+.vision-summary {
+  font-size: 12px;
+  color: #4a3728;
+  margin: 0 0 6px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.vision-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  color: #6b5744;
+  margin: 6px 0 4px;
+}
+
+.vision-author {
+  color: #8b4513;
+  font-weight: 600;
+}
+
+.vision-category {
+  color: #556b2f;
+  background: rgba(85, 107, 47, 0.15);
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.vision-views,
+.vision-likes {
+  color: #7a6b5d;
+}
+
+.vision-pagination {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0;
+}
+
+.vision-pagination .el-pagination {
+  --el-pagination-bg-color: transparent;
+  --el-pagination-text-color: #4a3728;
+  --el-pagination-button-bg-color: rgba(255, 255, 255, 0.4);
+  --el-pagination-button-color: #4a3728;
+  --el-pagination-hover-color: #8b4513;
 }
 
 .z_left {
@@ -2000,4 +2558,152 @@ html {
 .vision-article-title:hover {
   color: #007BFF;
 }
+
+.luntan_section_title {
+  font-family: cursive;
+  text-align: center;
+  font-size: 28px;
+  color: #333;
+  margin: 0 0 15px;
+  padding: 0;
+}
+
+.luntan_jx,
+.luntan_ddjx {
+  position: relative;
+  width: 100%;
+  border-radius: 16px;
+  margin: 0;
+  padding: 20px;
+  box-sizing: border-box;
+  overflow: visible;
+  min-height: 500px;
+}
+
+.luntan_jx {
+  background: linear-gradient(135deg, rgba(139, 69, 19, 0.08), rgba(210, 105, 30, 0.12));
+  border: 1px solid rgba(139, 69, 19, 0.15);
+}
+
+.luntan_ddjx {
+  background: linear-gradient(135deg, rgba(85, 107, 47, 0.08), rgba(107, 142, 35, 0.12));
+  border: 1px solid rgba(85, 107, 47, 0.15);
+}
+
+.luntan_jx_title {
+  font-size: 60px;
+  font-weight: bold;
+  background: linear-gradient(to right, #ff7e5f, #feb47b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 16px;
+  font-family: cursive;
+  letter-spacing: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.luntan_jx_scroll {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  max-height: 450px;
+  overflow-y: auto;
+}
+
+.luntan_jx_scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.luntan_jx_scroll::-webkit-scrollbar-thumb {
+  background: rgba(139, 69, 19, 0.3);
+  border-radius: 3px;
+}
+
+.luntan_jx_scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.poem_card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition: all 0.35s ease;
+  width: 100%;
+  box-sizing: border-box;
+  backdrop-filter: blur(8px);
+  overflow: visible;
+}
+
+.poem_card:hover {
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.15);
+  transform: translateY(-3px);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.poem_card img {
+  width: 120px;
+  height: 90px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 2px solid rgba(200, 200, 200, 0.4);
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.poem_card:hover img {
+  transform: scale(1.03);
+}
+
+.jingxuan_pl {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.jingxuan_pl p {
+  margin: 0;
+  font-size: 14px;
+  color: #444;
+  line-height: 1.6;
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.poem_date {
+  font-size: 13px;
+  color: #888;
+  display: block;
+  text-align: right;
+}
+
+.poem_title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #8B4513;
+  display: block;
+  margin: 6px 0;
+  letter-spacing: 1px;
+}
+
+.poem_author {
+  font-size: 14px;
+  color: #666;
+  display: block;
+  text-align: right;
+  margin-top: 8px;
+  font-style: italic;
+}
+
 </style>

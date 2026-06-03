@@ -11,7 +11,7 @@ const dateRange = ref<[string, string] | null>(null)
 const loading = ref(false)
 
 const methodTagType = (method: string) => {
-  const map: Record<string, string> = {
+  const map: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
     GET: 'info',
     POST: 'success',
     PUT: 'warning',

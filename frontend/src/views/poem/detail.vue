@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePoemStore } from '@/stores/poem'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
-import type { Poem, Comment } from '@/types/model'
+import type { Comment } from '@/types/model'
 import { likePoem, favoritePoem } from '@/api/modules/poem'
 import { getComments, createComment, likeComment } from '@/api/modules/forum'
 import { addHistory } from '@/api/modules/history'
@@ -225,7 +225,7 @@ onMounted(() => {
               </el-avatar>
               <div class="comment-meta">
                 <span class="comment-author">{{ comment.username }}</span>
-                <span class="comment-time">{{ comment.createdAt }}</span>
+                <span class="comment-time">{{ comment.createTime }}</span>
               </div>
             </div>
             <div class="comment-content">

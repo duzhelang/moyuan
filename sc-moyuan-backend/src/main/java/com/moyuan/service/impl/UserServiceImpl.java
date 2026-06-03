@@ -10,10 +10,15 @@ import com.moyuan.dto.request.UserUpdateRequest;
 import com.moyuan.dto.response.TokenResponse;
 import com.moyuan.entity.User;
 import com.moyuan.entity.UserFavorite;
+import com.moyuan.entity.UserHistory;
+import com.moyuan.entity.UserLike;
 import com.moyuan.enums.TargetType;
 import com.moyuan.exception.BusinessException;
 import com.moyuan.mapper.UserFavoriteMapper;
+import com.moyuan.mapper.UserHistoryMapper;
+import com.moyuan.mapper.UserLikeMapper;
 import com.moyuan.mapper.UserMapper;
+import com.moyuan.service.ForumPostService;
 import com.moyuan.service.UserService;
 import com.moyuan.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +32,9 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +42,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     private final UserMapper userMapper;
     private final UserFavoriteMapper userFavoriteMapper;
+    private final UserHistoryMapper userHistoryMapper;
+    private final UserLikeMapper userLikeMapper;
+    private final ForumPostService forumPostService;
     @Lazy
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
@@ -53,6 +64,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setEmail(request.getEmail());
         user.setNickname(request.getNickname() != null ? request.getNickname() : request.getUsername());
+        
+        // 处理兴趣选项
+        if (request.getInterests() != null && !request.getInterests().isEmpty()) {
+            user.setInterests(String.join(",", request.getInterests()));
+        }
+        
         user.setStatus(1);
         userMapper.insert(user);
 
@@ -148,6 +165,35 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                         .eq(UserFavorite::getUserId, userId)
                         .eq(UserFavorite::getTargetId, poemId)
                         .eq(UserFavorite::getTargetType, TargetType.POEM.getCode())) > 0;
+    }
+
+    @Override
+    public Map<String, Object> getUserStats(Long userId) {
+        Map<String, Object> stats = new HashMap<>();
+        
+        long favoriteCount = userFavoriteMapper.selectCount(
+                new LambdaQueryWrapper<UserFavorite>()
+                        .eq(UserFavorite::getUserId, userId));
+        
+        long postCount = forumPostService.count(
+                new LambdaQueryWrapper<com.moyuan.entity.ForumPost>()
+                        .eq(com.moyuan.entity.ForumPost::getUserId, userId)
+                        .eq(com.moyuan.entity.ForumPost::getDeleted, 0));
+        
+        long historyCount = userHistoryMapper.selectCount(
+                new LambdaQueryWrapper<UserHistory>()
+                        .eq(UserHistory::getUserId, userId));
+        
+        long likeCount = userLikeMapper.selectCount(
+                new LambdaQueryWrapper<UserLike>()
+                        .eq(UserLike::getUserId, userId));
+        
+        stats.put("favoriteCount", favoriteCount);
+        stats.put("postCount", postCount);
+        stats.put("historyCount", historyCount);
+        stats.put("likeCount", likeCount);
+        
+        return stats;
     }
 
     private String getClientIp() {

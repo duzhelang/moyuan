@@ -1,5 +1,5 @@
-import { ref, computed } from 'vue'
-import type { ForumPost, Comment, PageResult } from '@/types/model'
+import { ref } from 'vue'
+import type { ForumPost, Comment } from '@/types/model'
 import { getForumPostList, getForumPostById, getComments, createComment } from '@/api/modules/forum'
 import type { CommentCreateRequest } from '@/types/api'
 

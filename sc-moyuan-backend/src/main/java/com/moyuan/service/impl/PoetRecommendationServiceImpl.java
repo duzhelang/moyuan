@@ -21,6 +21,7 @@ public class PoetRecommendationServiceImpl implements PoetRecommendationService 
     private static final int FAVORITE_WEIGHT = 5;
     private static final int LIKE_WEIGHT = 3;
     private static final int VIEW_WEIGHT = 1;
+    private static final int INTEREST_WEIGHT = 2;
     private static final int MAX_SIMILAR_USERS = 20;
     private static final int POET_FAVORITE_TYPE = 3;
     private static final int POEM_TYPE = 1;
@@ -30,6 +31,7 @@ public class PoetRecommendationServiceImpl implements PoetRecommendationService 
     private final UserHistoryMapper userHistoryMapper;
     private final PoemMapper poemMapper;
     private final PoetMapper poetMapper;
+    private final UserMapper userMapper;
     private final DynastyService dynastyService;
 
     @Override
@@ -41,40 +43,48 @@ public class PoetRecommendationServiceImpl implements PoetRecommendationService 
 
         Map<Long, Map<Long, Double>> allUserPoetScores = buildUserPoetMatrix();
 
-        if (!allUserPoetScores.containsKey(userId) || allUserPoetScores.get(userId).isEmpty()) {
-            return getPopularPoets(limit);
-        }
+        // 基于协同过滤的推荐
+        Map<Long, Double> collaborativeScores = new HashMap<>();
+        if (allUserPoetScores.containsKey(userId) && !allUserPoetScores.get(userId).isEmpty()) {
+            Map<Long, Double> targetUserScores = allUserPoetScores.get(userId);
+            Map<Long, Double> userSimilarities = new HashMap<>();
 
-        Map<Long, Double> targetUserScores = allUserPoetScores.get(userId);
-        Map<Long, Double> userSimilarities = new HashMap<>();
+            for (Map.Entry<Long, Map<Long, Double>> entry : allUserPoetScores.entrySet()) {
+                Long otherUserId = entry.getKey();
+                if (otherUserId.equals(userId)) continue;
+                double similarity = cosineSimilarity(targetUserScores, entry.getValue());
+                if (similarity > 0) {
+                    userSimilarities.put(otherUserId, similarity);
+                }
+            }
 
-        for (Map.Entry<Long, Map<Long, Double>> entry : allUserPoetScores.entrySet()) {
-            Long otherUserId = entry.getKey();
-            if (otherUserId.equals(userId)) continue;
-            double similarity = cosineSimilarity(targetUserScores, entry.getValue());
-            if (similarity > 0) {
-                userSimilarities.put(otherUserId, similarity);
+            List<Long> similarUsers = userSimilarities.entrySet().stream()
+                    .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
+                    .limit(MAX_SIMILAR_USERS)
+                    .map(Map.Entry::getKey)
+                    .collect(Collectors.toList());
+
+            for (Long similarUserId : similarUsers) {
+                double similarity = userSimilarities.get(similarUserId);
+                Map<Long, Double> similarUserScores = allUserPoetScores.get(similarUserId);
+                for (Map.Entry<Long, Double> entry : similarUserScores.entrySet()) {
+                    Long poetId = entry.getKey();
+                    if (targetUserScores.containsKey(poetId)) continue;
+                    collaborativeScores.merge(poetId, similarity * entry.getValue(), Double::sum);
+                }
             }
         }
 
-        List<Long> similarUsers = userSimilarities.entrySet().stream()
-                .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
-                .limit(MAX_SIMILAR_USERS)
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toList());
+        // 基于用户兴趣的推荐
+        Map<Long, Double> interestScores = getInterestBasedScores(userId);
 
-        Map<Long, Double> candidateScores = new HashMap<>();
-        for (Long similarUserId : similarUsers) {
-            double similarity = userSimilarities.get(similarUserId);
-            Map<Long, Double> similarUserScores = allUserPoetScores.get(similarUserId);
-            for (Map.Entry<Long, Double> entry : similarUserScores.entrySet()) {
-                Long poetId = entry.getKey();
-                if (targetUserScores.containsKey(poetId)) continue;
-                candidateScores.merge(poetId, similarity * entry.getValue(), Double::sum);
-            }
+        // 合并两种推荐分数
+        Map<Long, Double> combinedScores = new HashMap<>(collaborativeScores);
+        for (Map.Entry<Long, Double> entry : interestScores.entrySet()) {
+            combinedScores.merge(entry.getKey(), entry.getValue(), Double::sum);
         }
 
-        List<Long> recommendedPoetIds = candidateScores.entrySet().stream()
+        List<Long> recommendedPoetIds = combinedScores.entrySet().stream()
                 .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
                 .limit(limit)
                 .map(Map.Entry::getKey)
@@ -91,6 +101,48 @@ public class PoetRecommendationServiceImpl implements PoetRecommendationService 
                 .filter(Objects::nonNull)
                 .filter(p -> p.getStatus() != null && p.getStatus() == 1)
                 .collect(Collectors.toList());
+    }
+
+    private Map<Long, Double> getInterestBasedScores(Long userId) {
+        Map<Long, Double> scores = new HashMap<>();
+        
+        User user = userMapper.selectById(userId);
+        if (user == null || user.getInterests() == null || user.getInterests().isEmpty()) {
+            return scores;
+        }
+
+        String[] interests = user.getInterests().split(",");
+        Set<String> interestSet = new HashSet<>(Arrays.asList(interests));
+
+        // 根据兴趣推荐相关朝代的诗人
+        if (interestSet.contains("古典")) {
+            addDynastyPoetScores(scores, Arrays.asList(1L, 2L, 3L, 4L, 5L, 6L), INTEREST_WEIGHT * 2);
+        }
+        if (interestSet.contains("现代")) {
+            addDynastyPoetScores(scores, Arrays.asList(11L, 12L, 13L), INTEREST_WEIGHT * 2);
+        }
+        if (interestSet.contains("自由体")) {
+            addDynastyPoetScores(scores, Arrays.asList(11L, 12L, 13L), INTEREST_WEIGHT);
+        }
+        if (interestSet.contains("外国")) {
+            // 外国诗歌兴趣，可以推荐一些有国际影响力的诗人
+            addDynastyPoetScores(scores, Arrays.asList(6L, 7L, 8L), INTEREST_WEIGHT);
+        }
+
+        return scores;
+    }
+
+    private void addDynastyPoetScores(Map<Long, Double> scores, List<Long> dynastyIds, double weight) {
+        for (Long dynastyId : dynastyIds) {
+            LambdaQueryWrapper<Poet> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(Poet::getDynastyId, dynastyId)
+                    .eq(Poet::getStatus, 1)
+                    .select(Poet::getId);
+            List<Poet> poets = poetMapper.selectList(wrapper);
+            for (Poet poet : poets) {
+                scores.merge(poet.getId(), weight, Double::sum);
+            }
+        }
     }
 
     @Override

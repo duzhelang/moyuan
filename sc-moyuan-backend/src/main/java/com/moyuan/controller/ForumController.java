@@ -90,13 +90,14 @@ public class ForumController {
         return R.success(result);
     }
 
-    @Operation(summary = "获取帖子评论列表")
-    @GetMapping("/posts/{id}/comments")
+    @Operation(summary = "获取评论列表")
+    @GetMapping("/comments")
     public R<Map<String, Object>> getComments(
-            @PathVariable Long id,
+            @RequestParam Long targetId,
+            @RequestParam Integer targetType,
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "10") int pageSize) {
-        IPage<Comment> page = commentService.getCommentsByPostId(id, pageNum, pageSize);
+        IPage<Comment> page = commentService.getCommentsByTarget(targetId, targetType, pageNum, pageSize);
         Map<String, Object> result = new HashMap<>();
         result.put("list", page.getRecords());
         result.put("total", page.getTotal());
@@ -106,10 +107,9 @@ public class ForumController {
     }
 
     @Operation(summary = "创建评论")
-    @PostMapping("/posts/{id}/comments")
-    public R<Comment> createComment(@PathVariable Long id, @Valid @RequestBody CommentCreateRequest request) {
+    @PostMapping("/comments")
+    public R<Comment> createComment(@Valid @RequestBody CommentCreateRequest request) {
         Long userId = securityUtil.getCurrentUserId();
-        request.setPostId(id);
         return R.success(commentService.createComment(userId, request));
     }
 

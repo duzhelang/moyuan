@@ -9,11 +9,13 @@ import com.moyuan.common.ResultCode;
 import com.moyuan.dto.request.ForumPostCreateRequest;
 import com.moyuan.dto.request.ForumPostUpdateRequest;
 import com.moyuan.entity.ForumPost;
+import com.moyuan.entity.User;
 import com.moyuan.entity.UserLike;
 import com.moyuan.enums.TargetType;
 import com.moyuan.exception.BusinessException;
 import com.moyuan.mapper.ForumPostMapper;
 import com.moyuan.mapper.UserLikeMapper;
+import com.moyuan.mapper.UserMapper;
 import com.moyuan.service.ForumPostService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
@@ -22,6 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +34,33 @@ public class ForumPostServiceImpl extends ServiceImpl<ForumPostMapper, ForumPost
 
     private final ForumPostMapper forumPostMapper;
     private final UserLikeMapper userLikeMapper;
+    private final UserMapper userMapper;
+
+    private void fillUserInfo(List<ForumPost> posts) {
+        if (posts == null || posts.isEmpty()) return;
+        List<Long> userIds = posts.stream()
+                .map(ForumPost::getUserId)
+                .distinct()
+                .collect(Collectors.toList());
+        Map<Long, User> userMap = userMapper.selectBatchIds(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+        for (ForumPost post : posts) {
+            User user = userMap.get(post.getUserId());
+            if (user != null) {
+                post.setUsername(user.getNickname() != null ? user.getNickname() : user.getUsername());
+                post.setAvatar(user.getAvatar());
+            }
+        }
+    }
+
+    private void fillUserInfo(ForumPost post) {
+        if (post == null) return;
+        User user = userMapper.selectById(post.getUserId());
+        if (user != null) {
+            post.setUsername(user.getNickname() != null ? user.getNickname() : user.getUsername());
+            post.setAvatar(user.getAvatar());
+        }
+    }
 
     @Override
     public IPage<ForumPost> getPostList(int pageNum, int pageSize, String category, String keyword) {
@@ -39,7 +71,9 @@ public class ForumPostServiceImpl extends ServiceImpl<ForumPostMapper, ForumPost
             wrapper.and(w -> w.like(ForumPost::getTitle, keyword).or().like(ForumPost::getContent, keyword));
         }
         wrapper.orderByDesc(ForumPost::getIsTop).orderByDesc(ForumPost::getCreateTime);
-        return forumPostMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
+        IPage<ForumPost> page = forumPostMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
+        fillUserInfo(page.getRecords());
+        return page;
     }
 
     @Override
@@ -52,6 +86,7 @@ public class ForumPostServiceImpl extends ServiceImpl<ForumPostMapper, ForumPost
                 .eq(ForumPost::getId, id)
                 .setSql("view_count = view_count + 1"));
         post.setViewCount(post.getViewCount() + 1);
+        fillUserInfo(post);
         return post;
     }
 
@@ -135,6 +170,8 @@ public class ForumPostServiceImpl extends ServiceImpl<ForumPostMapper, ForumPost
         LambdaQueryWrapper<ForumPost> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ForumPost::getUserId, userId)
                .orderByDesc(ForumPost::getCreateTime);
-        return forumPostMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
+        IPage<ForumPost> page = forumPostMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
+        fillUserInfo(page.getRecords());
+        return page;
     }
 }

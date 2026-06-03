@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { ForumPost } from '@/types/model'
@@ -58,7 +58,10 @@ onMounted(() => {
   <div class="forum-list-page">
     <div class="container">
       <div class="page-header">
-        <h1 class="page-title">诗汇论坛</h1>
+        <div class="header-left">
+          <h1 class="page-title">诗汇论坛</h1>
+          <p class="page-subtitle">以诗会友，畅谈古今</p>
+        </div>
         <el-button type="primary" @click="goToCreate">
           <el-icon><Edit /></el-icon>
           发帖
@@ -140,6 +143,13 @@ onMounted(() => {
 <style scoped lang="scss">
 .forum-list-page {
   padding: $spacing-xl 0;
+  width: 100%;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
 }
 
 .page-header {
@@ -153,6 +163,13 @@ onMounted(() => {
   font-size: $font-size-title;
   color: $primary-color;
   font-family: $font-family-title;
+}
+
+.page-subtitle {
+  font-size: $font-size-sm;
+  color: $text-color-light;
+  font-family: $font-family-base;
+  margin: 0;
 }
 
 .search-section {
@@ -170,11 +187,13 @@ onMounted(() => {
   flex-direction: column;
   gap: $spacing-lg;
   min-height: 400px;
+  border-radius: 0;
 }
 
 .post-card {
   @include card;
   cursor: pointer;
+  border-radius: $border-radius-md;
 }
 
 .post-header {

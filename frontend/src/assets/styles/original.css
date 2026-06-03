@@ -63,11 +63,7 @@ body .body {
   margin: 0 auto;
 }
 
-div {
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-}
+/* global div flex rule removed — was breaking layout on poem/poet/vision pages */
 
 /* ========== shouye.css ========== */
 body {
@@ -1331,12 +1327,7 @@ body {
   position: absolute;
   right: -60px;
   z-index: 51;
-  display: none;
   cursor: pointer;
-}
-
-.daohang ul li:hover .sy_xdlchuang {
-  display: block;
 }
 
 .sy_xdlchuang .login-container {
@@ -2521,13 +2512,7 @@ body {
   background: url('/img/dt_1.jpg') no-repeat 0px -360px / cover;
 }
 
-.container {
-  margin: 100px 10px;
-  width: 100%;
-  background: url('');
-  background-repeat: no-repeat;
-  background-position: 0px 0px;
-}
+/* .container legacy rule removed — was adding 100px margin to all pages */
 
 .zc_main {
   display: flex;
@@ -2671,10 +2656,7 @@ html {
   font-family: Arial, sans-serif;
 }
 
-.container {
-  display: flex;
-  height: 100vh;
-}
+/* .container flex rule removed — was causing poem/poet pages to display horizontally */
 
 .sidebar {
   width: 250px;
@@ -2751,13 +2733,7 @@ a:hover {
   text-shadow: 0 0 10px white;
 }
 
-.container {
-  display: flex;
-  height: 100%;
-  position: relative;
-  padding: 0 0 0 0;
-  z-index: 50;
-}
+/* .container flex rule removed — was causing layout issues across pages */
 
 .sidebar {
   width: 250px;

@@ -14,6 +14,7 @@ export interface RegisterRequest {
   password: string
   email?: string
   nickname?: string
+  interests?: string[]
 }
 
 export interface TokenResponse {
@@ -47,7 +48,9 @@ export interface ForumPostUpdateRequest extends Partial<ForumPostCreateRequest> 
 
 export interface CommentCreateRequest {
   content: string
-  postId: number
+  postId?: number
+  targetId?: number
+  targetType?: number
   parentId?: number
   replyToUserId?: number
 }

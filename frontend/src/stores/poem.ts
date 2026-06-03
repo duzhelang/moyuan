@@ -53,7 +53,7 @@ export const usePoemStore = defineStore('poem', () => {
     loading.value = true
     try {
       const response = await getModernPoems()
-      modernPoems.value = response.data
+      modernPoems.value = response.data.list
     } catch (error) {
       console.error('获取现代诗词失败:', error)
       throw error

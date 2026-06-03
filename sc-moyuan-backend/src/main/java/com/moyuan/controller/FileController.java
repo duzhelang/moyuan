@@ -1,18 +1,16 @@
 package com.moyuan.controller;
 
 import com.moyuan.common.R;
+import com.moyuan.entity.FileMetadata;
+import com.moyuan.service.FileStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 @Tag(name = "文件接口")
 @RestController
@@ -20,49 +18,34 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FileController {
 
-    @Value("${file.upload-dir:./uploads}")
-    private String uploadDir;
-
-    @Value("${file.base-url:http://localhost:8080/uploads}")
-    private String baseUrl;
+    private final FileStorageService fileStorageService;
 
     @Operation(summary = "上传文件")
     @PostMapping("/upload")
-    public R<Map<String, String>> upload(@RequestParam("file") MultipartFile file) {
-        if (file.isEmpty()) {
-            return R.error(400, "请选择文件");
-        }
-
-        String originalFilename = file.getOriginalFilename();
-        String extension = "";
-        if (originalFilename != null && originalFilename.contains(".")) {
-            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-        }
-
-        String allowedExtensions = ".jpg,.jpeg,.png,.gif,.webp,.bmp";
-        if (!allowedExtensions.toLowerCase().contains(extension.toLowerCase())) {
-            return R.error(400, "不支持的文件格式");
-        }
-
-        if (file.getSize() > 5 * 1024 * 1024) {
-            return R.error(400, "文件大小不能超过5MB");
-        }
-
-        String fileName = UUID.randomUUID().toString().replace("-", "") + extension;
-
-        try {
-            File dir = new File(uploadDir);
-            if (!dir.exists()) {
-                dir.mkdirs();
-            }
-            file.transferTo(new File(dir, fileName));
-        } catch (IOException e) {
-            return R.error(500, "文件上传失败");
-        }
-
+    public R<Map<String, String>> upload(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "fileType", defaultValue = "common") String fileType,
+            @RequestParam(value = "relatedId", required = false) Long relatedId,
+            @RequestParam(value = "relatedType", required = false) String relatedType) {
+        FileMetadata metadata = fileStorageService.upload(file, fileType, relatedId, relatedType);
         Map<String, String> result = new HashMap<>();
-        result.put("url", baseUrl + "/" + fileName);
-        result.put("fileName", fileName);
+        result.put("url", fileStorageService.getUrl(metadata.getFileKey()));
+        result.put("fileName", metadata.getOriginalName());
+        result.put("fileKey", metadata.getFileKey());
         return R.success(result);
+    }
+
+    @Operation(summary = "删除文件")
+    @DeleteMapping("/{fileKey}")
+    public R<Void> delete(@PathVariable String fileKey) {
+        fileStorageService.delete(fileKey);
+        return R.success(null);
+    }
+
+    @Operation(summary = "获取文件信息")
+    @GetMapping("/{fileKey}")
+    public R<FileMetadata> getFileInfo(@PathVariable String fileKey) {
+        FileMetadata metadata = fileStorageService.getFileInfo(fileKey);
+        return R.success(metadata);
     }
 }

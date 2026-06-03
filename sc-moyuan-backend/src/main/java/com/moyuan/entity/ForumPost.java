@@ -12,6 +12,10 @@ public class ForumPost {
     private String title;
     private String content;
     private Long userId;
+    @TableField(exist = false)
+    private String username;
+    @TableField(exist = false)
+    private String avatar;
     private String category;
     private Integer viewCount;
     private Integer likeCount;

@@ -11,9 +11,14 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Value("${file.upload-dir:./uploads}")
     private String uploadDir;
 
+    @Value("${spring.web.resources.cache.period:3600}")
+    private int cachePeriod;
+
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:" + uploadDir + "/");
+                .addResourceLocations("file:" + uploadDir + "/")
+                .setCachePeriod(cachePeriod)
+                .resourceChain(true);
     }
 }
