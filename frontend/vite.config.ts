@@ -28,8 +28,9 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    strictPort: true,
     host: '0.0.0.0',
-    open: true,
+    open: false,
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
@@ -40,7 +41,7 @@ export default defineConfig({
   css: {
     preprocessorOptions: {
       scss: {
-        additionalData: `@use "@/assets/styles/variables" as *;\n@use "@/assets/styles/mixins" as *;\n`,
+        additionalData: `@import "@/assets/styles/variables";\n@import "@/assets/styles/mixins";\n`,
         loadPaths: [resolve(__dirname, 'src/assets/styles')]
       }
     }

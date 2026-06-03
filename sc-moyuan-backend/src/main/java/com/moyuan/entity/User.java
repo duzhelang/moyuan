@@ -3,6 +3,7 @@ package com.moyuan.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @TableName("user")
@@ -16,6 +17,8 @@ public class User {
     private String nickname;
     private String avatar;
     private String bio;
+    @TableField(exist = false)
+    private String interests;
     private String role;
     private Integer status;
     private LocalDateTime lastLoginTime;
