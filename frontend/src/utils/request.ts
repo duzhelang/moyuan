@@ -44,6 +44,7 @@ const PUBLIC_PATHS = [
   '/home-navigation',
   '/vision',
   '/ai',
+  '/rhyme',
   '/search',
   '/auth'
 ]
@@ -68,7 +69,7 @@ service.interceptors.response.use(
       console.log(`[Response] ${response.config.url}`, response.data)
     }
     const { code, message } = response.data
-    if (code === 200) {
+    if (code === '200') {
       return response.data
     }
     ElMessage.error(message || '请求失败')

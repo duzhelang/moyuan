@@ -131,8 +131,8 @@ onMounted(() => {
       </div>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑精选诗人' : '新增精选诗人'" width="650px" append-to-body>
-      <el-form :model="form" label-width="100px">
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑精选诗人' : '新增精选诗人'" width="700px" append-to-body>
+      <el-form :model="form" label-width="80px">
         <el-form-item label="意境图">
           <ImageUpload v-model="form.imageUrl" :maxSize="5" />
         </el-form-item>
@@ -150,7 +150,7 @@ onMounted(() => {
         </el-row>
         <el-row :gutter="16">
           <el-col :span="12">
-            <el-form-item label="关联诗人ID">
+            <el-form-item label="诗人ID">
               <el-input-number v-model="form.poetId" :min="0" placeholder="关联诗人表ID" style="width: 100%" />
             </el-form-item>
           </el-col>
@@ -191,5 +191,18 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+:deep(.el-dialog) {
+  .el-form-item__content {
+    flex: 1;
+    min-width: 0;
+  }
+  .el-input,
+  .el-textarea,
+  .el-select,
+  .el-input-number {
+    width: 100% !important;
+  }
 }
 </style>

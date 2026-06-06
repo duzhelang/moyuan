@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -53,6 +53,18 @@ const mockSecurityLogs = ref([
   { id: 2, content: '登录成功', time: '2024-01-14 18:45:00' },
   { id: 3, content: '登录成功', time: '2024-01-13 09:15:00' }
 ])
+
+const uploadHeaders = computed(() => ({
+  Authorization: userStore.token ? `Bearer ${userStore.token}` : ''
+}))
+
+const uploadData = computed(() => {
+  const data: Record<string, any> = { fileType: 'avatar' }
+  if (userStore.userInfo?.id) {
+    data.relatedId = userStore.userInfo.id
+  }
+  return data
+})
 
 const form = reactive({
   nickname: '',
@@ -127,13 +139,23 @@ const fetchUserStats = async () => {
   }
 }
 
-const handleAvatarSuccess: UploadProps['onSuccess'] = (response) => {
-  if (response.code === 200) {
-    userStore.updateUser({ avatar: response.data.url })
-    ElMessage.success('头像更新成功')
-  } else {
-    ElMessage.error('头像上传失败')
+const handleAvatarSuccess: UploadProps['onSuccess'] = async (response) => {
+  try {
+    if (response.code === 200) {
+      await userStore.updateUser({ avatar: response.data.url })
+      ElMessage.success('头像更新成功')
+    } else {
+      ElMessage.error(response.message || '头像上传失败')
+    }
+  } catch (error) {
+    ElMessage.error('头像更新失败')
+  } finally {
+    avatarUploading.value = false
   }
+}
+
+const handleAvatarError = () => {
+  ElMessage.error('头像上传失败，请检查网络后重试')
   avatarUploading.value = false
 }
 
@@ -358,7 +380,27 @@ onMounted(() => {
 <template>
   <div class="profile-page">
     <div class="container">
-      <h1 class="page-title">个人中心</h1>
+      <div class="page-header">
+        <h1 class="page-title">个人中心</h1>
+        <div class="page-nav-buttons">
+          <el-button @click="router.push('/')">
+            <el-icon><HomeFilled /></el-icon>
+            <span>首页</span>
+          </el-button>
+          <el-button @click="router.push('/poems')">
+            <el-icon><Reading /></el-icon>
+            <span>诗词库</span>
+          </el-button>
+          <el-button @click="router.push('/forum')">
+            <el-icon><ChatDotSquare /></el-icon>
+            <span>论坛</span>
+          </el-button>
+          <el-button @click="router.push('/ai-chat')">
+            <el-icon><ChatLineSquare /></el-icon>
+            <span>AI对话</span>
+          </el-button>
+        </div>
+      </div>
       
       <div class="profile-content">
         <div class="profile-sidebar">
@@ -366,8 +408,11 @@ onMounted(() => {
             <el-upload
               class="avatar-uploader"
               action="/api/files/upload"
+              :headers="uploadHeaders"
+              :data="uploadData"
               :show-file-list="false"
               :on-success="handleAvatarSuccess"
+              :on-error="handleAvatarError"
               :before-upload="beforeAvatarUpload"
               accept="image/jpeg,image/png"
             >
@@ -386,7 +431,17 @@ onMounted(() => {
               </el-tag>
             </p>
             <p class="user-bio">{{ form.bio || '这个人很懒，什么都没留下' }}</p>
-            
+
+            <el-button
+              v-if="userStore.userInfo?.role === 'admin'"
+              type="danger"
+              class="admin-entry-btn"
+              @click="router.push('/admin')"
+            >
+              <el-icon><Setting /></el-icon>
+              <span>进入后台管理</span>
+            </el-button>
+
             <div class="user-stats">
               <div class="stat-item" @click="activeTab = 'favorites'">
                 <span class="stat-number">{{ userStats.favoriteCount }}</span>
@@ -433,7 +488,7 @@ onMounted(() => {
               <span>系统偏好</span>
             </el-menu-item>
             <el-menu-item index="privacy">
-              <el-icon><Shield /></el-icon>
+              <el-icon><Key /></el-icon>
               <span>数据隐私</span>
             </el-menu-item>
             <el-menu-item index="admin" v-if="userStore.userInfo?.role === 'admin'">
@@ -461,7 +516,7 @@ onMounted(() => {
               ref="formRef"
               :model="form"
               :rules="profileRules"
-              label-width="100px"
+              label-width="80px"
               class="profile-form"
             >
               <el-form-item label="用户名">
@@ -482,9 +537,9 @@ onMounted(() => {
               
               <el-form-item label="性别">
                 <el-radio-group v-model="form.gender">
-                  <el-radio :label="0">未知</el-radio>
-                  <el-radio :label="1">男</el-radio>
-                  <el-radio :label="2">女</el-radio>
+                  <el-radio :value="0">未知</el-radio>
+                  <el-radio :value="1">男</el-radio>
+                  <el-radio :value="2">女</el-radio>
                 </el-radio-group>
               </el-form-item>
               
@@ -920,14 +975,44 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .profile-page {
-  padding: $spacing-xl 0;
+  padding: $spacing-xl $spacing-xl;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-xl;
+  
+  @include responsive(sm) {
+    flex-direction: column;
+    gap: $spacing-md;
+    align-items: flex-start;
+  }
 }
 
 .page-title {
   font-size: $font-size-title;
   color: $primary-color;
   font-family: $font-family-title;
-  margin-bottom: $spacing-xl;
+  margin: 0;
+}
+
+.page-nav-buttons {
+  display: flex;
+  gap: $spacing-sm;
+  
+  @include responsive(sm) {
+    flex-wrap: wrap;
+  }
+  
+  .el-button {
+    display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+  }
 }
 
 .profile-content {
@@ -972,6 +1057,16 @@ onMounted(() => {
   font-size: $font-size-sm;
   color: $text-color-secondary;
   margin-bottom: $spacing-lg;
+}
+
+.admin-entry-btn {
+  width: 100%;
+  margin-bottom: $spacing-lg;
+  font-weight: 500;
+
+  .el-icon {
+    margin-right: $spacing-xs;
+  }
 }
 
 .user-stats {
@@ -1026,7 +1121,18 @@ onMounted(() => {
 
 .profile-form,
 .password-form {
-  max-width: 500px;
+  max-width: 100%;
+
+  :deep(.el-form-item__content) {
+    flex: 1;
+    min-width: 0;
+  }
+
+  :deep(.el-input),
+  :deep(.el-textarea),
+  :deep(.el-date-editor) {
+    width: 100% !important;
+  }
 
   :deep(.el-input__inner),
   :deep(.el-textarea__inner) {

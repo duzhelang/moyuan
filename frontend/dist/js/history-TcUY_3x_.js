@@ -1,1 +1,0 @@
-import{s as t}from"./index-jcwN3xjz.js";function o(r,s){return t.post("/history",null,{params:{targetId:r,targetType:s}})}function a(r){return t.get("/history",{params:r})}function i(r){return t.delete("/history",{params:{}})}export{o as a,i as c,a as g};

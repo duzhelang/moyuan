@@ -23,14 +23,16 @@ public class OpenAiCompatibleAdapter implements AiModelAdapter {
     }
 
     @Override
-    public String chat(String message, AiModel model) {
+    public String chat(String message, AiModel model, String systemPrompt) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(model.getApiKey());
 
+        List<Map<String, String>> messages = buildMessages(systemPrompt, message);
+
         Map<String, Object> body = new HashMap<>();
         body.put("model", model.getModelId());
-        body.put("messages", List.of(Map.of("role", "user", "content", message)));
+        body.put("messages", messages);
         body.put("max_tokens", model.getMaxTokens() != null ? model.getMaxTokens() : 1024);
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
@@ -48,7 +50,7 @@ public class OpenAiCompatibleAdapter implements AiModelAdapter {
     }
 
     @Override
-    public String vision(String prompt, String base64Image, AiModel model) {
+    public String vision(String prompt, String base64Image, AiModel model, String systemPrompt) {
         String visionModelId = model.getVisionModelId();
         if (visionModelId == null || visionModelId.isEmpty()) {
             throw new BusinessException(ResultCode.ERROR, model.getDisplayName() + "不支持视觉模型");
@@ -66,9 +68,15 @@ public class OpenAiCompatibleAdapter implements AiModelAdapter {
         imageContent.put("type", "image_url");
         imageContent.put("image_url", Map.of("url", "data:image/jpeg;base64," + base64Image));
 
+        List<Map<String, Object>> messages = new java.util.ArrayList<>();
+        if (systemPrompt != null && !systemPrompt.isEmpty()) {
+            messages.add(Map.of("role", "system", "content", systemPrompt));
+        }
+        messages.add(Map.of("role", "user", "content", List.of(textContent, imageContent)));
+
         Map<String, Object> body = new HashMap<>();
         body.put("model", visionModelId);
-        body.put("messages", List.of(Map.of("role", "user", "content", List.of(textContent, imageContent))));
+        body.put("messages", messages);
         body.put("max_tokens", model.getMaxTokens() != null ? model.getMaxTokens() : 1024);
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
@@ -88,6 +96,15 @@ public class OpenAiCompatibleAdapter implements AiModelAdapter {
     @Override
     public boolean supports(String provider) {
         return "zhipu".equals(provider) || "deepseek".equals(provider) || "kimi".equals(provider);
+    }
+
+    private List<Map<String, String>> buildMessages(String systemPrompt, String userMessage) {
+        List<Map<String, String>> messages = new java.util.ArrayList<>();
+        if (systemPrompt != null && !systemPrompt.isEmpty()) {
+            messages.add(Map.of("role", "system", "content", systemPrompt));
+        }
+        messages.add(Map.of("role", "user", "content", userMessage));
+        return messages;
     }
 
     private String extractContent(Map<String, Object> responseBody) {

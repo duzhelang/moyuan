@@ -10,4 +10,6 @@ public interface PoemService extends IService<Poem> {
     void toggleLike(Long userId, Long poemId);
     boolean isLike(Long userId, Long poemId);
     IPage<Poem> getFavorites(Long userId, int pageNum, int pageSize);
+    void createPoemWithAudit(Poem poem);
+    void auditPoem(Long poemId, Integer status, String reason);
 }

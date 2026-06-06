@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { usePoemStore } from '@/stores/poem'
 import { useUserStore } from '@/stores/user'
-import type { Dynasty, Category } from '@/types/model'
+import type { Dynasty, Category, Poem, Poet } from '@/types/model'
 import { getDynastyList } from '@/api/modules/dynasty'
 import { getCategoryList } from '@/api/modules/category'
-import { likePoem, favoritePoem } from '@/api/modules/poem'
+import { likePoem, favoritePoem, getModernPoems } from '@/api/modules/poem'
+import { getPoetList } from '@/api/modules/poet'
 
 const router = useRouter()
 const route = useRoute()
@@ -17,19 +18,42 @@ const userStore = useUserStore()
 const loading = ref(false)
 const dynasties = ref<Dynasty[]>([])
 const categories = ref<Category[]>([])
+const poets = ref<Poet[]>([])
+
+const activeTab = ref<'classical' | 'modern'>('classical')
 
 const filters = ref({
   dynastyId: undefined as number | undefined,
   categoryId: undefined as number | undefined,
+  poetId: undefined as number | undefined,
   keyword: '',
+  sortBy: 'latest' as 'latest' | 'popular' | 'likes'
+})
+
+const modernFilters = ref({
+  isOriginal: undefined as boolean | undefined,
+  hasCertifiedPoet: undefined as boolean | undefined,
   sortBy: 'latest' as 'latest' | 'popular' | 'likes'
 })
 
 const currentPage = ref(1)
 const pageSize = ref(10)
 
-const poems = computed(() => poemStore.poemList)
-const total = computed(() => poemStore.total)
+const poems = computed(() => {
+  if (activeTab.value === 'classical') {
+    return poemStore.poemList
+  }
+  return modernPoemList.value
+})
+const total = computed(() => {
+  if (activeTab.value === 'classical') {
+    return poemStore.total
+  }
+  return modernTotal.value
+})
+
+const modernPoemList = ref<Poem[]>([])
+const modernTotal = ref(0)
 
 const sortOptions = [
   { value: 'latest', label: '最新发布' },
@@ -40,16 +64,29 @@ const sortOptions = [
 const fetchPoems = async () => {
   loading.value = true
   try {
-    await poemStore.fetchPoemList({
-      pageNum: currentPage.value,
-      pageSize: pageSize.value,
-      dynastyId: filters.value.dynastyId,
-      categoryId: filters.value.categoryId,
-      keyword: filters.value.keyword,
-      sortBy: filters.value.sortBy
-    })
+    if (activeTab.value === 'classical') {
+      await poemStore.fetchPoemList({
+        pageNum: currentPage.value,
+        pageSize: pageSize.value,
+        dynastyId: filters.value.dynastyId,
+        categoryId: filters.value.categoryId,
+        poetId: filters.value.poetId,
+        keyword: filters.value.keyword,
+        sortBy: filters.value.sortBy
+      })
+    } else {
+      const res = await getModernPoems({
+        pageNum: currentPage.value,
+        pageSize: pageSize.value,
+        isOriginal: modernFilters.value.isOriginal,
+        hasCertifiedPoet: modernFilters.value.hasCertifiedPoet,
+        sortBy: modernFilters.value.sortBy
+      })
+      modernPoemList.value = res.data.list
+      modernTotal.value = res.data.total
+    }
   } catch (error) {
-    console.error('获取诗词列表失败:', error)
+    ElMessage.error('获取诗词列表失败')
   } finally {
     loading.value = false
   }
@@ -57,21 +94,78 @@ const fetchPoems = async () => {
 
 const fetchFilters = async () => {
   try {
-    const [dynastyRes, categoryRes] = await Promise.all([
+    const [dynastyRes, categoryRes, poetRes] = await Promise.all([
       getDynastyList(),
-      getCategoryList()
+      getCategoryList(),
+      getPoetList({ pageSize: 200 })
     ])
     dynasties.value = dynastyRes.data
     categories.value = categoryRes.data
+    poets.value = poetRes.data.list
   } catch (error) {
-    console.error('获取筛选条件失败:', error)
+    ElMessage.error('获取筛选条件失败')
   }
+}
+
+const handleTabChange = (tab: 'classical' | 'modern') => {
+  activeTab.value = tab
+  currentPage.value = 1
+  syncFiltersToUrl()
+  fetchPoems()
 }
 
 const handleFilterChange = () => {
   currentPage.value = 1
+  syncFiltersToUrl()
   fetchPoems()
 }
+
+const clearFilters = () => {
+  if (activeTab.value === 'classical') {
+    filters.value = {
+      dynastyId: undefined,
+      categoryId: undefined,
+      poetId: undefined,
+      keyword: '',
+      sortBy: 'latest'
+    }
+  } else {
+    modernFilters.value = {
+      isOriginal: undefined,
+      hasCertifiedPoet: undefined,
+      sortBy: 'latest'
+    }
+  }
+  currentPage.value = 1
+  syncFiltersToUrl()
+  fetchPoems()
+}
+
+const syncFiltersToUrl = () => {
+  const query: Record<string, string> = {}
+  if (activeTab.value === 'modern') {
+    query.tab = 'modern'
+  }
+  if (activeTab.value === 'classical') {
+    if (filters.value.dynastyId) query.dynastyId = String(filters.value.dynastyId)
+    if (filters.value.categoryId) query.categoryId = String(filters.value.categoryId)
+    if (filters.value.poetId) query.poetId = String(filters.value.poetId)
+    if (filters.value.keyword) query.keyword = filters.value.keyword
+    if (filters.value.sortBy !== 'latest') query.sortBy = filters.value.sortBy
+  } else {
+    if (modernFilters.value.isOriginal !== undefined) query.isOriginal = String(modernFilters.value.isOriginal)
+    if (modernFilters.value.hasCertifiedPoet !== undefined) query.hasCertifiedPoet = String(modernFilters.value.hasCertifiedPoet)
+    if (modernFilters.value.sortBy !== 'latest') query.sortBy = modernFilters.value.sortBy
+  }
+  router.replace({ query })
+}
+
+const hasActiveFilters = computed(() => {
+  if (activeTab.value === 'classical') {
+    return filters.value.dynastyId || filters.value.categoryId || filters.value.poetId || filters.value.keyword || filters.value.sortBy !== 'latest'
+  }
+  return modernFilters.value.isOriginal !== undefined || modernFilters.value.hasCertifiedPoet !== undefined || modernFilters.value.sortBy !== 'latest'
+})
 
 const handlePageChange = (page: number) => {
   currentPage.value = page
@@ -100,7 +194,6 @@ const handleLike = async (poem: any, event: Event) => {
     poem.likeCount = poem.isLiked ? poem.likeCount + 1 : poem.likeCount - 1
     ElMessage.success(poem.isLiked ? '点赞成功' : '已取消点赞')
   } catch (error) {
-    console.error('点赞操作失败:', error)
     ElMessage.error('操作失败，请稍后重试')
   }
 }
@@ -117,21 +210,40 @@ const handleFavorite = async (poem: any, event: Event) => {
     poem.favoriteCount = poem.isFavorited ? poem.favoriteCount + 1 : poem.favoriteCount - 1
     ElMessage.success(poem.isFavorited ? '收藏成功' : '已取消收藏')
   } catch (error) {
-    console.error('收藏操作失败:', error)
     ElMessage.error('操作失败，请稍后重试')
   }
 }
 
 onMounted(() => {
   const query = route.query
+  if (query.tab === 'modern') {
+    activeTab.value = 'modern'
+  }
   if (query.dynastyId) {
     filters.value.dynastyId = Number(query.dynastyId)
   }
   if (query.categoryId) {
     filters.value.categoryId = Number(query.categoryId)
   }
+  if (query.poetId) {
+    filters.value.poetId = Number(query.poetId)
+  }
   if (query.keyword) {
     filters.value.keyword = String(query.keyword)
+  }
+  if (query.sortBy) {
+    const sortBy = String(query.sortBy) as 'latest' | 'popular' | 'likes'
+    if (activeTab.value === 'classical') {
+      filters.value.sortBy = sortBy
+    } else {
+      modernFilters.value.sortBy = sortBy
+    }
+  }
+  if (query.isOriginal !== undefined) {
+    modernFilters.value.isOriginal = query.isOriginal === 'true'
+  }
+  if (query.hasCertifiedPoet !== undefined) {
+    modernFilters.value.hasCertifiedPoet = query.hasCertifiedPoet === 'true'
   }
   fetchFilters()
   fetchPoems()
@@ -141,22 +253,44 @@ onMounted(() => {
 <template>
   <div class="poem-list-page">
     <div class="container">
+      <div class="page-nav">
+        <el-button text @click="router.push('/')">
+          <el-icon><HomeFilled /></el-icon>
+          首页
+        </el-button>
+        <el-divider direction="vertical" />
+        <span class="current-page">诗词鉴赏</span>
+      </div>
+
       <div class="page-header">
         <div class="header-left">
           <h1 class="page-title">诗词鉴赏</h1>
           <p class="page-subtitle">品读千年韵律，感悟诗词之美</p>
         </div>
-        <el-button
-          v-if="userStore.isLoggedIn"
-          type="primary"
-          @click="router.push('/poem/create')"
-        >
-          <el-icon><Edit /></el-icon>
-          发布新诗
-        </el-button>
+        <div class="header-right">
+          <el-button @click="router.push('/poet')">
+            <el-icon><User /></el-icon>
+            诗人风采
+          </el-button>
+          <el-button
+            v-if="userStore.isLoggedIn"
+            type="primary"
+            @click="router.push('/poem/create')"
+          >
+            <el-icon><Edit /></el-icon>
+            发布新诗
+          </el-button>
+        </div>
       </div>
-      
-      <div class="filter-section">
+
+      <div class="tab-section">
+        <el-tabs v-model="activeTab" @tab-change="handleTabChange">
+          <el-tab-pane label="古籍诗文" name="classical" />
+          <el-tab-pane label="现代创作" name="modern" />
+        </el-tabs>
+      </div>
+
+      <div class="filter-section" v-if="activeTab === 'classical'">
         <el-card class="filter-card">
           <div class="filter-row">
             <div class="filter-item">
@@ -175,7 +309,7 @@ onMounted(() => {
                 />
               </el-select>
             </div>
-            
+
             <div class="filter-item">
               <label>分类：</label>
               <el-select
@@ -192,7 +326,25 @@ onMounted(() => {
                 />
               </el-select>
             </div>
-            
+
+            <div class="filter-item">
+              <label>诗人：</label>
+              <el-select
+                v-model="filters.poetId"
+                placeholder="全部诗人"
+                clearable
+                filterable
+                @change="handleFilterChange"
+              >
+                <el-option
+                  v-for="poet in poets"
+                  :key="poet.id"
+                  :label="poet.name"
+                  :value="poet.id"
+                />
+              </el-select>
+            </div>
+
             <div class="filter-item">
               <label>排序：</label>
               <el-select
@@ -207,7 +359,7 @@ onMounted(() => {
                 />
               </el-select>
             </div>
-            
+
             <div class="filter-item">
               <label>搜索：</label>
               <el-input
@@ -221,17 +373,77 @@ onMounted(() => {
                 </template>
               </el-input>
             </div>
-            
+
             <el-button type="primary" @click="handleFilterChange">
               搜索
+            </el-button>
+
+            <el-button v-if="hasActiveFilters" @click="clearFilters">
+              清除筛选
             </el-button>
           </div>
         </el-card>
       </div>
-      
+
+      <div class="filter-section" v-else>
+        <el-card class="filter-card">
+          <div class="filter-row">
+            <div class="filter-item">
+              <label>类型：</label>
+              <el-select
+                v-model="modernFilters.isOriginal"
+                placeholder="全部作品"
+                clearable
+                @change="handleFilterChange"
+              >
+                <el-option label="全部作品" :value="undefined" />
+                <el-option label="原创作品" :value="true" />
+                <el-option label="非原创" :value="false" />
+              </el-select>
+            </div>
+
+            <div class="filter-item">
+              <label>诗人：</label>
+              <el-select
+                v-model="modernFilters.hasCertifiedPoet"
+                placeholder="全部诗人"
+                clearable
+                @change="handleFilterChange"
+              >
+                <el-option label="全部诗人" :value="undefined" />
+                <el-option label="认证诗人" :value="true" />
+              </el-select>
+            </div>
+
+            <div class="filter-item">
+              <label>排序：</label>
+              <el-select
+                v-model="modernFilters.sortBy"
+                @change="handleFilterChange"
+              >
+                <el-option
+                  v-for="option in sortOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+            </div>
+
+            <el-button v-if="hasActiveFilters" @click="clearFilters">
+              清除筛选
+            </el-button>
+          </div>
+        </el-card>
+      </div>
+
+      <div class="result-stats" v-if="total > 0">
+        <span>共找到 <strong>{{ total }}</strong> 首诗词</span>
+      </div>
+
       <div class="poem-grid" v-loading="loading">
         <el-empty v-if="!loading && poems.length === 0" description="暂无诗词" />
-        
+
         <div
           v-for="poem in poems"
           :key="poem.id"
@@ -244,6 +456,10 @@ onMounted(() => {
               <el-icon><Star /></el-icon>
               精选
             </div>
+            <div class="original-badge" v-if="poem.isOriginal">
+              <el-icon><EditPen /></el-icon>
+              原创
+            </div>
           </div>
           <div class="poem-info">
             <div class="poem-header">
@@ -251,6 +467,7 @@ onMounted(() => {
               <div class="poem-tags">
                 <span class="tag dynasty-tag" v-if="poem.dynastyName">{{ poem.dynastyName }}</span>
                 <span class="tag category-tag" v-if="poem.categoryName">{{ poem.categoryName }}</span>
+                <span class="tag original-tag" v-if="poem.isOriginal">原创</span>
               </div>
             </div>
             <p class="poem-author">
@@ -266,6 +483,10 @@ onMounted(() => {
                 <span class="meta-item">
                   <el-icon><ChatDotRound /></el-icon>
                   {{ poem.likeCount }}
+                </span>
+                <span class="meta-item rating-meta" v-if="poem.averageScore">
+                  <el-icon><Trophy /></el-icon>
+                  {{ poem.averageScore.toFixed(1) }}
                 </span>
               </div>
               <div class="poem-actions">
@@ -292,7 +513,7 @@ onMounted(() => {
           </div>
         </div>
       </div>
-      
+
       <div class="pagination-section" v-if="total > 0">
         <el-pagination
           v-model:current-page="currentPage"
@@ -315,6 +536,26 @@ onMounted(() => {
   padding: $spacing-xl 0;
 }
 
+.page-nav {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-lg;
+
+  .el-button {
+    color: $text-color-secondary;
+
+    &:hover {
+      color: $primary-color;
+    }
+  }
+
+  .current-page {
+    font-size: $font-size-sm;
+    color: $text-color-light;
+  }
+}
+
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -328,6 +569,11 @@ onMounted(() => {
   gap: $spacing-xs;
 }
 
+.header-right {
+  display: flex;
+  gap: $spacing-sm;
+}
+
 .page-title {
   font-size: $font-size-title;
   color: $primary-color;
@@ -339,6 +585,29 @@ onMounted(() => {
   color: $text-color-light;
   font-family: $font-family-base;
   margin: 0;
+}
+
+.tab-section {
+  margin-bottom: $spacing-lg;
+
+  :deep(.el-tabs__header) {
+    margin-bottom: 0;
+  }
+
+  :deep(.el-tabs__item) {
+    font-size: $font-size-lg;
+    font-family: $font-family-title;
+    color: $text-color-secondary;
+
+    &.is-active {
+      color: $primary-color;
+      font-weight: 600;
+    }
+  }
+
+  :deep(.el-tabs__active-bar) {
+    background-color: $primary-color;
+  }
 }
 
 .filter-section {
@@ -360,13 +629,13 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: $spacing-sm;
-  
+
   label {
     font-size: $font-size-base;
     color: $text-color;
     white-space: nowrap;
   }
-  
+
   .el-select,
   .el-input {
     width: 180px;
@@ -379,16 +648,27 @@ onMounted(() => {
   }
 }
 
+.result-stats {
+  margin-bottom: $spacing-md;
+  font-size: $font-size-sm;
+  color: $text-color-secondary;
+
+  strong {
+    color: $primary-color;
+    font-weight: 600;
+  }
+}
+
 .poem-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: $spacing-lg;
   min-height: 400px;
-  
+
   @include responsive(lg) {
     grid-template-columns: repeat(2, 1fr);
   }
-  
+
   @include responsive(md) {
     grid-template-columns: 1fr;
   }
@@ -401,7 +681,7 @@ onMounted(() => {
   display: flex;
   gap: $spacing-lg;
   position: relative;
-  
+
   @include responsive(sm) {
     flex-direction: column;
   }
@@ -414,12 +694,12 @@ onMounted(() => {
   border-radius: $border-radius-sm;
   overflow: hidden;
   position: relative;
-  
+
   @include responsive(sm) {
     width: 100%;
     height: 180px;
   }
-  
+
   img {
     width: 100%;
     height: 100%;
@@ -433,6 +713,22 @@ onMounted(() => {
   top: $spacing-sm;
   left: $spacing-sm;
   background: linear-gradient(135deg, #FFD700, #FFA500);
+  color: white;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $border-radius-sm;
+  font-size: $font-size-xs;
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.original-badge {
+  position: absolute;
+  top: $spacing-sm;
+  right: $spacing-sm;
+  background: linear-gradient(135deg, #67C23A, #85ce61);
   color: white;
   padding: $spacing-xs $spacing-sm;
   border-radius: $border-radius-sm;
@@ -496,6 +792,11 @@ onMounted(() => {
   color: $accent-color;
 }
 
+.original-tag {
+  background-color: rgba($success-color, 0.1);
+  color: $success-color;
+}
+
 .poem-author {
   font-size: $font-size-sm;
   color: $text-color-secondary;
@@ -519,7 +820,7 @@ onMounted(() => {
   margin-top: $spacing-sm;
   padding-top: $spacing-sm;
   border-top: 1px solid $border-color-light;
-  
+
   @include responsive(sm) {
     flex-direction: column;
     align-items: flex-start;
@@ -540,6 +841,11 @@ onMounted(() => {
   color: $text-color-light;
 }
 
+.rating-meta {
+  color: $warning-color;
+  font-weight: 600;
+}
+
 .poem-actions {
   display: flex;
   gap: $spacing-sm;
@@ -554,7 +860,7 @@ onMounted(() => {
   transition: all $transition-fast;
   padding: $spacing-xs $spacing-sm;
   border-radius: $border-radius-sm;
-  
+
   &:hover {
     background-color: $background-color;
   }
@@ -563,7 +869,7 @@ onMounted(() => {
 .like-btn {
   &.is-liked {
     color: $warning-color;
-    
+
     &:hover {
       color: darken($warning-color, 10%);
     }
@@ -573,7 +879,7 @@ onMounted(() => {
 .favorite-btn {
   &.is-favorited {
     color: $danger-color;
-    
+
     &:hover {
       color: color.adjust($danger-color, $lightness: -10%);
     }

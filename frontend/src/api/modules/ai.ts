@@ -49,3 +49,18 @@ export function writePoemFromImage(image: File, model: string = 'zhipu', visionM
 export function analyzePoem(data: AnalyzeRequest) {
   return request.post<AnalyzeResponse>('/ai/analyze', data)
 }
+
+export interface CoupletRequest {
+  upperCouplet: string
+  model?: string
+}
+
+export interface CoupletResponse {
+  upperCouplet: string
+  result: string
+  model: string
+}
+
+export function matchCouplet(data: CoupletRequest) {
+  return request.post<CoupletResponse>('/ai/couplet', data)
+}

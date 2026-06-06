@@ -165,7 +165,7 @@ onMounted(() => {
       </div>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="600px">
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="650px">
       <el-form :model="form" label-width="80px">
         <el-form-item label="标题" required>
           <el-input v-model="form.title" placeholder="请输入诗词标题" />
@@ -228,5 +228,18 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+:deep(.el-dialog) {
+  .el-form-item__content {
+    flex: 1;
+    min-width: 0;
+  }
+  .el-input,
+  .el-textarea,
+  .el-select,
+  .el-input-number {
+    width: 100% !important;
+  }
 }
 </style>

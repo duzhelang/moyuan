@@ -41,6 +41,10 @@ const dynastyClass = computed(() => {
   return dynastyMap[props.poet.dynasty ?? ''] ?? 'other'
 })
 
+const isModernPoet = computed(() => {
+  return props.poet.dynasty === '现代'
+})
+
 const truncatedBiography = computed(() => {
   const bio = props.poet.biography || props.poet.description || ''
   return bio.length > 120 ? bio.slice(0, 120) + '...' : bio
@@ -66,6 +70,7 @@ const handleClick = () => {
         <div class="poet-flip-img-overlay"></div>
         <div class="poet-flip-img-name">
           <span v-if="poet.dynasty" :class="['poet-flip-img-dynasty', `dynasty-${dynastyClass}`]">{{ poet.dynasty }}</span>
+          <span v-if="isModernPoet" class="poet-flip-img-modern-tag">现代诗人</span>
           <span class="poet-flip-img-text">{{ poet.name }}</span>
         </div>
         <div class="poet-flip-front-info">
@@ -211,6 +216,19 @@ const handleClick = () => {
 .poet-flip-img-name .dynasty-five-dynasties { background: rgba(140, 30, 140, 0.75); color: #fff; }
 .poet-flip-img-name .dynasty-modern { background: rgba(90, 20, 150, 0.75); color: #fff; }
 .poet-flip-img-name .dynasty-other { background: rgba(110, 110, 110, 0.75); color: #fff; }
+
+.poet-flip-img-modern-tag {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 20px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  line-height: 1.5;
+  flex-shrink: 0;
+  background: rgba(40, 167, 69, 0.8);
+  color: #fff;
+}
 
 .poet-flip-img-text {
   font-size: 16px;

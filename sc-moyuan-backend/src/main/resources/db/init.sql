@@ -89,6 +89,12 @@ CREATE TABLE IF NOT EXISTS `poem` (
   `favorite_count` INT NOT NULL DEFAULT 0 COMMENT '收藏次数',
   `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-草稿，1-已发布，2-待审核',
   `is_featured` TINYINT NOT NULL DEFAULT 0 COMMENT '是否精选：0-否，1-是',
+  `is_original` TINYINT NOT NULL DEFAULT 0 COMMENT '是否原创：0-否，1-是',
+  `audit_status` TINYINT NOT NULL DEFAULT 1 COMMENT '审核状态：0-待审核，1-已通过，2-已拒绝',
+  `audit_time` DATETIME DEFAULT NULL COMMENT '审核时间',
+  `audit_reason` VARCHAR(500) DEFAULT NULL COMMENT '审核备注',
+  `avg_score` DECIMAL(3,1) DEFAULT NULL COMMENT '平均评分',
+  `rating_count` INT NOT NULL DEFAULT 0 COMMENT '评分数量',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
@@ -118,6 +124,8 @@ CREATE TABLE IF NOT EXISTS `user` (
   `bio` VARCHAR(500) DEFAULT NULL COMMENT '个人简介',
   `interests` VARCHAR(500) DEFAULT NULL COMMENT '兴趣选项（逗号分隔）',
   `role` VARCHAR(20) NOT NULL DEFAULT 'user' COMMENT '角色：user-普通用户，admin-管理员',
+  `poet_verified` TINYINT NOT NULL DEFAULT 0 COMMENT '诗人认证状态：0-未认证，1-已认证，2-认证中',
+  `poet_profile_id` BIGINT DEFAULT NULL COMMENT '诗人资料ID',
   `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
   `last_login_time` DATETIME DEFAULT NULL COMMENT '最后登录时间',
   `last_login_ip` VARCHAR(50) DEFAULT NULL COMMENT '最后登录IP',
@@ -312,14 +320,14 @@ INSERT IGNORE INTO `dynasty` (`name`, `start_year`, `end_year`, `description`, `
 -- 初始数据：诗词分类
 -- ============================================================
 INSERT IGNORE INTO `category` (`name`, `parent_id`, `description`, `sort_order`) VALUES
-('古体诗', 0, '古体诗，包括四言、五言、七言等', 1),
-('近体诗', 0, '近体诗，包括律诗、绝句等', 2),
-('词', 0, '词，包括各种词牌', 3),
-('曲', 0, '曲，包括散曲、杂剧等', 4),
-('五言律诗', 2, '五言律诗', 1),
-('七言律诗', 2, '七言律诗', 2),
-('五言绝句', 2, '五言绝句', 3),
-('七言绝句', 2, '七言绝句', 4),
+('古体诗', 0, '古体诗，包括四言、五言、七言等，形式自由，不受格律限制', 1),
+('近体诗', 0, '近体诗，包括律诗、绝句等，讲究平仄对仗，格律严谨', 2),
+('词', 0, '词，又称长短句，配合音乐歌唱的诗歌形式', 3),
+('曲', 0, '曲，包括散曲、杂剧等，元代新兴的文学形式', 4),
+('五言律诗', 2, '五言律诗，每句五字，共八句，讲究平仄对仗', 1),
+('七言律诗', 2, '七言律诗，每句七字，共八句，格律严谨', 2),
+('五言绝句', 2, '五言绝句，每句五字，共四句，短小精悍', 3),
+('七言绝句', 2, '七言绝句，每句七字，共四句，意境深远', 4),
 ('怀古诗', 1, '以历史事件、历史人物、历史陈迹为题材，借登高望远、咏叹史实、怀念古迹来达到感慨兴衰、寄托哀思、托古讽今等目的', 1),
 ('咏物诗', 1, '以某一具体事物为描写对象，抓住其某些特征着意描摹，借以表达思想感情', 2),
 ('边塞诗', 1, '以边疆地区军民生活和自然风光为题材，表现边塞风光、戍边将士生活和战争场面', 3),
@@ -328,7 +336,18 @@ INSERT IGNORE INTO `category` (`name`, `parent_id`, `description`, `sort_order`)
 ('闺怨诗', 1, '以描写古代妇女的生活和情感为主，表达闺中女子的愁思和怨恨', 6),
 ('咏史诗', 1, '以历史为题材，借古讽今，抒发作者对历史的感慨和对现实的思考', 7),
 ('悼亡诗', 1, '以悼念亡故之人为主，表达作者对逝者的哀思和怀念之情', 8),
-('田园诗', 1, '以田园生活为题材，描写农村风光、农耕生活和农民的淳朴情感', 9);
+('田园诗', 1, '以田园生活为题材，描写农村风光、农耕生活和农民的淳朴情感', 9),
+('豪放派', 3, '以苏轼、辛弃疾为代表，风格豪迈奔放，意境开阔', 1),
+('婉约派', 3, '以柳永、李清照为代表，风格婉转细腻，情感真挚', 2),
+('花间派', 3, '以温庭筠、韦庄为代表，风格绮丽婉媚，辞藻华丽', 3),
+('南唐词', 3, '以李煜为代表，风格清新自然，情感深沉', 4),
+('北宋词', 3, '北宋时期词作，承袭五代词风，开拓创新', 5),
+('南宋词', 3, '南宋时期词作，风格多样，艺术成就极高', 6),
+('散曲', 4, '包括小令和套数，是元代新兴的诗歌形式', 1),
+('杂剧', 4, '元代戏曲形式，融合歌唱、说白、舞蹈等表演', 2),
+('南戏', 4, '南宋时期形成的戏曲形式，对后世戏曲影响深远', 3),
+('昆曲', 4, '起源于昆山腔，被誉为"百戏之祖"', 4),
+('京剧', 4, '融合多种戏曲艺术精华，是中国国粹', 5);
 
 -- ============================================================
 -- 初始数据：诗人
@@ -413,12 +432,75 @@ CREATE TABLE IF NOT EXISTS `ai_model` (
   KEY `idx_ai_model_enabled` (`is_enabled`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI模型配置表';
 
--- 初始数据：国内可连接的AI模型
+-- 初始数据：AI模型配置
+-- ============================================================
+-- 独立提供商（直接调用官方API）
+-- ============================================================
 INSERT IGNORE INTO `ai_model` (`name`, `display_name`, `provider`, `model_type`, `api_url`, `api_key`, `model_id`, `vision_model_id`, `max_tokens`, `is_enabled`, `is_default`, `sort_order`) VALUES
+-- 智谱AI
 ('zhipu', '智谱AI', 'zhipu', 'both', 'https://open.bigmodel.cn/api/paas/v4/chat/completions', 'your-zhipu-api-key', 'glm-4', 'glm-4.6v-flash', 1024, 0, 0, 1),
-('deepseek', 'DeepSeek', 'deepseek', 'text', 'https://api.deepseek.com/v1/chat/completions', 'your-deepseek-api-key', 'deepseek-chat', NULL, 1024, 0, 0, 2),
-('kimi', 'Kimi', 'kimi', 'text', 'https://api.moonshot.cn/v1/chat/completions', 'your-kimi-api-key', 'moonshot-v1-8k', NULL, 1024, 0, 0, 3),
-('nvidia', 'NVIDIA NIM', 'nvidia', 'text', 'https://integrate.api.nvidia.com/v1/chat/completions', 'your-nvidia-api-key', 'meta/llama-4-scout', NULL, 1024, 0, 0, 4);
+('zhipu-flash', '智谱GLM-4.7-Flash', 'zhipu', 'text', 'https://open.bigmodel.cn/api/paas/v4/chat/completions', 'your-zhipu-api-key', 'glm-4.7-flash', NULL, 1024, 0, 0, 2),
+-- DeepSeek
+('deepseek', 'DeepSeek', 'deepseek', 'text', 'https://api.deepseek.com/v1/chat/completions', 'your-deepseek-api-key', 'deepseek-chat', NULL, 1024, 0, 0, 3),
+('deepseek-v3', 'DeepSeek-V3', 'deepseek', 'text', 'https://api.deepseek.com/v1/chat/completions', 'your-deepseek-api-key', 'deepseek-v3', NULL, 1024, 0, 0, 4),
+-- Kimi
+('kimi', 'Kimi', 'kimi', 'text', 'https://api.moonshot.cn/v1/chat/completions', 'your-kimi-api-key', 'moonshot-v1-8k', NULL, 1024, 0, 0, 5),
+('kimi-k26', 'Kimi-K2.6', 'kimi', 'text', 'https://api.moonshot.cn/v1/chat/completions', 'your-kimi-api-key', 'kimi-k2.6', NULL, 1024, 0, 0, 6),
+-- 千问
+('qwen36plus', 'Qwen3.6-Plus', 'qwen', 'text', 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', 'your-qwen-api-key', 'qwen3.6-plus', NULL, 1024, 0, 0, 7),
+-- 小米MiMo
+('mimo', '小米MiMo', 'mimo', 'text', 'https://api.xiaomimimo.com/v1/chat/completions', 'your-mimo-api-key', 'mimo-v2.5', 'mimo-v2.5-pro', 1024, 0, 0, 8),
+
+-- ============================================================
+-- NVIDIA NIM 平台（统一API Key）
+-- ============================================================
+('nvidia-llama4-scout', 'Llama 4 Scout', 'nvidia', 'text', 'https://integrate.api.nvidia.com/v1/chat/completions', 'your-nvidia-api-key', 'meta/llama-4-scout', NULL, 1024, 0, 0, 9),
+('nvidia-llama4-maverick', 'Llama 4 Maverick', 'nvidia', 'text', 'https://integrate.api.nvidia.com/v1/chat/completions', 'your-nvidia-api-key', 'meta/llama-4-maverick', NULL, 1024, 0, 0, 10),
+('nvidia-glm5', 'GLM-5', 'nvidia', 'text', 'https://integrate.api.nvidia.com/v1/chat/completions', 'your-nvidia-api-key', 'zai-org/glm-5', NULL, 1024, 0, 0, 11),
+('nvidia-glm51', 'GLM-5.1', 'nvidia', 'text', 'https://integrate.api.nvidia.com/v1/chat/completions', 'your-nvidia-api-key', 'zai-org/glm-51', NULL, 1024, 0, 0, 12),
+('nvidia-deepseek-v4-flash', 'DeepSeek-V4 Flash', 'nvidia', 'text', 'https://integrate.api.nvidia.com/v1/chat/completions', 'your-nvidia-api-key', 'deepseek-ai/deepseek-v4-flash', NULL, 1024, 0, 0, 13),
+('nvidia-deepseek-v4-pro', 'DeepSeek-V4 Pro', 'nvidia', 'text', 'https://integrate.api.nvidia.com/v1/chat/completions', 'your-nvidia-api-key', 'deepseek-ai/deepseek-v4-pro', NULL, 1024, 0, 0, 14),
+('nvidia-kimi-k25', 'Kimi-K2.5', 'nvidia', 'text', 'https://integrate.api.nvidia.com/v1/chat/completions', 'your-nvidia-api-key', 'moonshotai/kimi-k2.5', NULL, 1024, 0, 0, 15),
+('nvidia-kimi-k26', 'Kimi-K2.6', 'nvidia', 'text', 'https://integrate.api.nvidia.com/v1/chat/completions', 'your-nvidia-api-key', 'moonshotai/kimi-k2.6', NULL, 1024, 0, 0, 16),
+('nvidia-minimax-m25', 'MiniMax-M2.5', 'nvidia', 'text', 'https://integrate.api.nvidia.com/v1/chat/completions', 'your-nvidia-api-key', 'minimax-ai/minimax-m25', NULL, 1024, 0, 0, 17),
+('nvidia-qwen35', 'Qwen3.5', 'nvidia', 'text', 'https://integrate.api.nvidia.com/v1/chat/completions', 'your-nvidia-api-key', 'qwen/qwen3.5-397b-a17b', NULL, 1024, 0, 0, 18),
+('nvidia-qwen3-next', 'Qwen3 Next', 'nvidia', 'text', 'https://integrate.api.nvidia.com/v1/chat/completions', 'your-nvidia-api-key', 'qwen/qwen3-next-80b-a3b-instruct', NULL, 1024, 0, 0, 19),
+('nvidia-qwen3-coder', 'Qwen3 Coder', 'nvidia', 'text', 'https://integrate.api.nvidia.com/v1/chat/completions', 'your-nvidia-api-key', 'qwen/qwen3-coder-next', NULL, 1024, 0, 0, 20),
+
+-- ============================================================
+-- 免费模型（OpenRouter）
+-- ============================================================
+('free-deepseek-v4', 'DeepSeek-V4 (免费)', 'openrouter', 'text', 'https://openrouter.ai/api/v1/chat/completions', 'your-openrouter-key', 'deepseek/deepseek-v4-flash:free', NULL, 1024, 0, 0, 21),
+('free-kimi-k26', 'Kimi-K2.6 (免费)', 'openrouter', 'text', 'https://openrouter.ai/api/v1/chat/completions', 'your-openrouter-key', 'moonshotai/kimi-k2.6:free', NULL, 1024, 0, 0, 22),
+('free-gemma4', 'Gemma-4 (免费)', 'openrouter', 'text', 'https://openrouter.ai/api/v1/chat/completions', 'your-openrouter-key', 'google/gemma-4-26b-a4b-it:free', NULL, 1024, 0, 0, 23),
+('free-qwen3-next', 'Qwen3 Next (免费)', 'openrouter', 'text', 'https://openrouter.ai/api/v1/chat/completions', 'your-openrouter-key', 'qwen/qwen3-next-80b-a3b-instruct:free', NULL, 1024, 0, 0, 24),
+('free-qwen3-coder', 'Qwen3 Coder (免费)', 'openrouter', 'text', 'https://openrouter.ai/api/v1/chat/completions', 'your-openrouter-key', 'qwen/qwen3-coder:free', NULL, 1024, 0, 0, 25),
+('free-minimax-m25', 'MiniMax-M2.5 (免费)', 'openrouter', 'text', 'https://openrouter.ai/api/v1/chat/completions', 'your-openrouter-key', 'minimax/minimax-m2.5:free', NULL, 1024, 0, 0, 26),
+('free-llama4-scout', 'Llama 4 Scout (免费)', 'openrouter', 'text', 'https://openrouter.ai/api/v1/chat/completions', 'your-openrouter-key', 'meta-llama/llama-4-scout:free', NULL, 1024, 0, 0, 27);
+
+-- ============================================================
+-- AI模块模型配置表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `ai_module_config` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `module_code` VARCHAR(50) NOT NULL COMMENT '模块编码',
+  `module_name` VARCHAR(100) NOT NULL COMMENT '模块名称',
+  `model_id` BIGINT DEFAULT NULL COMMENT '关联的AI模型ID',
+  `require_vision` TINYINT NOT NULL DEFAULT 0 COMMENT '是否需要视觉能力：0-否，1-是',
+  `description` VARCHAR(255) DEFAULT NULL COMMENT '模块描述',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_module_code` (`module_code`),
+  KEY `idx_model_id` (`model_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI模块模型配置表';
+
+-- 初始数据：AI模块配置
+INSERT IGNORE INTO `ai_module_config` (`module_code`, `module_name`, `require_vision`, `description`) VALUES
+('chat', 'AI诗词问答', 0, '用户与AI进行诗词相关的对话交流'),
+('write_poem', '看图写诗', 1, '根据用户上传的图片创作古诗词'),
+('analyze', '诗词鉴赏分析', 0, '对古诗词进行多维度的深入分析'),
+('couplet', 'AI对对联', 0, '根据上联创作工整的下联');
 
 -- ============================================================
 -- 初始数据：测试用户
@@ -598,3 +680,275 @@ CREATE TABLE IF NOT EXISTS `ai_image_record` (
   KEY `idx_create_time` (`create_time`),
   CONSTRAINT `fk_ai_image_record_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI生成图片记录表';
+
+-- ============================================================
+-- 19. 认证诗人资料表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `poet_profile` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id` BIGINT NOT NULL COMMENT '关联用户ID',
+  `pen_name` VARCHAR(50) DEFAULT NULL COMMENT '笔名',
+  `real_name` VARCHAR(50) DEFAULT NULL COMMENT '真实姓名',
+  `specialty` VARCHAR(200) DEFAULT NULL COMMENT '擅长体裁（逗号分隔：古体诗,近体诗,词,曲,现代诗）',
+  `introduction` TEXT DEFAULT NULL COMMENT '诗人简介',
+  `literary_concept` TEXT DEFAULT NULL COMMENT '创作理念',
+  `achievements` TEXT DEFAULT NULL COMMENT '主要成就',
+  `contact_info` VARCHAR(200) DEFAULT NULL COMMENT '联系方式（邮箱/微信）',
+  `verified_status` TINYINT NOT NULL DEFAULT 0 COMMENT '认证状态：0-未认证，1-已认证，2-认证中，3-认证失败',
+  `verified_time` DATETIME DEFAULT NULL COMMENT '认证时间',
+  `verified_reason` VARCHAR(500) DEFAULT NULL COMMENT '认证审核备注',
+  `work_count` INT NOT NULL DEFAULT 0 COMMENT '作品数量',
+  `like_count` INT NOT NULL DEFAULT 0 COMMENT '获赞总数',
+  `favorite_count` INT NOT NULL DEFAULT 0 COMMENT '被收藏总数',
+  `follower_count` INT NOT NULL DEFAULT 0 COMMENT '粉丝数',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_poet_profile_user_id` (`user_id`),
+  KEY `idx_poet_profile_verified_status` (`verified_status`),
+  KEY `idx_poet_profile_work_count` (`work_count`),
+  KEY `idx_poet_profile_like_count` (`like_count`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='认证诗人资料表';
+
+-- ============================================================
+-- 20. 诗词评分表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `poem_rating` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `poem_id` BIGINT NOT NULL COMMENT '诗词ID',
+  `user_id` BIGINT DEFAULT NULL COMMENT '评分用户ID（AI评分时为NULL）',
+  `score` DECIMAL(3,1) NOT NULL COMMENT '评分（1.0-5.0）',
+  `rating_type` TINYINT NOT NULL DEFAULT 1 COMMENT '评分类型：1-用户评分，2-AI评分',
+  `dimension` VARCHAR(50) DEFAULT NULL COMMENT '评分维度（格律,意境,用词,情感,创新）',
+  `comment` TEXT DEFAULT NULL COMMENT '评分说明',
+  `ai_model` VARCHAR(50) DEFAULT NULL COMMENT 'AI模型名称（AI评分时使用）',
+  `ai_analysis` TEXT DEFAULT NULL COMMENT 'AI分析内容',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_poem_rating_poem_id` (`poem_id`),
+  KEY `idx_poem_rating_user_id` (`user_id`),
+  KEY `idx_poem_rating_type` (`rating_type`),
+  UNIQUE KEY `uk_poem_rating_user_poem` (`poem_id`, `user_id`, `rating_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='诗词评分表';
+
+-- ============================================================
+-- 21. 韵脚表（平水韵）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `rhyme` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `character` VARCHAR(4) NOT NULL COMMENT '汉字',
+  `rhyme_group` VARCHAR(20) NOT NULL COMMENT '韵部名称（如：东、冬、江、支）',
+  `tone_type` VARCHAR(4) NOT NULL COMMENT '声调类型：平声、上声、去声、入声',
+  `rhyme_category` VARCHAR(10) NOT NULL COMMENT '韵类：平声（上平/下平）、仄声（上声/去声/入声）',
+  `sort_order` INT NOT NULL DEFAULT 0 COMMENT '排序顺序',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_rhyme_character` (`character`),
+  KEY `idx_rhyme_group` (`rhyme_group`),
+  KEY `idx_rhyme_tone` (`tone_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='韵脚表（平水韵）';
+
+-- 平水韵种子数据 - 上平声（15韵）
+INSERT IGNORE INTO `rhyme` (`character`, `rhyme_group`, `tone_type`, `rhyme_category`, `sort_order`) VALUES
+-- 一东
+('东', '东', '平声', '上平', 1), ('同', '东', '平声', '上平', 2), ('风', '东', '平声', '上平', 3),
+('中', '东', '平声', '上平', 4), ('空', '东', '平声', '上平', 5), ('功', '东', '平声', '上平', 6),
+('红', '东', '平声', '上平', 7), ('通', '东', '平声', '上平', 8), ('穷', '东', '平声', '上平', 9),
+('翁', '东', '平声', '上平', 10), ('宫', '东', '平声', '上平', 11), ('弓', '东', '平声', '上平', 12),
+('雄', '东', '平声', '上平', 13), ('融', '东', '平声', '上平', 14), ('丛', '东', '平声', '上平', 15),
+('虹', '东', '平声', '上平', 16), ('聪', '东', '平声', '上平', 17), ('笼', '东', '平声', '上平', 18),
+('蓬', '东', '平声', '上平', 19), ('桐', '东', '平声', '上平', 20),
+-- 二冬
+('冬', '冬', '平声', '上平', 1), ('农', '冬', '平声', '上平', 2), ('宗', '冬', '平声', '上平', 3),
+('钟', '冬', '平声', '上平', 4), ('龙', '冬', '平声', '上平', 5), ('松', '冬', '平声', '上平', 6),
+('峰', '冬', '平声', '上平', 7), ('浓', '冬', '平声', '上平', 8), ('容', '冬', '平声', '上平', 9),
+('从', '冬', '平声', '上平', 10), ('踪', '冬', '平声', '上平', 11), ('逢', '冬', '平声', '上平', 12),
+('胸', '冬', '平声', '上平', 13), ('庸', '冬', '平声', '上平', 14), ('慵', '冬', '平声', '上平', 15),
+-- 三江
+('江', '江', '平声', '上平', 1), ('窗', '江', '平声', '上平', 2), ('邦', '江', '平声', '上平', 3),
+('降', '江', '平声', '上平', 4), ('双', '江', '平声', '上平', 5), ('庞', '江', '平声', '上平', 6),
+('腔', '江', '平声', '上平', 7), ('桩', '江', '平声', '上平', 8),
+-- 四支
+('支', '支', '平声', '上平', 1), ('时', '支', '平声', '上平', 2), ('诗', '支', '平声', '上平', 3),
+('知', '支', '平声', '上平', 4), ('之', '支', '平声', '上平', 5), ('期', '支', '平声', '上平', 6),
+('迟', '支', '平声', '上平', 7), ('悲', '支', '平声', '上平', 8), ('丝', '支', '平声', '上平', 9),
+('眉', '支', '平声', '上平', 10), ('池', '支', '平声', '上平', 11), ('枝', '支', '平声', '上平', 12),
+('移', '支', '平声', '上平', 13), ('随', '支', '平声', '上平', 14), ('谁', '支', '平声', '上平', 15),
+('吹', '支', '平声', '上平', 16), ('离', '支', '平声', '上平', 17), ('奇', '支', '平声', '上平', 18),
+('宜', '支', '平声', '上平', 19), ('仪', '支', '平声', '上平', 20),
+-- 五微
+('微', '微', '平声', '上平', 1), ('衣', '微', '平声', '上平', 2), ('归', '微', '平声', '上平', 3),
+('飞', '微', '平声', '上平', 4), ('非', '微', '平声', '上平', 5), ('机', '微', '平声', '上平', 6),
+('稀', '微', '平声', '上平', 7), ('依', '微', '平声', '上平', 8), ('晖', '微', '平声', '上平', 9),
+('辉', '微', '平声', '上平', 10), ('薇', '微', '平声', '上平', 11), ('扉', '微', '平声', '上平', 12),
+-- 六鱼
+('鱼', '鱼', '平声', '上平', 1), ('书', '鱼', '平声', '上平', 2), ('居', '鱼', '平声', '上平', 3),
+('初', '鱼', '平声', '上平', 4), ('如', '鱼', '平声', '上平', 5), ('虚', '鱼', '平声', '上平', 6),
+('余', '鱼', '平声', '上平', 7), ('庐', '鱼', '平声', '上平', 8), ('疏', '鱼', '平声', '上平', 9),
+('梳', '鱼', '平声', '上平', 10), ('裾', '鱼', '平声', '上平', 11), ('渠', '鱼', '平声', '上平', 12),
+-- 七虞
+('虞', '虞', '平声', '上平', 1), ('无', '虞', '平声', '上平', 2), ('夫', '虞', '平声', '上平', 3),
+('珠', '虞', '平声', '上平', 4), ('湖', '虞', '平声', '上平', 5), ('孤', '虞', '平声', '上平', 6),
+('壶', '虞', '平声', '上平', 7), ('途', '虞', '平声', '上平', 8), ('图', '虞', '平声', '上平', 9),
+('呼', '虞', '平声', '上平', 10), ('徒', '虞', '平声', '上平', 11), ('炉', '虞', '平声', '上平', 12),
+('蒲', '虞', '平声', '上平', 13), ('苏', '虞', '平声', '上平', 14), ('殊', '虞', '平声', '上平', 15),
+-- 八齐
+('齐', '齐', '平声', '上平', 1), ('西', '齐', '平声', '上平', 2), ('低', '齐', '平声', '上平', 3),
+('溪', '齐', '平声', '上平', 4), ('泥', '齐', '平声', '上平', 5), ('迷', '齐', '平声', '上平', 6),
+('鸡', '齐', '平声', '上平', 7), ('啼', '齐', '平声', '上平', 8), ('栖', '齐', '平声', '上平', 9),
+('题', '齐', '平声', '上平', 10), ('梯', '齐', '平声', '上平', 11), ('闺', '齐', '平声', '上平', 12),
+-- 九佳
+('佳', '佳', '平声', '上平', 1), ('街', '佳', '平声', '上平', 2), ('鞋', '佳', '平声', '上平', 3),
+('牌', '佳', '平声', '上平', 4), ('柴', '佳', '平声', '上平', 5), ('钗', '佳', '平声', '上平', 6),
+('崖', '佳', '平声', '上平', 7), ('阶', '佳', '平声', '上平', 8), ('怀', '佳', '平声', '上平', 9),
+-- 十灰
+('灰', '灰', '平声', '上平', 1), ('开', '灰', '平声', '上平', 2), ('来', '灰', '平声', '上平', 3),
+('台', '灰', '平声', '上平', 4), ('才', '灰', '平声', '上平', 5), ('回', '灰', '平声', '上平', 6),
+('杯', '灰', '平声', '上平', 7), ('梅', '灰', '平声', '上平', 8), ('哀', '灰', '平声', '上平', 9),
+('催', '灰', '平声', '上平', 10), ('裁', '灰', '平声', '上平', 11), ('猜', '灰', '平声', '上平', 12),
+-- 十一真
+('真', '真', '平声', '上平', 1), ('人', '真', '平声', '上平', 2), ('春', '真', '平声', '上平', 3),
+('新', '真', '平声', '上平', 4), ('尘', '真', '平声', '上平', 5), ('身', '真', '平声', '上平', 6),
+('神', '真', '平声', '上平', 7), ('亲', '真', '平声', '上平', 8), ('臣', '真', '平声', '上平', 9),
+('晨', '真', '平声', '上平', 10), ('频', '真', '平声', '上平', 11), ('邻', '真', '平声', '上平', 12),
+('贫', '真', '平声', '上平', 13), ('津', '真', '平声', '上平', 14), ('珍', '真', '平声', '上平', 15),
+-- 十二文
+('文', '文', '平声', '上平', 1), ('云', '文', '平声', '上平', 2), ('君', '文', '平声', '上平', 3),
+('群', '文', '平声', '上平', 4), ('军', '文', '平声', '上平', 5), ('纷', '文', '平声', '上平', 6),
+('闻', '文', '平声', '上平', 7), ('分', '文', '平声', '上平', 8), ('氛', '文', '平声', '上平', 9),
+('芬', '文', '平声', '上平', 10), ('焚', '文', '平声', '上平', 11), ('坟', '文', '平声', '上平', 12),
+-- 十三元
+('元', '元', '平声', '上平', 1), ('园', '元', '平声', '上平', 2), ('原', '元', '平声', '上平', 3),
+('源', '元', '平声', '上平', 4), ('言', '元', '平声', '上平', 5), ('门', '元', '平声', '上平', 6),
+('村', '元', '平声', '上平', 7), ('魂', '元', '平声', '上平', 8), ('存', '元', '平声', '上平', 9),
+('根', '元', '平声', '上平', 10), ('昏', '元', '平声', '上平', 11), ('恩', '元', '平声', '上平', 12),
+('论', '元', '平声', '上平', 13), ('温', '元', '平声', '上平', 14), ('孙', '元', '平声', '上平', 15),
+-- 十四寒
+('寒', '寒', '平声', '上平', 1), ('山', '寒', '平声', '上平', 2), ('关', '寒', '平声', '上平', 3),
+('难', '寒', '平声', '上平', 4), ('还', '寒', '平声', '上平', 5), ('间', '寒', '平声', '上平', 6),
+('看', '寒', '平声', '上平', 7), ('安', '寒', '平声', '上平', 8), ('残', '寒', '平声', '上平', 9),
+('闲', '寒', '平声', '上平', 10), ('欢', '寒', '平声', '上平', 11), ('官', '寒', '平声', '上平', 12),
+('冠', '寒', '平声', '上平', 13), ('丹', '寒', '平声', '上平', 14), ('兰', '寒', '平声', '上平', 15),
+('盘', '寒', '平声', '上平', 16), ('干', '寒', '平声', '上平', 17), ('坛', '寒', '平声', '上平', 18),
+-- 十五删
+('删', '删', '平声', '上平', 1), ('颜', '删', '平声', '上平', 2), ('攀', '删', '平声', '上平', 3),
+('关', '删', '平声', '上平', 4), ('班', '删', '平声', '上平', 5), ('斑', '删', '平声', '上平', 6),
+('湾', '删', '平声', '上平', 7), ('环', '删', '平声', '上平', 8), ('闲', '删', '平声', '上平', 9),
+('潸', '删', '平声', '上平', 10), ('蛮', '删', '平声', '上平', 11), ('鬟', '删', '平声', '上平', 12);
+
+-- 下平声（15韵）
+INSERT IGNORE INTO `rhyme` (`character`, `rhyme_group`, `tone_type`, `rhyme_category`, `sort_order`) VALUES
+-- 一先
+('先', '先', '平声', '下平', 1), ('天', '先', '平声', '下平', 2), ('年', '先', '平声', '下平', 3),
+('前', '先', '平声', '下平', 4), ('然', '先', '平声', '下平', 5), ('边', '先', '平声', '下平', 6),
+('仙', '先', '平声', '下平', 7), ('烟', '先', '平声', '下平', 8), ('莲', '先', '平声', '下平', 9),
+('田', '先', '平声', '下平', 10), ('川', '先', '平声', '下平', 11), ('弦', '先', '平声', '下平', 12),
+('船', '先', '平声', '下平', 13), ('眠', '先', '平声', '下平', 14), ('泉', '先', '平声', '下平', 15),
+('篇', '先', '平声', '下平', 16), ('圆', '先', '平声', '下平', 17), ('全', '先', '平声', '下平', 18),
+-- 二萧
+('萧', '萧', '平声', '下平', 1), ('朝', '萧', '平声', '下平', 2), ('遥', '萧', '平声', '下平', 3),
+('桥', '萧', '平声', '下平', 4), ('腰', '萧', '平声', '下平', 5), ('飘', '萧', '平声', '下平', 6),
+('苗', '萧', '平声', '下平', 7), ('条', '萧', '平声', '下平', 8), ('昭', '萧', '平声', '下平', 9),
+('招', '萧', '平声', '下平', 10), ('消', '萧', '平声', '下平', 11), ('潮', '萧', '平声', '下平', 12),
+('箫', '萧', '平声', '下平', 13), ('貂', '萧', '平声', '下平', 14), ('雕', '萧', '平声', '下平', 15),
+-- 三肴
+('肴', '肴', '平声', '下平', 1), ('交', '肴', '平声', '下平', 2), ('巢', '肴', '平声', '下平', 3),
+('梢', '肴', '平声', '下平', 4), ('茅', '肴', '平声', '下平', 5), ('郊', '肴', '平声', '下平', 6),
+('包', '肴', '平声', '下平', 7), ('敲', '肴', '平声', '下平', 8), ('抄', '肴', '平声', '下平', 9),
+-- 四豪
+('豪', '豪', '平声', '下平', 1), ('高', '豪', '平声', '下平', 2), ('刀', '豪', '平声', '下平', 3),
+('劳', '豪', '平声', '下平', 4), ('曹', '豪', '平声', '下平', 5), ('毫', '豪', '平声', '下平', 6),
+('涛', '豪', '平声', '下平', 7), ('桃', '豪', '平声', '下平', 8), ('袍', '豪', '平声', '下平', 9),
+('遭', '豪', '平声', '下平', 10), ('醪', '豪', '平声', '下平', 11), ('号', '豪', '平声', '下平', 12),
+-- 五歌
+('歌', '歌', '平声', '下平', 1), ('多', '歌', '平声', '下平', 2), ('河', '歌', '平声', '下平', 3),
+('何', '歌', '平声', '下平', 4), ('波', '歌', '平声', '下平', 5), ('罗', '歌', '平声', '下平', 6),
+('柯', '歌', '平声', '下平', 7), ('蛾', '歌', '平声', '下平', 8), ('梭', '歌', '平声', '下平', 9),
+('磨', '歌', '平声', '下平', 10), ('陀', '歌', '平声', '下平', 11), ('跎', '歌', '平声', '下平', 12),
+-- 六麻
+('麻', '麻', '平声', '下平', 1), ('花', '麻', '平声', '下平', 2), ('家', '麻', '平声', '下平', 3),
+('华', '麻', '平声', '下平', 4), ('斜', '麻', '平声', '下平', 5), ('沙', '麻', '平声', '下平', 6),
+('茶', '麻', '平声', '下平', 7), ('牙', '麻', '平声', '下平', 8), ('霞', '麻', '平声', '下平', 9),
+('涯', '麻', '平声', '下平', 10), ('瓜', '麻', '平声', '下平', 11), ('蛇', '麻', '平声', '下平', 12),
+('车', '麻', '平声', '下平', 13), ('纱', '麻', '平声', '下平', 14), ('遮', '麻', '平声', '下平', 15),
+-- 七阳
+('阳', '阳', '平声', '下平', 1), ('光', '阳', '平声', '下平', 2), ('长', '阳', '平声', '下平', 3),
+('方', '阳', '平声', '下平', 4), ('香', '阳', '平声', '下平', 5), ('堂', '阳', '平声', '下平', 6),
+('王', '阳', '平声', '下平', 7), ('乡', '阳', '平声', '下平', 8), ('霜', '阳', '平声', '下平', 9),
+('凉', '阳', '平声', '下平', 10), ('妆', '阳', '平声', '下平', 11), ('裳', '阳', '平声', '下平', 12),
+('忘', '阳', '平声', '下平', 13), ('狂', '阳', '平声', '下平', 14), ('黄', '阳', '平声', '下平', 15),
+('苍', '阳', '平声', '下平', 16), ('茫', '阳', '平声', '下平', 17), ('伤', '阳', '平声', '下平', 18),
+('肠', '阳', '平声', '下平', 19), ('翔', '阳', '平声', '下平', 20),
+-- 八庚
+('庚', '庚', '平声', '下平', 1), ('明', '庚', '平声', '下平', 2), ('声', '庚', '平声', '下平', 3),
+('清', '庚', '平声', '下平', 4), ('情', '庚', '平声', '下平', 5), ('生', '庚', '平声', '下平', 6),
+('行', '庚', '平声', '下平', 7), ('城', '庚', '平声', '下平', 8), ('名', '庚', '平声', '下平', 9),
+('平', '庚', '平声', '下平', 10), ('京', '庚', '平声', '下平', 11), ('英', '庚', '平声', '下平', 12),
+('兵', '庚', '平声', '下平', 13), ('惊', '庚', '平声', '下平', 14), ('荣', '庚', '平声', '下平', 15),
+('营', '庚', '平声', '下平', 16), ('横', '庚', '平声', '下平', 17), ('倾', '庚', '平声', '下平', 18),
+-- 九青
+('青', '青', '平声', '下平', 1), ('星', '青', '平声', '下平', 2), ('灵', '青', '平声', '下平', 3),
+('听', '青', '平声', '下平', 4), ('经', '青', '平声', '下平', 5), ('亭', '青', '平声', '下平', 6),
+('形', '青', '平声', '下平', 7), ('瓶', '青', '平声', '下平', 8), ('屏', '青', '平声', '下平', 9),
+('铭', '青', '平声', '下平', 10), ('铃', '青', '平声', '下平', 11), ('龄', '青', '平声', '下平', 12),
+-- 十蒸
+('蒸', '蒸', '平声', '下平', 1), ('冰', '蒸', '平声', '下平', 2), ('升', '蒸', '平声', '下平', 3),
+('灯', '蒸', '平声', '下平', 4), ('层', '蒸', '平声', '下平', 5), ('鹰', '蒸', '平声', '下平', 6),
+('凭', '蒸', '平声', '下平', 7), ('承', '蒸', '平声', '下平', 8), ('凝', '蒸', '平声', '下平', 9),
+('蒸', '蒸', '平声', '下平', 10), ('僧', '蒸', '平声', '下平', 11), ('曾', '蒸', '平声', '下平', 12),
+-- 十一尤
+('尤', '尤', '平声', '下平', 1), ('秋', '尤', '平声', '下平', 2), ('流', '尤', '平声', '下平', 3),
+('楼', '尤', '平声', '下平', 4), ('舟', '尤', '平声', '下平', 5), ('愁', '尤', '平声', '下平', 6),
+('游', '尤', '平声', '下平', 7), ('州', '尤', '平声', '下平', 8), ('头', '尤', '平声', '下平', 9),
+('休', '尤', '平声', '下平', 10), ('收', '尤', '平声', '下平', 11), ('留', '尤', '平声', '下平', 12),
+('求', '尤', '平声', '下平', 13), ('侯', '尤', '平声', '下平', 14), ('钩', '尤', '平声', '下平', 15),
+('幽', '尤', '平声', '下平', 16), ('牛', '尤', '平声', '下平', 17), ('丘', '尤', '平声', '下平', 18),
+-- 十二侵
+('侵', '侵', '平声', '下平', 1), ('心', '侵', '平声', '下平', 2), ('深', '侵', '平声', '下平', 3),
+('林', '侵', '平声', '下平', 4), ('金', '侵', '平声', '下平', 5), ('琴', '侵', '平声', '下平', 6),
+('音', '侵', '平声', '下平', 7), ('吟', '侵', '平声', '下平', 8), ('阴', '侵', '平声', '下平', 9),
+('沉', '侵', '平声', '下平', 10), ('寻', '侵', '平声', '下平', 11), ('禽', '侵', '平声', '下平', 12),
+('针', '侵', '平声', '下平', 13), ('临', '侵', '平声', '下平', 14), ('簪', '侵', '平声', '下平', 15),
+-- 十三覃
+('覃', '覃', '平声', '下平', 1), ('南', '覃', '平声', '下平', 2), ('蓝', '覃', '平声', '下平', 3),
+('甘', '覃', '平声', '下平', 4), ('岚', '覃', '平声', '下平', 5), ('蚕', '覃', '平声', '下平', 6),
+('贪', '覃', '平声', '下平', 7), ('谈', '覃', '平声', '下平', 8), ('涵', '覃', '平声', '下平', 9),
+-- 十四盐
+('盐', '盐', '平声', '下平', 1), ('帘', '盐', '平声', '下平', 2), ('添', '盐', '平声', '下平', 3),
+('嫌', '盐', '平声', '下平', 4), ('严', '盐', '平声', '下平', 5), ('纤', '盐', '平声', '下平', 6),
+('蟾', '盐', '平声', '下平', 7), ('拈', '盐', '平声', '下平', 8), ('签', '盐', '平声', '下平', 9),
+-- 十五咸
+('咸', '咸', '平声', '下平', 1), ('岩', '咸', '平声', '下平', 2), ('衫', '咸', '平声', '下平', 3),
+('帆', '咸', '平声', '下平', 4), ('馋', '咸', '平声', '下平', 5), ('缄', '咸', '平声', '下平', 6),
+('杉', '咸', '平声', '下平', 7), ('嵌', '咸', '平声', '下平', 8), ('谗', '咸', '平声', '下平', 9);
+
+-- 常用仄声字（上声、去声、入声各选代表韵部）
+INSERT IGNORE INTO `rhyme` (`character`, `rhyme_group`, `tone_type`, `rhyme_category`, `sort_order`) VALUES
+-- 上声 一董
+('董', '董', '上声', '上声', 1), ('动', '董', '上声', '上声', 2), ('总', '董', '上声', '上声', 3),
+('洞', '董', '上声', '上声', 4), ('桶', '董', '上声', '上声', 5), ('拢', '董', '上声', '上声', 6),
+-- 上声 四纸
+('纸', '纸', '上声', '上声', 1), ('此', '纸', '上声', '上声', 2), ('子', '纸', '上声', '上声', 3),
+('己', '纸', '上声', '上声', 4), ('里', '纸', '上声', '上声', 5), ('起', '纸', '上声', '上声', 6),
+('死', '纸', '上声', '上声', 7), ('美', '纸', '上声', '上声', 8), ('几', '纸', '上声', '上声', 9),
+('指', '纸', '上声', '上声', 10), ('似', '纸', '上声', '上声', 11), ('水', '纸', '上声', '上声', 12),
+-- 去声 一送
+('送', '送', '去声', '去声', 1), ('梦', '送', '去声', '去声', 2), ('凤', '送', '去声', '去声', 3),
+('众', '送', '去声', '去声', 4), ('弄', '送', '去声', '去声', 5), ('冻', '送', '去声', '去声', 6),
+-- 去声 四寘
+('寘', '寘', '去声', '去声', 1), ('地', '寘', '去声', '去声', 2), ('意', '寘', '去声', '去声', 3),
+('至', '寘', '去声', '去声', 4), ('寺', '寘', '去声', '去声', 5), ('泪', '寘', '去声', '去声', 6),
+('醉', '寘', '去声', '去声', 7), ('字', '寘', '去声', '去声', 8), ('寄', '寘', '去声', '去声', 9),
+('义', '寘', '去声', '去声', 10), ('戏', '寘', '去声', '去声', 11), ('翠', '寘', '去声', '去声', 12),
+-- 入声 一屋
+('屋', '屋', '入声', '入声', 1), ('木', '屋', '入声', '入声', 2), ('目', '屋', '入声', '入声', 3),
+('竹', '屋', '入声', '入声', 4), ('谷', '屋', '入声', '入声', 5), ('足', '屋', '入声', '入声', 6),
+('曲', '屋', '入声', '入声', 7), ('玉', '屋', '入声', '入声', 8), ('烛', '屋', '入声', '入声', 9),
+('绿', '屋', '入声', '入声', 10), ('独', '屋', '入声', '入声', 11), ('宿', '屋', '入声', '入声', 12),
+-- 入声 六月
+('月', '月', '入声', '入声', 1), ('骨', '月', '入声', '入声', 2), ('发', '月', '入声', '入声', 3),
+('阔', '月', '入声', '入声', 4), ('歇', '月', '入声', '入声', 5), ('没', '月', '入声', '入声', 6),
+('节', '月', '入声', '入声', 7), ('雪', '月', '入声', '入声', 8), ('别', '月', '入声', '入声', 9),
+('灭', '月', '入声', '入声', 10), ('绝', '月', '入声', '入声', 11), ('说', '月', '入声', '入声', 12);

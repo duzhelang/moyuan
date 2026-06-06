@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -12,10 +12,15 @@ import {
   setDefaultModel,
   getProviders,
   testConnection,
-  type AiModelConfig
+  getAllModuleConfigs,
+  updateModuleConfig,
+  type AiModelConfig,
+  type AiModuleConfig
 } from '@/api/modules/admin-ai-model'
 
+const activeTab = ref('models')
 const models = ref<AiModelConfig[]>([])
+const moduleConfigs = ref<AiModuleConfig[]>([])
 const providers = ref<{ value: string; label: string }[]>([])
 const loading = ref(false)
 const dialogVisible = ref(false)
@@ -52,7 +57,10 @@ const providerLabelMap: Record<string, string> = {
   zhipu: '智谱AI',
   deepseek: 'DeepSeek',
   kimi: 'Kimi',
-  nvidia: 'NVIDIA NIM'
+  nvidia: 'NVIDIA NIM',
+  qwen: '千问',
+  mimo: '小米MiMo',
+  openrouter: 'OpenRouter'
 }
 
 const typeLabelMap: Record<string, string> = {
@@ -75,6 +83,19 @@ const getTypeTag = (type: string) => {
   return 'primary' as const
 }
 
+function getModelName(modelId: number | null) {
+  if (!modelId) return '未配置'
+  const model = models.value.find(m => m.id === modelId)
+  return model ? model.displayName : '未知模型'
+}
+
+function getAvailableModels(requireVision: number) {
+  if (requireVision === 1) {
+    return models.value.filter(m => m.isEnabled === 1 && (m.modelType === 'vision' || m.modelType === 'both'))
+  }
+  return models.value.filter(m => m.isEnabled === 1)
+}
+
 async function loadModels() {
   loading.value = true
   try {
@@ -86,6 +107,17 @@ async function loadModels() {
     console.error('加载模型列表失败', e)
   } finally {
     loading.value = false
+  }
+}
+
+async function loadModuleConfigs() {
+  try {
+    const res = await getAllModuleConfigs()
+    if (res.data && res.data.code === 200) {
+      moduleConfigs.value = res.data.data || []
+    }
+  } catch (e) {
+    console.error('加载模块配置失败', e)
   }
 }
 
@@ -179,9 +211,20 @@ async function handleTest(model: AiModelConfig) {
   }
 }
 
+async function handleModuleModelChange(moduleCode: string, modelId: number | null) {
+  try {
+    await updateModuleConfig(moduleCode, { modelId })
+    ElMessage.success('模块配置已更新')
+    await loadModuleConfigs()
+  } catch (e: any) {
+    ElMessage.error(e.message || '更新失败')
+  }
+}
+
 onMounted(() => {
   loadModels()
   loadProviders()
+  loadModuleConfigs()
 })
 </script>
 
@@ -189,51 +232,109 @@ onMounted(() => {
   <div class="page-container">
     <h2 class="page-title">AI 模型管理</h2>
 
-    <el-card class="table-card">
-      <template #header>
-        <div class="card-header">
-          <span>模型列表</span>
-          <el-button type="primary" @click="openDialog()">
-            <el-icon><Plus /></el-icon>
-            新增模型
-          </el-button>
-        </div>
-      </template>
+    <el-tabs v-model="activeTab" class="ai-tabs">
+      <el-tab-pane label="模型管理" name="models">
+        <el-card class="table-card">
+          <template #header>
+            <div class="card-header">
+              <span>模型列表</span>
+              <el-button type="primary" @click="openDialog()">
+                <el-icon><Plus /></el-icon>
+                新增模型
+              </el-button>
+            </div>
+          </template>
 
-      <el-table :data="models" v-loading="loading" stripe style="width: 100%">
-        <el-table-column prop="displayName" label="模型名称" min-width="120" />
-        <el-table-column prop="provider" label="提供商" width="100">
-          <template #default="{ row }">
-            <el-tag>{{ getProviderLabel(row.provider) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="modelType" label="类型" width="80">
-          <template #default="{ row }">
-            <el-tag :type="getTypeTag(row.modelType)">
-              {{ getTypeLabel(row.modelType) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="modelId" label="模型ID" min-width="150" />
-        <el-table-column label="状态" width="140">
-          <template #default="{ row }">
-            <el-switch v-model="row.isEnabled" :active-value="1" :inactive-value="0" @change="handleToggle(row)" />
-            <el-tag v-if="row.isDefault" type="success" size="small" style="margin-left: 8px">默认</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="280" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" @click="openDialog(row)">编辑</el-button>
-            <el-button size="small" type="success" @click="handleTest(row)">测试</el-button>
-            <el-button size="small" type="warning" @click="handleSetDefault(row)" :disabled="row.isDefault === 1">默认</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+          <el-table :data="models" v-loading="loading" stripe style="width: 100%">
+            <el-table-column prop="displayName" label="模型名称" min-width="120" />
+            <el-table-column prop="provider" label="提供商" width="100">
+              <template #default="{ row }">
+                <el-tag>{{ getProviderLabel(row.provider) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="modelType" label="类型" width="80">
+              <template #default="{ row }">
+                <el-tag :type="getTypeTag(row.modelType)">
+                  {{ getTypeLabel(row.modelType) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="modelId" label="模型ID" min-width="150" />
+            <el-table-column label="状态" width="140">
+              <template #default="{ row }">
+                <el-switch v-model="row.isEnabled" :active-value="1" :inactive-value="0" @change="handleToggle(row)" />
+                <el-tag v-if="row.isDefault" type="success" size="small" style="margin-left: 8px">默认</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="280" fixed="right">
+              <template #default="{ row }">
+                <el-button size="small" @click="openDialog(row)">编辑</el-button>
+                <el-button size="small" type="success" @click="handleTest(row)">测试</el-button>
+                <el-button size="small" type="warning" @click="handleSetDefault(row)" :disabled="row.isDefault === 1">默认</el-button>
+                <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </el-tab-pane>
 
-    <el-dialog v-model="dialogVisible" :title="editingModel ? '编辑模型' : '新增模型'" width="600px">
-      <el-form :model="form" label-width="120px" :rules="rules" ref="formRef">
+      <el-tab-pane label="模块配置" name="modules">
+        <el-card class="table-card">
+          <template #header>
+            <div class="card-header">
+              <span>AI功能模块模型配置</span>
+              <el-tooltip content="为每个AI功能模块指定使用的模型，识图类功能只能选择支持视觉的模型" placement="top">
+                <el-tag type="info">配置说明</el-tag>
+              </el-tooltip>
+            </div>
+          </template>
+
+          <el-table :data="moduleConfigs" stripe style="width: 100%">
+            <el-table-column prop="moduleName" label="模块名称" width="150" />
+            <el-table-column prop="moduleCode" label="模块编码" width="120" />
+            <el-table-column prop="description" label="模块描述" min-width="200" />
+            <el-table-column label="需要视觉" width="100">
+              <template #default="{ row }">
+                <el-tag :type="row.requireVision === 1 ? 'warning' : 'info'" size="small">
+                  {{ row.requireVision === 1 ? '是' : '否' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="当前模型" width="150">
+              <template #default="{ row }">
+                <el-tag :type="row.modelId ? 'success' : 'danger'" size="small">
+                  {{ getModelName(row.modelId) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="配置模型" width="250">
+              <template #default="{ row }">
+                <el-select
+                  :model-value="row.modelId"
+                  placeholder="选择模型"
+                  clearable
+                  style="width: 100%"
+                  @change="(val: number | null) => handleModuleModelChange(row.moduleCode, val)"
+                >
+                  <el-option
+                    v-for="model in getAvailableModels(row.requireVision)"
+                    :key="model.id"
+                    :label="`${model.displayName} (${model.modelId})`"
+                    :value="model.id!"
+                  />
+                </el-select>
+                <div v-if="row.requireVision === 1" class="vision-tip">
+                  仅显示支持视觉的模型
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </el-tab-pane>
+    </el-tabs>
+
+    <el-dialog v-model="dialogVisible" :title="editingModel ? '编辑模型' : '新增模型'" width="650px">
+      <el-form :model="form" label-width="90px" :rules="rules" ref="formRef">
         <el-form-item label="提供商" prop="provider">
           <el-select v-model="form.provider" placeholder="选择提供商" style="width: 100%">
             <el-option v-for="p in providers" :key="p.value" :label="p.label" :value="p.value" />
@@ -292,6 +393,12 @@ onMounted(() => {
   color: #333;
 }
 
+.ai-tabs {
+  :deep(.el-tabs__header) {
+    margin-bottom: 16px;
+  }
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -300,5 +407,24 @@ onMounted(() => {
 
 .table-card {
   border-radius: 8px;
+}
+
+.vision-tip {
+  font-size: 12px;
+  color: #e6a23c;
+  margin-top: 4px;
+}
+
+:deep(.el-dialog) {
+  .el-form-item__content {
+    flex: 1;
+    min-width: 0;
+  }
+  .el-input,
+  .el-textarea,
+  .el-select,
+  .el-input-number {
+    width: 100% !important;
+  }
 }
 </style>

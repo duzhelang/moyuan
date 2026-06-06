@@ -296,6 +296,8 @@ onUnmounted(() => {
   height: auto !important;
   width: 100% !important;
   margin: 15px auto 0 !important;
+  display: flex;
+  align-items: flex-start;
 }
 
 .nav-title {
@@ -303,18 +305,21 @@ onUnmounted(() => {
   font-size: 50px;
   font-weight: 600;
   color: #333;
-  margin: 0 0 6px 35px;
+  margin: 8px 0 0 10px;
   display: block !important;
   width: auto !important;
   text-align: left !important;
   writing-mode: vertical-rl;
   text-orientation: mixed;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .scrollableDiv {
   position: relative;
   overflow: hidden;
+  flex: 1;
+  min-width: 0;
 }
 
 .arrow-btn {

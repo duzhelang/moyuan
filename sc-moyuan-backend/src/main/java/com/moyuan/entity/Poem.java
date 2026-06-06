@@ -2,6 +2,7 @@ package com.moyuan.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -23,6 +24,16 @@ public class Poem {
     private Integer favoriteCount;
     private Integer status;
     private Integer isFeatured;
+    private Integer isOriginal;
+    private Integer auditStatus;
+    private LocalDateTime auditTime;
+    private String auditReason;
+    private BigDecimal avgScore;
+    private Integer ratingCount;
+    @TableField(exist = false)
+    private String poetName;
+    @TableField(exist = false)
+    private String dynastyName;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
     @TableField(fill = FieldFill.INSERT_UPDATE)

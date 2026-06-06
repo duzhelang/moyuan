@@ -11,6 +11,10 @@ public class Comment {
     private Long id;
     private String content;
     private Long userId;
+    @TableField(exist = false)
+    private String username;
+    @TableField(exist = false)
+    private String avatar;
     private Long targetId;
     private Integer targetType;
     private Long parentId;

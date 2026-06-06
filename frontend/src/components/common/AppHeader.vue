@@ -310,7 +310,8 @@ const handleUserCommand = (command: string) => {
   display: flex;
   align-items: center;
   flex: 1;
-  justify-content: center;
+  justify-content: flex-end;
+  padding-right: 20px;
 }
 
 .time-display {
@@ -321,6 +322,7 @@ const handleUserCommand = (command: string) => {
   border-radius: 15px;
   letter-spacing: 0.5px;
   backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 .header-right {
@@ -410,6 +412,19 @@ const handleUserCommand = (command: string) => {
   gap: 8px;
   font-size: 15px;
   font-family: cursive;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 25px;
+  padding: 6px 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  }
 }
 
 .user-info {
@@ -419,20 +434,23 @@ const handleUserCommand = (command: string) => {
   cursor: pointer;
   padding: 4px 8px;
   border-radius: 20px;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   
   &:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: scale(1.02);
   }
 }
 
 .user-avatar {
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  transition: all 0.2s ease;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   
   &:hover {
     border-color: #ffd700;
-    box-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
+    transform: scale(1.05);
   }
 }
 
@@ -451,17 +469,22 @@ const handleUserCommand = (command: string) => {
   font-size: 15px;
   font-family: cursive;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
+  padding: 6px 12px;
+  border-radius: 15px;
   
   &:hover {
     color: #ffd700 !important;
     text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-1px);
   }
 }
 
 .separator {
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.5);
   font-size: 14px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .mobile-menu-btn {

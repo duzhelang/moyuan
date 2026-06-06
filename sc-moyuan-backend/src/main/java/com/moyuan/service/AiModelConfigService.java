@@ -3,9 +3,11 @@ package com.moyuan.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.moyuan.ai.AiModelRegistry;
 import com.moyuan.entity.AiModel;
+import com.moyuan.entity.AiModuleConfig;
 import com.moyuan.exception.BusinessException;
 import com.moyuan.common.ResultCode;
 import com.moyuan.mapper.AiModelMapper;
+import com.moyuan.mapper.AiModuleConfigMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,7 @@ import java.util.List;
 public class AiModelConfigService {
 
     private final AiModelMapper aiModelMapper;
+    private final AiModuleConfigMapper aiModuleConfigMapper;
     private final AiModelRegistry aiModelRegistry;
 
     public List<AiModel> getAllModels() {
@@ -87,7 +90,7 @@ public class AiModelConfigService {
 
     public String testConnection(Long id) {
         AiModel model = getModelById(id);
-        return aiModelRegistry.chat("你好，请回复ok确认连接正常", model.getName());
+        return aiModelRegistry.chat("你好，请回复ok确认连接正常", model.getName(), null);
     }
 
     @Transactional
@@ -107,5 +110,43 @@ public class AiModelConfigService {
             defaultModel.setIsDefault(0);
             aiModelMapper.updateById(defaultModel);
         }
+    }
+
+    public List<AiModuleConfig> getAllModuleConfigs() {
+        return aiModuleConfigMapper.selectList(null);
+    }
+
+    @Transactional
+    public AiModuleConfig updateModuleConfig(AiModuleConfig config) {
+        AiModuleConfig existing = aiModuleConfigMapper.selectOne(
+                new LambdaQueryWrapper<AiModuleConfig>().eq(AiModuleConfig::getModuleCode, config.getModuleCode())
+        );
+        if (existing == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "模块配置不存在");
+        }
+        existing.setModelId(config.getModelId());
+        existing.setUpdateTime(null);
+        aiModuleConfigMapper.updateById(existing);
+        return existing;
+    }
+
+    public List<AiModel> getModelsForModule(String moduleCode) {
+        AiModuleConfig config = aiModuleConfigMapper.selectOne(
+                new LambdaQueryWrapper<AiModuleConfig>().eq(AiModuleConfig::getModuleCode, moduleCode)
+        );
+        if (config == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "模块配置不存在");
+        }
+        LambdaQueryWrapper<AiModel> wrapper = new LambdaQueryWrapper<AiModel>()
+                .eq(AiModel::getIsEnabled, 1);
+        if (Integer.valueOf(1).equals(config.getRequireVision())) {
+            wrapper.and(w -> w
+                    .eq(AiModel::getModelType, "vision")
+                    .or()
+                    .eq(AiModel::getModelType, "both")
+            );
+        }
+        wrapper.orderByAsc(AiModel::getSortOrder);
+        return aiModelMapper.selectList(wrapper);
     }
 }

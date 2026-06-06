@@ -38,6 +38,10 @@ const handleReset = () => {
   form.agreement = false
 }
 
+const goToLogin = () => {
+  router.push('/user/login')
+}
+
 const handleSubmit = async () => {
   if (!form.username || !form.password) {
     ElMessage.warning('请输入用户名和密码')
@@ -89,6 +93,9 @@ const handleSubmit = async () => {
             <table border="0" cellspacing="2" align="center">
               <caption>
                 <h2>信&nbsp;&nbsp;&nbsp;&nbsp;息</h2>
+                <div class="login-link">
+                  <a href="javascript:void(0)" @click="goToLogin">已有账号?去登录</a>
+                </div>
               </caption>
               <tr>
                 <td align="right" width="200px">用户名：</td>
@@ -188,7 +195,6 @@ const handleSubmit = async () => {
                 <td align="right"><input type="button" value="重置" class="cz" @click="handleReset" /></td>
                 <td align="center"><input type="submit" value="提交" class="tj" :disabled="loading" /></td>
               </tr>
-              </tbody>
             </table>
           </form>
         </div>
@@ -337,6 +343,22 @@ const handleSubmit = async () => {
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+.login-link {
+  text-align: center;
+  margin-top: 8px;
+}
+
+.login-link a {
+  color: #007BFF;
+  font-size: 14px;
+  transition: color 0.3s ease;
+}
+
+.login-link a:hover {
+  color: #0056b3;
+  text-decoration: underline;
 }
 
 .biao select {

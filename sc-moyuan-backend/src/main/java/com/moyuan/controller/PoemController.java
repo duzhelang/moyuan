@@ -6,7 +6,6 @@ import com.moyuan.common.R;
 import com.moyuan.common.ResultCode;
 import com.moyuan.entity.Poem;
 import com.moyuan.exception.BusinessException;
-import com.moyuan.mapper.PoemMapper;
 import com.moyuan.service.PoemService;
 import com.moyuan.service.UserService;
 import com.moyuan.util.SecurityUtil;
@@ -26,7 +25,6 @@ import java.util.Map;
 public class PoemController {
 
     private final PoemService poemService;
-    private final PoemMapper poemMapper;
     private final UserService userService;
     private final SecurityUtil securityUtil;
 
@@ -54,7 +52,7 @@ public class PoemController {
         LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Poem::getStatus, 1)
                 .last("ORDER BY RAND() LIMIT 1");
-        Poem poem = poemMapper.selectOne(wrapper);
+        Poem poem = poemService.getOne(wrapper);
         if (poem == null) {
             throw new BusinessException(ResultCode.POEM_NOT_FOUND);
         }
@@ -68,7 +66,7 @@ public class PoemController {
         wrapper.eq(Poem::getStatus, 1)
                 .orderByDesc(Poem::getViewCount)
                 .last("LIMIT 3");
-        return R.success(poemMapper.selectList(wrapper));
+        return R.success(poemService.list(wrapper));
     }
 
     @Operation(summary = "创建诗词（用户发布）")
@@ -80,7 +78,7 @@ public class PoemController {
         poem.setFavoriteCount(0);
         poem.setStatus(1);
         poem.setIsFeatured(0);
-        poemMapper.insert(poem);
+        poemService.save(poem);
         return R.success(poem);
     }
 

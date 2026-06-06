@@ -4,12 +4,28 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.5</version>
+        <relativePath/>
+    </parent>
+
     <groupId>com.moyuan</groupId>
     <artifactId>sc-moyuan</artifactId>
     <version>1.0.0</version>
     <packaging>pom</packaging>
     <name>SC_MoYuan2_</name>
     <description>古今诗话——墨渊 父项目</description>
+
+    <properties>
+        <java.version>23</java.version>
+        <mybatis-plus.version>3.5.5</mybatis-plus.version>
+        <druid.version>1.2.20</druid.version>
+        <jjwt.version>0.12.5</jjwt.version>
+        <knife4j.version>4.3.0</knife4j.version>
+        <lombok.version>1.18.34</lombok.version>
+    </properties>
 
     <modules>
         <module>sc-moyuan-backend</module>

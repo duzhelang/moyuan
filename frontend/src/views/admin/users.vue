@@ -220,4 +220,17 @@ onMounted(fetchData)
   justify-content: flex-end;
   margin-top: 16px;
 }
+
+:deep(.el-dialog) {
+  .el-form-item__content {
+    flex: 1;
+    min-width: 0;
+  }
+  .el-input,
+  .el-textarea,
+  .el-select,
+  .el-input-number {
+    width: 100% !important;
+  }
+}
 </style>

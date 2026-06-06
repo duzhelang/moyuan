@@ -62,6 +62,15 @@ onMounted(() => {
 
 <template>
   <div class="search-page">
+    <div class="page-nav">
+      <el-button text @click="router.push('/')">
+        <el-icon><HomeFilled /></el-icon>
+        首页
+      </el-button>
+      <el-divider direction="vertical" />
+      <span class="current-page">搜索结果</span>
+    </div>
+
     <div class="search-header">
       <h1 class="search-title">搜索结果</h1>
       <div class="search-input">
@@ -116,7 +125,7 @@ onMounted(() => {
                     <span v-if="poet.dynastyName" class="result-meta">{{ poet.dynastyName }}</span>
                   </div>
                 </div>
-                <p v-if="poet.description" class="result-content">{{ truncateContent(poet.description) }}</p>
+                <p v-if="poet.biography" class="result-content">{{ truncateContent(poet.biography) }}</p>
               </div>
             </div>
           </el-tab-pane>
@@ -158,6 +167,26 @@ onMounted(() => {
   padding: $spacing-xl;
   max-width: 900px;
   margin: 0 auto;
+}
+
+.page-nav {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-lg;
+
+  .el-button {
+    color: $text-color-secondary;
+
+    &:hover {
+      color: $primary-color;
+    }
+  }
+
+  .current-page {
+    font-size: $font-size-sm;
+    color: $text-color-light;
+  }
 }
 
 .search-header {

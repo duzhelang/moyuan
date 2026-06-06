@@ -11,17 +11,19 @@ build/
 *.war
 *.zip
 *.tar.gz
+# 前端构建产物
+frontend/dist/
+# 用户上传文件
+uploads/
 
 # ==================== 环境与配置 ====================
-# Spring Boot配置（排除通用配置，保留环境专属配置）
-application-dev.yml
+# Spring Boot配置（排除敏感/生产环境配置，保留通用开发配置）
 application-test.yml
 application-prod.yml
 *.env
 .env
 .env.local
-# 敏感配置目录（API密钥、数据库密码等）
-secrets/
+# 敏感配置目录（API密钥、数据库密码等）——已迁移至 .git/info/exclude 管理
 # 数据库连接配置（敏感信息）
 db-config.properties
 # 会话/缓存文件

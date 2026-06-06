@@ -12,6 +12,8 @@ const poets = ref<Poet[]>([])
 const total = ref(0)
 const dynasties = ref<Dynasty[]>([])
 
+const activeTab = ref('ancient')
+
 const filters = ref({
   dynastyId: undefined as number | undefined,
   keyword: ''
@@ -23,12 +25,18 @@ const pageSize = ref(10)
 const fetchPoets = async () => {
   loading.value = true
   try {
-    const res = await getPoetList({
+    const params: Record<string, any> = {
       pageNum: currentPage.value,
       pageSize: pageSize.value,
       dynastyId: filters.value.dynastyId,
       keyword: filters.value.keyword
-    })
+    }
+    if (activeTab.value === 'ancient') {
+      params.poetType = 'ancient'
+    } else if (activeTab.value === 'modern') {
+      params.poetType = 'modern'
+    }
+    const res = await getPoetList(params)
     poets.value = res.data.list
     total.value = res.data.total
   } catch (error) {
@@ -45,6 +53,14 @@ const fetchDynasties = async () => {
   } catch (error) {
     console.error('获取朝代列表失败:', error)
   }
+}
+
+const handleTabChange = (tab: string) => {
+  activeTab.value = tab
+  currentPage.value = 1
+  filters.value.dynastyId = undefined
+  filters.value.keyword = ''
+  fetchPoets()
 }
 
 const handleFilterChange = () => {
@@ -76,9 +92,30 @@ onMounted(() => {
 <template>
   <div class="poet-list-page">
     <div class="container">
+      <div class="page-nav">
+        <el-button text @click="router.push('/')">
+          <el-icon><HomeFilled /></el-icon>
+          首页
+        </el-button>
+        <el-divider direction="vertical" />
+        <el-button text @click="router.push('/poem')">
+          诗词鉴赏
+        </el-button>
+        <el-divider direction="vertical" />
+        <span class="current-page">诗人风采</span>
+      </div>
+
       <div class="page-header">
         <h1 class="page-title">诗人风采</h1>
         <p class="page-subtitle">穿越千年时光，领略文人墨客的风采与情怀</p>
+      </div>
+
+      <div class="poet-tabs">
+        <el-radio-group v-model="activeTab" @change="handleTabChange">
+          <el-radio-button value="ancient">古籍诗人</el-radio-button>
+          <el-radio-button value="modern">现代诗人</el-radio-button>
+          <el-radio-button value="all">全部</el-radio-button>
+        </el-radio-group>
       </div>
 
       <div class="filter-section">
@@ -135,7 +172,10 @@ onMounted(() => {
             {{ poet.name?.charAt(0) }}
           </el-avatar>
           <div class="poet-info">
-            <h3 class="poet-name">{{ poet.name }}</h3>
+            <h3 class="poet-name">
+              {{ poet.name }}
+              <el-tag v-if="poet.poetType === 'modern'" type="success" size="small" class="modern-tag">现代诗人</el-tag>
+            </h3>
             <div class="poet-alias" v-if="poet.courtesyName || poet.pseudonym">
               <span v-if="poet.courtesyName">字：{{ poet.courtesyName }}</span>
               <span v-if="poet.pseudonym">号：{{ poet.pseudonym }}</span>
@@ -145,7 +185,7 @@ onMounted(() => {
               <span v-if="poet.birthYear">{{ poet.birthYear }}年 - {{ poet.deathYear ? poet.deathYear + '年' : '至今' }}</span>
               <span v-if="poet.birthplace">{{ poet.birthplace }}</span>
             </div>
-            <p class="poet-desc" v-if="poet.description">{{ poet.description }}</p>
+            <p class="poet-desc" v-if="poet.biography">{{ poet.biography }}</p>
           </div>
         </div>
       </div>
@@ -168,6 +208,26 @@ onMounted(() => {
 <style scoped lang="scss">
 .poet-list-page {
   padding: $spacing-xl 0;
+}
+
+.page-nav {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-lg;
+
+  .el-button {
+    color: $text-color-secondary;
+
+    &:hover {
+      color: $primary-color;
+    }
+  }
+
+  .current-page {
+    font-size: $font-size-sm;
+    color: $text-color-light;
+  }
 }
 
 .page-header {
@@ -282,6 +342,16 @@ onMounted(() => {
   line-height: $line-height-loose;
   @include text-clamp(2);
   flex: 1;
+}
+
+.modern-tag {
+  margin-left: $spacing-sm;
+  vertical-align: middle;
+}
+
+.poet-tabs {
+  text-align: center;
+  margin-bottom: $spacing-lg;
 }
 
 .pagination-section {

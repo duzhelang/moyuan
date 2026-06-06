@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAdminHomeNavigation, createHomeNavigation, updateHomeNavigation, deleteHomeNavigation } from '@/api/modules/admin'
+import ImageUpload from '@/components/common/ImageUpload.vue'
 
 const NAV_ANIMATION_KEY = 'home_nav_animation_config'
 
@@ -15,9 +16,12 @@ const isEdit = ref(false)
 const filterType = ref('')
 
 const animationOptions = [
-  { label: '波浪', value: 'wave' },
-  { label: '淡入', value: 'fade' },
-  { label: '滑入', value: 'slide' }
+  { label: '波浪', value: 'wave', icon: '🌊' },
+  { label: '淡入', value: 'fade', icon: '✨' },
+  { label: '滑入', value: 'slide', icon: '➡️' },
+  { label: '缩放', value: 'zoom', icon: '🔍' },
+  { label: '弹跳', value: 'bounce', icon: '⬆️' },
+  { label: '旋转', value: 'rotate', icon: '🔄' }
 ]
 
 const animationConfig = ref<Record<string, string>>({
@@ -167,7 +171,7 @@ onMounted(() => {
           <div class="animation-item">
             <span class="animation-label">作品模块</span>
             <el-select v-model="animationConfig.works" style="width: 100%">
-              <el-option v-for="opt in animationOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+              <el-option v-for="opt in animationOptions" :key="opt.value" :label="`${opt.icon} ${opt.label}`" :value="opt.value" />
             </el-select>
           </div>
         </el-col>
@@ -175,7 +179,7 @@ onMounted(() => {
           <div class="animation-item">
             <span class="animation-label">流派模块</span>
             <el-select v-model="animationConfig.genres" style="width: 100%">
-              <el-option v-for="opt in animationOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+              <el-option v-for="opt in animationOptions" :key="opt.value" :label="`${opt.icon} ${opt.label}`" :value="opt.value" />
             </el-select>
           </div>
         </el-col>
@@ -183,11 +187,25 @@ onMounted(() => {
           <div class="animation-item">
             <span class="animation-label">朝代模块</span>
             <el-select v-model="animationConfig.dynasties" style="width: 100%">
-              <el-option v-for="opt in animationOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+              <el-option v-for="opt in animationOptions" :key="opt.value" :label="`${opt.icon} ${opt.label}`" :value="opt.value" />
             </el-select>
           </div>
         </el-col>
       </el-row>
+      <div class="animation-preview">
+        <div class="preview-title">动画预览</div>
+        <div class="preview-cards">
+          <div 
+            v-for="(anim, key) in animationConfig" 
+            :key="key"
+            class="preview-card"
+            :class="`anim-${anim}`"
+          >
+            <div class="preview-card-icon">{{ animationOptions.find(o => o.value === anim)?.icon }}</div>
+            <div class="preview-card-text">{{ key === 'works' ? '作品' : key === 'genres' ? '流派' : '朝代' }}</div>
+          </div>
+        </div>
+      </div>
     </el-card>
 
     <el-card class="filter-card">
@@ -215,7 +233,17 @@ onMounted(() => {
         </el-table-column>
         <el-table-column prop="title" label="标题" width="150" show-overflow-tooltip />
         <el-table-column prop="subtitle" label="副标题" width="180" show-overflow-tooltip />
-        <el-table-column prop="imageUrl" label="图片" min-width="120" show-overflow-tooltip />
+        <el-table-column label="图片" width="100">
+          <template #default="{ row }">
+            <el-image :src="row.imageUrl" fit="cover" style="width: 60px; height: 60px; border-radius: 4px">
+              <template #error>
+                <div style="width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; background: #f5f5f5; border-radius: 4px">
+                  <el-icon><Picture /></el-icon>
+                </div>
+              </template>
+            </el-image>
+          </template>
+        </el-table-column>
         <el-table-column label="链接类型" width="80">
           <template #default="{ row }">
             {{ getLinkTypeLabel(row.linkType) }}
@@ -249,7 +277,7 @@ onMounted(() => {
       </div>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑导航项' : '新增导航项'" width="500px">
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑导航项' : '新增导航项'" width="550px">
       <el-form :model="form" label-width="80px">
         <el-form-item label="类型" required>
           <el-select v-model="form.type" style="width: 100%">
@@ -262,8 +290,8 @@ onMounted(() => {
         <el-form-item label="副标题">
           <el-input v-model="form.subtitle" placeholder="请输入副标题（可选）" />
         </el-form-item>
-        <el-form-item label="图片URL" required>
-          <el-input v-model="form.imageUrl" placeholder="请输入图片文件名" />
+        <el-form-item label="图片" required>
+          <ImageUpload v-model="form.imageUrl" :maxSize="5" fileType="config" />
         </el-form-item>
         <el-row :gutter="16">
           <el-col :span="12">
@@ -333,6 +361,109 @@ onMounted(() => {
   font-weight: 500;
 }
 
+.animation-preview {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #ebeef5;
+}
+
+.preview-title {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.preview-cards {
+  display: flex;
+  gap: 16px;
+}
+
+.preview-card {
+  flex: 1;
+  height: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.preview-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+}
+
+.preview-card-icon {
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.preview-card-text {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.anim-wave {
+  animation: wave 2s ease-in-out infinite;
+}
+
+.anim-fade {
+  animation: fade 2s ease-in-out infinite;
+}
+
+.anim-slide {
+  animation: slide 2s ease-in-out infinite;
+}
+
+.anim-zoom {
+  animation: zoom 2s ease-in-out infinite;
+}
+
+.anim-bounce {
+  animation: bounce 2s ease-in-out infinite;
+}
+
+.anim-rotate {
+  animation: rotate 2s ease-in-out infinite;
+}
+
+@keyframes wave {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes fade {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes slide {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(10px); }
+}
+
+@keyframes zoom {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-15px); }
+  50% { transform: translateY(0); }
+  75% { transform: translateY(-8px); }
+}
+
+@keyframes rotate {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(5deg); }
+}
+
 .filter-card {
   margin-bottom: 16px;
 }
@@ -345,5 +476,18 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+:deep(.el-dialog) {
+  .el-form-item__content {
+    flex: 1;
+    min-width: 0;
+  }
+  .el-input,
+  .el-textarea,
+  .el-select,
+  .el-input-number {
+    width: 100% !important;
+  }
 }
 </style>

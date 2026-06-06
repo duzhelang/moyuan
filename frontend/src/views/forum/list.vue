@@ -57,15 +57,30 @@ onMounted(() => {
 <template>
   <div class="forum-list-page">
     <div class="container">
+      <div class="page-nav">
+        <el-button text @click="router.push('/')">
+          <el-icon><HomeFilled /></el-icon>
+          首页
+        </el-button>
+        <el-divider direction="vertical" />
+        <span class="current-page">诗汇论坛</span>
+      </div>
+
       <div class="page-header">
         <div class="header-left">
           <h1 class="page-title">诗汇论坛</h1>
           <p class="page-subtitle">以诗会友，畅谈古今</p>
         </div>
-        <el-button type="primary" @click="goToCreate">
-          <el-icon><Edit /></el-icon>
-          发帖
-        </el-button>
+        <div class="header-right">
+          <el-button @click="router.push('/communicate')">
+            <el-icon><ChatDotSquare /></el-icon>
+            交流广场
+          </el-button>
+          <el-button type="primary" @click="goToCreate">
+            <el-icon><Edit /></el-icon>
+            发帖
+          </el-button>
+        </div>
       </div>
       
       <div class="search-section">
@@ -146,10 +161,35 @@ onMounted(() => {
   width: 100%;
 }
 
+.page-nav {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-lg;
+
+  .el-button {
+    color: $text-color-secondary;
+
+    &:hover {
+      color: $primary-color;
+    }
+  }
+
+  .current-page {
+    font-size: $font-size-sm;
+    color: $text-color-light;
+  }
+}
+
 .header-left {
   display: flex;
   flex-direction: column;
   gap: $spacing-xs;
+}
+
+.header-right {
+  display: flex;
+  gap: $spacing-sm;
 }
 
 .page-header {

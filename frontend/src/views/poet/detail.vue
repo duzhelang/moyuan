@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import type { Poet, Poem } from '@/types/model'
 import { getPoetById } from '@/api/modules/poet'
 import { getPoemsByPoet } from '@/api/modules/poem'
+import PoetryDetailDialog from '@/components/business/PoetryDetailDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -41,8 +42,18 @@ const editTitle = ref('')
 const isMusicPlaying = ref(false)
 let audioElement: HTMLAudioElement | null = null
 
+const poetryDialogVisible = ref(false)
+const selectedPoemTitle = ref('')
+const selectedPoemAuthor = ref('')
+
+const openPoetryDetail = (poem: Poem) => {
+  selectedPoemTitle.value = poem.title
+  selectedPoemAuthor.value = poet.value?.name || ''
+  poetryDialogVisible.value = true
+}
+
 const sectionContentMap: Record<string, { title: string; field: keyof Poet }> = {
-  'section-intro': { title: '简　　介', field: 'description' },
+  'section-intro': { title: '简　　介', field: 'biography' },
   'section-life': { title: '人物生平', field: 'lifeStory' },
   'section-influence': { title: '主要影响', field: 'influence' },
   'section-evaluation': { title: '历史评价', field: 'evaluation' },
@@ -195,6 +206,10 @@ const toggleMusic = () => {
   }
 }
 
+const handleScreenshot = () => {
+  ElMessage.info('截图功能开发中')
+}
+
 watch(() => route.params.id, (newId) => {
   if (newId) {
     fetchPoet()
@@ -251,16 +266,23 @@ onUnmounted(() => {
       </div>
 
       <div v-if="poet" class="poet-content">
-        <div class="poet-profile-card">
-          <div class="poet-profile">
-            <el-avatar :src="poet.avatar" :size="100" class="poet-avatar">
+        <div class="poet-hero">
+          <div class="poet-hero-bg">
+            <div class="hero-decoration deco-1"></div>
+            <div class="hero-decoration deco-2"></div>
+          </div>
+          <div class="poet-hero-content">
+            <el-avatar :src="poet.avatar" :size="120" class="poet-avatar">
               {{ poet.name?.charAt(0) }}
             </el-avatar>
             <div class="poet-basic">
-              <h1 class="poet-name">{{ poet.name }}</h1>
+              <h1 class="poet-name">
+                {{ poet.name }}
+                <el-tag v-if="poet.poetType === 'modern'" type="success" size="small" class="modern-tag">现代诗人</el-tag>
+              </h1>
               <div class="poet-alias" v-if="poet.courtesyName || poet.pseudonym">
-                <span v-if="poet.courtesyName">字：{{ poet.courtesyName }}</span>
-                <span v-if="poet.pseudonym">号：{{ poet.pseudonym }}</span>
+                <span v-if="poet.courtesyName" class="alias-tag">字：{{ poet.courtesyName }}</span>
+                <span v-if="poet.pseudonym" class="alias-tag">号：{{ poet.pseudonym }}</span>
               </div>
               <div class="poet-meta">
                 <span v-if="poet.dynastyName" class="meta-item">
@@ -278,6 +300,10 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
+        </div>
+
+        <div class="poet-brief" v-if="poet.biography">
+          <p class="brief-text">{{ poet.biography }}</p>
         </div>
 
         <div
@@ -340,7 +366,7 @@ onUnmounted(() => {
                 v-for="poem in poems"
                 :key="poem.id"
                 class="poem-item"
-                @click="goToPoemDetail(poem.id)"
+                @click="openPoetryDetail(poem)"
               >
                 <h3 class="poem-title">{{ poem.title }}</h3>
                 <p class="poem-content">{{ poem.content }}</p>
@@ -377,6 +403,10 @@ onUnmounted(() => {
     </main>
 
     <div class="right-toolbar">
+      <div class="toolbar-item" @click="handleScreenshot" title="截图">
+        <el-icon :size="20"><Camera /></el-icon>
+        <span class="toolbar-label">截图</span>
+      </div>
       <div class="toolbar-item" @click="toggleMusic" :title="isMusicPlaying ? '暂停音乐' : '播放音乐'">
         <el-icon :size="20"><Headset /></el-icon>
         <span class="toolbar-label">音乐</span>
@@ -411,6 +441,12 @@ onUnmounted(() => {
         </div>
       </Transition>
     </Teleport>
+
+    <PoetryDetailDialog
+      v-model:visible="poetryDialogVisible"
+      :title="selectedPoemTitle"
+      :author="selectedPoemAuthor"
+    />
   </div>
 </template>
 
@@ -547,18 +583,54 @@ onUnmounted(() => {
   max-width: 860px;
 }
 
-.poet-profile-card {
+.poet-hero {
+  position: relative;
   background: $background-color-light;
   border-radius: $border-radius-md;
   box-shadow: $box-shadow;
-  padding: $spacing-xl;
-  margin-bottom: $spacing-xl;
+  overflow: hidden;
+  margin-bottom: $spacing-lg;
 }
 
-.poet-profile {
+.poet-hero-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 120px;
+  background: linear-gradient(135deg, rgba($primary-color, 0.08), rgba($secondary-color, 0.05));
+  overflow: hidden;
+}
+
+.hero-decoration {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.1;
+
+  &.deco-1 {
+    width: 200px;
+    height: 200px;
+    background: $primary-color;
+    top: -80px;
+    right: -40px;
+  }
+
+  &.deco-2 {
+    width: 120px;
+    height: 120px;
+    background: $secondary-color;
+    bottom: -40px;
+    left: 60px;
+  }
+}
+
+.poet-hero-content {
+  position: relative;
+  z-index: 1;
   display: flex;
   gap: $spacing-xl;
   align-items: flex-start;
+  padding: $spacing-xl;
 
   @include responsive(sm) {
     flex-direction: column;
@@ -569,6 +641,8 @@ onUnmounted(() => {
 
 .poet-avatar {
   flex-shrink: 0;
+  border: 3px solid $background-color-light;
+  box-shadow: $box-shadow-md;
 }
 
 .poet-basic {
@@ -582,16 +656,29 @@ onUnmounted(() => {
   margin-bottom: $spacing-sm;
 }
 
+.modern-tag {
+  margin-left: $spacing-sm;
+  vertical-align: middle;
+}
+
 .poet-alias {
   display: flex;
-  gap: $spacing-lg;
-  font-size: $font-size-base;
-  color: $text-color-secondary;
+  gap: $spacing-md;
   margin-bottom: $spacing-md;
 
   @include responsive(sm) {
     justify-content: center;
   }
+}
+
+.alias-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: $spacing-xs $spacing-sm;
+  background: rgba($primary-color, 0.06);
+  border-radius: $border-radius-sm;
+  font-size: $font-size-sm;
+  color: $text-color-secondary;
 }
 
 .poet-meta {
@@ -610,6 +697,23 @@ onUnmounted(() => {
   gap: $spacing-xs;
   font-size: $font-size-base;
   color: $text-color-secondary;
+}
+
+.poet-brief {
+  background: $background-color-light;
+  border-radius: $border-radius-md;
+  box-shadow: $box-shadow;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-lg;
+  border-left: 3px solid $primary-color;
+}
+
+.brief-text {
+  font-size: $font-size-base;
+  color: $text-color-secondary;
+  line-height: $line-height-loose;
+  margin: 0;
+  text-indent: 2em;
 }
 
 .content-section {

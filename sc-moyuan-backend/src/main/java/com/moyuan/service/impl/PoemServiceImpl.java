@@ -7,11 +7,15 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.moyuan.common.ResultCode;
 import com.moyuan.entity.Poem;
+import com.moyuan.entity.Poet;
+import com.moyuan.entity.Dynasty;
 import com.moyuan.entity.UserFavorite;
 import com.moyuan.entity.UserLike;
 import com.moyuan.enums.TargetType;
 import com.moyuan.exception.BusinessException;
 import com.moyuan.mapper.PoemMapper;
+import com.moyuan.mapper.PoetMapper;
+import com.moyuan.mapper.DynastyMapper;
 import com.moyuan.mapper.UserFavoriteMapper;
 import com.moyuan.mapper.UserLikeMapper;
 import com.moyuan.service.PoemService;
@@ -29,6 +33,8 @@ import java.util.List;
 public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements PoemService {
 
     private final PoemMapper poemMapper;
+    private final PoetMapper poetMapper;
+    private final DynastyMapper dynastyMapper;
     private final UserLikeMapper userLikeMapper;
     private final UserFavoriteMapper userFavoriteMapper;
 
@@ -94,7 +100,6 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
     }
 
     @Override
-    @Cacheable(value = "poems", key = "'favorites:' + #userId + ':' + #pageNum + ':' + #pageSize")
     public IPage<Poem> getFavorites(Long userId, int pageNum, int pageSize) {
         List<Long> poemIds = userFavoriteMapper.selectList(
                 new LambdaQueryWrapper<UserFavorite>()
@@ -104,7 +109,50 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
         if (poemIds.isEmpty()) {
             return new Page<>(pageNum, pageSize);
         }
-        return poemMapper.selectPage(new Page<>(pageNum, pageSize),
+        IPage<Poem> page = poemMapper.selectPage(new Page<>(pageNum, pageSize),
                 new LambdaQueryWrapper<Poem>().in(Poem::getId, poemIds).eq(Poem::getStatus, 1));
+        populatePoetAndDynasty(page.getRecords());
+        return page;
+    }
+
+    private void populatePoetAndDynasty(List<Poem> poems) {
+        for (Poem poem : poems) {
+            if (poem.getPoetId() != null) {
+                Poet poet = poetMapper.selectById(poem.getPoetId());
+                if (poet != null) {
+                    poem.setPoetName(poet.getName());
+                }
+            }
+            if (poem.getDynastyId() != null) {
+                Dynasty dynasty = dynastyMapper.selectById(poem.getDynastyId());
+                if (dynasty != null) {
+                    poem.setDynastyName(dynasty.getName());
+                }
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    public void createPoemWithAudit(Poem poem) {
+        poem.setAuditStatus(0);
+        poem.setStatus(0);
+        save(poem);
+    }
+
+    @Override
+    @Transactional
+    public void auditPoem(Long poemId, Integer status, String reason) {
+        Poem poem = getById(poemId);
+        if (poem == null) {
+            throw new BusinessException(ResultCode.POEM_NOT_FOUND);
+        }
+        poem.setAuditStatus(status);
+        poem.setAuditReason(reason);
+        poem.setAuditTime(java.time.LocalDateTime.now());
+        if (status == 1) {
+            poem.setStatus(1);
+        }
+        updateById(poem);
     }
 }

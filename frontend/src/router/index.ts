@@ -84,6 +84,12 @@ const routes: RouteRecordRaw[] = [
         name: 'VisionDetail',
         component: () => import('@/views/vision/detail.vue'),
         meta: { title: '文章详情' }
+      },
+      {
+        path: 'user/:id/homepage',
+        name: 'UserHomepage',
+        component: () => import('@/views/user/homepage.vue'),
+        meta: { title: '用户主页' }
       }
     ]
   },

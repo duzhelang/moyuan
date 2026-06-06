@@ -197,12 +197,12 @@ onMounted(() => {
       </div>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑诗人' : '新增诗人'" width="550px" append-to-body>
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑诗人' : '新增诗人'" width="650px" append-to-body>
       <el-form :model="form" label-width="80px">
         <el-form-item label="头像">
           <ImageUpload v-model="form.avatar" :maxSize="2" />
         </el-form-item>
-        <el-row :gutter="16">
+        <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="姓名" required>
               <el-input v-model="form.name" placeholder="诗人姓名" />
@@ -216,7 +216,7 @@ onMounted(() => {
             </el-form-item>
           </el-col>
         </el-row>
-        <el-row :gutter="16">
+        <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="字">
               <el-input v-model="form.courtesyName" placeholder="字" />
@@ -228,20 +228,20 @@ onMounted(() => {
             </el-form-item>
           </el-col>
         </el-row>
-        <el-row :gutter="16">
-          <el-col :span="12">
+        <el-row :gutter="20">
+          <el-col :span="8">
             <el-form-item label="出生地">
               <el-input v-model="form.birthplace" placeholder="出生地" />
             </el-form-item>
           </el-col>
-          <el-col :span="6">
+          <el-col :span="8">
             <el-form-item label="生年">
-              <el-input-number v-model="form.birthYear" :min="-3000" :max="2500" style="width: 100%" />
+              <el-input-number v-model="form.birthYear" :min="-3000" :max="2500" controls-position="right" style="width: 100%" />
             </el-form-item>
           </el-col>
-          <el-col :span="6">
+          <el-col :span="8">
             <el-form-item label="卒年">
-              <el-input-number v-model="form.deathYear" :min="-3000" :max="2500" style="width: 100%" />
+              <el-input-number v-model="form.deathYear" :min="-3000" :max="2500" controls-position="right" style="width: 100%" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -285,6 +285,20 @@ onMounted(() => {
 .table-card {
   border-radius: 8px;
 }
+
+:deep(.el-dialog) {
+  .el-form-item__content {
+    flex: 1;
+    min-width: 0;
+  }
+  .el-input,
+  .el-textarea,
+  .el-select,
+  .el-input-number {
+    width: 100% !important;
+  }
+}
+
 .pagination-wrapper {
   display: flex;
   justify-content: flex-end;

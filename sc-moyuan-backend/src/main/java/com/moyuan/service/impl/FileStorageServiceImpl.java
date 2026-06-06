@@ -53,7 +53,7 @@ public class FileStorageServiceImpl extends ServiceImpl<FileMetadataMapper, File
     @Transactional(rollbackFor = Exception.class)
     public FileMetadata upload(MultipartFile file, String fileType, Long relatedId, String relatedType) {
         if (file == null || file.isEmpty()) {
-            throw new BusinessException(400, "上传文件不能为空");
+            throw new BusinessException("400", "上传文件不能为空");
         }
 
         String originalName = file.getOriginalFilename();
@@ -61,12 +61,12 @@ public class FileStorageServiceImpl extends ServiceImpl<FileMetadataMapper, File
 
         // 校验扩展名
         if (!isAllowedExtension(extension)) {
-            throw new BusinessException(400, "不支持的文件格式：" + extension);
+            throw new BusinessException("400", "不支持的文件格式：" + extension);
         }
 
         // 校验文件大小
         if (file.getSize() > maxSize) {
-            throw new BusinessException(400, "文件大小不能超过" + (maxSize / 1024 / 1024) + "MB");
+            throw new BusinessException("400", "文件大小不能超过" + (maxSize / 1024 / 1024) + "MB");
         }
 
         // 生成唯一文件名
@@ -76,8 +76,17 @@ public class FileStorageServiceImpl extends ServiceImpl<FileMetadataMapper, File
         String subDir = buildSubDirectory(fileType, relatedId);
         String relativePath = subDir + uniqueName;
 
+        // 读取文件字节数组（一次性读取，避免流被重复消费）
+        byte[] fileBytes;
+        try {
+            fileBytes = file.getBytes();
+        } catch (IOException e) {
+            log.error("读取文件字节失败：{}", originalName, e);
+            throw new BusinessException("500", "文件上传失败");
+        }
+
         // 计算文件MD5
-        String md5 = calculateMd5(file);
+        String md5 = calculateMd5(fileBytes);
 
         // 检查MD5是否已存在（秒传支持）
         FileMetadata existing = fileMetadataMapper.selectOne(
@@ -99,10 +108,10 @@ public class FileStorageServiceImpl extends ServiceImpl<FileMetadataMapper, File
             if (!parentDir.exists()) {
                 parentDir.mkdirs();
             }
-            file.transferTo(destFile);
+            java.nio.file.Files.write(destFile.toPath(), fileBytes);
         } catch (IOException e) {
             log.error("文件写入失败：{}", absolutePath, e);
-            throw new BusinessException(500, "文件上传失败");
+            throw new BusinessException("500", "文件上传失败");
         }
 
         // 对AI生成的图片自动添加水印
@@ -188,11 +197,11 @@ public class FileStorageServiceImpl extends ServiceImpl<FileMetadataMapper, File
         FileMetadata source = fileMetadataMapper.selectOne(
                 new LambdaQueryWrapper<FileMetadata>().eq(FileMetadata::getFileKey, fileKey));
         if (source == null) {
-            throw new BusinessException(404, "文件记录不存在");
+            throw new BusinessException("404", "文件记录不存在");
         }
 
         if (!isImageMimeType(source.getMimeType())) {
-            throw new BusinessException(400, "仅支持图片类型生成缩略图");
+            throw new BusinessException("400", "仅支持图片类型生成缩略图");
         }
 
         // 生成缩略图路径
@@ -204,12 +213,12 @@ public class FileStorageServiceImpl extends ServiceImpl<FileMetadataMapper, File
         try {
             File sourceFile = new File(sourcePath);
             if (!sourceFile.exists()) {
-                throw new BusinessException(404, "源文件不存在");
+                throw new BusinessException("404", "源文件不存在");
             }
 
             BufferedImage sourceImage = ImageIO.read(sourceFile);
             if (sourceImage == null) {
-                throw new BusinessException(500, "无法读取图片");
+                throw new BusinessException("500", "无法读取图片");
             }
 
             // 等比缩放
@@ -254,7 +263,7 @@ public class FileStorageServiceImpl extends ServiceImpl<FileMetadataMapper, File
             return thumbMetadata;
         } catch (IOException e) {
             log.error("缩略图生成失败：{}", fileKey, e);
-            throw new BusinessException(500, "缩略图生成失败");
+            throw new BusinessException("500", "缩略图生成失败");
         }
     }
 
@@ -358,18 +367,13 @@ public class FileStorageServiceImpl extends ServiceImpl<FileMetadataMapper, File
     }
 
     /**
-     * 计算文件MD5
+     * 计算文件MD5（从字节数组）
      */
-    private String calculateMd5(MultipartFile file) {
-        try (InputStream is = file.getInputStream()) {
+    private String calculateMd5(byte[] fileBytes) {
+        try {
             MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] buffer = new byte[8192];
-            int bytesRead;
-            while ((bytesRead = is.read(buffer)) != -1) {
-                md.update(buffer, 0, bytesRead);
-            }
-            return HexFormat.of().formatHex(md.digest());
-        } catch (IOException | NoSuchAlgorithmException e) {
+            return HexFormat.of().formatHex(md.digest(fileBytes));
+        } catch (NoSuchAlgorithmException e) {
             log.warn("计算MD5失败", e);
             return null;
         }

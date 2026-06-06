@@ -1,4 +1,5 @@
 import axios from 'axios'
+import request from '@/utils/request'
 
 // 今日诗词 API
 const jinrishiciApi = axios.create({
@@ -122,5 +123,168 @@ export async function searchPoetry(title: string, author: string): Promise<Poetr
   } catch (error) {
     console.error('组合搜索诗词失败:', error)
     return []
+  }
+}
+
+// ========== 后端诗词搜索推荐API ==========
+
+export interface PoemSearchResult {
+  id?: number
+  title: string
+  content: string
+  author?: string
+  dynasty?: string
+  source: 'local' | 'external'
+  recommendScore?: number
+  recommendReason?: string
+  viewCount?: number
+  likeCount?: number
+  favoriteCount?: number
+}
+
+/**
+ * 诗词搜索（支持协同过滤推荐）
+ */
+export async function searchPoemsWithRecommend(
+  keyword: string,
+  page: number = 1,
+  size: number = 10
+): Promise<PoemSearchResult[]> {
+  try {
+    const response = await request.get('/api/search/poems', {
+      params: { keyword, page, size }
+    })
+    return response.data || []
+  } catch (error) {
+    console.error('诗词搜索失败:', error)
+    return []
+  }
+}
+
+/**
+ * 获取推荐诗词（基于协同过滤）
+ */
+export async function getRecommendedPoems(limit: number = 10): Promise<PoemSearchResult[]> {
+  try {
+    const response = await request.get('/api/search/poems/recommended', {
+      params: { limit }
+    })
+    return response.data || []
+  } catch (error) {
+    console.error('获取推荐诗词失败:', error)
+    return []
+  }
+}
+
+/**
+ * 获取热门诗词
+ */
+export async function getPopularPoems(limit: number = 10): Promise<PoemSearchResult[]> {
+  try {
+    const response = await request.get('/api/search/poems/popular', {
+      params: { limit }
+    })
+    return response.data || []
+  } catch (error) {
+    console.error('获取热门诗词失败:', error)
+    return []
+  }
+}
+
+/**
+ * 从外部API获取古诗词
+ */
+export async function getExternalPoems(
+  keyword: string,
+  limit: number = 5
+): Promise<PoemSearchResult[]> {
+  try {
+    const response = await request.get('/api/search/poems/external', {
+      params: { keyword, limit }
+    })
+    return response.data || []
+  } catch (error) {
+    console.error('获取外部诗词失败:', error)
+    return []
+  }
+}
+
+// ========== 接口盒子 API (apihz.cn) ==========
+
+const APIHZ_BASE = 'https://cn.apihz.cn/api/zici'
+const APIHZ_ID = '10017619'
+const APIHZ_KEY = '87736ae7fe3a325574c57ef1f45962a4'
+
+export interface ApihzPoetryItem {
+  name: string
+  content: string
+  author: string
+  dynasty: string
+  tag: string | null
+  ywjzsy: string | null
+  ywjzse: string | null
+  czbj: string | null
+  jsy: string | null
+  jse: string | null
+  sxy: string | null
+  sxe: string | null
+  jj: string | null
+  wyzs: string | null
+  yj: string | null
+  xzsf: string | null
+  dj: string | null
+  pj: string | null
+  jx: string | null
+}
+
+export interface ApihzResponse {
+  code: number
+  msg: string
+  page: number
+  data: ApihzPoetryItem[]
+}
+
+function stripHtml(html: string | null): string | null {
+  if (!html) return null
+  return html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim() || null
+}
+
+export async function getApihzPoetryDetail(
+  keyword: string,
+  page: number = 1
+): Promise<ApihzPoetryItem | null> {
+  try {
+    const response = await axios.get<ApihzResponse>(`${APIHZ_BASE}/poetry.php`, {
+      params: {
+        id: APIHZ_ID,
+        key: APIHZ_KEY,
+        words: keyword,
+        page
+      }
+    })
+    if (response.data.code === 200 && response.data.data?.length > 0) {
+      const item = response.data.data[0]
+      return {
+        ...item,
+        content: stripHtml(item.content) || item.content,
+        ywjzsy: stripHtml(item.ywjzsy),
+        ywjzse: stripHtml(item.ywjzse),
+        czbj: stripHtml(item.czbj),
+        jsy: stripHtml(item.jsy),
+        jse: stripHtml(item.jse),
+        sxy: stripHtml(item.sxy),
+        sxe: stripHtml(item.sxe),
+        jj: stripHtml(item.jj),
+        yj: stripHtml(item.yj),
+        xzsf: stripHtml(item.xzsf),
+        dj: stripHtml(item.dj),
+        pj: stripHtml(item.pj),
+        jx: stripHtml(item.jx),
+      }
+    }
+    return null
+  } catch (error) {
+    console.error('获取接口盒子诗词详情失败:', error)
+    return null
   }
 }

@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>诗境AI - 古诗词智能助手</title>
+    <style>
+        :root {
+            --bg: #f5f0e8;
+            --paper: #fdfaf3;
+            --ink: #2c2416;
+            --ink-light: #5c4a3a;
+            --ink-faded: #8b7355;
+            --gold: #b8860b;
+            --gold-light: #d4a745;
+            --accent: #c0392b;
+            --accent-soft: #d4776a;
+            --jade: #6b8e7b;
+            --jade-light: #a3c4b5;
+            --cloud: #e8e0d5;
+            --border: #d9cebf;
+            --shadow: rgba(44, 36, 22, 0.08);
+            --shadow-lg: rgba(44, 36, 22, 0.16);
+            --radius-sm: 8px;
+            --radius: 14px;
+            --radius-lg: 20px;
+            --radius-xl: 28px;
+            --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --font-poem: 'STKaiti', 'KaiTi', 'Noto Serif SC', 'STSong', 'SimSun', 'Songti SC', serif;
+            --font-body: 'STSong', 'Noto Serif SC', 'Songti SC', 'SimSun', 'PingFang SC', 'Microsoft YaHei', serif;
+            --font-display: 'STKaiti', 'KaiTi', 'Ma Shan Zheng', 'ZCOOL XiaoWei', 'Noto Serif SC', serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background-color: #e8e0d3;
+            background-image:
+                    radial-gradient(ellipse at 15% 20%, rgba(180, 160, 130, 0.25) 0%, transparent 55%),
+                    radial-gradient(ellipse at 85% 75%, rgba(160, 140, 110, 0.2) 0%, transparent 55%),
+                    radial-gradient(ellipse at 50% 50%, rgba(210, 195, 165, 0.15) 0%, transparent 70%),
+                    url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 5 Q35 30 30 55' stroke='%23d9cebf' fill='none' stroke-width='0.3' opacity='0.4'/%3E%3Cpath d='M15 15 Q30 18 45 15' stroke='%23d9cebf' fill='none' stroke-width='0.3' opacity='0.35'/%3E%3C/svg%3E");
+            background-attachment: fixed;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* ============ 全局装饰 ============ */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -120px;
+            right: -80px;
+            width: 350px;
+            height: 350px;
+            background: radial-gradient(circle, rgba(210, 180, 140, 0.18) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        body::after {
+            content: '';
+            position: fixed;
+            bottom: -100px;
+            left: -60px;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(180, 160, 130, 0.16) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* 飘落花瓣 */
+        .petal-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+        .petal {
+            position: absolute;
+            top: -40px;
+            animation: petalFall linear infinite;
+            opacity: 0;
+            font-size: 18px;
+            user-select: none;
+        }
+        @keyframes petalFall {
+            0% {
+                transform: translateY(-40px) rotate(0deg) translateX(0px);
+                opacity: 0;
+            }
+            8% {
+                opacity: 0.7;
+            }
+            85% {
+                opacity: 0.5;
+            }
+            100% {
+                transform: translateY(105vh) rotate(720deg) translateX(120px);
+                opacity: 0;
+            }
+        }
+
+        /* ============ 主容器 ============ */
+        .main-container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 880px;
+            background: var(--paper);
+            border-radius: var(--radius-xl);
+            box-shadow:
+                    0 4px 30px var(--shadow),
+                    0 20px 60px var(--shadow-lg),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+            border: 1.5px solid var(--border);
+            padding: 40px 36px 32px;
+            /* 宣纸纹理 */
+            background-image:
+                    linear-gradient(0deg, transparent 24%, rgba(180, 160, 130, 0.03) 25%, rgba(180, 160, 130, 0.03) 26%, transparent 27%, transparent 74%, rgba(180, 160, 130, 0.03) 75%, rgba(180, 160, 130, 0.03) 76%, transparent 77%),
+                    linear-gradient(90deg, transparent 24%, rgba(180, 160, 130, 0.02) 25%, rgba(180, 160, 130, 0.02) 26%, transparent 27%, transparent 74%, rgba(180, 160, 130, 0.02) 75%, rgba(180, 160, 130, 0.02) 76%, transparent 77%);
+            background-size: 60px 60px;
+        }
+
+        /* 顶部装订线 */
+        .main-container::before {
+            content: '';
+            position: absolute;
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 70%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--ink-faded), var(--ink-faded), transparent);
+            opacity: 0.3;
+            border-radius: 1px;
+        }
+
+        /* ============ 头部 ============ */
+        .header {
+            text-align: center;
+            margin-bottom: 28px;
+            position: relative;
+        }
+        .header-icon {
+            display: inline-block;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #fdfaf3 0%, #f5ede0 100%);
+            border-radius: 50%;
+            border: 2px solid var(--border);
+            box-shadow: 0 3px 14px var(--shadow);
+            margin-bottom: 10px;
+            line-height: 56px;
+            font-size: 30px;
+            position: relative;
+        }
+        .header-icon::after {
+            content: '';
+            position: absolute;
+            inset: -6px;
+            border-radius: 50%;
+            border: 1px dashed var(--border);
+            opacity: 0.5;
+            animation: rotateDashed 20s linear infinite;
+        }
+        @keyframes rotateDashed {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        .header h1 {
+            font-family: var(--font-display);
+            font-size: 2.4em;
+            color: var(--ink);
+            letter-spacing: 0.06em;
+            font-weight: 400;
+            margin: 4px 0 0;
+            position: relative;
+            display: inline-block;
+        }
+        .header h1::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+            border-radius: 2px;
+        }
+        .header .subtitle {
+            display: block;
+            font-size: 0.85em;
+            color: var(--ink-faded);
+            letter-spacing: 0.08em;
+            margin-top: 8px;
+            font-family: var(--font-body);
+        }
+        .header .seal {
+            display: inline-block;
+            width: 38px;
+            height: 38px;
+            border: 2px solid var(--accent);
+            border-radius: 6px;
+            color: var(--accent);
+            font-family: var(--font-display);
+            font-size: 0.7em;
+            line-height: 34px;
+            text-align: center;
+            transform: rotate(-6deg);
+            margin-left: 8px;
+            opacity: 0.75;
+            vertical-align: middle;
+            position: relative;
+            top: -2px;
+        }
+
+        /* ============ 标签切换 ============ */
+        .tab-nav {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+            position: relative;
+            z-index: 2;
+        }
+        .tab-btn {
+            padding: 10px 22px;
+            border-radius: 30px;
+            border: 1.5px solid var(--border);
+            background: var(--paper);
+            cursor: pointer;
+            font-family: var(--font-body);
+            font-size: 0.95em;
+            color: var(--ink-light);
+            letter-spacing: 0.04em;
+            transition: all var(--transition);
+            position: relative;
+            white-space: nowrap;
+            user-select: none;
+        }
+        .tab-btn:hover {
+            border-color: var(--gold);
+            color: var(--ink);
+            box-shadow: 0 3px 14px var(--shadow);
+            transform: translateY(-1px);
+        }
+        .tab-btn.active {
+            background: linear-gradient(135deg, #3a2f20 0%, #2c2416 100%);
+            color: #f5ecd7;
+            border-color: transparent;
+            box-shadow: 0 4px 18px rgba(44, 36, 22, 0.3);
+            font-weight: 500;
+            letter-spacing: 0.05em;
+        }
+        .tab-btn .tab-icon {
+            margin-right: 4px;
+            font-size: 1.05em;
+        }
+
+        /* ============ 面板容器 ============ */
+        .panels {
+            position: relative;
+            min-height: 420px;
+        }
+        .panel {
+            display: none;
+            animation: fadeSlideIn 0.45s ease;
+        }
+        .panel.active {
+            display: block;
+        }
+        @keyframes fadeSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ============ 看图写诗面板 ============ */
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-lg);
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all var(--transition);
+            position: relative;
+            background: linear-gradient(180deg, rgba(245, 240, 230, 0.5) 0%, rgba(253, 250, 243, 0.3) 100%);
+            overflow: hidden;
+        }
+        .upload-zone:hover {
+            border-color: var(--gold);
+            background: linear-gradient(180deg, rgba(250, 245, 235, 0.7) 0%, rgba(255, 252, 245, 0.5) 100%);
+            box-shadow: 0 6px 28px var(--shadow);
+            transform: translateY(-2px);
+        }
+        .upload-zone.drag-over {
+            border-color: var(--gold-light);
+            background: rgba(210, 180, 140, 0.1);
+            box-shadow: 0 0 0 8px rgba(210, 180, 140, 0.06);
+        }
+        .upload-zone .upload-icon {
+            font-size: 56px;
+            display: block;
+            margin-bottom: 12px;
+            transition: transform var(--transition);
+        }
+        .upload-zone:hover .upload-icon {
+            transform: scale(1.08);
+        }
+        .upload-zone .upload-text {
+            font-family: var(--font-display);
+            font-size: 1.3em;
+            color: var(--ink-light);
+            letter-spacing: 0.05em;
+        }
+        .upload-zone .upload-hint {
+            font-size: 0.85em;
+            color: var(--ink-faded);
+            margin-top: 6px;
+        }
+        .upload-zone input[type="file"] {
+            display: none;
+        }
+        /* 预览区 */
+        .image-preview-area {
+            display: none;
+            margin-top: 18px;
+            text-align: center;
+            animation: fadeSlideIn 0.4s ease;
+        }
+        .image-preview-area.show {
+            display: block;
+        }
+        .image-preview-area img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: var(--radius);
+            box-shadow: 0 6px 24px var(--shadow-lg);
+            border: 3px solid var(--border);
+            object-fit: contain;
+            background: #faf7f0;
+        }
+        .preview-actions {
+            margin-top: 14px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        /* ============ 智能分析面板 ============ */
+        .analyze-input-wrap {
+            position: relative;
+            background: var(--paper);
+            border-radius: var(--radius);
+            border: 1.5px solid var(--border);
+            padding: 6px;
+            transition: all var(--transition);
+            box-shadow: 0 2px 10px var(--shadow);
+        }
+        .analyze-input-wrap:focus-within {
+            border-color: var(--gold);
+            box-shadow: 0 4px 20px rgba(184, 134, 11, 0.12);
+        }
+        .analyze-input-wrap textarea {
+            width: 100%;
+            min-height: 130px;
+            border: none;
+            outline: none;
+            resize: vertical;
+            font-family: var(--font-poem);
+            font-size: 1.15em;
+            padding: 16px 18px;
+            background: transparent;
+            color: var(--ink);
+            letter-spacing: 0.04em;
+            line-height: 1.8;
+            border-radius: var(--radius-sm);
+        }
+        .analyze-input-wrap textarea::placeholder {
+            color: #c4b8a8;
+            font-style: italic;
+            letter-spacing: 0.03em;
+        }
+        .analyze-examples {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+            padding: 0 4px;
+        }
+        .example-tag {
+            font-size: 0.82em;
+            padding: 6px 13px;
+            border-radius: 20px;
+            background: #f7f3ea;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            color: var(--ink-faded);
+            transition: all var(--transition);
+            white-space: nowrap;
+            font-family: var(--font-poem);
+        }
+        .example-tag:hover {
+            background: #f0e8d5;
+            border-color: var(--gold);
+            color: var(--ink);
+        }
+
+        /* ============ 结果展示区 ============ */
+        .result-card {
+            margin-top: 20px;
+            background: linear-gradient(180deg, #fdfaf5 0%, #f9f4e8 100%);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            padding: 22px 24px;
+            display: none;
+            animation: fadeSlideIn 0.5s ease;
+            position: relative;
+            box-shadow: 0 3px 16px var(--shadow);
+            min-height: 60px;
+        }
+        .result-card.show {
+            display: block;
+        }
+        .result-card .poem-content {
+            font-family: var(--font-poem);
+            font-size: 1.3em;
+            line-height: 2;
+            letter-spacing: 0.05em;
+            color: var(--ink);
+            text-align: center;
+            white-space: pre-line;
+            position: relative;
+        }
+        .result-card .poem-content::before,
+        .result-card .poem-content::after {
+            font-size: 1.6em;
+            color: var(--gold);
+            opacity: 0.6;
+            font-family: var(--font-display);
+            position: absolute;
+        }
+        .result-card .poem-content::before {
+            content: '「';
+            left: -4px;
+            top: -6px;
+        }
+        .result-card .poem-content::after {
+            content: '」';
+            right: -4px;
+            bottom: -6px;
+        }
+        .result-card .analysis-text {
+            font-family: var(--font-body);
+            font-size: 0.95em;
+            color: var(--ink-light);
+            line-height: 1.9;
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px dotted var(--border);
+            letter-spacing: 0.03em;
+        }
+        .result-card .analysis-label {
+            display: inline-block;
+            font-size: 0.8em;
+            color: var(--gold);
+            letter-spacing: 0.06em;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+        .typing-indicator {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            padding: 12px;
+        }
+        .typing-indicator span {
+            width: 7px;
+            height: 7px;
+            background: var(--gold);
+            border-radius: 50%;
+            animation: typingBounce 1.2s infinite;
+        }
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.15s;
+        }
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.3s;
+        }
+        @keyframes typingBounce {
+            0%,
+            80%,
+            100% {
+                transform: scale(0.6);
+                opacity: 0.4;
+            }
+            40% {
+                transform: scale(1.2);
+                opacity: 1;
+            }
+        }
+
+        /* ============ 按钮 ============ */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 11px 24px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-family: var(--font-body);
+            font-size: 0.95em;
+            letter-spacing: 0.04em;
+            border: none;
+            transition: all var(--transition);
+            user-select: none;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #3a2f20 0%, #2c2416 100%);
+            color: #f5ecd7;
+            box-shadow: 0 4px 16px rgba(44, 36, 22, 0.25);
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 22px rgba(44, 36, 22, 0.35);
+            background: linear-gradient(135deg, #4a3d2a 0%, #3a2f20 100%);
+        }
+        .btn-outline {
+            background: transparent;
+            border: 1.5px solid var(--border);
+            color: var(--ink-light);
+        }
+        .btn-outline:hover {
+            border-color: var(--gold);
+            color: var(--ink);
+            background: rgba(210, 180, 140, 0.06);
+        }
+        .btn-sm {
+            padding: 7px 16px;
+            font-size: 0.85em;
+            border-radius: 22px;
+        }
+        .btn-icon {
+            width: 38px;
+            height: 38px;
+            padding: 0;
+            border-radius: 50%;
+            justify-content: center;
+            font-size: 1.1em;
+        }
+
+        /* ============ 意见反馈浮动按钮和弹窗 ============ */
+        .feedback-fab {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            z-index: 100;
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #b8860b 0%, #8b6914 100%);
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-size: 1.5em;
+            box-shadow: 0 6px 22px rgba(139, 105, 20, 0.4);
+            transition: all var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: gentlePulse 3s ease-in-out infinite;
+        }
+        @keyframes gentlePulse {
+            0%,
+            100% {
+                box-shadow: 0 6px 22px rgba(139, 105, 20, 0.4);
+            }
+            50% {
+                box-shadow: 0 6px 30px rgba(139, 105, 20, 0.65), 0 0 0 10px rgba(184, 134, 11, 0.08);
+            }
+        }
+        .feedback-fab:hover {
+            transform: translateY(-3px) scale(1.06);
+            box-shadow: 0 10px 30px rgba(139, 105, 20, 0.5);
+            background: linear-gradient(135deg, #d4a745 0%, #b8860b 100%);
+        }
+        .feedback-fab .fab-tooltip {
+            position: absolute;
+            right: 62px;
+            background: var(--ink);
+            color: #f5ecd7;
+            padding: 7px 14px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity var(--transition);
+            font-family: var(--font-body);
+            letter-spacing: 0.04em;
+        }
+        .feedback-fab:hover .fab-tooltip {
+            opacity: 1;
+        }
+
+        /* 弹窗遮罩 */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(30, 22, 14, 0.55);
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity var(--transition);
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+        }
+        .modal-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-dialog {
+            background: var(--paper);
+            border-radius: var(--radius-lg);
+            padding: 28px 26px 22px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 50px rgba(30, 22, 14, 0.4);
+            border: 1.5px solid var(--border);
+            transform: translateY(20px);
+            transition: transform var(--transition);
+            position: relative;
+            background-image: linear-gradient(0deg, transparent 24%, rgba(180, 160, 130, 0.02) 25%, rgba(180, 160, 130, 0.02) 26%, transparent 27%);
+            background-size: 40px 40px;
+        }
+        .modal-overlay.open .modal-dialog {
+            transform: translateY(0);
+        }
+        .modal-dialog h3 {
+            font-family: var(--font-display);
+            font-size: 1.5em;
+            color: var(--ink);
+            letter-spacing: 0.05em;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .modal-dialog .form-group {
+            margin-bottom: 14px;
+        }
+        .modal-dialog label {
+            display: block;
+            font-size: 0.9em;
+            color: var(--ink-light);
+            margin-bottom: 5px;
+            letter-spacing: 0.03em;
+        }
+        .modal-dialog input,
+        .modal-dialog textarea,
+        .modal-dialog select {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            border: 1.5px solid var(--border);
+            font-family: var(--font-body);
+            font-size: 0.95em;
+            background: #fdfaf5;
+            color: var(--ink);
+            transition: all var(--transition);
+            letter-spacing: 0.03em;
+        }
+        .modal-dialog input:focus,
+        .modal-dialog textarea:focus,
+        .modal-dialog select:focus {
+            outline: none;
+            border-color: var(--gold);
+            box-shadow: 0 0 0 4px rgba(184, 134, 11, 0.06);
+        }
+        .modal-dialog textarea {
+            min-height: 90px;
+            resize: vertical;
+        }
+        .modal-dialog .btn-row {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 6px;
+        }
+        .modal-close {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: var(--ink-faded);
+            transition: color var(--transition);
+            line-height: 1;
+        }
+        .modal-close:hover {
+            color: var(--accent);
+        }
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 300;
+            background: var(--ink);
+            color: #f5ecd7;
+            padding: 10px 22px;
+            border-radius: 30px;
+            font-family: var(--font-body);
+            font-size: 0.9em;
+            letter-spacing: 0.04em;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease, top 0.35s ease;
+            box-shadow: 0 6px 22px rgba(30, 22, 14, 0.35);
+        }
+        .toast.show {
+            opacity: 1;
+            top: 30px;
+        }
+
+        /* ============ 拓展功能区 ============ */
+        .extra-features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 26px;
+            padding-top: 20px;
+            border-top: 1px dotted var(--border);
+        }
+        .extra-card {
+            background: #fdfaf5;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all var(--transition);
+            user-select: none;
+        }
+        .extra-card:hover {
+            border-color: var(--gold);
+            box-shadow: 0 4px 18px var(--shadow);
+            transform: translateY(-2px);
+        }
+        .extra-card .extra-icon {
+            font-size: 2em;
+            margin-bottom: 6px;
+        }
+        .extra-card .extra-title {
+            font-family: var(--font-display);
+            font-size: 1em;
+            color: var(--ink);
+            letter-spacing: 0.04em;
+        }
+        .extra-card .extra-desc {
+            font-size: 0.78em;
+            color: var(--ink-faded);
+            margin-top: 3px;
+        }
+
+        /* ============ 响应式 ============ */
+        @media (max-width: 640px) {
+            .main-container {
+                padding: 22px 14px 18px;
+                border-radius: var(--radius);
+            }
+            .header h1 {
+                font-size: 1.7em;
+            }
+            .tab-btn {
+                padding: 8px 14px;
+                font-size: 0.82em;
+            }
+            .upload-zone {
+                padding: 26px 12px;
+            }
+            .upload-zone .upload-icon {
+                font-size: 40px;
+            }
+            .result-card .poem-content {
+                font-size: 1.1em;
+            }
+            .extra-features {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+            .feedback-fab {
+                bottom: 16px;
+                right: 16px;
+                width: 44px;
+                height: 44px;
+                font-size: 1.2em;
+            }
+            .modal-dialog {
+                padding: 20px 16px 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- 飘落花瓣 -->
+<div class="petal-container" id="petalContainer"></div>
+
+<!-- 主容器 -->
+<div class="main-container">
+    <!-- 头部 -->
+    <header class="header">
+        <div class="header-icon">🖋️</div>
+        <h1>诗境 AI</h1>
+        <span class="seal">雅</span>
+        <span class="subtitle">· 古诗词智能创作与品鉴 ·</span>
+    </header>
+
+    <!-- 标签导航 -->
+    <nav class="tab-nav">
+        <button class="tab-btn active" data-panel="panel-poem">
+            <span class="tab-icon">🖼️</span> 看图写诗
+        </button>
+        <button class="tab-btn" data-panel="panel-analyze">
+            <span class="tab-icon">🔍</span> 智能分析
+        </button>
+        <button class="tab-btn" data-panel="panel-explore">
+            <span class="tab-icon">📜</span> 诗海拾贝
+        </button>
+    </nav>
+
+    <!-- 面板区域 -->
+    <div class="panels">
+        <!-- 看图写诗面板 -->
+        <div class="panel active" id="panel-poem">
+            <div class="upload-zone" id="uploadZone">
+                <span class="upload-icon">🏔️</span>
+                <p class="upload-text">点击上传图片，或拖拽至此处</p>
+                <p class="upload-hint">支持 JPG / PNG / WebP，AI 将为您赋诗一首</p>
+                <input type="file" id="imageInput" accept="image/*">
+            </div>
+            <div class="image-preview-area" id="previewArea">
+                <img id="previewImage" src="" alt="预览图片">
+                <div class="preview-actions">
+                    <button class="btn btn-primary" id="btnGeneratePoem">✨ 开始赋诗</button>
+                    <button class="btn btn-outline btn-sm" id="btnClearImage">重新选择</button>
+                </div>
+            </div>
+            <div class="result-card" id="poemResult">
+                <div class="typing-indicator" id="poemTyping">
+                    <span></span><span></span><span></span>
+                </div>
+                <div class="poem-content" id="poemContent"></div>
+                <div class="analysis-text" id="poemAnalysis"></div>
+            </div>
+        </div>
+
+        <!-- 智能分析面板 -->
+        <div class="panel" id="panel-analyze">
+            <div class="analyze-input-wrap">
+                <textarea id="analyzeInput" placeholder="在此输入诗句，如：床前明月光，疑是地上霜。"></textarea>
+            </div>
+            <div class="analyze-examples">
+                <span class="example-tag" data-text="床前明月光，疑是地上霜。">🌙 静夜思</span>
+                <span class="example-tag" data-text="大漠孤烟直，长河落日圆。">🏜️ 使至塞上</span>
+                <span class="example-tag" data-text="落霞与孤鹜齐飞，秋水共长天一色。">🕊️ 滕王阁序</span>
+                <span class="example-tag" data-text="人生若只如初见，何事秋风悲画扇。">🍂 纳兰词</span>
+            </div>
+            <div style="margin-top:14px;text-align:right;">
+                <button class="btn btn-primary" id="btnAnalyze">🔍 智能解析</button>
+            </div>
+            <div class="result-card" id="analyzeResult">
+                <div class="typing-indicator" id="analyzeTyping">
+                    <span></span><span></span><span></span>
+                </div>
+                <div class="analysis-label">📖 深度解析</div>
+                <div class="analysis-text" id="analyzeContent"></div>
+            </div>
+        </div>
+
+        <!-- 诗海拾贝面板（拓展） -->
+        <div class="panel" id="panel-explore">
+            <p style="text-align:center;color:var(--ink-faded);font-family:var(--font-display);font-size:1.1em;letter-spacing:0.05em;">
+                🌊 随机推荐一首经典诗词，感受千年文脉
+            </p>
+            <div class="result-card show" id="exploreResult" style="margin-top:14px;">
+                <div class="poem-content" id="explorePoem">加载中...</div>
+                <div class="analysis-text" id="exploreInfo" style="text-align:center;"></div>
+            </div>
+            <div style="text-align:center;margin-top:12px;">
+                <button class="btn btn-outline" id="btnRefreshExplore">🔄 换一首</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 拓展功能区 -->
+    <div class="extra-features">
+        <div class="extra-card" id="extraRhyme">
+            <div class="extra-icon">🎵</div>
+            <div class="extra-title">韵脚查询</div>
+            <div class="extra-desc">查询汉字所属韵部</div>
+        </div>
+        <div class="extra-card" id="extraCouplet">
+            <div class="extra-icon">🏮</div>
+            <div class="extra-title">AI 对对联</div>
+            <div class="extra-desc">上联出题，AI 对下联</div>
+        </div>
+        <div class="extra-card" id="extraCalligraphy">
+            <div class="extra-icon">✒️</div>
+            <div class="extra-title">书法生成</div>
+            <div class="extra-desc">诗句转书法图片</div>
+        </div>
+        <div class="extra-card" id="extraCollection">
+            <div class="extra-icon">📚</div>
+            <div class="extra-title">我的诗笺</div>
+            <div class="extra-desc">收藏喜爱的诗词</div>
+        </div>
+    </div>
+</div>
+
+<!-- 意见反馈浮动按钮 -->
+<button class="feedback-fab" id="feedbackFab" title="意见反馈">
+    💬
+    <span class="fab-tooltip">留下宝贵意见</span>
+</button>
+
+<!-- 意见反馈弹窗 -->
+<div class="modal-overlay" id="feedbackModal">
+    <div class="modal-dialog">
+        <button class="modal-close" id="modalClose">✕</button>
+        <h3>📝 意见反馈</h3>
+        <div class="form-group">
+            <label>反馈类型</label>
+            <select id="feedbackType">
+                <option value="suggestion">功能建议</option>
+                <option value="bug">问题反馈</option>
+                <option value="praise">好评点赞</option>
+                <option value="other">其他</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>您的昵称（选填）</label>
+            <input type="text" id="feedbackName" placeholder="如何称呼您">
+        </div>
+        <div class="form-group">
+            <label>详细描述 <span style="color:var(--accent);">*</span></label>
+            <textarea id="feedbackContent" placeholder="请详细描述您的想法或遇到的问题..." required></textarea>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-outline btn-sm" id="btnCancelFeedback">取消</button>
+            <button class="btn btn-primary btn-sm" id="btnSubmitFeedback">📨 提交反馈</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast 提示 -->
+<div class="toast" id="toast"></div>
+
+<script>
+    (function() {
+        // ============ 花瓣飘落 ============
+        const petalContainer = document.getElementById('petalContainer');
+        const petalChars = ['🌸', '🍂', '🍃', '🌺', '💮', '🏵️', '✿', '🌷', '🍁', '🌼'];
+        for (let i = 0; i < 18; i++) {
+            const petal = document.createElement('span');
+            petal.className = 'petal';
+            petal.textContent = petalChars[Math.floor(Math.random() * petalChars.length)];
+            petal.style.left = Math.random() * 95 + '%';
+            petal.style.fontSize = (12 + Math.random() * 18) + 'px';
+            petal.style.animationDuration = (8 + Math.random() * 16) + 's';
+            petal.style.animationDelay = Math.random() * 14 + 's';
+            petal.style.opacity = (0.3 + Math.random() * 0.4);
+            petalContainer.appendChild(petal);
+        }
+
+        // ============ 标签切换 ============
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const panels = document.querySelectorAll('.panel');
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                tabBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const targetId = btn.getAttribute('data-panel');
+                panels.forEach(p => p.classList.remove('active'));
+                document.getElementById(targetId).classList.add('active');
+            });
+        });
+
+        // ============ Toast ============
+        function showToast(msg, duration = 2200) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            clearTimeout(toast._timeout);
+            toast._timeout = setTimeout(() => toast.classList.remove('show'), duration);
+        }
+
+        // ============ 模拟AI响应 ============
+        function simulateAIResponse(callback, delay = 1600) {
+            setTimeout(callback, delay);
+        }
+
+        function showTyping(typingEl) {
+            if (typingEl) typingEl.style.display = 'flex';
+        }
+
+        function hideTyping(typingEl) {
+            if (typingEl) typingEl.style.display = 'none';
+        }
+
+        // ============ 看图写诗 ============
+        const uploadZone = document.getElementById('uploadZone');
+        const imageInput = document.getElementById('imageInput');
+        const previewArea = document.getElementById('previewArea');
+        const previewImage = document.getElementById('previewImage');
+        const btnGeneratePoem = document.getElementById('btnGeneratePoem');
+        const btnClearImage = document.getElementById('btnClearImage');
+        const poemResult = document.getElementById('poemResult');
+        const poemTyping = document.getElementById('poemTyping');
+        const poemContent = document.getElementById('poemContent');
+        const poemAnalysis = document.getElementById('poemAnalysis');
+        let uploadedFile = null;
+
+        uploadZone.addEventListener('click', () => imageInput.click());
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('drag-over');
+        });
+        uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        imageInput.addEventListener('change', () => {
+            if (imageInput.files.length > 0) handleFile(imageInput.files[0]);
+        });
+
+        function handleFile(file) {
+            if (!file.type.match(/image\/(jpeg|png|webp)/)) {
+                showToast('请上传 JPG / PNG / WebP 格式的图片');
+                return;
+            }
+            uploadedFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                previewArea.classList.add('show');
+                uploadZone.style.display = 'none';
+                poemResult.classList.remove('show');
+                poemContent.textContent = '';
+                poemAnalysis.textContent = '';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        btnClearImage.addEventListener('click', () => {
+            uploadedFile = null;
+            previewImage.src = '';
+            previewArea.classList.remove('show');
+            uploadZone.style.display = '';
+            poemResult.classList.remove('show');
+            imageInput.value = '';
+        });
+
+        btnGeneratePoem.addEventListener('click', () => {
+            if (!uploadedFile) {
+                showToast('请先上传一张图片');
+                return;
+            }
+            poemResult.classList.add('show');
+            poemContent.textContent = '';
+            poemAnalysis.textContent = '';
+            showTyping(poemTyping);
+            simulateAIResponse(() => {
+                hideTyping(poemTyping);
+                const poems = [
+                    { poem: '云山苍翠远，\n流水绕孤村。\n一鹤排空去，\n千峰入梦痕。',
+                        analysis: '此诗以山水为背景，描绘了一幅宁静悠远的画面。"云山苍翠"写远景之壮阔，"流水绕孤村"则拉近至人间烟火，一远一近间意境顿生。白鹤排空而去，象征高洁之志；千峰入梦，则将自然之景内化为心灵之境，余韵悠长。' },
+                    { poem: '竹影摇窗月，\n松风入砚池。\n心随云鹤远，\n天地一囊诗。',
+                        analysis: '诗人借竹影、松风等意象营造清雅氛围。"摇窗月"三字灵动，将月光与竹影交织的动态美展现无遗。后两句由景入情，抒发了心怀天地、以诗囊括万物的豁达胸襟，体现了典型的文人情怀。' },
+                    { poem: '秋水长天阔，\n孤帆落日斜。\n人生如逆旅，\n何处不烟霞。',
+                        analysis: '开篇以秋水长天、孤帆落日勾勒出苍茫辽阔的意境，暗含旅途之寂寥。后两句笔锋一转，以"逆旅"喻人生，以"烟霞"寄希望，表达了随遇而安、处处皆有美景的达观态度，哲理深远。' },
+                ];
+                const pick = poems[Math.floor(Math.random() * poems.length)];
+                poemContent.textContent = pick.poem;
+                poemAnalysis.textContent = pick.analysis;
+            }, 1800);
+        });
+
+        // ============ 智能分析 ============
+        const analyzeInput = document.getElementById('analyzeInput');
+        const btnAnalyze = document.getElementById('btnAnalyze');
+        const analyzeResult = document.getElementById('analyzeResult');
+        const analyzeTyping = document.getElementById('analyzeTyping');
+        const analyzeContent = document.getElementById('analyzeContent');
+        const exampleTags = document.querySelectorAll('.example-tag');
+
+        exampleTags.forEach(tag => {
+            tag.addEventListener('click', () => {
+                analyzeInput.value = tag.getAttribute('data-text');
+                analyzeInput.focus();
+            });
+        });
+
+        btnAnalyze.addEventListener('click', () => {
+            const text = analyzeInput.value.trim();
+            if (!text) {
+                showToast('请输入需要解析的诗句');
+                return;
+            }
+            if (text.length < 4) {
+                showToast('诗句太短，请输入完整的诗句');
+                return;
+            }
+            analyzeResult.classList.add('show');
+            analyzeContent.textContent = '';
+            showTyping(analyzeTyping);
+            simulateAIResponse(() => {
+                hideTyping(analyzeTyping);
+                const analyses = [
+                    '此句意境深远，用词精炼。诗人以简练的笔触勾勒出丰富的画面感，虚实相生，给读者留下广阔的想象空间。从格律上看，平仄协调，音韵和谐，体现了高超的炼字功夫。',
+                    '这句诗情景交融，物我合一。前段写景，后段抒情，过渡自然流畅。意象的选择颇具匠心，既有视觉上的层次感，又暗含情感的起伏变化，堪称佳句。',
+                    '从修辞角度审视，此句运用了精妙的比拟手法，将抽象情感具象化。语言质朴而意蕴丰厚，读来令人回味无穷。在整体结构中起到承上启下的关键作用。',
+                ];
+                analyzeContent.textContent =
+                    '📜 原文：' + text + '\n\n' + analyses[Math.floor(Math.random() * analyses.length)] +
+                    '\n\n🖋️ 赏析要点：意象鲜明、格律工整、情感真挚、余韵悠长。';
+            }, 1500);
+        });
+
+        // ============ 诗海拾贝（拓展） ============
+        const explorePoem = document.getElementById('explorePoem');
+        const exploreInfo = document.getElementById('exploreInfo');
+        const btnRefreshExplore = document.getElementById('btnRefreshExplore');
+        const poetryLibrary = [
+            { title: '静夜思', author: '李白',
+                poem: '床前明月光，\n疑是地上霜。\n举头望明月，\n低头思故乡。', info: '唐·李白 — 语言清新朴素，意蕴深远，是思乡诗中的千古绝唱。' },
+            { title: '春晓', author: '孟浩然',
+                poem: '春眠不觉晓，\n处处闻啼鸟。\n夜来风雨声，\n花落知多少。', info: '唐·孟浩然 — 以听觉写春景，惜春之情溢于言表。' },
+            { title: '登鹳雀楼', author: '王之涣',
+                poem: '白日依山尽，\n黄河入海流。\n欲穷千里目，\n更上一层楼。', info: '唐·王之涣 — 气势磅礴，蕴含积极向上的哲理。' },
+            { title: '江雪', author: '柳宗元',
+                poem: '千山鸟飞绝，\n万径人踪灭。\n孤舟蓑笠翁，\n独钓寒江雪。', info: '唐·柳宗元 — 以极简笔墨营造孤绝意境，遗世独立。' },
+            { title: '相思', author: '王维', poem: '红豆生南国，\n春来发几枝。\n愿君多采撷，\n此物最相思。',
+                info: '唐·王维 — 借红豆寄寓深情，语浅而情浓。' },
+            { title: '枫桥夜泊', author: '张继',
+                poem: '月落乌啼霜满天，\n江枫渔火对愁眠。\n姑苏城外寒山寺，\n夜半钟声到客船。', info: '唐·张继 — 声色交织，愁绪弥漫，千古传诵的名篇。' },
+        ];
+
+        function loadRandomPoem() {
+            const pick = poetryLibrary[Math.floor(Math.random() * poetryLibrary.length)];
+            explorePoem.textContent = pick.poem;
+            exploreInfo.textContent = '《' + pick.title + '》— ' + pick.info;
+        }
+        loadRandomPoem();
+        btnRefreshExplore.addEventListener('click', loadRandomPoem);
+
+        // ============ 拓展功能卡片 ============
+        document.getElementById('extraRhyme').addEventListener('click', () => {
+            showToast('韵脚查询功能即将上线，敬请期待！');
+        });
+        document.getElementById('extraCouplet').addEventListener('click', () => {
+            showToast('AI对对联功能开发中，敬请期待！');
+        });
+        document.getElementById('extraCalligraphy').addEventListener('click', () => {
+            showToast('书法生成功能即将上线，敬请期待！');
+        });
+        document.getElementById('extraCollection').addEventListener('click', () => {
+            showToast('我的诗笺功能即将上线，敬请期待！');
+        });
+
+        // ============ 意见反馈弹窗 ============
+        const feedbackFab = document.getElementById('feedbackFab');
+        const feedbackModal = document.getElementById('feedbackModal');
+        const modalClose = document.getElementById('modalClose');
+        const btnCancelFeedback = document.getElementById('btnCancelFeedback');
+        const btnSubmitFeedback = document.getElementById('btnSubmitFeedback');
+        const feedbackContent = document.getElementById('feedbackContent');
+        const feedbackName = document.getElementById('feedbackName');
+        const feedbackType = document.getElementById('feedbackType');
+
+        function openModal() {
+            feedbackModal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            feedbackModal.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+        feedbackFab.addEventListener('click', openModal);
+        modalClose.addEventListener('click', closeModal);
+        btnCancelFeedback.addEventListener('click', closeModal);
+        feedbackModal.addEventListener('click', (e) => {
+            if (e.target === feedbackModal) closeModal();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && feedbackModal.classList.contains('open')) closeModal();
+        });
+
+        btnSubmitFeedback.addEventListener('click', () => {
+            const content = feedbackContent.value.trim();
+            if (!content) {
+                showToast('请填写反馈内容');
+                feedbackContent.focus();
+                return;
+            }
+            // 模拟提交
+            const feedbackData = {
+                type: feedbackType.value,
+                name: feedbackName.value.trim() || '匿名',
+                content: content,
+                time: new Date().toISOString(),
+            };
+            console.log('反馈数据：', feedbackData);
+            showToast('✅ 感谢您的反馈！我们会认真对待每一条建议。', 2800);
+            feedbackContent.value = '';
+            feedbackName.value = '';
+            feedbackType.value = 'suggestion';
+            setTimeout(closeModal, 400);
+        });
+
+        // ============ 键盘快捷键 ============
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === '1') {
+                    e.preventDefault();
+                    tabBtns[0].click();
+                } else if (e.key === '2') {
+                    e.preventDefault();
+                    tabBtns[1].click();
+                } else if (e.key === '3') {
+                    e.preventDefault();
+                    tabBtns[2].click();
+                }
+            }
+        });
+
+        console.log('🖋️  诗境AI模块已就绪');
+        console.log('   - 看图写诗：上传图片，AI赋诗');
+        console.log('   - 智能分析：输入诗句，深度解析');
+        console.log('   - 诗海拾贝：随机推荐经典诗词');
+        console.log('   - 意见反馈：点击右下角浮动按钮');
+        console.log('   - 快捷键：Ctrl+1/2/3 切换标签');
+    })();
+</script>
+</body>
+</html>

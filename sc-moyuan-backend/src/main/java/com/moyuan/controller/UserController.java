@@ -5,8 +5,10 @@ import com.moyuan.common.R;
 import com.moyuan.dto.request.PasswordUpdateRequest;
 import com.moyuan.dto.request.UserUpdateRequest;
 import com.moyuan.entity.ForumPost;
+import com.moyuan.entity.PoetProfile;
 import com.moyuan.entity.User;
 import com.moyuan.service.ForumPostService;
+import com.moyuan.service.PoetProfileService;
 import com.moyuan.service.UserService;
 import com.moyuan.util.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,6 +29,7 @@ public class UserController {
 
     private final UserService userService;
     private final ForumPostService forumPostService;
+    private final PoetProfileService poetProfileService;
     private final SecurityUtil securityUtil;
 
     @Operation(summary = "获取当前用户信息")
@@ -77,5 +80,34 @@ public class UserController {
     @GetMapping("/{id}")
     public R<User> getUser(@PathVariable Long id) {
         return R.success(userService.getUserInfo(id));
+    }
+
+    @Operation(summary = "获取用户主页信息")
+    @GetMapping("/{id}/profile")
+    public R<Map<String, Object>> getUserProfile(@PathVariable Long id) {
+        User user = userService.getUserInfo(id);
+        PoetProfile poetProfile = poetProfileService.getByUserId(id);
+        Map<String, Object> stats = userService.getUserStats(id);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("user", user);
+        result.put("poetProfile", poetProfile);
+        result.put("stats", stats);
+        return R.success(result);
+    }
+
+    @Operation(summary = "获取用户作品列表")
+    @GetMapping("/{id}/works")
+    public R<Map<String, Object>> getUserWorks(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize) {
+        IPage<ForumPost> page = forumPostService.getPostsByUserId(id, pageNum, pageSize);
+        Map<String, Object> result = new HashMap<>();
+        result.put("list", page.getRecords());
+        result.put("total", page.getTotal());
+        result.put("pageNum", page.getCurrent());
+        result.put("pageSize", page.getSize());
+        return R.success(result);
     }
 }

@@ -26,7 +26,7 @@ echo.
 
 echo [3/3] 初始化表结构和数据...
 echo 正在执行初始化脚本...
-mysql -u root -p moyuan < backend\src\main\resources\db\init.sql
+mysql -u root -p moyuan < sc-moyuan-backend\src\main\resources\db\init.sql
 if %errorlevel% neq 0 (
     echo 错误: 初始化脚本执行失败
     pause
@@ -38,7 +38,11 @@ echo.
 echo ========================================
 echo 数据库初始化成功！
 echo 数据库名: moyuan
-echo 表: poem, poet, dynasty, category
-echo 现代诗词数据已导入
+echo 共 20 张表：dynasty, poet, category, poem, user,
+echo   forum_post, comment, user_favorite, user_like,
+echo   user_history, operation_log, ai_model, poet_featured,
+echo   home_navigation, vision_article, visit_log, file_metadata,
+echo   ai_image_record, poet_profile, poem_rating
+echo 初始数据：13个朝代、27个分类、5位诗人、15首诗词、3个用户、7个帖子、6位精选诗人、24条导航、10篇文章、4个AI模型
 echo ========================================
 pause

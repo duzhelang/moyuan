@@ -63,4 +63,19 @@ public class AiController {
                 "model", model
         ));
     }
+
+    @Operation(summary = "AI对对联")
+    @PostMapping("/couplet")
+    public R<Map<String, String>> matchCouplet(@RequestBody Map<String, String> request) {
+        String upperCouplet = request.get("upperCouplet");
+        String model = request.getOrDefault("model", "zhipu");
+
+        String result = aiService.matchCouplet(upperCouplet, model);
+
+        return R.success(Map.of(
+                "upperCouplet", upperCouplet,
+                "result", result,
+                "model", model
+        ));
+    }
 }

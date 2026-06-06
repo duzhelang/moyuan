@@ -1,13 +1,18 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getForumPostList } from '@/api/modules/forum'
-import { writePoemFromImage, analyzePoem } from '@/api/modules/ai'
+import { getForumPostList, getComments, createComment, likeComment } from '@/api/modules/forum'
+import { likePoem, favoritePoem } from '@/api/modules/poem'
+import { writePoemFromImage, analyzePoem, matchCouplet } from '@/api/modules/ai'
+import { queryRhymeByCharacter, queryRhymeByGroup } from '@/api/modules/rhyme'
+import type { RhymeItem } from '@/api/modules/rhyme'
 import { getRandomPoetFeatured } from '@/api/modules/poetFeatured'
 import type { PoetFeatured } from '@/api/modules/poetFeatured'
-import { getFeaturedVisionArticles } from '@/api/modules/visionArticle'
+import { getVisionArticleList } from '@/api/modules/visionArticle'
+import { searchPoemsWithRecommend, getRecommendedPoems, getPopularPoems } from '@/api/modules/external-poetry'
+import type { PoemSearchResult } from '@/api/modules/external-poetry'
 import { ElMessage } from 'element-plus'
-import type { ForumPost, VisionArticle } from '@/types/model'
+import type { ForumPost, VisionArticle, Comment } from '@/types/model'
 import { useUserStore } from '@/stores/user'
 import { getItem } from '@/utils/storage'
 import PoetCard from '@/components/business/PoetCard.vue'
@@ -21,6 +26,49 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const hotPosts = ref<ForumPost[]>([])
+
+const expandedPoemIdx = ref<string | null>(null)
+const poemComments = ref<Record<string, Comment[]>>({})
+const commentInputs = ref<Record<string, string>>({})
+const submittingComment = ref<Record<string, boolean>>({})
+const commentTotals = ref<Record<string, number>>({})
+
+const poemLikeStates = ref<Record<string, boolean>>({})
+const poemFavoriteStates = ref<Record<string, boolean>>({})
+const poemLikeCounts = ref<Record<string, number>>({})
+const poemFavoriteCounts = ref<Record<string, number>>({})
+
+const handlePoemLike = async (poemIdx: string) => {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录')
+    router.push('/user/login')
+    return
+  }
+  try {
+    await likePoem(Number(poemIdx))
+    poemLikeStates.value[poemIdx] = !poemLikeStates.value[poemIdx]
+    poemLikeCounts.value[poemIdx] = (poemLikeCounts.value[poemIdx] || 0) + (poemLikeStates.value[poemIdx] ? 1 : -1)
+    ElMessage.success(poemLikeStates.value[poemIdx] ? '点赞成功' : '已取消点赞')
+  } catch {
+    ElMessage.error('操作失败')
+  }
+}
+
+const handlePoemFavorite = async (poemIdx: string) => {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录')
+    router.push('/user/login')
+    return
+  }
+  try {
+    await favoritePoem(Number(poemIdx))
+    poemFavoriteStates.value[poemIdx] = !poemFavoriteStates.value[poemIdx]
+    poemFavoriteCounts.value[poemIdx] = (poemFavoriteCounts.value[poemIdx] || 0) + (poemFavoriteStates.value[poemIdx] ? 1 : -1)
+    ElMessage.success(poemFavoriteStates.value[poemIdx] ? '收藏成功' : '已取消收藏')
+  } catch {
+    ElMessage.error('操作失败')
+  }
+}
 
 const animationConfig = ref<Record<string, string>>({
   works: 'wave',
@@ -62,6 +110,8 @@ const handleLoginDropdownLeave = () => {
 const aiModel = ref('zhipu')
 const visionModel = ref('glm-4.6v-flash')
 
+const activeAiTab = ref<'poem' | 'analyze' | 'explore'>('poem')
+
 const imageFile = ref<File | null>(null)
 const imagePreview = ref('')
 const poemResult = ref('')
@@ -70,6 +120,94 @@ const poemLoading = ref(false)
 const analyzeInput = ref('')
 const analyzeResult = ref('')
 const analyzeLoading = ref(false)
+
+const analyzeExamples = [
+  { text: '床前明月光，疑是地上霜。', label: '🌙 静夜思' },
+  { text: '大漠孤烟直，长河落日圆。', label: '🏜️ 使至塞上' },
+  { text: '落霞与孤鹜齐飞，秋水共长天一色。', label: '🕊️ 滕王阁序' },
+  { text: '人生若只如初见，何事秋风悲画扇。', label: '🍂 纳兰词' }
+]
+
+interface PoetryItem {
+  title: string
+  author: string
+  poem: string
+  info: string
+}
+
+const poetryLibrary: PoetryItem[] = [
+  { title: '静夜思', author: '李白', poem: '床前明月光，\n疑是地上霜。\n举头望明月，\n低头思故乡。', info: '唐·李白 — 语言清新朴素，意蕴深远，是思乡诗中的千古绝唱。' },
+  { title: '春晓', author: '孟浩然', poem: '春眠不觉晓，\n处处闻啼鸟。\n夜来风雨声，\n花落知多少。', info: '唐·孟浩然 — 以听觉写春景，惜春之情溢于言表。' },
+  { title: '登鹳雀楼', author: '王之涣', poem: '白日依山尽，\n黄河入海流。\n欲穷千里目，\n更上一层楼。', info: '唐·王之涣 — 气势磅礴，蕴含积极向上的哲理。' },
+  { title: '江雪', author: '柳宗元', poem: '千山鸟飞绝，\n万径人踪灭。\n孤舟蓑笠翁，\n独钓寒江雪。', info: '唐·柳宗元 — 以极简笔墨营造孤绝意境，遗世独立。' },
+  { title: '相思', author: '王维', poem: '红豆生南国，\n春来发几枝。\n愿君多采撷，\n此物最相思。', info: '唐·王维 — 借红豆寄寓深情，语浅而情浓。' },
+  { title: '枫桥夜泊', author: '张继', poem: '月落乌啼霜满天，\n江枫渔火对愁眠。\n姑苏城外寒山寺，\n夜半钟声到客船。', info: '唐·张继 — 声色交织，愁绪弥漫，千古传诵的名篇。' }
+]
+
+const explorePoem = ref('')
+const exploreInfo = ref('')
+
+const loadRandomPoem = () => {
+  const pick = poetryLibrary[Math.floor(Math.random() * poetryLibrary.length)]
+  explorePoem.value = pick.poem
+  exploreInfo.value = `《${pick.title}》— ${pick.info}`
+}
+
+loadRandomPoem()
+
+const activeExtraPanel = ref<'rhyme' | 'couplet' | null>(null)
+
+const rhymeInput = ref('')
+const rhymeResults = ref<RhymeItem[]>([])
+const rhymeLoading = ref(false)
+const rhymeSearchType = ref<'character' | 'group'>('character')
+
+const handleRhymeQuery = async () => {
+  if (!rhymeInput.value.trim()) {
+    ElMessage.warning('请输入要查询的汉字或韵部')
+    return
+  }
+  rhymeLoading.value = true
+  rhymeResults.value = []
+  try {
+    const res = rhymeSearchType.value === 'character'
+      ? await queryRhymeByCharacter(rhymeInput.value.trim())
+      : await queryRhymeByGroup(rhymeInput.value.trim())
+    rhymeResults.value = res.data
+    if (res.data.length === 0) {
+      ElMessage.info('未找到匹配的韵脚数据')
+    }
+  } catch {
+    ElMessage.error('查询失败，请稍后重试')
+  } finally {
+    rhymeLoading.value = false
+  }
+}
+
+const coupletInput = ref('')
+const coupletResult = ref('')
+const coupletLoading = ref(false)
+
+const exampleCouplets = ['春风得意马蹄疾', '海内存知己', '大漠孤烟直', '明月松间照']
+
+const handleCoupletMatch = async (upperCouplet?: string) => {
+  const input = upperCouplet || coupletInput.value.trim()
+  if (!input) {
+    ElMessage.warning('请输入上联')
+    return
+  }
+  coupletInput.value = input
+  coupletLoading.value = true
+  coupletResult.value = ''
+  try {
+    const res = await matchCouplet({ upperCouplet: input })
+    coupletResult.value = res.data.result
+  } catch {
+    coupletResult.value = '抱歉，AI服务暂时不可用，请稍后重试。'
+  } finally {
+    coupletLoading.value = false
+  }
+}
 
 const currentSlide = ref(1)
 const maxSlides = 6
@@ -107,21 +245,80 @@ interface PoemCard {
   title?: string
   content: string
   author: string
-  image: string
+  image?: string
 }
 
 const ancientPoems: PoemCard[] = [
-  { date: '唐代', title: '静夜思', content: '床前明月光，疑是地上霜。举头望明月，低头思故乡。', author: '李白', image: '/img/lt_jx (1).jpg' },
-  { date: '唐代', title: '登鹳雀楼', content: '白日依山尽，黄河入海流。欲穷千里目，更上一层楼。', author: '王之涣', image: '/img/lt_jx (2).jpg' },
-  { date: '唐代', title: '春晓', content: '春眠不觉晓，处处闻啼鸟。夜来风雨声，花落知多少。', author: '孟浩然', image: '/img/lt_jx (3).jpg' },
-  { date: '唐代', title: '悯农', content: '锄禾日当午，汗滴禾下土。谁知盘中餐，粒粒皆辛苦。', author: '李绅', image: '/img/lt_jx (4).jpg' },
-  { date: '唐代', title: '望庐山瀑布', content: '日照香炉生紫烟，遥看瀑布挂前川。飞流直下三千尺，疑是银河落九天。', author: '李白', image: '/img/lt_jx (1).jpg' },
-  { date: '宋代', title: '水调歌头', content: '明月几时有？把酒问青天。不知天上宫阙，今夕是何年。', author: '苏轼', image: '/img/lt_jx (2).jpg' },
-  { date: '唐代', title: '黄鹤楼送孟浩然之广陵', content: '故人西辞黄鹤楼，烟花三月下扬州。孤帆远影碧空尽，唯见长江天际流。', author: '李白', image: '/img/lt_jx (3).jpg' },
-  { date: '唐代', title: '相思', content: '红豆生南国，春来发几枝。愿君多采撷，此物最相思。', author: '王维', image: '/img/lt_jx (4).jpg' },
-  { date: '宋代', title: '念奴娇·赤壁怀古', content: '大江东去，浪淘尽，千古风流人物。故垒西边，人道是，三国周郎赤壁。', author: '苏轼', image: '/img/lt_jx (1).jpg' },
-  { date: '唐代', title: '将进酒', content: '君不见，黄河之水天上来，奔流到海不复回。君不见，高堂明镜悲白发，朝如青丝暮成雪。', author: '李白', image: '/img/lt_jx (2).jpg' }
+  { date: '唐代', title: '静夜思', content: '床前明月光，疑是地上霜。\n举头望明月，低头思故乡。', author: '李白', image: '/img/lt_jx (1).jpg' },
+  { date: '唐代', title: '登鹳雀楼', content: '白日依山尽，黄河入海流。\n欲穷千里目，更上一层楼。', author: '王之涣', image: '/img/lt_jx (2).jpg' },
+  { date: '唐代', title: '春晓', content: '春眠不觉晓，处处闻啼鸟。\n夜来风雨声，花落知多少。', author: '孟浩然', image: '/img/lt_jx (3).jpg' },
+  { date: '唐代', title: '悯农', content: '锄禾日当午，汗滴禾下土。\n谁知盘中餐，粒粒皆辛苦。', author: '李绅', image: '/img/lt_jx (4).jpg' },
+  { date: '唐代', title: '望庐山瀑布', content: '日照香炉生紫烟，遥看瀑布挂前川。\n飞流直下三千尺，疑是银河落九天。', author: '李白', image: '/img/lt_jx (1).jpg' },
+  { date: '宋代', title: '水调歌头', content: '明月几时有？把酒问青天。\n不知天上宫阙，今夕是何年。', author: '苏轼', image: '/img/lt_jx (2).jpg' },
+  { date: '唐代', title: '黄鹤楼送孟浩然之广陵', content: '故人西辞黄鹤楼，烟花三月下扬州。\n孤帆远影碧空尽，唯见长江天际流。', author: '李白', image: '/img/lt_jx (3).jpg' },
+  { date: '唐代', title: '相思', content: '红豆生南国，春来发几枝。\n愿君多采撷，此物最相思。', author: '王维', image: '/img/lt_jx (4).jpg' },
+  { date: '宋代', title: '念奴娇·赤壁怀古', content: '大江东去，浪淘尽，千古风流人物。\n故垒西边，人道是，三国周郎赤壁。', author: '苏轼', image: '/img/lt_jx (1).jpg' },
+  { date: '唐代', title: '将进酒', content: '君不见，黄河之水天上来，奔流到海不复回。\n君不见，高堂明镜悲白发，朝如青丝暮成雪。', author: '李白', image: '/img/lt_jx (2).jpg' }
 ]
+
+// 历史的印痕搜索相关状态
+const poemSearchKeyword = ref('')
+const poemSearchResults = ref<PoemSearchResult[]>([])
+const poemSearchLoading = ref(false)
+const poemSearchMode = ref<'default' | 'search' | 'recommend'>('default')
+const recommendedPoems = ref<PoemSearchResult[]>([])
+
+// 搜索诗词
+const handlePoemSearch = async () => {
+  if (!poemSearchKeyword.value.trim()) {
+    poemSearchMode.value = 'default'
+    poemSearchResults.value = []
+    return
+  }
+  poemSearchLoading.value = true
+  poemSearchMode.value = 'search'
+  try {
+    const results = await searchPoemsWithRecommend(poemSearchKeyword.value.trim())
+    poemSearchResults.value = results
+  } catch (error) {
+    console.error('搜索诗词失败:', error)
+    ElMessage.error('搜索失败，请稍后重试')
+  } finally {
+    poemSearchLoading.value = false
+  }
+}
+
+// 获取推荐诗词
+const fetchRecommendedPoems = async () => {
+  try {
+    const results = await getRecommendedPoems(6)
+    recommendedPoems.value = results
+  } catch (error) {
+    console.error('获取推荐诗词失败:', error)
+  }
+}
+
+// 切换到推荐模式
+const showRecommendedPoems = async () => {
+  poemSearchMode.value = 'recommend'
+  if (recommendedPoems.value.length === 0) {
+    await fetchRecommendedPoems()
+  }
+}
+
+// 切换回默认模式
+const showDefaultPoems = () => {
+  poemSearchMode.value = 'default'
+  poemSearchKeyword.value = ''
+  poemSearchResults.value = []
+}
+
+// 清空搜索
+const clearPoemSearch = () => {
+  poemSearchKeyword.value = ''
+  poemSearchResults.value = []
+  poemSearchMode.value = 'default'
+}
 
 const contemporaryPoems: PoemCard[] = [
   { date: '2019年6月24日', content: '愿如花已落千行，未闻花语浅别殇。幽僻心境漫过少，唯有诗语解锁缰。金甲未脱抬眼望，怒剑难收向疆场。笑祝功成人与事，再鼓一旬又何妨。', author: '常平逼王', image: '/img/lt_jx (4).jpg' },
@@ -136,6 +333,17 @@ const contemporaryPoems: PoemCard[] = [
   { date: '2021年4月3日', content: '沉影迷叠千层障，乱云归处是它乡。酒酣仍识昔日客，心迷难辨眼前芳。纵把凡锦比仙缎，不需经年多思量。一笑即随羊角去，九风还作万华芳。', author: '常平逼王', image: '/img/lt_jx (4).jpg' },
   { date: '2023年1月4日', title: '一剪梅.无题', content: '一别三秋未招摇，山也迢迢，水也昭昭。何人再添新衣袍，笑意盈绕，喜上眉梢。忆昔花开岁月好，蜂字飘摇，蝶字舞蹈。而今方知云未晓，风又飘飘，雨又萧萧。', author: '常平逼王', image: '/img/lt_jx (4).jpg' }
 ]
+
+const contemporaryPage = ref(1)
+const contemporaryPageSize = 3
+const contemporaryTotal = computed(() => contemporaryPoems.length)
+const paginatedContemporaryPoems = computed(() => {
+  const start = (contemporaryPage.value - 1) * contemporaryPageSize
+  return contemporaryPoems.slice(start, start + contemporaryPageSize)
+})
+const handleContemporaryPageChange = (page: number) => {
+  contemporaryPage.value = page
+}
 
 const shuffleArray = <T,>(arr: T[]): T[] => {
   const copy = [...arr]
@@ -237,6 +445,68 @@ const scrollToTop = () => {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+const formatDate = (dateStr: string) => {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+  const minutes = Math.floor(diff / 60000)
+  const hours = Math.floor(diff / 3600000)
+  const days = Math.floor(diff / 86400000)
+
+  if (minutes < 1) return '刚刚'
+  if (minutes < 60) return `${minutes}分钟前`
+  if (hours < 24) return `${hours}小时前`
+  if (days < 30) return `${days}天前`
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+const togglePoemComments = async (poemIdx: string, targetType: number) => {
+  if (expandedPoemIdx.value === poemIdx) {
+    expandedPoemIdx.value = null
+    return
+  }
+  expandedPoemIdx.value = poemIdx
+  if (!poemComments.value[poemIdx]) {
+    try {
+      const res = await getComments(Number(poemIdx), targetType, { pageNum: 1, pageSize: 20 })
+      poemComments.value[poemIdx] = res.data.list
+      commentTotals.value[poemIdx] = res.data.total
+    } catch {
+      ElMessage.error('获取评论失败')
+    }
+  }
+}
+
+const handleSubmitPoemComment = async (poemIdx: string, targetType: number) => {
+  const content = commentInputs.value[poemIdx]
+  if (!content?.trim()) {
+    ElMessage.warning('请输入评论内容')
+    return
+  }
+  submittingComment.value[poemIdx] = true
+  try {
+    await createComment({ content, targetId: Number(poemIdx), targetType })
+    ElMessage.success('评论成功')
+    commentInputs.value[poemIdx] = ''
+    const res = await getComments(Number(poemIdx), targetType, { pageNum: 1, pageSize: 20 })
+    poemComments.value[poemIdx] = res.data.list
+    commentTotals.value[poemIdx] = res.data.total
+  } catch {
+    ElMessage.error('评论失败')
+  } finally {
+    submittingComment.value[poemIdx] = false
+  }
+}
+
+const handlePoemCommentLike = async (comment: Comment) => {
+  try {
+    await likeComment(comment.id)
+    comment.likeCount++
+  } catch {
+    ElMessage.error('点赞失败')
+  }
+}
+
 const openMusic = () => {
   const audio = document.getElementById('myAudio') as HTMLAudioElement
   if (audio) {
@@ -249,13 +519,44 @@ const handleImageUpload = (event: Event) => {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   if (file) {
-    imageFile.value = file
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      imagePreview.value = e.target?.result as string
-    }
-    reader.readAsDataURL(file)
+    processImageFile(file)
   }
+}
+
+const processImageFile = (file: File) => {
+  if (!file.type.match(/image\/(jpeg|png|webp)/)) {
+    ElMessage.warning('请上传 JPG / PNG / WebP 格式的图片')
+    return
+  }
+  imageFile.value = file
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    imagePreview.value = e.target?.result as string
+  }
+  reader.readAsDataURL(file)
+}
+
+const handleDragOver = (e: DragEvent) => {
+  (e.currentTarget as HTMLElement)?.classList.add('ai-drag-over')
+}
+
+const handleDragLeave = (e: DragEvent) => {
+  (e.currentTarget as HTMLElement)?.classList.remove('ai-drag-over')
+}
+
+const handleDrop = (e: DragEvent) => {
+  (e.currentTarget as HTMLElement)?.classList.remove('ai-drag-over')
+  const files = e.dataTransfer?.files
+  if (files && files.length > 0) {
+    processImageFile(files[0])
+  }
+}
+
+const clearImage = () => {
+  imageFile.value = null
+  imagePreview.value = ''
+  poemResult.value = ''
+  if (imageUploadRef.value) imageUploadRef.value.value = ''
 }
 
 const handleWritePoem = async () => {
@@ -381,7 +682,7 @@ onMounted(async () => {
 
 const fetchVisionArticles = async () => {
   try {
-    const visionRes = await getFeaturedVisionArticles({
+    const visionRes = await getVisionArticleList({
       pageNum: visionCurrentPage.value,
       pageSize: visionPageSize.value
     }).catch(() => ({ data: { list: [] as VisionArticle[], total: 0 } }))
@@ -703,66 +1004,197 @@ onUnmounted(() => {
     </div>
 
     <hr>
-    <div class="z_center">
-      <h2 class="ai_title">趣味AI</h2>
-      <div class="z_left">
-        <div class="ai-card ai-card-poem">
-          <div class="ai-card-header">
-            <h2>看图写诗</h2>
-            <p>上传图片，AI为你赋诗一首</p>
+    <div class="ai-container">
+      <header class="ai-header">
+        <div class="ai-header-icon">🖋️</div>
+        <h2 class="ai-header-title">诗境 AI</h2>
+        <span class="ai-seal">雅</span>
+        <span class="ai-subtitle">· 古诗词智能创作与品鉴 ·</span>
+      </header>
+
+      <nav class="ai-tab-nav">
+        <button
+          class="ai-tab-btn"
+          :class="{ active: activeAiTab === 'poem' }"
+          @click="activeAiTab = 'poem'"
+        >
+          <span class="ai-tab-icon">🖼️</span> 看图写诗
+        </button>
+        <button
+          class="ai-tab-btn"
+          :class="{ active: activeAiTab === 'analyze' }"
+          @click="activeAiTab = 'analyze'"
+        >
+          <span class="ai-tab-icon">🔍</span> 智能分析
+        </button>
+        <button
+          class="ai-tab-btn"
+          :class="{ active: activeAiTab === 'explore' }"
+          @click="activeAiTab = 'explore'"
+        >
+          <span class="ai-tab-icon">📜</span> 诗海拾贝
+        </button>
+      </nav>
+
+      <div class="ai-panels">
+        <div v-show="activeAiTab === 'poem'" class="ai-panel">
+          <div class="ai-upload-zone" @click="imageUploadRef?.click()" @dragover.prevent="handleDragOver" @dragleave="handleDragLeave" @drop.prevent="handleDrop">
+            <span class="ai-upload-emoji">🏔️</span>
+            <p class="ai-upload-text">点击上传图片，或拖拽至此处</p>
+            <p class="ai-upload-hint">支持 JPG / PNG / WebP，AI 将为您赋诗一首</p>
+            <input ref="imageUploadRef" type="file" accept="image/jpeg,image/png,image/webp" style="display:none" @change="handleImageUpload">
           </div>
-          <div class="ai-card-body">
-            <div class="ai-upload-area" @click="imageUploadRef?.click()">
-              <img
-                v-if="imagePreview"
-                :src="imagePreview"
-                alt=""
-                class="ai-preview-img"
-              >
-              <div v-else class="ai-upload-placeholder">
-                <span class="ai-upload-icon">+</span>
-                <span>点击上传图片</span>
-              </div>
+          <div v-if="imagePreview" class="ai-preview-area">
+            <img :src="imagePreview" alt="预览图片">
+            <div class="ai-preview-actions">
+              <button class="ai-btn-primary" @click="handleWritePoem" :disabled="poemLoading">
+                {{ poemLoading ? 'AI赋诗中...' : '✨ 开始赋诗' }}
+              </button>
+              <button class="ai-btn-outline" @click="clearImage">重新选择</button>
             </div>
-            <input
-              ref="imageUploadRef"
-              type="file"
-              accept="image/*"
-              style="display: none;"
-              @change="handleImageUpload"
-            >
-            <button class="ai-btn ai-btn-primary" @click="handleWritePoem" :disabled="poemLoading">
-              {{ poemLoading ? 'AI赋诗中...' : '开始赋诗' }}
-            </button>
-            <div v-if="poemResult" class="ai-result-box">
-              <p class="ai-result-text">{{ poemResult }}</p>
-            </div>
+          </div>
+          <div v-if="poemResult" class="ai-result-card">
+            <div class="ai-poem-content">{{ poemResult }}</div>
           </div>
         </div>
-        <div class="ai-card ai-card-analyze">
-          <div class="ai-card-header">
-            <h2>智能分析</h2>
-            <p>输入诗句，AI为你深度解析</p>
-          </div>
-          <div class="ai-card-body">
+
+        <div v-show="activeAiTab === 'analyze'" class="ai-panel">
+          <div class="ai-analyze-wrap">
             <textarea
-              class="ai-textarea"
               v-model="analyzeInput"
-              placeholder="例如：床前明月光，疑是地上霜。"
-              rows="4"
+              class="ai-analyze-textarea"
+              placeholder="在此输入诗句，如：床前明月光，疑是地上霜。"
             ></textarea>
-            <button class="ai-btn ai-btn-primary" @click="handleAnalyzePoem" :disabled="analyzeLoading">
-              {{ analyzeLoading ? 'AI解析中...' : '智能解析' }}
+          </div>
+          <div class="ai-example-tags">
+            <span
+              v-for="ex in analyzeExamples"
+              :key="ex.text"
+              class="ai-example-tag"
+              @click="analyzeInput = ex.text"
+            >{{ ex.label }}</span>
+          </div>
+          <div style="margin-top:14px;text-align:right;">
+            <button class="ai-btn-primary" @click="handleAnalyzePoem" :disabled="analyzeLoading">
+              {{ analyzeLoading ? 'AI解析中...' : '🔍 智能解析' }}
             </button>
-            <div v-if="analyzeResult" class="ai-result-box">
-              <p class="ai-result-text">{{ analyzeResult }}</p>
-            </div>
+          </div>
+          <div v-if="analyzeResult" class="ai-result-card">
+            <div class="ai-analysis-label">📖 深度解析</div>
+            <div class="ai-analysis-text">{{ analyzeResult }}</div>
+          </div>
+        </div>
+
+        <div v-show="activeAiTab === 'explore'" class="ai-panel">
+          <p class="ai-explore-hint">🌊 随机推荐一首经典诗词，感受千年文脉</p>
+          <div class="ai-result-card ai-explore-card">
+            <div class="ai-poem-content">{{ explorePoem }}</div>
+            <div class="ai-analysis-text ai-explore-info">{{ exploreInfo }}</div>
+          </div>
+          <div style="text-align:center;margin-top:12px;">
+            <button class="ai-btn-outline" @click="loadRandomPoem">🔄 换一首</button>
           </div>
         </div>
       </div>
+
+      <div class="ai-extra-features">
+        <div class="ai-extra-card" :class="{ active: activeExtraPanel === 'rhyme' }" @click="activeExtraPanel = activeExtraPanel === 'rhyme' ? null : 'rhyme'">
+          <div class="ai-extra-icon">🎵</div>
+          <div class="ai-extra-title">韵脚查询</div>
+          <div class="ai-extra-desc">查询汉字所属韵部</div>
+        </div>
+        <div class="ai-extra-card" :class="{ active: activeExtraPanel === 'couplet' }" @click="activeExtraPanel = activeExtraPanel === 'couplet' ? null : 'couplet'">
+          <div class="ai-extra-icon">🏮</div>
+          <div class="ai-extra-title">AI 对对联</div>
+          <div class="ai-extra-desc">上联出题，AI 对下联</div>
+        </div>
+        <div class="ai-extra-card">
+          <div class="ai-extra-icon">✒️</div>
+          <div class="ai-extra-title">书法生成</div>
+          <div class="ai-extra-desc">诗句转书法图片</div>
+        </div>
+        <div class="ai-extra-card">
+          <div class="ai-extra-icon">📚</div>
+          <div class="ai-extra-title">我的诗笺</div>
+          <div class="ai-extra-desc">收藏喜爱的诗词</div>
+        </div>
+      </div>
+
+      <div v-if="activeExtraPanel === 'rhyme'" class="ai-extra-panel">
+        <div class="ai-extra-panel-header">
+          <span class="ai-extra-panel-title">🎵 韵脚查询</span>
+          <button class="ai-extra-panel-close" @click="activeExtraPanel = null">&times;</button>
+        </div>
+        <div class="rhyme-search-bar">
+          <div class="rhyme-search-type">
+            <button class="rhyme-type-btn" :class="{ active: rhymeSearchType === 'character' }" @click="rhymeSearchType = 'character'">按汉字查</button>
+            <button class="rhyme-type-btn" :class="{ active: rhymeSearchType === 'group' }" @click="rhymeSearchType = 'group'">按韵部查</button>
+          </div>
+          <div class="rhyme-search-input">
+            <input
+              v-model="rhymeInput"
+              :placeholder="rhymeSearchType === 'character' ? '输入一个汉字，如：风' : '输入韵部名称，如：东'"
+              maxlength="10"
+              @keyup.enter="handleRhymeQuery"
+            />
+            <button class="ai-btn-primary" :disabled="rhymeLoading" @click="handleRhymeQuery">
+              {{ rhymeLoading ? '查询中...' : '查询' }}
+            </button>
+          </div>
+        </div>
+        <div v-if="rhymeResults.length > 0" class="rhyme-results">
+          <div class="rhyme-result-header">
+            <span class="rhyme-result-char">{{ rhymeResults[0].character }}</span>
+            <span class="rhyme-result-info">
+              属于「<strong>{{ rhymeResults[0].rhymeGroup }}</strong>」韵 · {{ rhymeResults[0].toneType }} · {{ rhymeResults[0].rhymeCategory }}
+            </span>
+          </div>
+          <div class="rhyme-same-group" v-if="rhymeSearchType === 'character'">
+            <div class="rhyme-same-title">同韵字：</div>
+            <div class="rhyme-char-grid">
+              <span v-for="item in rhymeResults" :key="item.id" class="rhyme-char-tag" :class="item.toneType">{{ item.character }}</span>
+            </div>
+          </div>
+          <div v-if="rhymeSearchType === 'group'" class="rhyme-char-grid">
+            <span v-for="item in rhymeResults" :key="item.id" class="rhyme-char-tag" :class="item.toneType">{{ item.character }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="activeExtraPanel === 'couplet'" class="ai-extra-panel">
+        <div class="ai-extra-panel-header">
+          <span class="ai-extra-panel-title">🏮 AI 对对联</span>
+          <button class="ai-extra-panel-close" @click="activeExtraPanel = null">&times;</button>
+        </div>
+        <div class="couplet-example-tags">
+          <span class="couplet-example-label">示例上联：</span>
+          <button v-for="ex in exampleCouplets" :key="ex" class="couplet-example-tag" @click="handleCoupletMatch(ex)">{{ ex }}</button>
+        </div>
+        <div class="couplet-input-area">
+          <input
+            v-model="coupletInput"
+            placeholder="请输入上联，如：春风得意马蹄疾"
+            @keyup.enter="handleCoupletMatch()"
+          />
+          <button class="ai-btn-primary" :disabled="coupletLoading" @click="handleCoupletMatch()">
+            {{ coupletLoading ? 'AI 思考中...' : '对下联' }}
+          </button>
+        </div>
+        <div v-if="coupletResult" class="ai-result-card couplet-result-card">
+          <div class="couplet-display">
+            <div class="couplet-upper">上联：{{ coupletInput }}</div>
+            <div class="couplet-divider">—</div>
+            <div class="couplet-lower">{{ coupletResult }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="z_right_container">
       <div class="z_right">
-        <h4>诗话视野</h4>
-        <hr>
+        <div class="vision-header">
+          <h4>诗话视野</h4>
+        </div>
         <template v-for="(item, index) in visionArticles" :key="'va-' + item.id">
           <div class="vision-item" @click="router.push(`/vision/${item.id}`)">
             <p class="vision-title">---{{ (visionCurrentPage - 1) * visionPageSize + index + 1 }}. "{{ item.title }}"</p>
@@ -778,7 +1210,7 @@ onUnmounted(() => {
         </template>
         <div class="vision-pagination" v-if="visionTotal > visionPageSize">
           <el-pagination
-            small
+            size="small"
             layout="prev, pager, next"
             :total="visionTotal"
             :page-size="visionPageSize"
@@ -787,7 +1219,9 @@ onUnmounted(() => {
           />
         </div>
         <hr>
-        <a class="shsy_gdxq" @click.prevent="router.push('/vision')">&lt;查看全部&gt;</a>
+        <el-link type="primary" class="shsy_gdxq" @click="router.push('/vision')">
+          &lt;查看全部&gt;
+        </el-link>
       </div>
     </div>
 
@@ -896,45 +1330,204 @@ onUnmounted(() => {
         <div class="poem_selection_left">
           <h2 class="luntan_section_title">古诗词推选</h2>
           <div class="luntan_jx">
-            <div class="luntan_jx_title">历史的印痕</div>
+            <div class="luntan_jx_title">
+              <span @click="showDefaultPoems" :class="{ active: poemSearchMode === 'default' }">历史的印痕</span>
+              <span @click="showRecommendedPoems" :class="{ active: poemSearchMode === 'recommend' }" class="recommend_btn">为您推荐</span>
+            </div>
+            <div class="poem_search_bar">
+              <input
+                v-model="poemSearchKeyword"
+                class="poem_search_input"
+                placeholder="搜索古诗词..."
+                @keyup.enter="handlePoemSearch"
+              />
+              <button class="poem_search_btn" @click="handlePoemSearch" :disabled="poemSearchLoading">
+                {{ poemSearchLoading ? '搜索中...' : '搜索' }}
+              </button>
+              <button v-if="poemSearchMode === 'search'" class="poem_search_clear" @click="clearPoemSearch">清除</button>
+            </div>
             <div class="luntan_jx_scroll">
-              <div
-                v-for="(poem, idx) in ancientPoems"
-                :key="'ancient-' + idx"
-                class="poem_card"
-              >
-                <img :src="asset(poem.image)" :alt="poem.title || '诗词配图'">
-                <div class="jingxuan_pl">
-                  <p>
-                    <span class="poem_date">{{ poem.date }}</span><br>
-                    <span v-if="poem.title" class="poem_title">{{ poem.title }}</span>
-                    {{ poem.content }}<br><span class="poem_author">{{ poem.author }}</span>
-                  </p>
+              <!-- 默认模式：显示静态古诗词 -->
+              <template v-if="poemSearchMode === 'default'">
+                <div
+                  v-for="(poem, idx) in ancientPoems"
+                  :key="'ancient-' + idx"
+                  class="poem_card"
+                >
+                  <div class="poem_card_img">
+                    <img :src="asset(poem.image)" :alt="poem.title || '诗词配图'">
+                    <div class="poem_card_img_overlay"></div>
+                  </div>
+                  <div class="poem_card_body">
+                    <div v-if="poem.title" class="poem_title">{{ poem.title }}</div>
+                    <div class="poem_meta">【{{ poem.date }}】{{ poem.author }}</div>
+                    <div class="poem_lines">
+                      <div v-for="(line, li) in poem.content.split('\n')" :key="li" class="poem_line">{{ line }}</div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </template>
+
+              <!-- 搜索模式：显示搜索结果 -->
+              <template v-if="poemSearchMode === 'search'">
+                <div v-if="poemSearchLoading" class="poem_search_status">
+                  正在搜索...
+                </div>
+                <div v-else-if="poemSearchResults.length === 0" class="poem_search_status">
+                  未找到相关诗词
+                </div>
+                <template v-else>
+                  <div
+                    v-for="(poem, idx) in poemSearchResults"
+                    :key="'search-' + idx"
+                    class="poem_card poem_search_card"
+                  >
+                    <div class="poem_card_body">
+                      <div class="poem_title">{{ poem.title }}</div>
+                      <div class="poem_meta">
+                        <span v-if="poem.dynasty">【{{ poem.dynasty }}】</span>
+                        <span v-if="poem.author">{{ poem.author }}</span>
+                        <span v-if="poem.source === 'external'" class="poem_source_tag">古诗库</span>
+                      </div>
+                      <div class="poem_lines">
+                        <div v-for="(line, li) in poem.content.split('\n')" :key="li" class="poem_line">{{ line }}</div>
+                      </div>
+                      <div v-if="poem.recommendReason" class="poem_recommend_reason">
+                        <span class="recommend_icon">&#128161;</span> {{ poem.recommendReason }}
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </template>
+
+              <!-- 推荐模式：显示协同过滤推荐 -->
+              <template v-if="poemSearchMode === 'recommend'">
+                <div v-if="recommendedPoems.length === 0" class="poem_search_status">
+                  暂无推荐，多浏览诗词会更精准哦~
+                </div>
+                <template v-else>
+                  <div
+                    v-for="(poem, idx) in recommendedPoems"
+                    :key="'recommend-' + idx"
+                    class="poem_card poem_recommend_card"
+                  >
+                    <div class="poem_card_body">
+                      <div class="poem_title">{{ poem.title }}</div>
+                      <div class="poem_meta">
+                        <span v-if="poem.dynasty">【{{ poem.dynasty }}】</span>
+                        <span v-if="poem.author">{{ poem.author }}</span>
+                      </div>
+                      <div class="poem_lines">
+                        <div v-for="(line, li) in poem.content.split('\n')" :key="li" class="poem_line">{{ line }}</div>
+                      </div>
+                      <div v-if="poem.recommendReason" class="poem_recommend_reason">
+                        <span class="recommend_icon">&#128161;</span> {{ poem.recommendReason }}
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </template>
             </div>
           </div>
         </div>
 
         <div class="poem_selection_right">
           <h2 class="luntan_section_title">当代·精选</h2>
-          <div class="luntan_ddjx">
-            <div class="luntan_jx_title">时代画像</div>
-            <div class="luntan_jx_scroll">
+          <div class="luntan_ddjx contemporary_container">
+            <div class="luntan_jx_title contemporary_title">时代画像</div>
+            <div class="contemporary_scroll">
               <div
-                v-for="(poem, idx) in contemporaryPoems"
-                :key="'contemporary-' + idx"
-                class="poem_card"
+                v-for="(poem, idx) in paginatedContemporaryPoems"
+                :key="'contemporary-' + ((contemporaryPage - 1) * contemporaryPageSize + idx)"
+                class="contemporary_card"
               >
-                <img :src="asset(poem.image)" :alt="poem.title || '诗词配图'">
-                <div class="jingxuan_pl">
-                  <p>
-                    <span class="poem_date">{{ poem.date }}</span><br>
-                    <span v-if="poem.title" class="poem_title">{{ poem.title }}</span>
-                    {{ poem.content }}<br><span class="poem_author">{{ poem.author }}</span>
-                  </p>
+                <div class="contemporary_card_img">
+                  <img :src="asset(poem.image)" :alt="poem.title || '诗词配图'">
+                </div>
+                <div class="contemporary_card_body">
+                  <div class="contemporary_card_date">{{ poem.date }}</div>
+                  <div class="contemporary_card_content">
+                    <div class="contemporary_card_title">{{ poem.title || '&nbsp;' }}</div>
+                    <p>{{ poem.content }}</p>
+                  </div>
+                  <div class="contemporary_card_footer">
+                    <span class="contemporary_card_author">{{ poem.author }}</span>
+                    <div class="contemporary_card_actions">
+                      <button
+                        class="contemporary_action_btn"
+                        :class="{ active: poemLikeStates[String((contemporaryPage - 1) * contemporaryPageSize + idx)] }"
+                        @click="handlePoemLike(String((contemporaryPage - 1) * contemporaryPageSize + idx))"
+                      >
+                        <span class="action_icon">&#10084;</span>
+                        <span class="action_count">{{ poemLikeCounts[String((contemporaryPage - 1) * contemporaryPageSize + idx)] || '' }}</span>
+                      </button>
+                      <button
+                        class="contemporary_action_btn"
+                        :class="{ active: poemFavoriteStates[String((contemporaryPage - 1) * contemporaryPageSize + idx)] }"
+                        @click="handlePoemFavorite(String((contemporaryPage - 1) * contemporaryPageSize + idx))"
+                      >
+                        <span class="action_icon">&#9733;</span>
+                      </button>
+                      <button
+                        class="contemporary_action_btn"
+                        @click="togglePoemComments('contemporary-' + ((contemporaryPage - 1) * contemporaryPageSize + idx), 2)"
+                      >
+                        <span class="action_icon">&#128172;</span>
+                        <span class="action_count">{{ commentTotals['contemporary-' + ((contemporaryPage - 1) * contemporaryPageSize + idx)] || '' }}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div class="contemporary_comment_section" v-if="expandedPoemIdx === 'contemporary-' + ((contemporaryPage - 1) * contemporaryPageSize + idx)">
+                  <div class="contemporary_comment_input_bar" v-if="userStore.isLoggedIn">
+                    <input
+                      v-model="commentInputs['contemporary-' + ((contemporaryPage - 1) * contemporaryPageSize + idx)]"
+                      class="contemporary_comment_input"
+                      placeholder="写下你的想法..."
+                      @keyup.enter="handleSubmitPoemComment('contemporary-' + ((contemporaryPage - 1) * contemporaryPageSize + idx), 2)"
+                    />
+                    <button
+                      class="contemporary_comment_submit"
+                      @click="handleSubmitPoemComment('contemporary-' + ((contemporaryPage - 1) * contemporaryPageSize + idx), 2)"
+                      :disabled="submittingComment['contemporary-' + ((contemporaryPage - 1) * contemporaryPageSize + idx)]"
+                    >
+                      {{ submittingComment['contemporary-' + ((contemporaryPage - 1) * contemporaryPageSize + idx)] ? '...' : '发送' }}
+                    </button>
+                  </div>
+                  <div class="contemporary_comment_login" v-else @click="router.push('/user/login')">
+                    <span>登录后参与讨论</span>
+                  </div>
+                  <div class="contemporary_comment_list" v-if="poemComments['contemporary-' + ((contemporaryPage - 1) * contemporaryPageSize + idx)]?.length">
+                    <div
+                      v-for="comment in poemComments['contemporary-' + ((contemporaryPage - 1) * contemporaryPageSize + idx)]"
+                      :key="comment.id"
+                      class="contemporary_comment_item"
+                    >
+                      <div class="contemporary_comment_author">{{ comment.username }}</div>
+                      <div class="contemporary_comment_text">{{ comment.content }}</div>
+                      <div class="contemporary_comment_footer">
+                        <span class="contemporary_comment_time">{{ formatDate(comment.createTime) }}</span>
+                        <button class="contemporary_comment_like" @click="handlePoemCommentLike(comment)">
+                          &#128077; {{ comment.likeCount || '' }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="contemporary_comment_empty" v-else-if="commentTotals['contemporary-' + ((contemporaryPage - 1) * contemporaryPageSize + idx)] === 0">
+                    <span>暂无评论，来发表第一条评论吧</span>
+                  </div>
                 </div>
               </div>
+            </div>
+            <div class="contemporary_pagination" v-if="contemporaryTotal > contemporaryPageSize">
+              <el-pagination
+                size="small"
+                layout="prev, pager, next"
+                :total="contemporaryTotal"
+                :page-size="contemporaryPageSize"
+                :current-page="contemporaryPage"
+                @current-change="handleContemporaryPageChange"
+              />
             </div>
           </div>
         </div>
@@ -960,8 +1553,7 @@ onUnmounted(() => {
 
 .home-page h1,
 .home-page h2,
-.home-page h4,
-.home-page .ai_title {
+.home-page h4 {
   font-family: cursive;
 }
 
@@ -1721,8 +2313,8 @@ html {
   height: 235px;
   position: absolute;
   top: 165px;
-  left: 0;
-  z-index: 20;
+  left: 60px;
+  z-index: 22;
 }
 
 .zhuang_s2 {
@@ -1816,7 +2408,7 @@ html {
   width: 210px;
   height: 406px;
   position: absolute;
-  top: 2400px;
+  top: 2700px;
   left: 82.6%;
   z-index: 1;
   opacity: 0.6;
@@ -2213,24 +2805,13 @@ html {
   background-color: #0056b3;
 }
 
-.z_center {
+.z_right_container {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 30px;
   padding: 20px 0;
   position: relative;
-}
-
-.ai_title {
-  width: 100%;
-  text-align: center;
-  font-size: 28px;
-  font-weight: 700;
-  color: #4A2C1A;
-  margin: 0 0 20px;
-  position: static;
-  height: auto;
 }
 
 .z_right {
@@ -2247,6 +2828,30 @@ html {
   box-sizing: border-box;
   position: relative;
   z-index: 2;
+}
+
+.vision-header {
+  position: sticky;
+  top: -20px;
+  z-index: 10;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95) 80%, rgba(255, 255, 255, 0));
+  padding: 0 0 12px;
+  margin: -20px -20px 12px;
+  padding-top: 20px;
+  padding-bottom: 16px;
+}
+
+.vision-header h4 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2c1810;
+  text-align: center;
+  margin: 0;
+  padding-bottom: 10px;
+  border-bottom: 2px solid rgba(139, 69, 19, 0.3);
+  letter-spacing: 4px;
+  padding-left: 4px;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
 }
 
 .z_right::-webkit-scrollbar {
@@ -2355,187 +2960,742 @@ html {
   --el-pagination-hover-color: #8b4513;
 }
 
-.z_left {
-  overflow-y: visible;
-  height: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  width: 500px;
-}
-
-.z_left > .ai-card {
-  min-width: 0;
+.ai-container {
   width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 30px 28px 24px;
+  position: relative;
+  z-index: 10;
+  border-radius: 20px;
+  box-shadow: 0 4px 30px rgba(44, 36, 22, 0.08), 0 20px 60px rgba(44, 36, 22, 0.16);
+  border: 1.5px solid #d9cebf;
+  background-image:
+    linear-gradient(180deg, rgba(253, 250, 243, 0.55) 0%, rgba(245, 240, 232, 0.55) 100%),
+    linear-gradient(0deg, transparent 24%, rgba(180, 160, 130, 0.03) 25%, rgba(180, 160, 130, 0.03) 26%, transparent 27%, transparent 74%, rgba(180, 160, 130, 0.03) 75%, rgba(180, 160, 130, 0.03) 76%, transparent 77%),
+    linear-gradient(90deg, transparent 24%, rgba(180, 160, 130, 0.02) 25%, rgba(180, 160, 130, 0.02) 26%, transparent 27%, transparent 74%, rgba(180, 160, 130, 0.02) 75%, rgba(180, 160, 130, 0.02) 76%, transparent 77%);
+  background-size: 100% 100%, 60px 60px, 60px 60px;
+  backdrop-filter: blur(8px);
 }
 
-.ai-card {
-  border-radius: 16px;
-  overflow: hidden;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+.ai-container::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 70%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #8b7355, #8b7355, transparent);
+  opacity: 0.3;
+  border-radius: 1px;
 }
 
-.ai-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
-}
-
-.ai-card-poem {
-  background: linear-gradient(145deg, rgba(139, 69, 19, 0.15), rgba(210, 105, 30, 0.25));
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.ai-card-analyze {
-  background: linear-gradient(145deg, rgba(85, 107, 47, 0.15), rgba(107, 142, 35, 0.25));
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.ai-card-header {
-  padding: 20px 24px 12px;
+.ai-header {
   text-align: center;
+  margin-bottom: 24px;
+  position: relative;
 }
 
-.ai-card-header h2 {
-  font-size: 22px;
-  font-weight: 700;
-  color: #4A2C1A;
-  margin: 0 0 6px;
+.ai-header-icon {
+  display: inline-block;
+  width: 52px;
+  height: 52px;
+  background: linear-gradient(135deg, #fdfaf3 0%, #f5ede0 100%);
+  border-radius: 50%;
+  border: 2px solid #d9cebf;
+  box-shadow: 0 3px 14px rgba(44, 36, 22, 0.08);
+  margin-bottom: 8px;
+  line-height: 52px;
+  font-size: 28px;
+  position: relative;
 }
 
-.ai-card-header p {
-  font-size: 13px;
-  color: #555;
+.ai-header-icon::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px dashed #d9cebf;
+  opacity: 0.5;
+  animation: aiRotateDashed 20s linear infinite;
+}
+
+@keyframes aiRotateDashed {
+  to { transform: rotate(360deg); }
+}
+
+.ai-header-title {
+  font-family: 'STKaiti', 'KaiTi', 'Ma Shan Zheng', 'Noto Serif SC', serif;
+  font-size: 2em;
+  color: #2c2416;
+  letter-spacing: 0.06em;
+  font-weight: 400;
+  margin: 4px 0 0;
+  position: relative;
+  display: inline-block;
+}
+
+.ai-header-title::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #b8860b, transparent);
+  border-radius: 2px;
+}
+
+.ai-seal {
+  display: inline-block;
+  width: 36px;
+  height: 36px;
+  border: 2px solid #c0392b;
+  border-radius: 6px;
+  color: #c0392b;
+  font-family: 'STKaiti', 'KaiTi', 'Ma Shan Zheng', 'Noto Serif SC', serif;
+  font-size: 0.7em;
+  line-height: 32px;
+  text-align: center;
+  transform: rotate(-6deg);
+  margin-left: 8px;
+  opacity: 0.75;
+  vertical-align: middle;
+  position: relative;
+  top: -2px;
+}
+
+.ai-subtitle {
+  display: block;
+  font-size: 0.85em;
+  color: #8b7355;
+  letter-spacing: 0.08em;
+  margin-top: 8px;
+  font-family: 'STSong', 'Noto Serif SC', 'Songti SC', 'SimSun', 'PingFang SC', 'Microsoft YaHei', serif;
+}
+
+.ai-tab-nav {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 2;
+}
+
+.ai-tab-btn {
+  padding: 10px 22px;
+  border-radius: 30px;
+  border: 1.5px solid #d9cebf;
+  background: #fdfaf3;
+  cursor: pointer;
+  font-family: 'STSong', 'Noto Serif SC', 'Songti SC', 'SimSun', 'PingFang SC', 'Microsoft YaHei', serif;
+  font-size: 0.95em;
+  color: #5c4a3a;
+  letter-spacing: 0.04em;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.ai-tab-btn:hover {
+  border-color: #b8860b;
+  color: #2c2416;
+  box-shadow: 0 3px 14px rgba(44, 36, 22, 0.08);
+  transform: translateY(-1px);
+}
+
+.ai-tab-btn.active {
+  background: linear-gradient(135deg, #3a2f20 0%, #2c2416 100%);
+  color: #f5ecd7;
+  border-color: transparent;
+  box-shadow: 0 4px 18px rgba(44, 36, 22, 0.3);
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.ai-tab-icon {
+  margin-right: 4px;
+  font-size: 1.05em;
+}
+
+.ai-panels {
+  position: relative;
+  min-height: 200px;
+}
+
+.ai-panel {
+  animation: aiFadeSlideIn 0.45s ease;
+}
+
+@keyframes aiFadeSlideIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ai-upload-zone {
+  border: 2px dashed #d9cebf;
+  border-radius: 20px;
+  padding: 36px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  background: linear-gradient(180deg, rgba(245, 240, 230, 0.5) 0%, rgba(253, 250, 243, 0.3) 100%);
+  overflow: hidden;
+}
+
+.ai-upload-zone:hover {
+  border-color: #b8860b;
+  background: linear-gradient(180deg, rgba(250, 245, 235, 0.7) 0%, rgba(255, 252, 245, 0.5) 100%);
+  box-shadow: 0 6px 28px rgba(44, 36, 22, 0.08);
+  transform: translateY(-2px);
+}
+
+.ai-upload-zone.ai-drag-over {
+  border-color: #d4a745;
+  background: rgba(210, 180, 140, 0.1);
+  box-shadow: 0 0 0 8px rgba(210, 180, 140, 0.06);
+}
+
+.ai-upload-emoji {
+  font-size: 52px;
+  display: block;
+  margin-bottom: 10px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ai-upload-zone:hover .ai-upload-emoji {
+  transform: scale(1.08);
+}
+
+.ai-upload-text {
+  font-family: 'STKaiti', 'KaiTi', 'Ma Shan Zheng', 'Noto Serif SC', serif;
+  font-size: 1.2em;
+  color: #5c4a3a;
+  letter-spacing: 0.05em;
   margin: 0;
 }
 
-.ai-card-body {
-  padding: 12px 24px 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
+.ai-upload-hint {
+  font-size: 0.85em;
+  color: #8b7355;
+  margin-top: 6px;
 }
 
-.ai-upload-area {
-  width: 100%;
-  height: 180px;
-  border: 2px dashed rgba(139, 69, 19, 0.3);
-  border-radius: 12px;
-  cursor: pointer;
+.ai-preview-area {
+  margin-top: 16px;
+  text-align: center;
+  animation: aiFadeSlideIn 0.4s ease;
+}
+
+.ai-preview-area img {
+  max-width: 100%;
+  max-height: 280px;
+  border-radius: 14px;
+  box-shadow: 0 6px 24px rgba(44, 36, 22, 0.16);
+  border: 3px solid #d9cebf;
+  object-fit: contain;
+  background: #faf7f0;
+}
+
+.ai-preview-actions {
+  margin-top: 14px;
   display: flex;
-  align-items: center;
+  gap: 10px;
   justify-content: center;
-  overflow: hidden;
-  transition: border-color 0.3s ease, background-color 0.3s ease;
-  background-color: rgba(255, 255, 255, 0.15);
-}
-
-.ai-upload-area:hover {
-  border-color: rgba(139, 69, 19, 0.6);
-  background-color: rgba(255, 255, 255, 0.25);
-}
-
-.ai-preview-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 10px;
-}
-
-.ai-upload-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  color: #666;
-  font-size: 14px;
-}
-
-.ai-upload-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: rgba(139, 69, 19, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  color: #8B4513;
-}
-
-.ai-textarea {
-  width: 100%;
-  padding: 12px 14px;
-  border: 1px solid rgba(139, 69, 19, 0.2);
-  border-radius: 10px;
-  background-color: rgba(255, 255, 255, 0.2);
-  color: #333;
-  font-size: 15px;
-  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
-  letter-spacing: 0.5px;
-  line-height: 1.6;
-  resize: vertical;
-  outline: none;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
-  box-sizing: border-box;
-}
-
-.ai-textarea:focus {
-  border-color: rgba(139, 69, 19, 0.5);
-  box-shadow: 0 0 0 3px rgba(139, 69, 19, 0.1);
-}
-
-.ai-textarea::placeholder {
-  color: #999;
-  font-size: 14px;
-}
-
-.ai-btn {
-  width: 100%;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 15px;
-  font-weight: 600;
-  font-family: cursive;
-  transition: all 0.3s ease;
+  flex-wrap: wrap;
 }
 
 .ai-btn-primary {
-  background: linear-gradient(135deg, #8B4513, #A0522D);
-  color: white;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 24px;
+  border-radius: 30px;
+  cursor: pointer;
+  font-family: 'STSong', 'Noto Serif SC', 'Songti SC', 'SimSun', 'PingFang SC', 'Microsoft YaHei', serif;
+  font-size: 0.95em;
+  letter-spacing: 0.04em;
+  border: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  white-space: nowrap;
+  background: linear-gradient(135deg, #3a2f20 0%, #2c2416 100%);
+  color: #f5ecd7;
+  box-shadow: 0 4px 16px rgba(44, 36, 22, 0.25);
 }
 
 .ai-btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(139, 69, 19, 0.4);
+  box-shadow: 0 7px 22px rgba(44, 36, 22, 0.35);
+  background: linear-gradient(135deg, #4a3d2a 0%, #3a2f20 100%);
 }
 
-.ai-btn:disabled {
+.ai-btn-primary:disabled {
   background: #c3c3c3;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
 }
 
-.ai-result-box {
-  width: 100%;
-  padding: 14px 16px;
-  background-color: rgba(255, 255, 255, 0.3);
-  border-radius: 10px;
-  border-left: 4px solid #8B4513;
-  animation: aiFadeIn 0.4s ease;
+.ai-btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 24px;
+  border-radius: 30px;
+  cursor: pointer;
+  font-family: 'STSong', 'Noto Serif SC', 'Songti SC', 'SimSun', 'PingFang SC', 'Microsoft YaHei', serif;
+  font-size: 0.95em;
+  letter-spacing: 0.04em;
+  border: 1.5px solid #d9cebf;
+  background: transparent;
+  color: #5c4a3a;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  white-space: nowrap;
 }
 
-.ai-result-text {
-  margin: 0;
-  font-size: 14px;
-  color: #333;
+.ai-btn-outline:hover {
+  border-color: #b8860b;
+  color: #2c2416;
+  background: rgba(210, 180, 140, 0.06);
+}
+
+.ai-analyze-wrap {
+  position: relative;
+  background: #fdfaf3;
+  border-radius: 14px;
+  border: 1.5px solid #d9cebf;
+  padding: 6px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 10px rgba(44, 36, 22, 0.08);
+}
+
+.ai-analyze-wrap:focus-within {
+  border-color: #b8860b;
+  box-shadow: 0 4px 20px rgba(184, 134, 11, 0.12);
+}
+
+.ai-analyze-textarea {
+  width: 100%;
+  min-height: 120px;
+  border: none;
+  outline: none;
+  resize: vertical;
+  font-family: 'STKaiti', 'KaiTi', 'Noto Serif SC', 'STSong', 'SimSun', 'Songti SC', serif;
+  font-size: 1.1em;
+  padding: 14px 16px;
+  background: transparent;
+  color: #2c2416;
+  letter-spacing: 0.04em;
   line-height: 1.8;
-  font-family: cursive;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.ai-analyze-textarea::placeholder {
+  color: #c4b8a8;
+  font-style: italic;
+  letter-spacing: 0.03em;
+}
+
+.ai-example-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding: 0 4px;
+}
+
+.ai-example-tag {
+  font-size: 0.82em;
+  padding: 6px 13px;
+  border-radius: 20px;
+  background: #f7f3ea;
+  border: 1px solid #d9cebf;
+  cursor: pointer;
+  color: #8b7355;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  font-family: 'STKaiti', 'KaiTi', 'Noto Serif SC', 'STSong', 'SimSun', 'Songti SC', serif;
+}
+
+.ai-example-tag:hover {
+  background: #f0e8d5;
+  border-color: #b8860b;
+  color: #2c2416;
+}
+
+.ai-result-card {
+  margin-top: 18px;
+  background: linear-gradient(180deg, #fdfaf5 0%, #f9f4e8 100%);
+  border-radius: 14px;
+  border: 1px solid #d9cebf;
+  padding: 20px 22px;
+  animation: aiFadeSlideIn 0.5s ease;
+  position: relative;
+  box-shadow: 0 3px 16px rgba(44, 36, 22, 0.08);
+}
+
+.ai-poem-content {
+  font-family: 'STKaiti', 'KaiTi', 'Noto Serif SC', 'STSong', 'SimSun', 'Songti SC', serif;
+  font-size: 1.25em;
+  line-height: 2;
+  letter-spacing: 0.05em;
+  color: #2c2416;
+  text-align: center;
+  white-space: pre-line;
+  position: relative;
+  padding: 0 10px;
+}
+
+.ai-poem-content::before,
+.ai-poem-content::after {
+  font-size: 1.6em;
+  color: #b8860b;
+  opacity: 0.6;
+  font-family: 'STKaiti', 'KaiTi', 'Ma Shan Zheng', 'Noto Serif SC', serif;
+  position: absolute;
+}
+
+.ai-poem-content::before {
+  content: '「';
+  left: -4px;
+  top: -6px;
+}
+
+.ai-poem-content::after {
+  content: '」';
+  right: -4px;
+  bottom: -6px;
+}
+
+.ai-analysis-label {
+  display: inline-block;
+  font-size: 0.8em;
+  color: #b8860b;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.ai-analysis-text {
+  font-family: 'STSong', 'Noto Serif SC', 'Songti SC', 'SimSun', 'PingFang SC', 'Microsoft YaHei', serif;
+  font-size: 0.95em;
+  color: #5c4a3a;
+  line-height: 1.9;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dotted #d9cebf;
+  letter-spacing: 0.03em;
+}
+
+.ai-explore-hint {
+  text-align: center;
+  color: #8b7355;
+  font-family: 'STKaiti', 'KaiTi', 'Ma Shan Zheng', 'Noto Serif SC', serif;
+  font-size: 1.05em;
+  letter-spacing: 0.05em;
+  margin: 0 0 14px;
+}
+
+.ai-explore-card {
+  background: linear-gradient(180deg, #fdfaf5 0%, #f9f4e8 100%);
+}
+
+.ai-explore-info {
+  text-align: center;
+  margin-top: 12px;
+}
+
+.ai-extra-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px dotted #d9cebf;
+}
+
+.ai-extra-card {
+  background: #fdfaf5;
+  border-radius: 14px;
+  border: 1px solid #d9cebf;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.ai-extra-card:hover {
+  border-color: #b8860b;
+  box-shadow: 0 4px 18px rgba(44, 36, 22, 0.08);
+  transform: translateY(-2px);
+}
+
+.ai-extra-icon {
+  font-size: 2em;
+  margin-bottom: 6px;
+}
+
+.ai-extra-title {
+  font-family: 'STKaiti', 'KaiTi', 'Ma Shan Zheng', 'Noto Serif SC', serif;
+  font-size: 1em;
+  color: #2c2416;
+  letter-spacing: 0.04em;
+}
+
+.ai-extra-desc {
+  font-size: 0.78em;
+  color: #8b7355;
+  margin-top: 3px;
+}
+
+.ai-extra-card.active {
+  border-color: #b8860b;
+  background: linear-gradient(135deg, #fdfaf5, #f5eed8);
+  box-shadow: 0 4px 18px rgba(44, 36, 22, 0.12);
+}
+
+.ai-extra-panel {
+  margin-top: 16px;
+  background: #fdfaf5;
+  border: 1px solid #d9cebf;
+  border-radius: 14px;
+  padding: 20px;
+  animation: aiFadeIn 0.3s ease;
+}
+
+.ai-extra-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.ai-extra-panel-title {
+  font-family: 'STKaiti', 'KaiTi', 'Ma Shan Zheng', 'Noto Serif SC', serif;
+  font-size: 1.1em;
+  color: #2c2416;
+  letter-spacing: 0.04em;
+}
+
+.ai-extra-panel-close {
+  background: none;
+  border: none;
+  font-size: 1.4em;
+  color: #8b7355;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.ai-extra-panel-close:hover {
+  color: #2c2416;
+}
+
+.rhyme-search-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rhyme-search-type {
+  display: flex;
+  gap: 8px;
+}
+
+.rhyme-type-btn {
+  background: none;
+  border: 1px solid #d9cebf;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 0.85em;
+  color: #5a4a3a;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.rhyme-type-btn.active {
+  background: #b8860b;
+  color: #fff;
+  border-color: #b8860b;
+}
+
+.rhyme-search-input {
+  display: flex;
+  gap: 8px;
+}
+
+.rhyme-search-input input {
+  flex: 1;
+  border: 1px solid #d9cebf;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.9em;
+  background: #fff;
+  color: #2c2416;
+  outline: none;
+}
+
+.rhyme-search-input input:focus {
+  border-color: #b8860b;
+}
+
+.rhyme-results {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dotted #d9cebf;
+}
+
+.rhyme-result-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.rhyme-result-char {
+  font-family: 'STKaiti', 'KaiTi', 'Ma Shan Zheng', 'Noto Serif SC', serif;
+  font-size: 2em;
+  color: #b8860b;
+  line-height: 1;
+}
+
+.rhyme-result-info {
+  font-size: 0.9em;
+  color: #5a4a3a;
+}
+
+.rhyme-result-info strong {
+  color: #b8860b;
+}
+
+.rhyme-same-title {
+  font-size: 0.85em;
+  color: #8b7355;
+  margin-bottom: 8px;
+}
+
+.rhyme-char-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rhyme-char-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  font-family: 'STKaiti', 'KaiTi', 'Ma Shan Zheng', 'Noto Serif SC', serif;
+  font-size: 1em;
+  cursor: default;
+  transition: all 0.2s;
+}
+
+.rhyme-char-tag.平声 {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #c8e6c9;
+}
+
+.rhyme-char-tag.上声,
+.rhyme-char-tag.去声,
+.rhyme-char-tag.入声 {
+  background: #fce4ec;
+  color: #c62828;
+  border: 1px solid #f8bbd0;
+}
+
+.couplet-example-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.couplet-example-label {
+  font-size: 0.82em;
+  color: #8b7355;
+}
+
+.couplet-example-tag {
+  background: none;
+  border: 1px solid #d9cebf;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.8em;
+  color: #5a4a3a;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.couplet-example-tag:hover {
+  border-color: #b8860b;
+  color: #b8860b;
+}
+
+.couplet-input-area {
+  display: flex;
+  gap: 8px;
+}
+
+.couplet-input-area input {
+  flex: 1;
+  border: 1px solid #d9cebf;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.9em;
+  background: #fff;
+  color: #2c2416;
+  outline: none;
+}
+
+.couplet-input-area input:focus {
+  border-color: #b8860b;
+}
+
+.couplet-result-card {
+  margin-top: 14px;
+}
+
+.couplet-display {
+  text-align: center;
+  padding: 8px 0;
+}
+
+.couplet-upper {
+  font-family: 'STKaiti', 'KaiTi', 'Ma Shan Zheng', 'Noto Serif SC', serif;
+  font-size: 1.05em;
+  color: #2c2416;
+  letter-spacing: 0.08em;
+}
+
+.couplet-divider {
+  color: #d9cebf;
+  margin: 8px 0;
+  font-size: 0.9em;
+}
+
+.couplet-lower {
+  font-family: 'STKaiti', 'KaiTi', 'Ma Shan Zheng', 'Noto Serif SC', serif;
+  font-size: 1.05em;
+  color: #b8860b;
+  letter-spacing: 0.08em;
+  white-space: pre-wrap;
+  text-align: left;
+  line-height: 1.8;
 }
 
 @keyframes aiFadeIn {
@@ -2591,7 +3751,7 @@ html {
 }
 
 .luntan_jx_title {
-  font-size: 60px;
+  font-size: 36px;
   font-weight: bold;
   background: linear-gradient(to right, #ff7e5f, #feb47b);
   -webkit-background-clip: text;
@@ -2603,6 +3763,139 @@ html {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.luntan_jx_title span {
+  cursor: pointer;
+  transition: all 0.3s;
+  -webkit-text-fill-color: initial;
+  background-clip: initial;
+  background: none;
+  border-bottom: 2px solid transparent;
+  padding-bottom: 4px;
+}
+
+.luntan_jx_title span:hover {
+  opacity: 0.8;
+  border-bottom-color: rgba(255, 126, 95, 0.5);
+}
+
+.luntan_jx_title span.active {
+  border-bottom-color: #ff7e5f;
+}
+
+.luntan_jx_title .recommend_btn {
+  font-size: 20px;
+  color: #667eea;
+}
+
+.poem_search_bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  align-items: center;
+}
+
+.poem_search_input {
+  flex: 1;
+  padding: 10px 16px;
+  border: 1px solid rgba(139, 69, 19, 0.2);
+  border-radius: 8px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.8);
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.poem_search_input:focus {
+  outline: none;
+  border-color: #ff7e5f;
+  box-shadow: 0 0 0 3px rgba(255, 126, 95, 0.1);
+}
+
+.poem_search_input::placeholder {
+  color: #999;
+}
+
+.poem_search_btn {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #ff7e5f, #feb47b);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  white-space: nowrap;
+}
+
+.poem_search_btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 126, 95, 0.3);
+}
+
+.poem_search_btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.poem_search_clear {
+  padding: 10px 16px;
+  background: transparent;
+  color: #999;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.poem_search_clear:hover {
+  background: #f5f5f5;
+  border-color: #ccc;
+}
+
+.poem_search_status {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+  font-size: 14px;
+}
+
+.poem_search_card,
+.poem_recommend_card {
+  flex-direction: column;
+}
+
+.poem_search_card .poem_card_body,
+.poem_recommend_card .poem_card_body {
+  padding: 16px;
+}
+
+.poem_source_tag {
+  display: inline-block;
+  padding: 2px 8px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.poem_recommend_reason {
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.08));
+  border-radius: 6px;
+  font-size: 12px;
+  color: #667eea;
+}
+
+.recommend_icon {
+  margin-right: 4px;
 }
 
 .luntan_jx_scroll {
@@ -2628,37 +3921,146 @@ html {
 
 .poem_card {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  transition: all 0.35s ease;
+  align-items: stretch;
+  gap: 0;
+  background: linear-gradient(135deg, #fffbf5 0%, #fff8ee 50%, #fffbf5 100%);
+  border-radius: 14px;
+  border: 1px solid rgba(139, 69, 19, 0.15);
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   width: 100%;
   box-sizing: border-box;
-  backdrop-filter: blur(8px);
-  overflow: visible;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 2px 12px rgba(139, 69, 19, 0.08);
+}
+
+.poem_card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 14px;
+  border: 2px solid transparent;
+  background: linear-gradient(135deg, rgba(139, 69, 19, 0.1), rgba(210, 105, 30, 0.08)) border-box;
+  mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+  pointer-events: none;
 }
 
 .poem_card:hover {
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.15);
-  transform: translateY(-3px);
-  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 12px 40px rgba(139, 69, 19, 0.18), 0 4px 12px rgba(0, 0, 0, 0.06);
+  transform: translateY(-4px);
+  background: linear-gradient(135deg, #fff 0%, #fff9f0 50%, #fff 100%);
+  z-index: 10;
 }
 
-.poem_card img {
-  width: 120px;
-  height: 90px;
-  border-radius: 8px;
-  object-fit: cover;
-  border: 2px solid rgba(200, 200, 200, 0.4);
+.poem_card_img {
+  position: relative;
+  width: 160px;
+  min-height: 180px;
   flex-shrink: 0;
-  transition: transform 0.3s ease;
+  overflow: hidden;
 }
 
-.poem_card:hover img {
-  transform: scale(1.03);
+.poem_card_img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.poem_card:hover .poem_card_img img {
+  transform: scale(1.08);
+}
+
+.poem_card_img_overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(139, 69, 19, 0.15), rgba(0, 0, 0, 0.25));
+  transition: opacity 0.4s ease;
+}
+
+.poem_card:hover .poem_card_img_overlay {
+  opacity: 0.6;
+}
+
+.poem_card_dynasty {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: linear-gradient(135deg, rgba(139, 69, 19, 0.85), rgba(160, 82, 45, 0.9));
+  color: #ffe4c4;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 2px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(4px);
+}
+
+.poem_card_body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px;
+  text-align: center;
+  position: relative;
+}
+
+.poem_card_body::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, rgba(139, 69, 19, 0.2), transparent);
+}
+
+.poem_card .poem_title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #8B4513;
+  margin-bottom: 8px;
+  letter-spacing: 3px;
+  text-shadow: 0 1px 2px rgba(139, 69, 19, 0.1);
+}
+
+.poem_meta {
+  font-size: 13px;
+  color: #a0724e;
+  margin-bottom: 16px;
+  letter-spacing: 2px;
+}
+
+.poem_author {
+  font-size: 13px;
+  color: #a0724e;
+  margin-bottom: 16px;
+  letter-spacing: 3px;
+}
+
+.poem_lines {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.poem_line {
+  font-size: 16px;
+  color: #333;
+  letter-spacing: 2px;
+  line-height: 2;
+  font-family: "Noto Serif SC", "Source Han Serif SC", "STSong", "SimSun", serif;
 }
 
 .jingxuan_pl {
@@ -2681,14 +4083,14 @@ html {
   -webkit-line-clamp: 4;
 }
 
-.poem_date {
+.luntan_ddjx .poem_date {
   font-size: 13px;
   color: #888;
   display: block;
   text-align: right;
 }
 
-.poem_title {
+.luntan_ddjx .poem_title {
   font-size: 17px;
   font-weight: 600;
   color: #8B4513;
@@ -2697,13 +4099,458 @@ html {
   letter-spacing: 1px;
 }
 
-.poem_author {
+.luntan_ddjx .poem_author {
   font-size: 14px;
   color: #666;
   display: block;
   text-align: right;
   margin-top: 8px;
   font-style: italic;
+}
+
+.luntan_ddjx .poem_card img {
+  width: 120px;
+  height: 90px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 2px solid rgba(200, 200, 200, 0.4);
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.luntan_ddjx .poem_card:hover img {
+  transform: scale(1.03);
+}
+
+.poem_comment_trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.poem_comment_trigger:hover {
+  opacity: 1;
+}
+
+.poem_comment_icon {
+  font-size: 14px;
+}
+
+.poem_comment_count {
+  font-size: 12px;
+  color: #666;
+}
+
+.poem_comment_section {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+  box-sizing: border-box;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.poem_comment_input_bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.poem_comment_input_bar.poem_comment_login_hint {
+  justify-content: center;
+  padding: 8px;
+  color: #999;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.poem_comment_input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.poem_comment_input:focus {
+  border-color: #66afe9;
+}
+
+.poem_comment_submit_btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.poem_comment_submit_btn:hover {
+  opacity: 0.9;
+}
+
+.poem_comment_submit_btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.poem_comment_list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.poem_comment_list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.poem_comment_list::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+}
+
+.poem_comment_item {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.poem_comment_item:last-child {
+  border-bottom: none;
+}
+
+.poem_comment_author {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.poem_comment_text {
+  font-size: 13px;
+  color: #555;
+  line-height: 1.5;
+}
+
+.poem_comment_footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.poem_comment_time {
+  font-size: 11px;
+  color: #999;
+}
+
+.poem_comment_like_btn {
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: #999;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.poem_comment_like_btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #666;
+}
+
+.poem_comment_empty {
+  text-align: center;
+  padding: 16px;
+  color: #999;
+  font-size: 13px;
+}
+
+.contemporary_container {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+  border: 1px solid #dee2e6 !important;
+}
+
+.contemporary_title {
+  background: linear-gradient(to right, #495057, #6c757d) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+}
+
+.contemporary_scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 5px;
+}
+
+.contemporary_pagination {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 8px;
+}
+
+.contemporary_card {
+  display: flex;
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #e9ecef;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.contemporary_card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.contemporary_card_img {
+  width: 120px;
+  height: 120px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 10px 0 0 10px;
+}
+
+.contemporary_card_img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.contemporary_card:hover .contemporary_card_img img {
+  transform: scale(1.05);
+}
+
+.contemporary_card_body {
+  flex: 1;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  position: relative;
+}
+
+.contemporary_card_date {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 12px;
+  color: #868e96;
+}
+
+.contemporary_card_content {
+  flex: 1;
+  margin-bottom: 8px;
+}
+
+.contemporary_card_content p {
+  font-size: 14px;
+  color: #495057;
+  line-height: 1.6;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+}
+
+.contemporary_card_title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #212529;
+  margin-bottom: 6px;
+}
+
+.contemporary_card_footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid #f1f3f5;
+}
+
+.contemporary_card_author {
+  font-size: 12px;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.contemporary_card_actions {
+  display: flex;
+  gap: 6px;
+}
+
+.contemporary_action_btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12px;
+  color: #6c757d;
+}
+
+.contemporary_action_btn:hover {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.contemporary_action_btn.active {
+  background: #e94560;
+  border-color: transparent;
+  color: #fff;
+}
+
+.action_icon {
+  font-size: 12px;
+}
+
+.action_count {
+  font-size: 11px;
+}
+
+.contemporary_comment_section {
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+}
+
+.contemporary_comment_input_bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.contemporary_comment_input {
+  flex: 1;
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 16px;
+  font-size: 13px;
+  color: #212529;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.contemporary_comment_input::placeholder {
+  color: #adb5bd;
+}
+
+.contemporary_comment_input:focus {
+  border-color: #868e96;
+  box-shadow: 0 0 0 2px rgba(134, 142, 150, 0.1);
+}
+
+.contemporary_comment_submit {
+  padding: 8px 14px;
+  background: #495057;
+  border: none;
+  border-radius: 16px;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.contemporary_comment_submit:hover {
+  background: #343a40;
+}
+
+.contemporary_comment_submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.contemporary_comment_login {
+  text-align: center;
+  padding: 8px;
+  background: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #495057;
+  font-size: 12px;
+  border: 1px solid #e9ecef;
+}
+
+.contemporary_comment_login:hover {
+  background: #f8f9fa;
+}
+
+.contemporary_comment_list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.contemporary_comment_item {
+  background: #fff;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.contemporary_comment_author {
+  font-size: 12px;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 4px;
+}
+
+.contemporary_comment_text {
+  font-size: 12px;
+  color: #212529;
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+
+.contemporary_comment_footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.contemporary_comment_time {
+  font-size: 11px;
+  color: #adb5bd;
+}
+
+.contemporary_comment_like {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: #6c757d;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.contemporary_comment_like:hover {
+  background: #f1f3f5;
+}
+
+.contemporary_comment_empty {
+  text-align: center;
+  padding: 10px;
+  color: #adb5bd;
+  font-size: 12px;
 }
 
 </style>

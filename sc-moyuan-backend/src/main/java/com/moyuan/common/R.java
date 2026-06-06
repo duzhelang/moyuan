@@ -4,13 +4,13 @@ import lombok.Data;
 
 @Data
 public class R<T> {
-    private int code;
+    private String code;
     private String message;
     private T data;
 
     public static <T> R<T> success(T data) {
         R<T> r = new R<>();
-        r.setCode(200);
+        r.setCode("200");
         r.setMessage("success");
         r.setData(data);
         return r;
@@ -20,7 +20,7 @@ public class R<T> {
         return success(null);
     }
 
-    public static <T> R<T> error(int code, String message) {
+    public static <T> R<T> error(String code, String message) {
         R<T> r = new R<>();
         r.setCode(code);
         r.setMessage(message);
@@ -28,6 +28,6 @@ public class R<T> {
     }
 
     public static <T> R<T> error(String message) {
-        return error(500, message);
+        return error("500", message);
     }
 }

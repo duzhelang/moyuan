@@ -3,8 +3,8 @@ package com.moyuan.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.moyuan.common.R;
 import com.moyuan.entity.Poet;
-import com.moyuan.service.PoetRecommendationService;
 import com.moyuan.service.PoetService;
+import com.moyuan.service.RecommendationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +25,7 @@ import java.util.Map;
 public class PoetController {
 
     private final PoetService poetService;
-    private final PoetRecommendationService poetRecommendationService;
+    private final RecommendationService recommendationService;
 
     @Operation(summary = "获取诗人列表")
     @GetMapping
@@ -33,8 +33,9 @@ public class PoetController {
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "10") int pageSize,
             @RequestParam(required = false) Long dynastyId,
-            @RequestParam(required = false) String keyword) {
-        IPage<Poet> page = poetService.getPoetList(pageNum, pageSize, dynastyId, keyword);
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String poetType) {
+        IPage<Poet> page = poetService.getPoetList(pageNum, pageSize, dynastyId, keyword, poetType);
         Map<String, Object> result = new HashMap<>();
         result.put("list", page.getRecords());
         result.put("total", page.getTotal());
@@ -53,14 +54,14 @@ public class PoetController {
     @GetMapping("/recommend")
     public R<List<Poet>> getRecommendedPoets(@RequestParam(defaultValue = "6") int limit) {
         Long userId = resolveCurrentUserId();
-        List<Poet> poets = poetRecommendationService.getRecommendedPoets(userId, Math.min(limit, 20));
+        List<Poet> poets = recommendationService.getRecommendedPoets(userId, Math.min(limit, 20));
         return R.success(poets);
     }
 
     @Operation(summary = "热门著名诗人排行")
     @GetMapping("/popular")
     public R<List<Poet>> getPopularPoets(@RequestParam(defaultValue = "10") int limit) {
-        List<Poet> poets = poetRecommendationService.getPopularPoets(Math.min(limit, 50));
+        List<Poet> poets = recommendationService.getPopularPoets(Math.min(limit, 50));
         return R.success(poets);
     }
 

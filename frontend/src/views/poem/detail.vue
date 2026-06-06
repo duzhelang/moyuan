@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePoemStore } from '@/stores/poem'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
-import type { Comment } from '@/types/model'
-import { likePoem, favoritePoem } from '@/api/modules/poem'
+import type { Comment, PoemRatingsData } from '@/types/model'
+import { likePoem, favoritePoem, getPoemRatings, ratePoem, requestAiRating } from '@/api/modules/poem'
 import { getComments, createComment, likeComment } from '@/api/modules/forum'
 import { addHistory } from '@/api/modules/history'
 
@@ -25,6 +25,13 @@ const newComment = ref('')
 const submittingComment = ref(false)
 
 const poemId = computed(() => Number(route.params.id))
+
+const ratingsData = ref<PoemRatingsData | null>(null)
+const userScore = ref(0)
+const userComment = ref('')
+const submittingRating = ref(false)
+const requestingAi = ref(false)
+const aiPollTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 const fetchPoem = async () => {
   loading.value = true
@@ -49,6 +56,15 @@ const fetchComments = async () => {
     commentTotal.value = res.data.total
   } catch (error) {
     console.error('获取评论失败:', error)
+  }
+}
+
+const fetchRatings = async () => {
+  try {
+    const res = await getPoemRatings(poemId.value)
+    ratingsData.value = res.data
+  } catch (error) {
+    ElMessage.error('获取评分失败')
   }
 }
 
@@ -88,12 +104,77 @@ const handleFavorite = async () => {
   }
 }
 
+const handleSubmitRating = async () => {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录后再评分')
+    return
+  }
+  if (userScore.value === 0) {
+    ElMessage.warning('请选择评分')
+    return
+  }
+  submittingRating.value = true
+  try {
+    await ratePoem(poemId.value, userScore.value, userComment.value || undefined)
+    ElMessage.success('评分成功')
+    userScore.value = 0
+    userComment.value = ''
+    fetchRatings()
+  } catch (error) {
+    ElMessage.error('评分失败')
+  } finally {
+    submittingRating.value = false
+  }
+}
+
+const pollAiRating = () => {
+  let attempts = 0
+  const maxAttempts = 10
+  aiPollTimer.value = setInterval(async () => {
+    attempts++
+    await fetchRatings()
+    if (ratingsData.value?.aiRating || attempts >= maxAttempts) {
+      if (aiPollTimer.value) {
+        clearInterval(aiPollTimer.value)
+        aiPollTimer.value = null
+      }
+      if (attempts >= maxAttempts && !ratingsData.value?.aiRating) {
+        ElMessage.warning('AI评分处理中，请稍后刷新查看')
+      }
+    }
+  }, 1500)
+}
+
+onUnmounted(() => {
+  if (aiPollTimer.value) {
+    clearInterval(aiPollTimer.value)
+    aiPollTimer.value = null
+  }
+})
+
+const handleRequestAiRating = async () => {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录')
+    return
+  }
+  requestingAi.value = true
+  try {
+    await requestAiRating(poemId.value)
+    ElMessage.success('AI评分请求已提交')
+    pollAiRating()
+  } catch (error) {
+    ElMessage.error('AI评分请求失败')
+  } finally {
+    requestingAi.value = false
+  }
+}
+
 const handleSubmitComment = async () => {
   if (!newComment.value.trim()) {
     ElMessage.warning('请输入评论内容')
     return
   }
-  
+
   submittingComment.value = true
   try {
     await createComment({
@@ -129,6 +210,7 @@ const handleCommentPageChange = (page: number) => {
 onMounted(() => {
   fetchPoem()
   fetchComments()
+  fetchRatings()
 })
 </script>
 
@@ -186,7 +268,108 @@ onMounted(() => {
           </span>
         </div>
       </el-card>
-      
+
+      <div class="rating-section" v-if="ratingsData">
+        <h2 class="section-title">评分区域</h2>
+
+        <div class="rating-overview">
+          <div class="rating-score">
+            <span class="score-value">{{ ratingsData.averageScore.toFixed(1) }}</span>
+            <span class="score-label">综合评分</span>
+          </div>
+          <div class="rating-count">
+            <span>{{ ratingsData.ratingCount }} 人评分</span>
+          </div>
+        </div>
+
+        <div class="ai-rating-card" v-if="ratingsData.aiRating">
+          <el-card>
+            <template #header>
+              <div class="ai-rating-header">
+                <span class="ai-label">
+                  <el-icon><Cpu /></el-icon>
+                  AI 评分
+                </span>
+                <span class="ai-model">{{ ratingsData.aiRating.aiModel || '未知模型' }}</span>
+              </div>
+            </template>
+            <div class="ai-rating-content">
+              <div class="ai-score">
+                <span class="score-value">{{ ratingsData.aiRating.score.toFixed(1) }}</span>
+              </div>
+              <div class="ai-analysis" v-if="ratingsData.aiRating.aiAnalysis">
+                <p>{{ ratingsData.aiRating.aiAnalysis }}</p>
+              </div>
+            </div>
+          </el-card>
+        </div>
+
+        <div class="request-ai-section" v-else>
+          <el-button
+            type="primary"
+            :loading="requestingAi"
+            @click="handleRequestAiRating"
+          >
+            <el-icon><Cpu /></el-icon>
+            请求 AI 评分
+          </el-button>
+        </div>
+
+        <div class="user-rating-section">
+          <h3 class="sub-title">用户评分</h3>
+          <div class="rating-form">
+            <div class="score-select">
+              <label>评分：</label>
+              <el-rate
+                v-model="userScore"
+                :max="5"
+                show-score
+                score-template="{value} 分"
+              />
+            </div>
+            <div class="comment-input">
+              <el-input
+                v-model="userComment"
+                type="textarea"
+                :rows="3"
+                placeholder="写下你的评价（可选）..."
+                maxlength="200"
+                show-word-limit
+              />
+            </div>
+            <el-button
+              type="primary"
+              :loading="submittingRating"
+              @click="handleSubmitRating"
+              :disabled="userScore === 0"
+            >
+              提交评分
+            </el-button>
+          </div>
+        </div>
+
+        <div class="user-ratings-list" v-if="ratingsData.userRatings.length > 0">
+          <h3 class="sub-title">用户评价</h3>
+          <div
+            v-for="rating in ratingsData.userRatings"
+            :key="rating.id"
+            class="rating-item"
+          >
+            <div class="rating-item-header">
+              <el-avatar :src="rating.avatar" :size="32">
+                {{ rating.username?.charAt(0)?.toUpperCase() }}
+              </el-avatar>
+              <span class="rating-username">{{ rating.username }}</span>
+              <el-rate :model-value="rating.score" disabled :max="5" />
+              <span class="rating-time">{{ rating.createTime }}</span>
+            </div>
+            <div class="rating-comment" v-if="rating.comment">
+              <p>{{ rating.comment }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="comment-section">
         <h2 class="section-title">评论区</h2>
         
@@ -432,5 +615,187 @@ onMounted(() => {
   margin-top: $spacing-xl;
   display: flex;
   justify-content: center;
+}
+
+.rating-section {
+  margin-top: $spacing-xl;
+  padding: $spacing-lg;
+  background: $background-color-light;
+  border-radius: $border-radius-md;
+  box-shadow: $box-shadow;
+}
+
+.rating-overview {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xl;
+  margin-bottom: $spacing-xl;
+  padding: $spacing-lg;
+  background: linear-gradient(135deg, rgba($primary-color, 0.05), rgba($accent-color, 0.05));
+  border-radius: $border-radius-md;
+}
+
+.rating-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $spacing-xs;
+}
+
+.score-value {
+  font-size: $font-size-hero;
+  font-weight: bold;
+  color: $warning-color;
+  font-family: $font-family-title;
+}
+
+.score-label {
+  font-size: $font-size-sm;
+  color: $text-color-secondary;
+}
+
+.rating-count {
+  font-size: $font-size-base;
+  color: $text-color-secondary;
+}
+
+.ai-rating-card {
+  margin-bottom: $spacing-xl;
+
+  .ai-rating-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .ai-label {
+    display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+    font-weight: 600;
+    color: $primary-color;
+  }
+
+  .ai-model {
+    font-size: $font-size-sm;
+    color: $text-color-light;
+  }
+
+  .ai-rating-content {
+    display: flex;
+    gap: $spacing-xl;
+    align-items: flex-start;
+  }
+
+  .ai-score {
+    flex-shrink: 0;
+
+    .score-value {
+      font-size: $font-size-xxl;
+      color: $primary-color;
+    }
+  }
+
+  .ai-analysis {
+    flex: 1;
+
+    p {
+      font-size: $font-size-base;
+      color: $text-color;
+      line-height: $line-height-loose;
+      margin: 0;
+    }
+  }
+}
+
+.request-ai-section {
+  margin-bottom: $spacing-xl;
+  text-align: center;
+  padding: $spacing-lg;
+  background: $background-color;
+  border-radius: $border-radius-md;
+}
+
+.user-rating-section {
+  margin-bottom: $spacing-xl;
+
+  .sub-title {
+    font-size: $font-size-lg;
+    color: $text-color;
+    margin-bottom: $spacing-md;
+    font-family: $font-family-title;
+  }
+}
+
+.rating-form {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+
+  .score-select {
+    display: flex;
+    align-items: center;
+    gap: $spacing-md;
+
+    label {
+      font-size: $font-size-base;
+      color: $text-color;
+      white-space: nowrap;
+    }
+  }
+
+  .comment-input {
+    :deep(.el-textarea__inner) {
+      font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+      letter-spacing: 0.5px;
+      line-height: 1.6;
+    }
+  }
+}
+
+.user-ratings-list {
+  .sub-title {
+    font-size: $font-size-lg;
+    color: $text-color;
+    margin-bottom: $spacing-md;
+    font-family: $font-family-title;
+  }
+}
+
+.rating-item {
+  padding: $spacing-md;
+  border-bottom: 1px solid $border-color-light;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.rating-item-header {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  margin-bottom: $spacing-sm;
+}
+
+.rating-username {
+  font-size: $font-size-base;
+  color: $text-color;
+  font-weight: 600;
+}
+
+.rating-time {
+  font-size: $font-size-sm;
+  color: $text-color-light;
+  margin-left: auto;
+}
+
+.rating-comment {
+  p {
+    font-size: $font-size-base;
+    color: $text-color-secondary;
+    line-height: $line-height-loose;
+    margin: 0;
+  }
 }
 </style>

@@ -16,7 +16,8 @@ const form = ref({
   content: '',
   dynastyId: undefined as number | undefined,
   categoryId: undefined as number | undefined,
-  source: ''
+  source: '',
+  isOriginal: 1 as number
 })
 
 const dynasties = ref<Dynasty[]>([])
@@ -62,7 +63,8 @@ const handleSubmit = async () => {
           content: form.value.content,
           dynastyId: form.value.dynastyId,
           categoryId: form.value.categoryId,
-          source: form.value.source || undefined
+          source: form.value.source || undefined,
+          isOriginal: form.value.isOriginal
         })
         ElMessage.success('发布成功')
         router.push(`/poem/${res.data.id}`)
@@ -81,7 +83,8 @@ const handleReset = () => {
     content: '',
     dynastyId: undefined,
     categoryId: undefined,
-    source: ''
+    source: '',
+    isOriginal: 1
   }
 }
 
@@ -170,6 +173,21 @@ onMounted(() => {
             />
           </el-form-item>
           
+          <el-form-item label="原创标识" prop="isOriginal">
+            <el-radio-group v-model="form.isOriginal">
+              <el-radio :value="1">原创作品</el-radio>
+              <el-radio :value="0">转载引用</el-radio>
+            </el-radio-group>
+            <div class="original-tip">
+              <template v-if="form.isOriginal === 1">
+                标记为原创的作品将展示原创标识，发布后需通过审核
+              </template>
+              <template v-else>
+                转载引用请务必填写出处信息，尊重原作者版权
+              </template>
+            </div>
+          </el-form-item>
+          
           <el-form-item class="form-actions">
             <el-button
               type="primary"
@@ -199,6 +217,8 @@ onMounted(() => {
           <li>每行一句，系统会自动保留换行格式</li>
           <li>选择合适的朝代和分类有助于其他用户发现您的作品</li>
           <li>填写出处可以增加诗词的可信度</li>
+          <li>原创作品发布后将进入审核流程，审核通过后展示原创标识</li>
+          <li>转载引用需注明原作者和出处，尊重知识产权</li>
         </ul>
       </el-card>
     </div>
@@ -283,6 +303,13 @@ onMounted(() => {
     font-size: $font-size-lg;
     color: $primary-color;
   }
+}
+
+.original-tip {
+  margin-top: $spacing-sm;
+  font-size: $font-size-sm;
+  color: $text-color-secondary;
+  line-height: 1.5;
 }
 
 .tips-list {

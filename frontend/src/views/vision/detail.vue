@@ -4,8 +4,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   ArrowLeft, User, Clock, View, Star, HomeFilled,
-  Share, DocumentCopy, ArrowUp, List, Reading,
-  Collection, Promotion, MoreFilled
+  Share, DocumentCopy, ArrowUp, Reading,
+  Collection, Promotion, MoreFilled, Expand, Fold,
+  Microphone, VideoPause, Edit, Close,
+  Headset, Top
 } from '@element-plus/icons-vue'
 import type { VisionArticle } from '@/types/model'
 import { getVisionArticleById, likeVisionArticle, getVisionArticleList } from '@/api/modules/visionArticle'
@@ -18,12 +20,20 @@ const article = ref<VisionArticle | null>(null)
 const articleId = computed(() => Number(route.params.id))
 const fontSize = ref(16)
 const readProgress = ref(0)
-const showToc = ref(false)
 const showBackToTop = ref(false)
 const relatedArticles = ref<VisionArticle[]>([])
 const prevArticle = ref<VisionArticle | null>(null)
 const nextArticle = ref<VisionArticle | null>(null)
 const tocItems = ref<{ id: string; text: string; level: number }[]>([])
+const sidebarCollapsed = ref(false)
+const activeSection = ref('')
+const isReading = ref(false)
+let speechUtterance: SpeechSynthesisUtterance | null = null
+const editingSection = ref(false)
+const editText = ref('')
+
+const isMusicPlaying = ref(false)
+let audioElement: HTMLAudioElement | null = null
 
 const readTime = computed(() => {
   if (!article.value?.content) return '3 分钟'
@@ -35,7 +45,14 @@ const readTime = computed(() => {
 const formattedContent = computed(() => {
   if (!article.value?.content) return ''
   let content = article.value.content
-  content = content.replace(/\n/g, '<br/>')
+  // 先转义 HTML 实体，防止 v-html 将内容中的 < > & 等误解析为 HTML 标签
+  content = content
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+  // 处理 Windows (\r\n) 和 Unix (\n) 两种换行符
+  content = content.replace(/\r?\n/g, '<br/>')
+  // 如果内容包含 HTML 标题标签，提取目录结构（内容中已有 &lt;h 标签则不会匹配到）
   content = content.replace(/<h([1-6])[^>]*>(.*?)<\/h[1-6]>/gi, (match, level, text) => {
     const id = `heading-${text.replace(/\s+/g, '-').toLowerCase()}`
     return `<h${level} id="${id}" class="article-heading">${text}</h${level}>`
@@ -157,7 +174,6 @@ const scrollToHeading = (id: string) => {
   const element = document.getElementById(id)
   if (element) {
     element.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    showToc.value = false
   }
 }
 
@@ -170,11 +186,81 @@ const handleScroll = () => {
   const docHeight = document.documentElement.scrollHeight - window.innerHeight
   readProgress.value = docHeight > 0 ? Math.round((scrollTop / docHeight) * 100) : 0
   showBackToTop.value = scrollTop > 300
+
+  const adjustedScrollTop = scrollTop + 120
+  for (let i = tocItems.value.length - 1; i >= 0; i--) {
+    const el = document.getElementById(tocItems.value[i].id)
+    if (el && el.offsetTop <= adjustedScrollTop) {
+      activeSection.value = tocItems.value[i].id
+      break
+    }
+  }
 }
 
 const goToArticle = (id: number) => {
   router.push(`/vision/${id}`)
   window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+const readText = () => {
+  if (isReading.value) {
+    stopReading()
+    return
+  }
+
+  const content = article.value?.content
+  if (!content) {
+    ElMessage.info('暂无可朗读的内容')
+    return
+  }
+
+  const tempDiv = document.createElement('div')
+  tempDiv.innerHTML = content
+  const text = tempDiv.innerText
+
+  speechUtterance = new SpeechSynthesisUtterance(text)
+  speechUtterance.lang = 'zh-CN'
+  speechUtterance.rate = 0.9
+  speechUtterance.onend = () => {
+    isReading.value = false
+  }
+  speechUtterance.onerror = () => {
+    isReading.value = false
+  }
+  window.speechSynthesis.speak(speechUtterance)
+  isReading.value = true
+}
+
+const stopReading = () => {
+  window.speechSynthesis.cancel()
+  isReading.value = false
+}
+
+const toggleMusic = () => {
+  if (!audioElement) {
+    audioElement = new Audio('/js/music.mp3')
+    audioElement.loop = true
+    audioElement.volume = 0.5
+  }
+  if (isMusicPlaying.value) {
+    audioElement.pause()
+    isMusicPlaying.value = false
+  } else {
+    audioElement.play().catch(() => {
+      ElMessage.warning('音乐播放失败，请检查音频文件')
+    })
+    isMusicPlaying.value = true
+  }
+}
+
+const openEdit = () => {
+  editText.value = article.value?.content || ''
+  editingSection.value = true
+}
+
+const closeEdit = () => {
+  editingSection.value = false
+  editText.value = ''
 }
 
 watch(() => route.params.id, (newId) => {
@@ -190,6 +276,11 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
+  stopReading()
+  if (audioElement) {
+    audioElement.pause()
+    audioElement = null
+  }
 })
 </script>
 
@@ -199,6 +290,26 @@ onUnmounted(() => {
       <div class="progress-bar" :style="{ width: readProgress + '%' }"></div>
     </div>
 
+    <aside class="vision-sidebar" :class="{ collapsed: sidebarCollapsed }">
+      <div class="sidebar-header">
+        <el-icon class="collapse-btn" @click="sidebarCollapsed = !sidebarCollapsed">
+          <component :is="sidebarCollapsed ? 'Expand' : 'Fold'" />
+        </el-icon>
+        <span v-show="!sidebarCollapsed" class="sidebar-title">文章目录</span>
+      </div>
+      <nav v-show="!sidebarCollapsed" class="sidebar-nav">
+        <a
+          v-for="item in tocItems"
+          :key="item.id"
+          :class="['nav-item', { active: activeSection === item.id }]"
+          @click="scrollToHeading(item.id)"
+        >
+          <span>{{ item.text }}</span>
+        </a>
+      </nav>
+    </aside>
+
+    <main class="vision-main" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
     <div class="container" v-if="article">
       <div class="article-header">
         <div class="header-top">
@@ -215,39 +326,23 @@ onUnmounted(() => {
                 <span class="font-size-btn">A+</span>
               </el-button>
             </el-button-group>
-            <el-button @click="showToc = !showToc" text>
-              <el-icon><List /></el-icon>
-              目录
-            </el-button>
             <el-button @click="handleShare" text>
               <el-icon><Share /></el-icon>
               分享
+            </el-button>
+            <el-button @click="readText" text>
+              <el-icon><VideoPause v-if="isReading" /><Microphone v-else /></el-icon>
+              {{ isReading ? '停止朗读' : '朗读' }}
+            </el-button>
+            <el-button @click="openEdit" text>
+              <el-icon><Edit /></el-icon>
+              编辑
             </el-button>
           </div>
         </div>
       </div>
 
       <div class="article-layout">
-        <div class="toc-sidebar" v-if="showToc && tocItems.length > 0">
-          <div class="toc-card">
-            <div class="toc-header">
-              <el-icon><List /></el-icon>
-              <span>文章目录</span>
-            </div>
-            <div class="toc-list">
-              <div
-                v-for="item in tocItems"
-                :key="item.id"
-                class="toc-item"
-                :class="{ 'toc-level-2': item.level === 2, 'toc-level-3': item.level === 3 }"
-                @click="scrollToHeading(item.id)"
-              >
-                {{ item.text }}
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div class="article-main">
           <el-card class="article-card" :body-style="{ padding: '40px' }">
             <div class="article-title-section">
@@ -360,6 +455,43 @@ onUnmounted(() => {
 
       <el-back-top :right="40" :bottom="40" />
     </div>
+    </main>
+
+    <div class="right-toolbar">
+      <div class="toolbar-item" @click="toggleMusic" :title="isMusicPlaying ? '暂停音乐' : '播放音乐'">
+        <el-icon :size="20"><Headset /></el-icon>
+        <span class="toolbar-label">音乐</span>
+      </div>
+      <div class="toolbar-item" @click="scrollToTop" title="返回顶部">
+        <el-icon :size="20"><Top /></el-icon>
+        <span class="toolbar-label">顶部</span>
+      </div>
+    </div>
+
+    <Teleport to="body">
+      <Transition name="fade">
+        <div v-if="editingSection" class="edit-overlay" @click.self="closeEdit">
+          <div class="edit-panel">
+            <div class="edit-panel-header">
+              <span>编辑文章内容</span>
+              <el-icon class="edit-close" @click="closeEdit"><Close /></el-icon>
+            </div>
+            <div class="edit-panel-body">
+              <el-input
+                v-model="editText"
+                type="textarea"
+                :rows="15"
+                placeholder="输入内容..."
+              />
+            </div>
+            <div class="edit-panel-footer">
+              <span class="edit-tip">提示：此编辑仅在当前会话生效</span>
+              <el-button @click="closeEdit">关闭</el-button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -424,64 +556,6 @@ onUnmounted(() => {
   display: flex;
   gap: 24px;
   align-items: flex-start;
-}
-
-.toc-sidebar {
-  width: 240px;
-  flex-shrink: 0;
-  position: sticky;
-  top: 20px;
-}
-
-.toc-card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-}
-
-.toc-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #eee;
-}
-
-.toc-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.toc-item {
-  font-size: 13px;
-  color: #666;
-  cursor: pointer;
-  padding: 6px 8px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-  line-height: 1.4;
-
-  &:hover {
-    background: #f5f0e8;
-    color: #8b4513;
-  }
-
-  &.toc-level-2 {
-    padding-left: 16px;
-    font-size: 12px;
-  }
-
-  &.toc-level-3 {
-    padding-left: 24px;
-    font-size: 11px;
-    color: #999;
-  }
 }
 
 .article-main {
@@ -743,14 +817,51 @@ onUnmounted(() => {
   padding: 24px 0;
 }
 
+.right-toolbar {
+  position: fixed;
+  right: 20px;
+  bottom: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 100;
+
+  @media (max-width: 768px) {
+    right: 10px;
+    bottom: 80px;
+  }
+}
+
+.toolbar-item {
+  width: 48px;
+  height: 48px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #666;
+
+  &:hover {
+    color: #8b4513;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+  }
+
+  .toolbar-label {
+    font-size: 10px;
+    margin-top: 1px;
+    line-height: 1;
+  }
+}
+
 @media (max-width: 768px) {
   .article-layout {
     flex-direction: column;
-  }
-
-  .toc-sidebar {
-    width: 100%;
-    position: static;
   }
 
   .article-title {
@@ -769,5 +880,171 @@ onUnmounted(() => {
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+.vision-sidebar {
+  position: fixed;
+  left: 0;
+  top: 60px;
+  bottom: 0;
+  width: 200px;
+  background: #f5f0e8;
+  border-right: 1px solid #e0d6c6;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease;
+  overflow: hidden;
+
+  &.collapsed {
+    width: 48px;
+  }
+
+  @media (max-width: 768px) {
+    display: none;
+  }
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid #e0d6c6;
+  min-height: 48px;
+}
+
+.collapse-btn {
+  cursor: pointer;
+  font-size: 18px;
+  color: #8b4513;
+  flex-shrink: 0;
+
+  &:hover {
+    color: #d2691e;
+  }
+}
+
+.sidebar-title {
+  font-size: 14px;
+  color: #8b4513;
+  white-space: nowrap;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 8px 0;
+  overflow-y: auto;
+}
+
+.nav-item {
+  display: block;
+  padding: 8px 12px;
+  margin: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #666;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  &:hover {
+    color: #8b4513;
+    background: rgba(139, 69, 19, 0.06);
+  }
+
+  &.active {
+    color: #8b4513;
+    background: rgba(139, 69, 19, 0.1);
+    font-weight: 600;
+  }
+}
+
+.vision-main {
+  flex: 1;
+  margin-left: 200px;
+  transition: margin-left 0.3s ease;
+
+  &.sidebar-collapsed {
+    margin-left: 48px;
+  }
+
+  @media (max-width: 768px) {
+    margin-left: 0 !important;
+  }
+}
+
+.edit-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.edit-panel {
+  width: 700px;
+  max-width: 90vw;
+  max-height: 80vh;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.edit-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid #eee;
+  font-size: 18px;
+  color: #333;
+}
+
+.edit-close {
+  cursor: pointer;
+  font-size: 18px;
+  color: #999;
+
+  &:hover {
+    color: #e74c3c;
+  }
+}
+
+.edit-panel-body {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.edit-panel-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-top: 1px solid #eee;
+}
+
+.edit-tip {
+  font-size: 13px;
+  color: #999;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

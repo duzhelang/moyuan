@@ -12,6 +12,7 @@ const userStore = useUserStore()
 
 const loading = ref(false)
 const rememberMe = ref(false)
+const showPassword = ref(false)
 
 const form = reactive({
   username: '',
@@ -60,6 +61,10 @@ const goToRegister = () => {
   router.push('/user/register')
 }
 
+const togglePassword = () => {
+  showPassword.value = !showPassword.value
+}
+
 const fillAdminUsername = () => {
   form.username = userStore.lastAdminUsername
 }
@@ -98,7 +103,12 @@ const fillAdminUsername = () => {
               </div>
               <div class="a2">
                 <label for="password">密&nbsp;&nbsp;码:</label>
-                <input type="password" id="password" class="dl_shurukuang" placeholder="请输入密码" required v-model="form.password">
+                <div class="password-wrapper">
+                  <input :type="showPassword ? 'text' : 'password'" id="password" class="dl_shurukuang" placeholder="请输入密码" required v-model="form.password">
+                  <span class="toggle-password" @click="togglePassword">
+                    {{ showPassword ? '🙈' : '👁' }}
+                  </span>
+                </div>
               </div>
               <div class="remember-row">
                 <label class="remember-label">
@@ -354,6 +364,24 @@ const fillAdminUsername = () => {
   padding: 0 5px;
   font-size: 16px;
   outline: none;
+}
+
+.password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-wrapper .dl_shurukuang {
+  padding-right: 35px;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 8px;
+  cursor: pointer;
+  font-size: 18px;
+  user-select: none;
 }
 
 .a1, .a2, .a3 {

@@ -10,6 +10,8 @@ export interface User {
   bio?: string
   role?: string
   status: number
+  poetVerified?: number
+  poetProfileId?: number
   createTime: string
   updateTime: string
 }
@@ -35,6 +37,10 @@ export interface Poem {
   isFeatured: number
   isLiked?: boolean
   isFavorited?: boolean
+  isOriginal?: boolean
+  poemType?: 'classical' | 'modern'
+  averageScore?: number
+  ratingCount?: number
   createTime: string
   updateTime: string
 }
@@ -49,13 +55,13 @@ export interface Poet {
   birthYear?: number
   deathYear?: number
   birthplace?: string
-  description?: string
   biography?: string
   lifeStory?: string
   influence?: string
   evaluation?: string
   anecdotes?: string
   avatar?: string
+  poetType?: string
   status?: number
   createdAt: string
 }
@@ -121,6 +127,9 @@ export interface PoemListParams {
   poetId?: number
   keyword?: string
   sortBy?: 'latest' | 'popular' | 'likes'
+  poemType?: 'classical' | 'modern'
+  isOriginal?: boolean
+  hasCertifiedPoet?: boolean
 }
 
 export interface PageResult<T> {
@@ -128,6 +137,27 @@ export interface PageResult<T> {
   total: number
   pageNum: number
   pageSize: number
+}
+
+export interface PoetProfile {
+  id: number
+  userId: number
+  penName?: string
+  realName?: string
+  specialty?: string
+  introduction?: string
+  literaryConcept?: string
+  achievements?: string
+  contactInfo?: string
+  verifiedStatus: number
+  verifiedTime?: string
+  verifiedReason?: string
+  workCount: number
+  likeCount: number
+  favoriteCount: number
+  followerCount: number
+  createTime: string
+  updateTime: string
 }
 
 export interface VisionArticle {
@@ -145,4 +175,26 @@ export interface VisionArticle {
   sortOrder: number
   createTime: string
   updateTime: string
+}
+
+export interface PoemRating {
+  id: number
+  poemId: number
+  userId?: number
+  username?: string
+  avatar?: string
+  score: number
+  ratingType: number
+  dimension?: string
+  comment?: string
+  aiModel?: string
+  aiAnalysis?: string
+  createTime: string
+}
+
+export interface PoemRatingsData {
+  averageScore: number
+  ratingCount: number
+  aiRating?: PoemRating
+  userRatings: PoemRating[]
 }

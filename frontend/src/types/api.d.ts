@@ -1,5 +1,5 @@
 export interface ApiResponse<T = any> {
-  code: number
+  code: string
   message: string
   data: T
 }
@@ -30,6 +30,7 @@ export interface PoemCreateRequest {
   dynastyId?: number
   categoryId?: number
   poetId?: number
+  isOriginal?: number
 }
 
 export interface PoemUpdateRequest extends Partial<PoemCreateRequest> {

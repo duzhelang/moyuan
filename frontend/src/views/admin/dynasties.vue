@@ -113,7 +113,7 @@ onMounted(fetchData)
       </div>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑朝代' : '新增朝代'" width="450px">
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑朝代' : '新增朝代'" width="500px">
       <el-form :model="form" label-width="80px">
         <el-form-item label="名称" required>
           <el-input v-model="form.name" placeholder="朝代名称" />
@@ -149,4 +149,17 @@ onMounted(fetchData)
 .page-title { font-size: 24px; margin-bottom: 20px; color: #333; }
 .table-card { border-radius: 8px; }
 .pagination-wrapper { display: flex; justify-content: flex-end; margin-top: 16px; }
+
+:deep(.el-dialog) {
+  .el-form-item__content {
+    flex: 1;
+    min-width: 0;
+  }
+  .el-input,
+  .el-textarea,
+  .el-select,
+  .el-input-number {
+    width: 100% !important;
+  }
+}
 </style>

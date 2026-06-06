@@ -68,13 +68,13 @@ public class AiModelRegistry {
                 .orElseThrow(() -> new BusinessException(ResultCode.ERROR, "不支持的AI提供商: " + provider));
     }
 
-    public String chat(String message, String modelName) {
+    public String chat(String message, String modelName, String systemPrompt) {
         AiModel model = modelName != null ? getModel(modelName) : getDefaultModel();
         AiModelAdapter adapter = getAdapter(model.getProvider());
-        return adapter.chat(message, model);
+        return adapter.chat(message, model, systemPrompt);
     }
 
-    public String vision(String prompt, String base64Image, String modelName, String visionModelName) {
+    public String vision(String prompt, String base64Image, String modelName, String visionModelName, String systemPrompt) {
         AiModel model = modelName != null ? getModel(modelName) : getDefaultModel();
         AiModelAdapter adapter = getAdapter(model.getProvider());
 
@@ -96,9 +96,9 @@ public class AiModelRegistry {
             visionModel.setSortOrder(model.getSortOrder());
             visionModel.setCreateTime(model.getCreateTime());
             visionModel.setUpdateTime(model.getUpdateTime());
-            return adapter.vision(prompt, base64Image, visionModel);
+            return adapter.vision(prompt, base64Image, visionModel, systemPrompt);
         }
 
-        return adapter.vision(prompt, base64Image, model);
+        return adapter.vision(prompt, base64Image, model, systemPrompt);
     }
 }

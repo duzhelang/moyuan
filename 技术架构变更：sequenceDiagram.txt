@@ -1,0 +1,42 @@
+技术架构变更：sequenceDiagram
+    participant FE as 前端
+    participant FC as FileController
+    participant FSS as FileStorageService
+    participant WU as WatermarkUtil
+    participant DB as MySQL
+    participant FS as 文件系统
+
+    FE->>FC: POST /api/files/upload
+    FC->>FSS: upload(file, fileType, relatedId, relatedType)
+    FSS->>FS: calculateMd5(file)
+    FSS->>DB: 查询MD5是否存在
+    alt MD5不存在
+        FSS->>FS: transferTo(destFile)
+        alt ai_generated类型
+            FSS->>WU: addAiWatermark(image)
+            WU-->>FSS: watermarkedImage
+            FSS->>FS: 覆盖写入水印图片
+        end
+        FSS->>DB: insert(file_metadata)
+    end
+    FSS-->>FC: FileMetadata
+    FC-->>FE: R<Map>
+
+业务流程变更：
+flowchart TD
+    A[前端上传请求] --> B{是否携带fileType?}
+    B -->|是| C[FileStorageService.upload]
+    B -->|否| D[FileController旧逻辑]
+    C --> E[构建子目录路径]
+    E --> F[计算MD5]
+    F --> G{MD5已存在?}
+    G -->|是| H[复用旧记录]
+    G -->|否| I[写入磁盘]
+    I --> J{是否AI生成图片?}
+    J -->|是| K[添加水印]
+    J -->|否| L[读取宽高]
+    K --> L
+    L --> M[保存元数据到DB]
+    M --> N[返回文件信息]
+    style C fill:#c8e6c9,color:#1a5e20
+    style K fill:#fff3e0,color:#e65100

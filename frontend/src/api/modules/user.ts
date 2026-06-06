@@ -37,3 +37,11 @@ export function getMyPosts(params?: { pageNum?: number; pageSize?: number }) {
 export function getUserStats() {
   return request.get('/users/me/stats')
 }
+
+export function getUserProfile(id: number) {
+  return request.get(`/users/${id}/profile`)
+}
+
+export function getUserWorks(id: number, pageNum: number = 1, pageSize: number = 10) {
+  return request.get(`/users/${id}/works`, { params: { pageNum, pageSize } })
+}

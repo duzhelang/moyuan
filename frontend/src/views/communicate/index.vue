@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { ForumPost, Comment } from '@/types/model'
@@ -21,6 +21,7 @@ const postComments = ref<Record<number, Comment[]>>({})
 const commentInputs = ref<Record<number, string>>({})
 const submittingComment = ref<Record<number, boolean>>({})
 const commentTotals = ref<Record<number, number>>({})
+const likedPostIds = ref<Set<number>>(new Set())
 
 const showPostForm = ref(false)
 const newPostTitle = ref('')
@@ -82,10 +83,15 @@ const toggleComments = async (postId: number) => {
 const handleLike = async (post: ForumPost) => {
   try {
     await likeForumPost(post.id)
-    post.likeCount++
-    ElMessage.success('点赞成功')
+    if (likedPostIds.value.has(post.id)) {
+      likedPostIds.value.delete(post.id)
+      post.likeCount = Math.max(0, post.likeCount - 1)
+    } else {
+      likedPostIds.value.add(post.id)
+      post.likeCount++
+    }
   } catch {
-    ElMessage.error('点赞失败')
+    ElMessage.error('操作失败')
   }
 }
 
@@ -97,7 +103,7 @@ const handleSubmitComment = async (postId: number) => {
   }
   submittingComment.value[postId] = true
   try {
-    await createComment({ content, postId, targetType: 2 })
+    await createComment({ content, targetId: postId, targetType: 2 })
     ElMessage.success('评论成功')
     commentInputs.value[postId] = ''
     const res = await getComments(postId, 2, { pageNum: 1, pageSize: 20 })
@@ -181,6 +187,11 @@ const goToLogin = () => {
 onMounted(() => {
   fetchPosts()
 })
+
+onActivated(() => {
+  currentPage.value = 1
+  fetchPosts()
+})
 </script>
 
 <template>
@@ -188,75 +199,90 @@ onMounted(() => {
     <div class="star-bg"></div>
 
     <div class="communicate-container">
+      <div class="page-nav-bar">
+        <button class="nav-btn" @click="router.push('/')">
+          <el-icon><HomeFilled /></el-icon>
+          首页
+        </button>
+        <span class="nav-sep">/</span>
+        <button class="nav-btn" @click="router.push('/forum')">
+          诗汇论坛
+        </button>
+        <span class="nav-sep">/</span>
+        <span class="nav-current">交流广场</span>
+      </div>
+
       <div class="page-header-bar">
         <h1 class="page-title">交流广场</h1>
         <p class="page-subtitle">分享你的诗词感悟，与同好交流心得</p>
       </div>
 
-      <div class="post-compose-card" v-if="userStore.isLoggedIn">
+      <div class="post-compose-card fade-slide-up" v-if="userStore.isLoggedIn">
         <div class="compose-trigger" @click="showPostForm = !showPostForm">
           <el-avatar :src="userStore.avatar" :size="42">
             {{ userStore.username?.charAt(0)?.toUpperCase() }}
           </el-avatar>
           <span class="compose-placeholder">分享你的想法...</span>
           <div class="compose-actions">
-            <el-icon class="compose-icon"><Edit /></el-icon>
+            <el-icon class="compose-icon" :class="{ 'rotate-icon': showPostForm }"><Edit /></el-icon>
           </div>
         </div>
 
-        <div class="compose-form" v-show="showPostForm">
-          <el-input
-            v-model="newPostTitle"
-            placeholder="标题"
-            maxlength="50"
-            class="compose-title-input"
-          />
-          <el-input
-            v-model="newPostContent"
-            type="textarea"
-            :rows="4"
-            placeholder="写下你想分享的内容..."
-            maxlength="1000"
-            show-word-limit
-            class="compose-content-input"
-          />
+        <transition name="expand">
+          <div class="compose-form" v-show="showPostForm">
+            <el-input
+              v-model="newPostTitle"
+              placeholder="标题"
+              maxlength="50"
+              class="compose-title-input"
+            />
+            <el-input
+              v-model="newPostContent"
+              type="textarea"
+              :rows="4"
+              placeholder="写下你想分享的内容..."
+              maxlength="1000"
+              show-word-limit
+              class="compose-content-input"
+            />
 
-          <div class="compose-images" v-if="newPostImages.length > 0">
-            <div
-              v-for="(img, idx) in newPostImages"
-              :key="idx"
-              class="compose-image-item"
-            >
-              <img :src="img" alt="">
-              <span class="compose-image-remove" @click="removeImage(idx)">×</span>
-            </div>
-          </div>
-
-          <div class="compose-footer">
-            <div class="compose-tools">
-              <input
-                ref="imageUploadRef"
-                type="file"
-                accept="image/*"
-                multiple
-                style="display: none;"
-                @change="handleImageUpload"
+            <div class="compose-images" v-if="newPostImages.length > 0">
+              <div
+                v-for="(img, idx) in newPostImages"
+                :key="idx"
+                class="compose-image-item"
               >
-              <button class="tool-btn" @click="imageUploadRef?.click()" :disabled="uploading">
-                <el-icon><Picture /></el-icon>
-                <span>{{ uploading ? '上传中...' : '图片' }}</span>
-              </button>
+                <img :src="img" alt="">
+                <span class="compose-image-remove" @click="removeImage(idx)">×</span>
+              </div>
             </div>
-            <el-button
-              type="primary"
-              :loading="submittingPost"
-              @click="handleSubmitPost"
-              class="compose-submit-btn"
-            >
-              发布
-            </el-button>
+
+            <div class="compose-footer">
+              <div class="compose-tools">
+                <input
+                  ref="imageUploadRef"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  style="display: none;"
+                  @change="handleImageUpload"
+                >
+                <button class="tool-btn" @click="imageUploadRef?.click()" :disabled="uploading">
+                  <el-icon><Picture /></el-icon>
+                  <span>{{ uploading ? '上传中...' : '图片' }}</span>
+                </button>
+              </div>
+              <el-button
+                type="primary"
+                :loading="submittingPost"
+                @click="handleSubmitPost"
+                class="compose-submit-btn"
+              >
+                发布
+              </el-button>
+            </div>
           </div>
-        </div>
+        </transition>
       </div>
 
       <div class="post-compose-card login-hint" v-else @click="goToLogin">
@@ -268,9 +294,10 @@ onMounted(() => {
 
       <div class="feed-list" v-loading="loading">
         <div
-          v-for="post in posts"
+          v-for="(post, index) in posts"
           :key="post.id"
-          class="feed-card"
+          class="feed-card fade-slide-up"
+          :style="{ animationDelay: `${index * 0.06}s` }"
         >
           <div class="feed-header">
             <el-avatar :src="post.avatar" :size="44" class="feed-avatar">
@@ -377,6 +404,55 @@ onMounted(() => {
 </template>
 
 <style scoped lang="scss">
+/* ==================== 入场动画 ==================== */
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes headerFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes twinkle {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes gentlePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(100, 160, 240, 0); }
+  50% { box-shadow: 0 0 20px 2px rgba(100, 160, 240, 0.08); }
+}
+
+.fade-slide-up {
+  animation: fadeSlideUp 0.5s ease-out both;
+}
+
+/* ==================== 页面基础 ==================== */
 .communicate-page {
   min-height: 100vh;
   position: relative;
@@ -424,7 +500,7 @@ onMounted(() => {
       radial-gradient(1px 1px at 5% 95%, rgba(255, 255, 255, 0.35), transparent),
       radial-gradient(1px 1px at 45% 5%, rgba(255, 255, 255, 0.6), transparent),
       radial-gradient(1px 1px at 75% 60%, rgba(255, 255, 255, 0.25), transparent);
-    animation: twinkle 4s ease-in-out infinite alternate;
+    animation: twinkle 4s ease-in-out infinite;
   }
 
   &::after {
@@ -439,15 +515,11 @@ onMounted(() => {
       radial-gradient(1.5px 1.5px at 62% 72%, rgba(255, 255, 255, 0.5), transparent),
       radial-gradient(1px 1px at 8% 48%, rgba(255, 255, 255, 0.2), transparent),
       radial-gradient(1px 1px at 92% 8%, rgba(255, 255, 255, 0.4), transparent);
-    animation: twinkle 5s ease-in-out infinite alternate-reverse;
+    animation: twinkle 5s ease-in-out infinite reverse;
   }
 }
 
-@keyframes twinkle {
-  0% { opacity: 0.6; }
-  100% { opacity: 1; }
-}
-
+/* ==================== 容器 ==================== */
 .communicate-container {
   position: relative;
   z-index: 1;
@@ -456,108 +528,265 @@ onMounted(() => {
   padding: 30px 16px 60px;
 }
 
+/* ==================== 页头 ==================== */
+.page-nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  animation: headerFadeIn 0.6s ease-out;
+
+  .nav-btn {
+    background: none;
+    border: none;
+    color: rgba(180, 195, 220, 0.6);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.25s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+
+    &:hover {
+      color: #e8d5b7;
+      background: rgba(100, 150, 220, 0.08);
+    }
+  }
+
+  .nav-sep {
+    color: rgba(150, 165, 190, 0.3);
+    font-size: 12px;
+  }
+
+  .nav-current {
+    color: rgba(200, 210, 230, 0.5);
+    font-size: 13px;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+}
+
 .page-header-bar {
   text-align: center;
   margin-bottom: 30px;
+  animation: headerFadeIn 0.6s ease-out;
 }
 
 .page-title {
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 700;
   color: #e8d5b7;
   font-family: cursive;
   margin: 0 0 8px;
-  text-shadow: 0 2px 10px rgba(232, 213, 183, 0.3);
+  text-shadow: 0 2px 12px rgba(232, 213, 183, 0.35);
+  letter-spacing: 2px;
 }
 
 .page-subtitle {
   font-size: 14px;
-  color: rgba(200, 200, 210, 0.6);
+  color: rgba(200, 210, 225, 0.7);
   margin: 0;
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
+/* ==================== 发布卡片 ==================== */
 .post-compose-card {
-  background: rgba(20, 35, 65, 0.7);
-  border: 1px solid rgba(100, 140, 200, 0.15);
-  border-radius: 14px;
-  padding: 16px;
+  background: linear-gradient(135deg, rgba(20, 38, 72, 0.75), rgba(16, 30, 58, 0.85));
+  border: 1px solid rgba(100, 150, 220, 0.15);
+  border-radius: 16px;
+  padding: 18px;
   margin-bottom: 24px;
-  backdrop-filter: blur(12px);
-  transition: all 0.3s ease;
+  backdrop-filter: blur(16px);
+  transition: all 0.35s ease;
+  overflow: hidden;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 
   &:hover {
-    border-color: rgba(100, 140, 200, 0.25);
+    border-color: rgba(100, 150, 220, 0.3);
+    box-shadow: 0 6px 30px rgba(0, 0, 0, 0.25), 0 0 40px rgba(80, 140, 220, 0.06);
   }
 
   &.login-hint {
     cursor: pointer;
 
     &:hover {
-      border-color: rgba(100, 140, 200, 0.35);
-      background: rgba(25, 42, 75, 0.8);
+      border-color: rgba(100, 150, 220, 0.35);
+      background: linear-gradient(135deg, rgba(25, 45, 80, 0.85), rgba(18, 35, 65, 0.9));
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
     }
   }
 }
 
+/* ==================== 触发栏 ==================== */
 .compose-trigger {
   display: flex;
   align-items: center;
   gap: 12px;
   cursor: pointer;
+  padding: 4px 0;
+  transition: all 0.2s ease;
+
+  &:hover {
+    .compose-placeholder {
+      color: rgba(200, 210, 230, 0.7);
+    }
+  }
 }
 
 .compose-placeholder {
   flex: 1;
   font-size: 14px;
-  color: rgba(180, 185, 200, 0.5);
+  color: rgba(180, 190, 210, 0.55);
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  transition: color 0.25s ease;
 }
 
 .compose-icon {
   font-size: 18px;
-  color: rgba(180, 185, 200, 0.4);
+  color: rgba(180, 190, 210, 0.4);
+  transition: transform 0.35s ease, color 0.25s ease;
+}
+
+.rotate-icon {
+  transform: rotate(45deg);
+  color: rgba(120, 170, 240, 0.7);
 }
 
 .login-avatar {
   background: rgba(60, 80, 120, 0.5);
-  color: rgba(180, 185, 200, 0.5);
+  color: rgba(180, 190, 210, 0.5);
 }
 
+/* ==================== 发布表单 ==================== */
 .compose-form {
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid rgba(100, 140, 200, 0.1);
+  overflow: hidden;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  position: relative;
 
-  :deep(.el-input__inner),
-  :deep(.el-textarea__inner) {
-    background: rgba(15, 25, 50, 0.6);
-    border: 1px solid rgba(100, 140, 200, 0.12);
-    color: rgba(220, 225, 240, 0.9);
-    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-    border-radius: 8px;
+  :deep(.el-input) {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
 
-    &::placeholder {
-      color: rgba(160, 170, 190, 0.4);
+  :deep(.el-input__prefix) {
+    display: none !important;
+  }
+
+  :deep(.el-input__wrapper) {
+    background: rgba(12, 22, 45, 0.7);
+    box-shadow: none;
+    border: 1px solid rgba(100, 140, 200, 0.15);
+    border-radius: 10px;
+    padding: 0 14px;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+
+    &:hover {
+      border-color: rgba(100, 140, 200, 0.28);
     }
 
-    &:focus {
-      border-color: rgba(100, 160, 240, 0.3);
+    &:focus-within {
+      border-color: rgba(100, 160, 240, 0.4);
+      box-shadow: 0 0 12px rgba(80, 140, 220, 0.1);
     }
   }
 
+  :deep(.el-input__inner) {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: rgba(220, 230, 245, 0.92);
+    font-size: 14px;
+    line-height: 1.6;
+    width: 100%;
+    max-width: 100%;
+
+    &::placeholder {
+      color: rgba(160, 175, 200, 0.45);
+    }
+  }
+
+  :deep(.el-textarea) {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    position: relative;
+    overflow: hidden;
+  }
+
   :deep(.el-textarea__inner) {
+    background: rgba(12, 22, 45, 0.7);
+    box-shadow: none;
+    border: 1px solid rgba(100, 140, 200, 0.15);
+    border-radius: 10px;
+    color: rgba(220, 230, 245, 0.92);
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
     resize: none;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    display: block;
+    margin: 0 !important;
+    overflow: hidden;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+
+    &::placeholder {
+      color: rgba(160, 175, 200, 0.45);
+    }
+
+    &:hover {
+      border-color: rgba(100, 140, 200, 0.28);
+    }
+
+    &:focus {
+      border-color: rgba(100, 160, 240, 0.4);
+      box-shadow: 0 0 12px rgba(80, 140, 220, 0.1);
+    }
   }
 
   :deep(.el-input__count-inner) {
     background: transparent;
-    color: rgba(160, 170, 190, 0.5);
+    color: rgba(160, 175, 195, 0.55);
+    font-size: 12px;
   }
 }
 
 .compose-title-input {
   margin-bottom: 12px;
+  width: 100%;
+}
+
+.compose-content-input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+
+  :deep(.el-textarea) {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
 }
 
 .compose-images {
@@ -571,8 +800,13 @@ onMounted(() => {
   position: relative;
   width: 80px;
   height: 80px;
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: scale(1.05);
+  }
 
   img {
     width: 100%;
@@ -596,6 +830,11 @@ onMounted(() => {
   font-size: 14px;
   cursor: pointer;
   line-height: 1;
+  transition: background 0.2s ease;
+
+  &:hover {
+    background: rgba(220, 60, 60, 0.8);
+  }
 }
 
 .compose-footer {
@@ -614,45 +853,71 @@ onMounted(() => {
   align-items: center;
   gap: 4px;
   padding: 6px 12px;
-  background: rgba(60, 80, 120, 0.3);
-  border: 1px solid rgba(100, 140, 200, 0.15);
-  border-radius: 8px;
-  color: rgba(180, 190, 210, 0.7);
+  background: rgba(50, 75, 115, 0.35);
+  border: 1px solid rgba(100, 140, 200, 0.18);
+  border-radius: 10px;
+  color: rgba(180, 195, 215, 0.75);
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
 
   &:hover {
-    background: rgba(60, 80, 120, 0.5);
-    border-color: rgba(100, 140, 200, 0.3);
-    color: rgba(200, 210, 230, 0.9);
+    background: rgba(60, 90, 140, 0.45);
+    border-color: rgba(100, 150, 220, 0.3);
+    color: rgba(210, 220, 240, 0.9);
+    transform: translateY(-1px);
   }
 
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    transform: none;
   }
 }
 
 .compose-submit-btn {
-  background: linear-gradient(135deg, rgba(70, 130, 200, 0.8), rgba(50, 100, 180, 0.9));
+  background: linear-gradient(135deg, rgba(65, 125, 200, 0.85), rgba(45, 95, 175, 0.95));
   border: none;
   color: #fff;
-  padding: 8px 24px;
-  border-radius: 8px;
+  padding: 9px 28px;
+  border-radius: 10px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
+  letter-spacing: 1px;
 
   &:hover {
-    background: linear-gradient(135deg, rgba(80, 145, 220, 0.9), rgba(60, 115, 200, 1));
-    transform: translateY(-1px);
-    box-shadow: 0 4px 15px rgba(50, 100, 180, 0.4);
+    background: linear-gradient(135deg, rgba(75, 140, 215, 0.95), rgba(55, 110, 195, 1));
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(50, 100, 180, 0.4);
+  }
+
+  &:active {
+    transform: translateY(0);
   }
 }
 
+/* ==================== 展开/折叠过渡 ==================== */
+.expand-enter-active,
+.expand-leave-active {
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  max-height: 400px;
+  opacity: 1;
+  overflow: hidden;
+}
+
+.expand-enter-from,
+.expand-leave-to {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+  padding-top: 0;
+  border-top-width: 0;
+}
+
+/* ==================== 动态列表 ==================== */
 .feed-list {
   display: flex;
   flex-direction: column;
@@ -661,16 +926,24 @@ onMounted(() => {
 }
 
 .feed-card {
-  background: rgba(18, 32, 60, 0.75);
-  border: 1px solid rgba(80, 120, 180, 0.12);
-  border-radius: 14px;
-  padding: 20px;
-  backdrop-filter: blur(10px);
-  transition: all 0.3s ease;
+  background: linear-gradient(145deg, rgba(18, 34, 64, 0.8), rgba(14, 28, 54, 0.9));
+  border: 1px solid rgba(80, 125, 185, 0.14);
+  border-radius: 16px;
+  padding: 22px;
+  backdrop-filter: blur(12px);
+  transition: all 0.35s ease;
+  animation: gentlePulse 6s ease-in-out infinite;
+  animation-delay: inherit;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 
   &:hover {
-    border-color: rgba(80, 120, 180, 0.25);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    border-color: rgba(80, 125, 185, 0.3);
+    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.25), 0 0 30px rgba(80, 140, 220, 0.05);
+    transform: translateY(-2px);
+    animation-play-state: paused;
   }
 }
 
@@ -683,9 +956,14 @@ onMounted(() => {
 
 .feed-avatar {
   flex-shrink: 0;
-  border: 2px solid rgba(100, 160, 240, 0.2);
-  background: rgba(40, 70, 120, 0.5);
-  color: rgba(200, 210, 230, 0.8);
+  border: 2px solid rgba(100, 160, 240, 0.22);
+  background: rgba(40, 70, 120, 0.55);
+  color: rgba(200, 215, 235, 0.85);
+  transition: border-color 0.3s ease;
+
+  &:hover {
+    border-color: rgba(100, 170, 250, 0.4);
+  }
 }
 
 .feed-user-info {
@@ -699,32 +977,41 @@ onMounted(() => {
   font-weight: 600;
   color: #e8c87a;
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  text-shadow: 0 1px 6px rgba(232, 200, 122, 0.15);
 }
 
 .feed-time {
   font-size: 12px;
-  color: rgba(160, 170, 190, 0.5);
+  color: rgba(160, 175, 200, 0.55);
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
 .feed-body {
   cursor: pointer;
   margin-bottom: 14px;
+  padding: 4px 0;
+  border-radius: 8px;
+  transition: background 0.2s ease;
+
+  &:hover {
+    background: rgba(80, 130, 200, 0.04);
+  }
 }
 
 .feed-title {
   font-size: 17px;
   font-weight: 600;
-  color: rgba(220, 230, 250, 0.95);
+  color: rgba(225, 235, 255, 0.95);
   margin: 0 0 8px;
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
   line-height: 1.4;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 
 .feed-content {
   font-size: 14px;
-  color: rgba(200, 210, 230, 0.75);
-  line-height: 1.7;
+  color: rgba(205, 215, 240, 0.8);
+  line-height: 1.75;
   margin: 0;
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
   white-space: pre-line;
@@ -745,23 +1032,34 @@ onMounted(() => {
   padding: 6px 16px;
   background: transparent;
   border: none;
-  border-radius: 8px;
-  color: rgba(160, 175, 200, 0.6);
+  border-radius: 10px;
+  color: rgba(160, 180, 210, 0.6);
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
 
   &:hover {
-    background: rgba(80, 120, 180, 0.1);
-    color: rgba(180, 200, 230, 0.9);
+    background: rgba(80, 125, 200, 0.12);
+    color: rgba(190, 210, 240, 0.95);
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: scale(0.95);
   }
 
   .el-icon {
     font-size: 16px;
+    transition: transform 0.25s ease;
+  }
+
+  &:hover .el-icon {
+    transform: scale(1.15);
   }
 }
 
+/* ==================== 评论区 ==================== */
 .comment-section {
   margin-top: 14px;
   padding-top: 14px;
@@ -778,89 +1076,99 @@ onMounted(() => {
     cursor: pointer;
     padding: 10px 14px;
     background: rgba(40, 60, 100, 0.3);
-    border-radius: 8px;
+    border-radius: 10px;
     justify-content: center;
+    transition: background 0.25s ease;
 
     span {
       font-size: 13px;
-      color: rgba(160, 175, 200, 0.5);
+      color: rgba(160, 180, 210, 0.5);
       font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
     }
 
     &:hover {
-      background: rgba(40, 60, 100, 0.5);
+      background: rgba(40, 65, 110, 0.45);
     }
   }
 }
 
 .comment-user-avatar {
   flex-shrink: 0;
-  background: rgba(40, 70, 120, 0.5);
-  color: rgba(200, 210, 230, 0.8);
+  background: rgba(40, 70, 120, 0.55);
+  color: rgba(200, 215, 235, 0.8);
 }
 
 .comment-input {
   flex: 1;
   height: 36px;
   padding: 0 14px;
-  background: rgba(15, 25, 50, 0.6);
-  border: 1px solid rgba(100, 140, 200, 0.12);
+  background: rgba(12, 22, 45, 0.7);
+  border: 1px solid rgba(100, 140, 200, 0.15);
   border-radius: 18px;
-  color: rgba(220, 225, 240, 0.9);
+  color: rgba(220, 230, 245, 0.92);
   font-size: 13px;
   outline: none;
-  transition: border-color 0.2s ease;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
 
   &::placeholder {
-    color: rgba(160, 170, 190, 0.4);
+    color: rgba(160, 175, 200, 0.45);
   }
 
   &:focus {
-    border-color: rgba(100, 160, 240, 0.3);
+    border-color: rgba(100, 160, 240, 0.4);
+    box-shadow: 0 0 12px rgba(80, 140, 220, 0.08);
   }
 }
 
 .comment-submit-btn {
-  padding: 6px 16px;
-  background: rgba(70, 130, 200, 0.6);
+  padding: 6px 18px;
+  background: rgba(65, 125, 200, 0.65);
   border: none;
-  border-radius: 16px;
-  color: rgba(230, 240, 255, 0.9);
+  border-radius: 18px;
+  color: rgba(235, 242, 255, 0.92);
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
 
   &:hover {
-    background: rgba(80, 145, 220, 0.8);
+    background: rgba(75, 140, 215, 0.85);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 12px rgba(50, 100, 180, 0.3);
   }
 
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    transform: none;
   }
 }
 
 .comment-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .comment-item {
   display: flex;
   gap: 10px;
-  padding: 10px 12px;
-  background: rgba(15, 25, 48, 0.5);
-  border-radius: 10px;
-  border: 1px solid rgba(80, 120, 180, 0.06);
+  padding: 12px 14px;
+  background: rgba(14, 24, 50, 0.55);
+  border-radius: 12px;
+  border: 1px solid rgba(80, 120, 180, 0.07);
+  transition: background 0.2s ease;
+
+  &:hover {
+    background: rgba(18, 30, 58, 0.65);
+  }
 }
 
 .comment-avatar {
   flex-shrink: 0;
   background: rgba(50, 80, 130, 0.5);
-  color: rgba(200, 210, 230, 0.7);
+  color: rgba(200, 215, 235, 0.7);
 }
 
 .comment-body {
@@ -878,20 +1186,20 @@ onMounted(() => {
 .comment-author {
   font-size: 13px;
   font-weight: 500;
-  color: rgba(180, 200, 230, 0.8);
+  color: rgba(185, 205, 235, 0.85);
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
 .comment-time {
   font-size: 11px;
-  color: rgba(140, 155, 180, 0.4);
+  color: rgba(140, 155, 185, 0.45);
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
 .comment-text {
   font-size: 13px;
-  color: rgba(200, 210, 230, 0.7);
-  line-height: 1.6;
+  color: rgba(205, 215, 240, 0.75);
+  line-height: 1.65;
   margin: 0;
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
   word-break: break-word;
@@ -910,15 +1218,15 @@ onMounted(() => {
   padding: 2px 6px;
   background: transparent;
   border: none;
-  border-radius: 4px;
-  color: rgba(150, 165, 190, 0.5);
+  border-radius: 6px;
+  color: rgba(155, 170, 195, 0.5);
   font-size: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    color: rgba(180, 200, 230, 0.8);
-    background: rgba(80, 120, 180, 0.1);
+    color: rgba(190, 210, 240, 0.85);
+    background: rgba(80, 125, 200, 0.1);
   }
 
   .el-icon {
@@ -929,7 +1237,7 @@ onMounted(() => {
 .comment-empty {
   text-align: center;
   padding: 16px;
-  color: rgba(150, 165, 190, 0.4);
+  color: rgba(155, 170, 200, 0.45);
   font-size: 13px;
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
 }
@@ -937,12 +1245,13 @@ onMounted(() => {
 .empty-state {
   text-align: center;
   padding: 60px 20px;
-  color: rgba(160, 175, 200, 0.5);
+  color: rgba(165, 180, 210, 0.55);
 
   .empty-icon {
     font-size: 48px;
     margin-bottom: 16px;
-    opacity: 0.4;
+    opacity: 0.45;
+    animation: float 3s ease-in-out infinite;
   }
 
   p {
@@ -953,33 +1262,43 @@ onMounted(() => {
 
   .empty-hint {
     font-size: 13px;
-    color: rgba(150, 165, 190, 0.35);
+    color: rgba(155, 170, 200, 0.38);
   }
 }
 
+/* ==================== 分页 ==================== */
 .pagination-bar {
   margin-top: 30px;
   display: flex;
   justify-content: center;
+  animation: fadeSlideUp 0.5s ease-out 0.3s both;
 
   :deep(.el-pagination) {
     --el-pagination-bg-color: rgba(20, 35, 65, 0.7);
-    --el-pagination-text-color: rgba(180, 195, 220, 0.7);
+    --el-pagination-text-color: rgba(185, 200, 225, 0.75);
     --el-pagination-button-bg-color: rgba(20, 35, 65, 0.7);
-    --el-pagination-button-color: rgba(180, 195, 220, 0.7);
-    --el-pagination-hover-color: rgba(100, 160, 240, 0.8);
+    --el-pagination-button-color: rgba(185, 200, 225, 0.75);
+    --el-pagination-hover-color: rgba(100, 165, 245, 0.85);
   }
 
   :deep(.el-pager li) {
     background: rgba(20, 35, 65, 0.7);
-    color: rgba(180, 195, 220, 0.7);
-    border-radius: 6px;
+    color: rgba(185, 200, 225, 0.75);
+    border-radius: 8px;
     margin: 0 3px;
+    transition: all 0.25s ease;
+
+    &:hover {
+      color: rgba(210, 225, 250, 0.95);
+    }
 
     &.is-active {
-      background: rgba(70, 130, 200, 0.7);
+      background: rgba(65, 130, 205, 0.75);
       color: #fff;
+      box-shadow: 0 2px 10px rgba(50, 100, 180, 0.3);
     }
   }
 }
 </style>
+
+

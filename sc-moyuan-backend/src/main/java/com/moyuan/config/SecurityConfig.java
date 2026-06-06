@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -51,8 +52,6 @@ public class SecurityConfig {
                     "/v3/api-docs/**",
                     "/swagger-resources/**",
                     "/api/auth/**",
-                    "/api/poems",
-                    "/api/poems/**",
                     "/api/poets",
                     "/api/poets/**",
                     "/api/dynasties",
@@ -62,30 +61,30 @@ public class SecurityConfig {
                     "/api/forum/posts",
                     "/api/forum/posts/**",
                     "/api/forum/comments/**",
-                    "/api/poet-featured",
-                    "/api/poet-featured/**",
-                    "/api/home-navigation",
-                    "/api/home-navigation/**",
                     "/api/vision",
                     "/api/vision/**",
-                    "/api/ai",
-                    "/api/ai/**",
                     "/api/search",
                     "/uploads/**"
                 ).permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/poems", "/api/poems/{id:[0-9]+}").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/poet-featured", "/api/poet-featured/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/home-navigation", "/api/home-navigation/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/rhyme/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
             .exceptionHandling(exception -> exception
                 .authenticationEntryPoint((request, response, authException) -> {
-                    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.setCharacterEncoding("UTF-8");
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    response.getWriter().write(objectMapper.writeValueAsString(R.error(401, "未登录或Token已过期")));
+                    response.getWriter().write(objectMapper.writeValueAsString(R.error("401", "未登录或Token已过期")));
                 })
                 .accessDeniedHandler((request, response, accessDeniedException) -> {
-                    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.setCharacterEncoding("UTF-8");
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                    response.getWriter().write(objectMapper.writeValueAsString(R.error(403, "没有操作权限")));
+                    response.getWriter().write(objectMapper.writeValueAsString(R.error("403", "没有操作权限")));
                 })
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

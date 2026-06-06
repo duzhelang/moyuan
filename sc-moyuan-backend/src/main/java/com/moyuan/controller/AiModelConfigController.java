@@ -2,6 +2,7 @@ package com.moyuan.controller;
 
 import com.moyuan.common.R;
 import com.moyuan.entity.AiModel;
+import com.moyuan.entity.AiModuleConfig;
 import com.moyuan.service.AiModelConfigService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,6 +32,18 @@ public class AiModelConfigController {
     @GetMapping("/enabled")
     public R<List<AiModel>> getEnabledModels() {
         return R.success(aiModelConfigService.getEnabledModels());
+    }
+
+    @Operation(summary = "获取所有模块配置")
+    @GetMapping("/modules")
+    public R<List<AiModuleConfig>> getAllModuleConfigs() {
+        return R.success(aiModelConfigService.getAllModuleConfigs());
+    }
+
+    @Operation(summary = "获取模块可用模型列表")
+    @GetMapping("/modules/{moduleCode}/models")
+    public R<List<AiModel>> getModelsForModule(@PathVariable String moduleCode) {
+        return R.success(aiModelConfigService.getModelsForModule(moduleCode));
     }
 
     @Operation(summary = "获取模型详情")
@@ -101,5 +114,12 @@ public class AiModelConfigController {
         } catch (Exception e) {
             return R.error("连接测试失败: " + e.getMessage());
         }
+    }
+
+    @Operation(summary = "更新模块配置")
+    @PutMapping("/modules/{moduleCode}")
+    public R<AiModuleConfig> updateModuleConfig(@PathVariable String moduleCode, @RequestBody AiModuleConfig config) {
+        config.setModuleCode(moduleCode);
+        return R.success(aiModelConfigService.updateModuleConfig(config));
     }
 }

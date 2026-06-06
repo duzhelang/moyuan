@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import type { Poem, Poet, ForumPost, PoemListParams, PageResult } from '@/types/model'
+import type { Poem, Poet, ForumPost, PoemListParams, PageResult, PoemRatingsData, PoemRating } from '@/types/model'
 import type { PoemCreateRequest, PoemUpdateRequest } from '@/types/api'
 
 export function getPoemList(params: PoemListParams) {
@@ -10,8 +10,8 @@ export function getPoemById(id: number) {
   return request.get<Poem>(`/poems/${id}`)
 }
 
-export function getModernPoems(params?: { pageNum?: number; pageSize?: number }) {
-  return request.get<PageResult<Poem>>('/poems', { params: { ...params, keyword: '现代' } })
+export function getModernPoems(params?: { pageNum?: number; pageSize?: number; isOriginal?: boolean; hasCertifiedPoet?: boolean; sortBy?: string }) {
+  return request.get<PageResult<Poem>>('/poems/modern/page', { params })
 }
 
 export function createPoem(data: PoemCreateRequest) {
@@ -68,4 +68,22 @@ export function getDailyPoem() {
 
 export function globalSearch(keyword: string) {
   return request.get<{ poems: Poem[]; poets: Poet[]; posts: ForumPost[] }>('/search', { params: { keyword } })
+}
+
+export function getPoemRatings(poemId: number) {
+  return request.get<PoemRatingsData>(`/poems/${poemId}/ratings`)
+}
+
+export function ratePoem(poemId: number, score: number, comment?: string) {
+  return request.post<void>(`/poems/${poemId}/ratings`, null, {
+    params: { score, comment }
+  })
+}
+
+export function requestAiRating(poemId: number) {
+  return request.post<void>(`/poems/${poemId}/ratings/ai`)
+}
+
+export function getAiRating(poemId: number) {
+  return request.get<PoemRating>(`/poems/${poemId}/ratings/ai`)
 }

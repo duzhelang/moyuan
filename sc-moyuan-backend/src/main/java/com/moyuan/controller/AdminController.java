@@ -4,11 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.moyuan.common.R;
+import com.moyuan.dto.StatsTrendDTO;
 import com.moyuan.entity.*;
-import com.moyuan.mapper.*;
-import com.moyuan.service.VisitLogService;
-import com.moyuan.service.ForumPostService;
-import com.moyuan.service.UserService;
+import com.moyuan.mapper.StatsMapper;
+import com.moyuan.service.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -30,17 +29,19 @@ import java.util.stream.IntStream;
 public class AdminController {
 
     private final UserService userService;
-    private final PoemMapper poemMapper;
-    private final PoetMapper poetMapper;
-    private final CategoryMapper categoryMapper;
-    private final DynastyMapper dynastyMapper;
+    private final PoemService poemService;
+    private final PoetService poetService;
+    private final CategoryService categoryService;
+    private final DynastyService dynastyService;
     private final ForumPostService forumPostService;
-    private final OperationLogMapper operationLogMapper;
-    private final UserMapper userMapper;
+    private final OperationLogService operationLogService;
     private final PasswordEncoder passwordEncoder;
-    private final PoetFeaturedMapper poetFeaturedMapper;
-    private final HomeNavigationMapper homeNavigationMapper;
-    private final VisitLogMapper visitLogMapper;
+    private final PoetFeaturedService poetFeaturedService;
+    private final HomeNavigationService homeNavigationService;
+    private final VisitLogService visitLogService;
+    private final PoetSyncService poetSyncService;
+    private final PoetProfileService poetProfileService;
+    private final StatsMapper statsMapper;
 
     // ========== 统计数据 ==========
 
@@ -48,10 +49,10 @@ public class AdminController {
     @GetMapping("/stats")
     public R<Map<String, Object>> getStats() {
         long userCount = userService.count();
-        long poemCount = poemMapper.selectCount(null);
-        long categoryCount = categoryMapper.selectCount(null);
-        long dynastyCount = dynastyMapper.selectCount(null);
-        long poetCount = poetMapper.selectCount(null);
+        long poemCount = poemService.count();
+        long categoryCount = categoryService.count();
+        long dynastyCount = dynastyService.count();
+        long poetCount = poetService.count();
         long postCount = forumPostService.count();
 
         Map<String, Object> stats = new HashMap<>();
@@ -67,37 +68,32 @@ public class AdminController {
     @Operation(summary = "获取统计趋势")
     @GetMapping("/stats/trend")
     public R<Map<String, Object>> getStatsTrend() {
-        LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
+        int days = 7;
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd");
 
-        List<String> dates = IntStream.rangeClosed(0, 6)
-                .mapToObj(i -> LocalDate.now().minusDays(6 - i).format(formatter))
+        List<String> dates = IntStream.rangeClosed(0, days - 1)
+                .mapToObj(i -> LocalDate.now().minusDays(days - 1 - i).format(formatter))
                 .toList();
 
-        List<Poem> recentPoems = poemMapper.selectList(
-                new LambdaQueryWrapper<Poem>().ge(Poem::getCreateTime, sevenDaysAgo));
-        Map<String, Long> poemByDate = recentPoems.stream()
-                .collect(Collectors.groupingBy(
-                        p -> p.getCreateTime().format(formatter),
-                        Collectors.counting()));
+        List<StatsTrendDTO> trendData = statsMapper.selectStatsTrend(days);
 
-        List<ForumPost> recentPosts = forumPostService.list(
-                new LambdaQueryWrapper<ForumPost>().ge(ForumPost::getCreateTime, sevenDaysAgo));
-        Map<String, Long> postByDate = recentPosts.stream()
+        Map<String, Map<String, Long>> grouped = trendData.stream()
                 .collect(Collectors.groupingBy(
-                        p -> p.getCreateTime().format(formatter),
-                        Collectors.counting()));
+                        StatsTrendDTO::getType,
+                        Collectors.toMap(
+                                StatsTrendDTO::getDate,
+                                StatsTrendDTO::getCount,
+                                Long::sum)));
 
-        List<User> recentUsers = userMapper.selectList(
-                new LambdaQueryWrapper<User>().ge(User::getCreateTime, sevenDaysAgo));
-        Map<String, Long> userByDate = recentUsers.stream()
-                .collect(Collectors.groupingBy(
-                        u -> u.getCreateTime().format(formatter),
-                        Collectors.counting()));
-
-        List<Long> poemCounts = dates.stream().map(d -> poemByDate.getOrDefault(d, 0L)).toList();
-        List<Long> postCounts = dates.stream().map(d -> postByDate.getOrDefault(d, 0L)).toList();
-        List<Long> userCounts = dates.stream().map(d -> userByDate.getOrDefault(d, 0L)).toList();
+        List<Long> poemCounts = dates.stream()
+                .map(d -> grouped.getOrDefault("poem", Map.of()).getOrDefault(d, 0L))
+                .toList();
+        List<Long> postCounts = dates.stream()
+                .map(d -> grouped.getOrDefault("post", Map.of()).getOrDefault(d, 0L))
+                .toList();
+        List<Long> userCounts = dates.stream()
+                .map(d -> grouped.getOrDefault("user", Map.of()).getOrDefault(d, 0L))
+                .toList();
 
         Map<String, Object> result = new HashMap<>();
         result.put("dates", dates);
@@ -146,7 +142,7 @@ public class AdminController {
         if (username == null || password == null) {
             return R.error("用户名和密码不能为空");
         }
-        User existing = userMapper.selectOne(
+        User existing = userService.getOne(
                 new LambdaQueryWrapper<User>().eq(User::getUsername, username));
         if (existing != null) {
             return R.error("用户名已存在");
@@ -204,13 +200,13 @@ public class AdminController {
                     .like(Poem::getContent, keyword);
         }
         wrapper.orderByDesc(Poem::getCreateTime);
-        return R.success(poemMapper.selectPage(new Page<>(page, size), wrapper));
+        return R.success(poemService.page(new Page<>(page, size), wrapper));
     }
 
     @Operation(summary = "获取诗词详情")
     @GetMapping("/poems/{id}")
     public R<Poem> getPoem(@PathVariable Long id) {
-        Poem poem = poemMapper.selectById(id);
+        Poem poem = poemService.getById(id);
         if (poem == null) {
             return R.error("诗词不存在");
         }
@@ -223,7 +219,7 @@ public class AdminController {
         poem.setViewCount(0);
         poem.setLikeCount(0);
         poem.setFavoriteCount(0);
-        poemMapper.insert(poem);
+        poemService.save(poem);
         return R.success(poem);
     }
 
@@ -231,14 +227,14 @@ public class AdminController {
     @PutMapping("/poems/{id}")
     public R<Poem> updatePoem(@PathVariable Long id, @RequestBody Poem poem) {
         poem.setId(id);
-        poemMapper.updateById(poem);
+        poemService.updateById(poem);
         return R.success(poem);
     }
 
     @Operation(summary = "删除诗词")
     @DeleteMapping("/poems/{id}")
     public R<Void> deletePoem(@PathVariable Long id) {
-        poemMapper.deleteById(id);
+        poemService.removeById(id);
         return R.success();
     }
 
@@ -249,13 +245,13 @@ public class AdminController {
     public R<?> listCategories(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return R.success(categoryMapper.selectPage(new Page<>(page, size), null));
+        return R.success(categoryService.page(new Page<>(page, size), null));
     }
 
     @Operation(summary = "获取分类详情")
     @GetMapping("/categories/{id}")
     public R<Category> getCategory(@PathVariable Long id) {
-        Category category = categoryMapper.selectById(id);
+        Category category = categoryService.getById(id);
         if (category == null) {
             return R.error("分类不存在");
         }
@@ -265,7 +261,7 @@ public class AdminController {
     @Operation(summary = "创建分类")
     @PostMapping("/categories")
     public R<Category> createCategory(@RequestBody Category category) {
-        categoryMapper.insert(category);
+        categoryService.save(category);
         return R.success(category);
     }
 
@@ -273,14 +269,14 @@ public class AdminController {
     @PutMapping("/categories/{id}")
     public R<Category> updateCategory(@PathVariable Long id, @RequestBody Category category) {
         category.setId(id);
-        categoryMapper.updateById(category);
+        categoryService.updateById(category);
         return R.success(category);
     }
 
     @Operation(summary = "删除分类")
     @DeleteMapping("/categories/{id}")
     public R<Void> deleteCategory(@PathVariable Long id) {
-        categoryMapper.deleteById(id);
+        categoryService.removeById(id);
         return R.success();
     }
 
@@ -291,13 +287,13 @@ public class AdminController {
     public R<?> listDynasties(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return R.success(dynastyMapper.selectPage(new Page<>(page, size), null));
+        return R.success(dynastyService.page(new Page<>(page, size), null));
     }
 
     @Operation(summary = "获取朝代详情")
     @GetMapping("/dynasties/{id}")
     public R<Dynasty> getDynasty(@PathVariable Long id) {
-        Dynasty dynasty = dynastyMapper.selectById(id);
+        Dynasty dynasty = dynastyService.getById(id);
         if (dynasty == null) {
             return R.error("朝代不存在");
         }
@@ -307,7 +303,7 @@ public class AdminController {
     @Operation(summary = "创建朝代")
     @PostMapping("/dynasties")
     public R<Dynasty> createDynasty(@RequestBody Dynasty dynasty) {
-        dynastyMapper.insert(dynasty);
+        dynastyService.save(dynasty);
         return R.success(dynasty);
     }
 
@@ -315,14 +311,14 @@ public class AdminController {
     @PutMapping("/dynasties/{id}")
     public R<Dynasty> updateDynasty(@PathVariable Long id, @RequestBody Dynasty dynasty) {
         dynasty.setId(id);
-        dynastyMapper.updateById(dynasty);
+        dynastyService.updateById(dynasty);
         return R.success(dynasty);
     }
 
     @Operation(summary = "删除朝代")
     @DeleteMapping("/dynasties/{id}")
     public R<Void> deleteDynasty(@PathVariable Long id) {
-        dynastyMapper.deleteById(id);
+        dynastyService.removeById(id);
         return R.success();
     }
 
@@ -339,13 +335,13 @@ public class AdminController {
             wrapper.like(Poet::getName, keyword);
         }
         wrapper.orderByDesc(Poet::getCreateTime);
-        return R.success(poetMapper.selectPage(new Page<>(page, size), wrapper));
+        return R.success(poetService.page(new Page<>(page, size), wrapper));
     }
 
     @Operation(summary = "获取诗人详情")
     @GetMapping("/poets/{id}")
     public R<Poet> getPoet(@PathVariable Long id) {
-        Poet poet = poetMapper.selectById(id);
+        Poet poet = poetService.getById(id);
         if (poet == null) {
             return R.error("诗人不存在");
         }
@@ -355,7 +351,7 @@ public class AdminController {
     @Operation(summary = "创建诗人")
     @PostMapping("/poets")
     public R<Poet> createPoet(@RequestBody Poet poet) {
-        poetMapper.insert(poet);
+        poetService.save(poet);
         return R.success(poet);
     }
 
@@ -363,14 +359,14 @@ public class AdminController {
     @PutMapping("/poets/{id}")
     public R<Poet> updatePoet(@PathVariable Long id, @RequestBody Poet poet) {
         poet.setId(id);
-        poetMapper.updateById(poet);
+        poetService.updateById(poet);
         return R.success(poet);
     }
 
     @Operation(summary = "删除诗人")
     @DeleteMapping("/poets/{id}")
     public R<Void> deletePoet(@PathVariable Long id) {
-        poetMapper.deleteById(id);
+        poetService.removeById(id);
         return R.success();
     }
 
@@ -384,13 +380,13 @@ public class AdminController {
         LambdaQueryWrapper<PoetFeatured> wrapper = new LambdaQueryWrapper<>();
         wrapper.orderByAsc(PoetFeatured::getSortOrder)
                .orderByDesc(PoetFeatured::getCreateTime);
-        return R.success(poetFeaturedMapper.selectPage(new Page<>(page, size), wrapper));
+        return R.success(poetFeaturedService.page(new Page<>(page, size), wrapper));
     }
 
     @Operation(summary = "获取精选诗人详情")
     @GetMapping("/poet-featured/{id}")
     public R<PoetFeatured> getPoetFeatured(@PathVariable Long id) {
-        PoetFeatured poetFeatured = poetFeaturedMapper.selectById(id);
+        PoetFeatured poetFeatured = poetFeaturedService.getById(id);
         if (poetFeatured == null) {
             return R.error("精选诗人不存在");
         }
@@ -400,7 +396,7 @@ public class AdminController {
     @Operation(summary = "创建精选诗人")
     @PostMapping("/poet-featured")
     public R<PoetFeatured> createPoetFeatured(@RequestBody PoetFeatured poetFeatured) {
-        poetFeaturedMapper.insert(poetFeatured);
+        poetFeaturedService.save(poetFeatured);
         return R.success(poetFeatured);
     }
 
@@ -408,14 +404,14 @@ public class AdminController {
     @PutMapping("/poet-featured/{id}")
     public R<PoetFeatured> updatePoetFeatured(@PathVariable Long id, @RequestBody PoetFeatured poetFeatured) {
         poetFeatured.setId(id);
-        poetFeaturedMapper.updateById(poetFeatured);
+        poetFeaturedService.updateById(poetFeatured);
         return R.success(poetFeatured);
     }
 
     @Operation(summary = "删除精选诗人")
     @DeleteMapping("/poet-featured/{id}")
     public R<Void> deletePoetFeatured(@PathVariable Long id) {
-        poetFeaturedMapper.deleteById(id);
+        poetFeaturedService.removeById(id);
         return R.success();
     }
 
@@ -431,7 +427,7 @@ public class AdminController {
         }
         wrapper.eq(HomeNavigation::getStatus, 1)
                .orderByAsc(HomeNavigation::getSortOrder);
-        return R.success(homeNavigationMapper.selectList(wrapper));
+        return R.success(homeNavigationService.list(wrapper));
     }
 
     @Operation(summary = "管理端获取首页导航列表")
@@ -446,13 +442,13 @@ public class AdminController {
         }
         wrapper.orderByAsc(HomeNavigation::getType)
                .orderByAsc(HomeNavigation::getSortOrder);
-        return R.success(homeNavigationMapper.selectPage(new Page<>(page, size), wrapper));
+        return R.success(homeNavigationService.page(new Page<>(page, size), wrapper));
     }
 
     @Operation(summary = "创建首页导航")
     @PostMapping("/home-navigation")
     public R<HomeNavigation> createHomeNavigation(@RequestBody HomeNavigation homeNavigation) {
-        homeNavigationMapper.insert(homeNavigation);
+        homeNavigationService.save(homeNavigation);
         return R.success(homeNavigation);
     }
 
@@ -460,14 +456,14 @@ public class AdminController {
     @PutMapping("/home-navigation/{id}")
     public R<HomeNavigation> updateHomeNavigation(@PathVariable Long id, @RequestBody HomeNavigation homeNavigation) {
         homeNavigation.setId(id);
-        homeNavigationMapper.updateById(homeNavigation);
+        homeNavigationService.updateById(homeNavigation);
         return R.success(homeNavigation);
     }
 
     @Operation(summary = "删除首页导航")
     @DeleteMapping("/home-navigation/{id}")
     public R<Void> deleteHomeNavigation(@PathVariable Long id) {
-        homeNavigationMapper.deleteById(id);
+        homeNavigationService.removeById(id);
         return R.success();
     }
 
@@ -527,13 +523,13 @@ public class AdminController {
         LocalDateTime weekStart = now.toLocalDate().minusDays(7).atStartOfDay();
         LocalDateTime monthStart = now.toLocalDate().minusDays(30).atStartOfDay();
 
-        long todayVisits = visitLogMapper.selectCount(
+        long todayVisits = visitLogService.count(
                 new LambdaQueryWrapper<VisitLog>().ge(VisitLog::getCreateTime, todayStart));
-        long weekVisits = visitLogMapper.selectCount(
+        long weekVisits = visitLogService.count(
                 new LambdaQueryWrapper<VisitLog>().ge(VisitLog::getCreateTime, weekStart));
-        long monthVisits = visitLogMapper.selectCount(
+        long monthVisits = visitLogService.count(
                 new LambdaQueryWrapper<VisitLog>().ge(VisitLog::getCreateTime, monthStart));
-        long totalVisits = visitLogMapper.selectCount(null);
+        long totalVisits = visitLogService.count();
 
         Map<String, Object> stats = new HashMap<>();
         stats.put("todayVisits", todayVisits);
@@ -553,7 +549,7 @@ public class AdminController {
                 .toList();
 
         LocalDateTime startTime = LocalDateTime.now().minusDays(days).toLocalDate().atStartOfDay();
-        List<VisitLog> visitLogs = visitLogMapper.selectList(
+        List<VisitLog> visitLogs = visitLogService.list(
                 new LambdaQueryWrapper<VisitLog>().ge(VisitLog::getCreateTime, startTime));
 
         Map<String, Long> visitsByDate = visitLogs.stream()
@@ -578,6 +574,65 @@ public class AdminController {
         return R.success(result);
     }
 
+    // ========== 诗人数据同步 ==========
+
+    @Operation(summary = "同步单个诗人数据")
+    @PostMapping("/poets/sync/{name}")
+    public R<Map<String, Object>> syncPoet(@PathVariable String name) {
+        Map<String, Object> result = poetSyncService.syncPoetData(name);
+        if (Boolean.TRUE.equals(result.get("success"))) {
+            return R.success(result);
+        }
+        return R.error((String) result.get("message"));
+    }
+
+    @Operation(summary = "同步所有诗人数据")
+    @PostMapping("/poets/sync-all")
+    public R<Map<String, Object>> syncAllPoets() {
+        Map<String, Object> result = poetSyncService.syncAllPoets();
+        return R.success(result);
+    }
+
+    // ========== 内容审核 ==========
+
+    @Operation(summary = "审核诗词")
+    @PutMapping("/poems/{id}/audit")
+    public R<Void> auditPoem(@PathVariable Long id, @RequestBody Map<String, Object> params) {
+        Integer status = (Integer) params.get("status");
+        String reason = (String) params.get("reason");
+        if (status == null) {
+            return R.error("审核状态不能为空");
+        }
+        poemService.auditPoem(id, status, reason);
+        return R.success();
+    }
+
+    @Operation(summary = "获取诗人认证申请列表")
+    @GetMapping("/poet-profiles")
+    public R<?> getPoetProfiles(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) Integer status) {
+        LambdaQueryWrapper<PoetProfile> wrapper = new LambdaQueryWrapper<>();
+        if (status != null) {
+            wrapper.eq(PoetProfile::getVerifiedStatus, status);
+        }
+        wrapper.orderByDesc(PoetProfile::getCreateTime);
+        return R.success(poetProfileService.page(new Page<>(page, size), wrapper));
+    }
+
+    @Operation(summary = "审核诗人认证")
+    @PutMapping("/poet-profiles/{id}/verify")
+    public R<Void> verifyPoetProfile(@PathVariable Long id, @RequestBody Map<String, Object> params) {
+        Integer status = (Integer) params.get("status");
+        String reason = (String) params.get("reason");
+        if (status == null) {
+            return R.error("审核状态不能为空");
+        }
+        poetProfileService.verifyProfile(id, status, reason);
+        return R.success();
+    }
+
     // ========== 操作日志 ==========
 
     @Operation(summary = "获取操作日志")
@@ -600,6 +655,6 @@ public class AdminController {
             wrapper.le(OperationLog::getCreateTime, LocalDateTime.parse(endTime, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         }
         wrapper.orderByDesc(OperationLog::getCreateTime);
-        return R.success(operationLogMapper.selectPage(new Page<>(page, size), wrapper));
+        return R.success(operationLogService.page(new Page<>(page, size), wrapper));
     }
 }

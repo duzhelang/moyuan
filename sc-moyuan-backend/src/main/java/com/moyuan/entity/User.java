@@ -2,6 +2,7 @@ package com.moyuan.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -17,9 +18,13 @@ public class User {
     private String nickname;
     private String avatar;
     private String bio;
+    private Integer gender;
+    private LocalDate birthday;
     @TableField(exist = false)
     private String interests;
     private String role;
+    private Integer poetVerified;
+    private Long poetProfileId;
     private Integer status;
     private LocalDateTime lastLoginTime;
     private String lastLoginIp;

@@ -130,9 +130,9 @@ const goHome = () => {
 .auth-header-center {
   display: flex;
   align-items: center;
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  flex: 1;
+  justify-content: flex-end;
+  padding-right: 20px;
 }
 
 .time-display {
@@ -142,6 +142,8 @@ const goHome = () => {
   font-size: 13px;
   border-radius: 15px;
   letter-spacing: 0.5px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 .auth-header-right {
@@ -232,12 +234,21 @@ const goHome = () => {
   font-size: 15px;
   font-family: cursive;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  padding: 6px 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 
   &:hover {
     color: #ffd700;
     text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
   }
 }
 
