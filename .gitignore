@@ -23,7 +23,8 @@ application-prod.yml
 *.env
 .env
 .env.local
-# 敏感配置目录（API密钥、数据库密码等）——已迁移至 .git/info/exclude 管理
+# 敏感配置目录（API密钥、数据库密码等）
+secrets/
 # 数据库连接配置（敏感信息）
 db-config.properties
 # 会话/缓存文件
