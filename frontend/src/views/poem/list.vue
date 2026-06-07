@@ -4,16 +4,19 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { usePoemStore } from '@/stores/poem'
 import { useUserStore } from '@/stores/user'
+import { usePreferencesStore } from '@/stores/preferences'
 import type { Dynasty, Category, Poem, Poet } from '@/types/model'
 import { getDynastyList } from '@/api/modules/dynasty'
 import { getCategoryList } from '@/api/modules/category'
 import { likePoem, favoritePoem, getModernPoems } from '@/api/modules/poem'
 import { getPoetList } from '@/api/modules/poet'
+import { getCache, setCache } from '@/utils/storage'
 
 const router = useRouter()
 const route = useRoute()
 const poemStore = usePoemStore()
 const userStore = useUserStore()
+const preferencesStore = usePreferencesStore()
 
 const loading = ref(false)
 const dynasties = ref<Dynasty[]>([])
@@ -37,7 +40,7 @@ const modernFilters = ref({
 })
 
 const currentPage = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(preferencesStore.userPreferences.pageSize || 10)
 
 const poems = computed(() => {
   if (activeTab.value === 'classical') {
@@ -94,6 +97,17 @@ const fetchPoems = async () => {
 
 const fetchFilters = async () => {
   try {
+    const cachedDynasties = getCache<Dynasty[]>('dynasties')
+    const cachedCategories = getCache<Category[]>('categories')
+    const cachedPoets = getCache<Poet[]>('poets')
+
+    if (cachedDynasties && cachedCategories && cachedPoets) {
+      dynasties.value = cachedDynasties
+      categories.value = cachedCategories
+      poets.value = cachedPoets
+      return
+    }
+
     const [dynastyRes, categoryRes, poetRes] = await Promise.all([
       getDynastyList(),
       getCategoryList(),
@@ -102,6 +116,10 @@ const fetchFilters = async () => {
     dynasties.value = dynastyRes.data
     categories.value = categoryRes.data
     poets.value = poetRes.data.list
+
+    setCache('dynasties', dynastyRes.data, 60 * 60 * 1000)
+    setCache('categories', categoryRes.data, 60 * 60 * 1000)
+    setCache('poets', poetRes.data.list, 60 * 60 * 1000)
   } catch (error) {
     ElMessage.error('获取筛选条件失败')
   }
@@ -175,6 +193,7 @@ const handlePageChange = (page: number) => {
 const handleSizeChange = (size: number) => {
   pageSize.value = size
   currentPage.value = 1
+  preferencesStore.setPageSize(size)
   fetchPoems()
 }
 

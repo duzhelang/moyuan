@@ -9,9 +9,10 @@ import type { RhymeItem } from '@/api/modules/rhyme'
 import { getRandomPoetFeatured } from '@/api/modules/poetFeatured'
 import type { PoetFeatured } from '@/api/modules/poetFeatured'
 import { getVisionArticleList } from '@/api/modules/visionArticle'
-import { searchPoemsWithRecommend, getRecommendedPoems, getPopularPoems } from '@/api/modules/external-poetry'
+import { searchPoemsWithRecommend, getRecommendedPoems } from '@/api/modules/external-poetry'
 import type { PoemSearchResult } from '@/api/modules/external-poetry'
 import { ElMessage } from 'element-plus'
+import { HomeFilled, Document, UserFilled, Reading, ChatDotRound, Notebook, EditPen } from '@element-plus/icons-vue'
 import type { ForumPost, VisionArticle, Comment } from '@/types/model'
 import { useUserStore } from '@/stores/user'
 import { getItem } from '@/utils/storage'
@@ -278,8 +279,7 @@ const handlePoemSearch = async () => {
   poemSearchLoading.value = true
   poemSearchMode.value = 'search'
   try {
-    const results = await searchPoemsWithRecommend(poemSearchKeyword.value.trim())
-    poemSearchResults.value = results
+    poemSearchResults.value = await searchPoemsWithRecommend(poemSearchKeyword.value.trim())
   } catch (error) {
     console.error('搜索诗词失败:', error)
     ElMessage.error('搜索失败，请稍后重试')
@@ -291,8 +291,7 @@ const handlePoemSearch = async () => {
 // 获取推荐诗词
 const fetchRecommendedPoems = async () => {
   try {
-    const results = await getRecommendedPoems(6)
-    recommendedPoems.value = results
+    recommendedPoems.value = await getRecommendedPoems(6)
   } catch (error) {
     console.error('获取推荐诗词失败:', error)
   }
@@ -772,10 +771,10 @@ onUnmounted(() => {
 
     <div class="lbye">
       <div class="sy_top_daohang_biao">
-        <div class="toptub1"><a href="#luntan" title="交流论坛"><img src="/img/top_tubiao4.png"></a></div>
-        <div class="toptub2" title="菜单"><a href="#sy_fljs"><img src="/img/top_tubiao2.png"></a></div>
-        <div class="toptub3" title="搜索"><a href="javascript:void(0)"><img src="/img/top_tubiao1.png"></a></div>
-        <div class="toptub4" title="去登录"><a href="/user/login"><img src="/img/top_tubiao3.png"></a></div>
+        <div class="toptub1"><a href="#luntan" title="交流论坛"><img src="/img/top_tubiao4.png" alt="交流论坛"></a></div>
+        <div class="toptub2" title="菜单"><a href="#sy_fljs"><img src="/img/top_tubiao2.png" alt="菜单"></a></div>
+        <div class="toptub3" title="搜索"><a href="javascript:void(0)"><img src="/img/top_tubiao1.png" alt="搜索"></a></div>
+        <div class="toptub4" title="去登录"><a href="/user/login"><img src="/img/top_tubiao3.png" alt="去登录"></a></div>
       </div>
       <div id="lb_jt_z" class="lb_jiantou_left" @click="prevSlide">
         <img :src="asset('/img/jianzu (3).png')" alt="">
@@ -1355,7 +1354,7 @@ onUnmounted(() => {
                   class="poem_card"
                 >
                   <div class="poem_card_img">
-                    <img :src="asset(poem.image)" :alt="poem.title || '诗词配图'">
+                    <img :src="asset(poem.image ?? '')" :alt="poem.title || '诗词配图'">
                     <div class="poem_card_img_overlay"></div>
                   </div>
                   <div class="poem_card_body">
@@ -1442,7 +1441,7 @@ onUnmounted(() => {
                 class="contemporary_card"
               >
                 <div class="contemporary_card_img">
-                  <img :src="asset(poem.image)" :alt="poem.title || '诗词配图'">
+                  <img :src="asset(poem.image ?? '')" :alt="poem.title || '诗词配图'">
                 </div>
                 <div class="contemporary_card_body">
                   <div class="contemporary_card_date">{{ poem.date }}</div>
@@ -2543,7 +2542,6 @@ html {
   flex: 1;
   height: 30px;
   padding: 0 15px;
-  border: 1px solid #ccc;
   border-radius: 20px 0 0 20px;
   font-size: 14px;
   font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
@@ -3945,7 +3943,7 @@ html {
   border-radius: 14px;
   border: 2px solid transparent;
   background: linear-gradient(135deg, rgba(139, 69, 19, 0.1), rgba(210, 105, 30, 0.08)) border-box;
-  mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff, #fff) padding-box, linear-gradient(#fff, #fff);
   mask-composite: exclude;
   -webkit-mask-composite: xor;
   pointer-events: none;

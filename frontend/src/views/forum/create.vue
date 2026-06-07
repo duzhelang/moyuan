@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { Category } from '@/types/model'
 import type { ForumPostCreateRequest } from '@/types/api'
 import { createForumPost } from '@/api/modules/forum'
 import { getCategoryList } from '@/api/modules/category'
+import { useFormDraftStore } from '@/stores/formDraft'
+import { getCache, setCache } from '@/utils/storage'
 
 const router = useRouter()
+const formDraftStore = useFormDraftStore()
 
 const form = ref<ForumPostCreateRequest>({
   title: '',
@@ -19,10 +22,31 @@ const submitting = ref(false)
 
 const fetchCategories = async () => {
   try {
+    const cachedCategories = getCache<Category[]>('categories')
+    if (cachedCategories) {
+      categories.value = cachedCategories
+      return
+    }
+
     const res = await getCategoryList()
     categories.value = res.data
+    setCache('categories', res.data, 60 * 60 * 1000)
   } catch (error) {
     ElMessage.error('获取分类列表失败')
+  }
+}
+
+const loadDraft = () => {
+  const draft = formDraftStore.loadDraft('forum')
+  if (draft) {
+    form.value = draft.data as ForumPostCreateRequest
+    ElMessage.info('已恢复未保存的草稿')
+  }
+}
+
+const saveDraft = () => {
+  if (form.value.title || form.value.content) {
+    formDraftStore.saveDraft('forum', form.value)
   }
 }
 
@@ -40,6 +64,7 @@ const handleSubmit = async () => {
   try {
     const res = await createForumPost(form.value)
     ElMessage.success('发帖成功')
+    formDraftStore.deleteDraft('forum')
     router.push(`/forum/${res.data.id}`)
   } catch (error) {
     ElMessage.error('发帖失败')
@@ -50,6 +75,11 @@ const handleSubmit = async () => {
 
 onMounted(() => {
   fetchCategories()
+  loadDraft()
+})
+
+onUnmounted(() => {
+  saveDraft()
 })
 </script>
 

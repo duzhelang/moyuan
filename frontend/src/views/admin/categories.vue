@@ -9,7 +9,37 @@ const dialogVisible = ref(false)
 const isEdit = ref(false)
 const searchText = ref('')
 const filterStatus = ref<number | ''>('')
-const expandAll = ref(true)
+const expandedGroups = ref<Set<number>>(new Set())
+const expandedSubId = ref<number | null>(null)
+const detailClickTime = ref<number>(0)
+
+const toggleGroup = (id: number) => {
+  const newSet = new Set(expandedGroups.value)
+  if (newSet.has(id)) {
+    newSet.delete(id)
+  } else {
+    newSet.add(id)
+  }
+  expandedGroups.value = newSet
+}
+
+const allExpanded = computed(() => {
+  return treeData.value.length > 0 && treeData.value.every(root => expandedGroups.value.has(root.id))
+})
+
+const toggleAllGroups = () => {
+  if (allExpanded.value) {
+    expandedGroups.value = new Set()
+  } else {
+    const newSet = new Set<number>()
+    treeData.value.forEach(root => newSet.add(root.id))
+    expandedGroups.value = newSet
+  }
+}
+
+const toggleSubExpand = (child: any) => {
+  expandedSubId.value = expandedSubId.value === child.id ? null : child.id
+}
 
 const form = ref({
   id: 0,
@@ -68,6 +98,9 @@ const fetchData = async () => {
   try {
     const res = await getAdminCategories({ page: 1, size: 500 })
     allCategories.value = res.data.records
+    const newSet = new Set<number>()
+    allCategories.value.filter(c => c.parentId === 0).forEach(c => newSet.add(c.id))
+    expandedGroups.value = newSet
   } catch (error) {
     console.error('获取分类列表失败', error)
   } finally {
@@ -189,8 +222,8 @@ onMounted(fetchData)
             <el-tag size="small" type="info">共 {{ stats.total }} 项</el-tag>
           </div>
           <div class="header-right">
-            <el-button size="small" @click="expandAll = !expandAll">
-              {{ expandAll ? '全部折叠' : '全部展开' }}
+            <el-button size="small" @click="toggleAllGroups">
+              {{ allExpanded ? '全部折叠' : '全部展开' }}
             </el-button>
             <el-button type="primary" size="small" @click="handleAdd()">新增顶级分类</el-button>
           </div>
@@ -228,64 +261,114 @@ onMounted(fetchData)
               >
                 {{ root.status === 1 ? '启用' : '禁用' }}
               </el-tag>
-              <span class="category-desc">{{ root.description || '暂无描述' }}</span>
+              <el-tooltip
+                :content="root.description || '暂无描述'"
+                placement="top"
+                :show-after="300"
+                :disabled="!root.description || root.description.length <= 40"
+              >
+                <span class="category-desc" @click="handleEdit(root)">{{ root.description || '暂无描述' }}</span>
+              </el-tooltip>
               <el-tag size="small" type="info" class="sub-count">
                 {{ getSubCategoryCount(root.id) }} 个子分类
               </el-tag>
               <span class="category-time">{{ formatTime(root.createTime) }}</span>
             </div>
             <div class="category-actions">
-              <el-button size="small" type="success" plain @click="handleAddSub(root.id)">
+              <el-button
+                v-if="root.children && root.children.length > 0"
+                size="small"
+                @click.stop="toggleGroup(root.id)"
+              >
+                {{ expandedGroups.has(root.id) ? '收起' : '展开' }}
+              </el-button>
+              <el-button size="small" type="success" plain @click.stop="handleAddSub(root.id)">
                 + 添加子分类
               </el-button>
-              <el-button size="small" @click="handleEdit(root)">编辑</el-button>
+              <el-button size="small" @click.stop="handleEdit(root)">编辑</el-button>
               <el-button
                 size="small"
                 :type="root.status === 1 ? 'warning' : 'success'"
                 plain
-                @click="handleToggleStatus(root)"
+                @click.stop="handleToggleStatus(root)"
               >
                 {{ root.status === 1 ? '禁用' : '启用' }}
               </el-button>
-              <el-button size="small" type="danger" @click="handleDelete(root)">删除</el-button>
+              <el-button size="small" type="danger" @click.stop="handleDelete(root)">删除</el-button>
             </div>
           </div>
 
-          <div v-if="expandAll && root.children && root.children.length > 0" class="sub-categories">
+          <div v-if="expandedGroups.has(root.id) && root.children && root.children.length > 0" class="sub-categories">
             <div
               v-for="child in root.children"
               :key="child.id"
               class="sub-category-item"
+              :class="{ 'is-expanded': expandedSubId === child.id }"
+              @click="toggleSubExpand(child)"
             >
-              <div class="sub-info">
-                <span v-if="child.icon" class="sub-icon">{{ child.icon }}</span>
-                <el-tag type="success" size="default">{{ child.name }}</el-tag>
-                <el-tag
-                  size="small"
-                  :type="child.status === 1 ? 'success' : 'danger'"
-                  effect="plain"
-                >
-                  {{ child.status === 1 ? '启用' : '禁用' }}
-                </el-tag>
-                <span class="sub-desc" :title="child.description">{{ child.description || '-' }}</span>
-                <span class="sub-sort">排序: {{ child.sortOrder || 0 }}</span>
+              <div class="sub-main">
+                <div class="sub-info">
+                  <span v-if="child.icon" class="sub-icon">{{ child.icon }}</span>
+                  <el-tag type="success" size="default">{{ child.name }}</el-tag>
+                  <el-tag
+                    size="small"
+                    :type="child.status === 1 ? 'success' : 'danger'"
+                    effect="plain"
+                  >
+                    {{ child.status === 1 ? '启用' : '禁用' }}
+                  </el-tag>
+                  <span class="sub-desc-text">{{ child.description || '-' }}</span>
+                  <span class="sub-sort">排序: {{ child.sortOrder || 0 }}</span>
+                </div>
+                <div class="sub-actions" @click.stop>
+                  <el-button size="small" @click="handleEdit(child)">编辑</el-button>
+                  <el-button
+                    size="small"
+                    :type="child.status === 1 ? 'warning' : 'success'"
+                    plain
+                    @click="handleToggleStatus(child)"
+                  >
+                    {{ child.status === 1 ? '禁用' : '启用' }}
+                  </el-button>
+                  <el-button size="small" type="danger" @click="handleDelete(child)">删除</el-button>
+                </div>
               </div>
-              <div class="sub-actions">
-                <el-button size="small" @click="handleEdit(child)">编辑</el-button>
-                <el-button
-                  size="small"
-                  :type="child.status === 1 ? 'warning' : 'success'"
-                  plain
-                  @click="handleToggleStatus(child)"
-                >
-                  {{ child.status === 1 ? '禁用' : '启用' }}
-                </el-button>
-                <el-button size="small" type="danger" @click="handleDelete(child)">删除</el-button>
+              <div v-if="expandedSubId === child.id" class="sub-detail">
+                <div class="detail-row">
+                  <span class="detail-label">分类名称：</span>
+                  <span class="detail-value">{{ child.name }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">图标：</span>
+                  <span class="detail-value">{{ child.icon || '无' }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">描述信息：</span>
+                  <span class="detail-value">{{ child.description || '暂无描述' }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">排序权重：</span>
+                  <span class="detail-value">{{ child.sortOrder || 0 }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">状态：</span>
+                  <el-tag size="small" :type="child.status === 1 ? 'success' : 'danger'">
+                    {{ child.status === 1 ? '启用' : '禁用' }}
+                  </el-tag>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">创建时间：</span>
+                  <span class="detail-value">{{ formatTime(child.createTime) }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">更新时间：</span>
+                  <span class="detail-value">{{ formatTime(child.updateTime) }}</span>
+                </div>
               </div>
             </div>
           </div>
 
-          <div v-else-if="expandAll && root.children && root.children.length === 0" class="no-sub">
+          <div v-else-if="expandedGroups.has(root.id) && root.children && root.children.length === 0" class="no-sub">
             暂无子分类
           </div>
         </div>
@@ -467,6 +550,14 @@ onMounted(fetchData)
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: #409eff;
+    border-bottom-color: #409eff;
+  }
 }
 
 .category-time {
@@ -487,41 +578,55 @@ onMounted(fetchData)
 .sub-categories {
   padding: 12px 20px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
 }
 
 .sub-category-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 14px;
   background: #f9fafc;
   border-radius: 6px;
   border: 1px solid #ebeef5;
   transition: all 0.3s ease;
+  cursor: pointer;
+  overflow: hidden;
 
   &:hover {
     background: #f0f2f5;
     border-color: #c0c4cc;
   }
+
+  &.is-expanded {
+    grid-column: 1 / -1;
+    border-color: #409eff;
+    box-shadow: 0 2px 12px rgba(64, 158, 255, 0.1);
+  }
+}
+
+.sub-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
 }
 
 .sub-info {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .sub-icon {
   font-size: 16px;
 }
 
-.sub-desc {
-  color: #909399;
+.sub-desc-text {
+  color: #606266;
   font-size: 12px;
-  max-width: 160px;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -537,6 +642,49 @@ onMounted(fetchData)
   display: flex;
   gap: 4px;
   flex-shrink: 0;
+}
+
+.sub-detail {
+  padding: 14px;
+  background: #fff;
+  border-top: 1px solid #ebeef5;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 300px;
+  }
+}
+
+.detail-row {
+  display: flex;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-bottom: 1px dashed #ebeef5;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.detail-label {
+  color: #909399;
+  font-size: 13px;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.detail-value {
+  color: #303133;
+  font-size: 13px;
+  flex: 1;
+  word-break: break-all;
 }
 
 .no-sub {

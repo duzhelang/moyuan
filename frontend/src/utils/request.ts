@@ -50,6 +50,9 @@ const PUBLIC_PATHS = [
 ]
 
 function isPublicRequest(url: string = ''): boolean {
+  if (url.includes('/admin/')) {
+    return false
+  }
   return PUBLIC_PATHS.some(path => url.includes(path))
 }
 

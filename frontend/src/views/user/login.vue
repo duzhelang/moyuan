@@ -181,6 +181,10 @@ const fillAdminUsername = () => {
   padding-top: 55px;
   padding-bottom: 80px;
   min-height: calc(100vh - 55px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .dl_tubiao {
@@ -239,7 +243,7 @@ const fillAdminUsername = () => {
 }
 
 .dl_zhuti {
-  margin: 100px 10px;
+  margin: 20px 10px;
   text-align: center;
   display: flex;
   justify-content: center;
@@ -265,31 +269,29 @@ const fillAdminUsername = () => {
   backdrop-filter: blur(1.5px);
   box-shadow: 0 4px 8px rgba(0,0,0,0.2);
   width: 600px;
-  height: 380px;
+  height: 400px;
   border-radius: 27px;
   background-color: rgba(227,196,165,0.7);
   background-size: cover;
   background-repeat: no-repeat;
   background-position: 0px 0px;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
 }
 
 .zhong .dlzt_tx_div {
   display: flex;
   flex-direction: column;
-  justify-content: space-around;
+  justify-content: center;
   align-items: center;
   width: 35%;
-  height: 40%;
-  position: relative;
-  top: -30px;
+  height: 100%;
 }
 
 .zhong .dlzt_tx_div > img {
   display: block;
   border-radius: 50%;
-  margin: 10px;
+  margin-bottom: 15px;
   width: 80px;
   height: 80px;
   position: relative;
@@ -313,10 +315,8 @@ const fillAdminUsername = () => {
 .register-link {
   font-size: 20px;
   text-align: center;
-  margin-top: 0px;
-  position: absolute;
-  bottom: -100px;
-  right: 60px;
+  margin-top: 15px;
+  position: relative;
 }
 
 .register-link .fuzhu {
@@ -334,12 +334,16 @@ const fillAdminUsername = () => {
 
 .zhong_shuxian {
   width: 1px;
-  height: 300px;
+  height: 70%;
   background-color: #e0e0e0;
 }
 
 .zhong .dlzt_wz_div {
-  width: 55%;
+  width: 60%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
 }
 
 .zhong .dlzt_wz_div h1 {
@@ -347,7 +351,7 @@ const fillAdminUsername = () => {
   color: #333;
   font-size: 50px;
   font-weight: 600;
-  margin: 10px auto 25px;
+  margin: 0 auto 25px;
   display: flex;
   justify-content: center;
 }

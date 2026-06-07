@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -7,9 +7,12 @@ import type { Dynasty, Category } from '@/types/model'
 import { createPoem } from '@/api/modules/poem'
 import { getDynastyList } from '@/api/modules/dynasty'
 import { getCategoryList } from '@/api/modules/category'
+import { useFormDraftStore } from '@/stores/formDraft'
+import { getCache, setCache } from '@/utils/storage'
 
 const router = useRouter()
 const formRef = ref<FormInstance>()
+const formDraftStore = useFormDraftStore()
 
 const form = ref({
   title: '',
@@ -40,12 +43,22 @@ const rules: FormRules = {
 
 const fetchOptions = async () => {
   try {
+    const cachedDynasties = getCache<Dynasty[]>('dynasties')
+    const cachedCategories = getCache<Category[]>('categories')
+    if (cachedDynasties && cachedCategories) {
+      dynasties.value = cachedDynasties
+      categories.value = cachedCategories
+      return
+    }
+
     const [dynastyRes, categoryRes] = await Promise.all([
       getDynastyList(),
       getCategoryList()
     ])
     dynasties.value = dynastyRes.data
     categories.value = categoryRes.data
+    setCache('dynasties', dynastyRes.data, 60 * 60 * 1000)
+    setCache('categories', categoryRes.data, 60 * 60 * 1000)
   } catch (error) {
     console.error('获取选项失败:', error)
   }
@@ -86,10 +99,30 @@ const handleReset = () => {
     source: '',
     isOriginal: 1
   }
+  formDraftStore.deleteDraft('poem')
+}
+
+const loadDraft = () => {
+  const draft = formDraftStore.loadDraft('poem')
+  if (draft) {
+    form.value = draft.data as any
+    ElMessage.info('已恢复未保存的草稿')
+  }
+}
+
+const saveDraft = () => {
+  if (form.value.title || form.value.content) {
+    formDraftStore.saveDraft('poem', form.value)
+  }
 }
 
 onMounted(() => {
   fetchOptions()
+  loadDraft()
+})
+
+onUnmounted(() => {
+  saveDraft()
 })
 </script>
 

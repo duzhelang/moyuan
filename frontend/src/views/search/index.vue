@@ -3,9 +3,11 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { globalSearch } from '@/api/modules/poem'
 import type { Poem, Poet, ForumPost } from '@/types/model'
+import { useSearchHistoryStore } from '@/stores/searchHistory'
 
 const route = useRoute()
 const router = useRouter()
+const searchHistoryStore = useSearchHistoryStore()
 const keyword = ref((route.query.keyword as string) || '')
 const loading = ref(false)
 const searched = ref(false)
@@ -19,6 +21,8 @@ const results = ref<{ poems: Poem[]; poets: Poet[]; posts: ForumPost[] }>({
 const hasResults = computed(() =>
   results.value.poems.length > 0 || results.value.poets.length > 0 || results.value.posts.length > 0
 )
+
+const recentSearches = computed(() => searchHistoryStore.getRecentSearches(5))
 
 const doSearch = async () => {
   const q = keyword.value.trim()
@@ -36,6 +40,7 @@ const doSearch = async () => {
     else if (results.value.poets.length > 0) activeTab.value = 'poets'
     else if (results.value.posts.length > 0) activeTab.value = 'posts'
     router.replace({ query: { keyword: q } })
+    searchHistoryStore.addHistory(q)
   } catch (error) {
     console.error('搜索失败')
   } finally {
@@ -86,6 +91,20 @@ onMounted(() => {
             </el-button>
           </template>
         </el-input>
+      </div>
+    </div>
+
+    <div v-if="!searched && recentSearches.length > 0" class="recent-searches">
+      <h3>最近搜索</h3>
+      <div class="search-tags">
+        <el-tag
+          v-for="item in recentSearches"
+          :key="item.keyword"
+          @click="keyword = item.keyword; doSearch()"
+          class="search-tag"
+        >
+          {{ item.keyword }}
+        </el-tag>
       </div>
     </div>
 
@@ -167,6 +186,34 @@ onMounted(() => {
   padding: $spacing-xl;
   max-width: 900px;
   margin: 0 auto;
+}
+
+.recent-searches {
+  margin-bottom: $spacing-xl;
+  text-align: center;
+
+  h3 {
+    font-size: $font-size-base;
+    color: $text-color-secondary;
+    margin-bottom: $spacing-md;
+  }
+
+  .search-tags {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: $spacing-sm;
+  }
+
+  .search-tag {
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover {
+      background-color: $primary-color;
+      color: #fff;
+    }
+  }
 }
 
 .page-nav {

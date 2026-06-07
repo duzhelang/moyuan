@@ -8,16 +8,46 @@ const userStore = useUserStore()
 
 const adminMenus = [
   { path: '/admin/dashboard', name: 'dashboard', icon: 'DataAnalysis', label: '控制台' },
-  { path: '/admin/users', name: 'AdminUsers', icon: 'User', label: '用户管理' },
-  { path: '/admin/poems', name: 'AdminPoems', icon: 'Reading', label: '诗词管理' },
-  { path: '/admin/categories', name: 'AdminCategories', icon: 'FolderOpened', label: '分类管理' },
-  { path: '/admin/dynasties', name: 'AdminDynasties', icon: 'Clock', label: '朝代管理' },
-  { path: '/admin/poets', name: 'AdminPoets', icon: 'EditPen', label: '诗人管理' },
-  { path: '/admin/poet-featured', name: 'AdminPoetFeatured', icon: 'Star', label: '精选诗人管理' },
-  { path: '/admin/forum-posts', name: 'AdminForumPosts', icon: 'ChatLineSquare', label: '帖子管理' },
-  { path: '/admin/logs', name: 'AdminLogs', icon: 'Document', label: '操作日志' },
-  { path: '/admin/ai-models', name: 'AdminAiModels', icon: 'Cpu', label: 'AI模型管理' },
-  { path: '/admin/home-navigation', name: 'AdminHomeNavigation', icon: 'Guide', label: '首页导航管理' }
+  {
+    label: '用户管理',
+    icon: 'User',
+    children: [
+      { path: '/admin/users', name: 'AdminUsers', icon: 'User', label: '用户管理' }
+    ]
+  },
+  {
+    label: '内容管理',
+    icon: 'Document',
+    children: [
+      { path: '/admin/poems', name: 'AdminPoems', icon: 'Reading', label: '诗词管理' },
+      { path: '/admin/categories', name: 'AdminCategories', icon: 'FolderOpened', label: '分类管理' },
+      { path: '/admin/dynasties', name: 'AdminDynasties', icon: 'Clock', label: '朝代管理' },
+      { path: '/admin/poets', name: 'AdminPoets', icon: 'EditPen', label: '诗人管理' },
+      { path: '/admin/poet-featured', name: 'AdminPoetFeatured', icon: 'Star', label: '精选诗人管理' },
+      { path: '/admin/home-navigation', name: 'AdminHomeNavigation', icon: 'Guide', label: '首页导航管理' }
+    ]
+  },
+  {
+    label: '社区管理',
+    icon: 'ChatLineSquare',
+    children: [
+      { path: '/admin/forum-posts', name: 'AdminForumPosts', icon: 'ChatLineSquare', label: '帖子管理' }
+    ]
+  },
+  {
+    label: 'AI功能',
+    icon: 'Cpu',
+    children: [
+      { path: '/admin/ai-models', name: 'AdminAiModels', icon: 'Cpu', label: 'AI模型管理' }
+    ]
+  },
+  {
+    label: '系统管理',
+    icon: 'Setting',
+    children: [
+      { path: '/admin/logs', name: 'AdminLogs', icon: 'Document', label: '操作日志' }
+    ]
+  }
 ]
 
 const handleLogout = () => {
@@ -45,14 +75,26 @@ const goHome = () => {
           text-color="#ffffff99"
           active-text-color="#ffffff"
         >
-          <el-menu-item
-            v-for="menu in adminMenus"
-            :key="menu.path"
-            :index="menu.path"
-          >
-            <el-icon><component :is="menu.icon" /></el-icon>
-            <span>{{ menu.label }}</span>
-          </el-menu-item>
+          <template v-for="menu in adminMenus" :key="menu.path || menu.label">
+            <el-menu-item v-if="!menu.children" :index="menu.path">
+              <el-icon><component :is="menu.icon" /></el-icon>
+              <span>{{ menu.label }}</span>
+            </el-menu-item>
+            <el-sub-menu v-else :index="menu.label">
+              <template #title>
+                <el-icon><component :is="menu.icon" /></el-icon>
+                <span>{{ menu.label }}</span>
+              </template>
+              <el-menu-item
+                v-for="child in menu.children"
+                :key="child.path"
+                :index="child.path"
+              >
+                <el-icon><component :is="child.icon" /></el-icon>
+                <span>{{ child.label }}</span>
+              </el-menu-item>
+            </el-sub-menu>
+          </template>
         </el-menu>
       </el-aside>
 
@@ -119,6 +161,48 @@ const goHome = () => {
 
 .sidebar-menu {
   border-right: none;
+  
+  :deep(.el-sub-menu) {
+    .el-sub-menu__title {
+      height: 56px;
+      line-height: 56px;
+      
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+      }
+    }
+    
+    .el-menu {
+      background-color: #000c17 !important;
+      
+      .el-menu-item {
+        height: 50px;
+        line-height: 50px;
+        padding-left: 56px !important;
+        
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        
+        &.is-active {
+          background-color: #1890ff !important;
+        }
+      }
+    }
+  }
+  
+  :deep(.el-menu-item) {
+    height: 56px;
+    line-height: 56px;
+    
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.1) !important;
+    }
+    
+    &.is-active {
+      background-color: #1890ff !important;
+    }
+  }
 }
 
 .admin-header {
