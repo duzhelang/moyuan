@@ -24,6 +24,11 @@ export interface AiModuleConfig {
   modelId: number | null
   requireVision: number
   description?: string
+  promptTemplate?: string
+  maxLength?: number
+  responseStyle?: string
+  firstResponseLength?: number
+  enableMarkdown?: number
 }
 
 export function createModel(data: AiModelConfig) {

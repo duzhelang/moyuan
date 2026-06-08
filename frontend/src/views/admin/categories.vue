@@ -12,6 +12,22 @@ const filterStatus = ref<number | ''>('')
 const expandedGroups = ref<Set<number>>(new Set())
 const expandedSubId = ref<number | null>(null)
 const detailClickTime = ref<number>(0)
+const filterTopLevel = ref<number | ''>('')
+
+const topLevelTagType: Record<number, string> = {
+  1: 'primary',
+  2: 'success',
+  3: 'warning',
+  4: 'danger',
+  5: '',
+  6: 'info',
+  73: 'primary',
+  74: 'success'
+}
+
+const getTopLevelType = (id: number) => {
+  return topLevelTagType[id] || 'info'
+}
 
 const toggleGroup = (id: number) => {
   const newSet = new Set(expandedGroups.value)
@@ -57,6 +73,9 @@ const parentCategories = computed(() => {
 
 const filteredCategories = computed(() => {
   let list = allCategories.value
+  if (filterTopLevel.value !== '') {
+    list = list.filter(c => c.parentId === 0 ? c.id === filterTopLevel.value : c.parentId === filterTopLevel.value)
+  }
   if (searchText.value) {
     const keyword = searchText.value.toLowerCase()
     list = list.filter(c =>
@@ -238,6 +257,14 @@ onMounted(fetchData)
           prefix-icon="Search"
           style="width: 280px"
         />
+        <el-select v-model="filterTopLevel" placeholder="按顶级分类筛选" clearable style="width: 180px">
+          <el-option
+            v-for="cat in parentCategories"
+            :key="cat.id"
+            :label="cat.name"
+            :value="cat.id"
+          />
+        </el-select>
         <el-select v-model="filterStatus" placeholder="状态筛选" clearable style="width: 140px">
           <el-option label="已启用" :value="1" />
           <el-option label="已禁用" :value="0" />
@@ -253,7 +280,7 @@ onMounted(fetchData)
           <div class="category-header">
             <div class="category-info">
               <span v-if="root.icon" class="category-icon">{{ root.icon }}</span>
-              <el-tag type="primary" effect="dark" size="large">{{ root.name }}</el-tag>
+              <el-tag :type="getTopLevelType(root.id)" effect="dark" size="large">{{ root.name }}</el-tag>
               <el-tag
                 size="small"
                 :type="root.status === 1 ? 'success' : 'danger'"

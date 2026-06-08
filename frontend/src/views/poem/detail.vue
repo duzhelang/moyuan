@@ -216,6 +216,15 @@ onMounted(() => {
 
 <template>
   <div class="poem-detail-page" v-loading="loading">
+    <div class="page-decoration">
+      <div class="decoration-left">
+        <img src="/img/lb_shiwen (1).png" alt="" class="deco-img" />
+      </div>
+      <div class="decoration-right">
+        <img src="/img/lb_shiwen (2).png" alt="" class="deco-img" />
+      </div>
+    </div>
+
     <div class="container" v-if="poem">
       <div class="poem-header">
         <el-button @click="router.push('/poem')" class="back-button">
@@ -445,6 +454,49 @@ onMounted(() => {
 .poem-detail-page {
   padding: $spacing-xl 0;
   min-height: 60vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.page-decoration {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.decoration-left {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.12;
+
+  .deco-img {
+    width: 180px;
+    height: auto;
+  }
+}
+
+.decoration-right {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.12;
+
+  .deco-img {
+    width: 180px;
+    height: auto;
+  }
+}
+
+.container {
+  position: relative;
+  z-index: 1;
 }
 
 .poem-header {
@@ -533,19 +585,27 @@ onMounted(() => {
 
 .comment-section {
   margin-top: $spacing-xl;
+  background: $background-color-light;
+  border-radius: $border-radius-md;
+  padding: $spacing-xl;
+  box-shadow: $box-shadow;
 }
 
 .section-title {
   font-size: $font-size-xl;
-  color: $text-color;
+  color: $primary-color;
   margin-bottom: $spacing-lg;
   padding-bottom: $spacing-sm;
   border-bottom: 2px solid $primary-color;
   display: inline-block;
+  font-family: $font-family-title;
 }
 
 .comment-form {
   margin-bottom: $spacing-xl;
+  padding: $spacing-lg;
+  background: $background-color;
+  border-radius: $border-radius-md;
 
   :deep(.el-textarea__inner) {
     font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
@@ -561,7 +621,7 @@ onMounted(() => {
 .comment-list {
   display: flex;
   flex-direction: column;
-  gap: $spacing-lg;
+  gap: $spacing-md;
 }
 
 .empty-comments {
@@ -571,6 +631,12 @@ onMounted(() => {
 .comment-item {
   @include card;
   padding: $spacing-lg;
+  border-left: 3px solid transparent;
+  transition: all $transition-fast;
+
+  &:hover {
+    border-left-color: $primary-color;
+  }
 }
 
 .comment-header {
@@ -619,7 +685,7 @@ onMounted(() => {
 
 .rating-section {
   margin-top: $spacing-xl;
-  padding: $spacing-lg;
+  padding: $spacing-xl;
   background: $background-color-light;
   border-radius: $border-radius-md;
   box-shadow: $box-shadow;

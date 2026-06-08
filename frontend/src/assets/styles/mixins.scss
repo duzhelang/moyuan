@@ -39,7 +39,15 @@
   width: 100%;
   max-width: $container-xl;
   margin: 0 auto;
-  padding: 0 $spacing-lg;
+  padding: 0 $spacing-xxl;
+
+  @media (max-width: $breakpoint-md) {
+    padding: 0 $spacing-lg;
+  }
+
+  @media (max-width: $breakpoint-sm) {
+    padding: 0 $spacing-md;
+  }
 }
 
 @mixin card {

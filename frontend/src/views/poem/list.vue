@@ -233,6 +233,12 @@ const handleFavorite = async (poem: any, event: Event) => {
   }
 }
 
+const getFormattedVerses = (content: string) => {
+  if (!content) return []
+  const lines = content.split(/[。！？；\n]+/).filter(line => line.trim())
+  return lines.slice(0, 3).map(line => line.trim())
+}
+
 onMounted(() => {
   const query = route.query
   if (query.tab === 'modern') {
@@ -271,6 +277,15 @@ onMounted(() => {
 
 <template>
   <div class="poem-list-page">
+    <div class="page-decoration">
+      <div class="decoration-left">
+        <img src="/img/lb_shiwen (1).png" alt="" class="deco-img" />
+      </div>
+      <div class="decoration-right">
+        <img src="/img/lb_shiwen (2).png" alt="" class="deco-img" />
+      </div>
+    </div>
+
     <div class="container">
       <div class="page-nav">
         <el-button text @click="router.push('/')">
@@ -282,23 +297,30 @@ onMounted(() => {
       </div>
 
       <div class="page-header">
-        <div class="header-left">
-          <h1 class="page-title">诗词鉴赏</h1>
-          <p class="page-subtitle">品读千年韵律，感悟诗词之美</p>
-        </div>
-        <div class="header-right">
-          <el-button @click="router.push('/poet')">
-            <el-icon><User /></el-icon>
-            诗人风采
-          </el-button>
-          <el-button
-            v-if="userStore.isLoggedIn"
-            type="primary"
-            @click="router.push('/poem/create')"
-          >
-            <el-icon><Edit /></el-icon>
-            发布新诗
-          </el-button>
+        <div class="header-content">
+          <div class="header-left">
+            <h1 class="page-title">诗词鉴赏</h1>
+            <p class="page-subtitle">品读千年韵律，感悟诗词之美</p>
+            <div class="title-decoration">
+              <span class="deco-line"></span>
+              <span class="deco-icon">墨</span>
+              <span class="deco-line"></span>
+            </div>
+          </div>
+          <div class="header-right">
+            <el-button @click="router.push('/poet')">
+              <el-icon><User /></el-icon>
+              诗人风采
+            </el-button>
+            <el-button
+              v-if="userStore.isLoggedIn"
+              type="primary"
+              @click="router.push('/poem/create')"
+            >
+              <el-icon><Edit /></el-icon>
+              发布新诗
+            </el-button>
+          </div>
         </div>
       </div>
 
@@ -492,7 +514,11 @@ onMounted(() => {
             <p class="poem-author">
               <span v-if="poem.poetName">{{ poem.poetName }}</span>
             </p>
-            <p class="poem-content">{{ poem.content }}</p>
+            <div class="poem-verses">
+              <p v-for="(line, index) in getFormattedVerses(poem.content)" :key="index" class="verse-line">
+                {{ line }}
+              </p>
+            </div>
             <div class="poem-footer">
               <div class="poem-meta">
                 <span class="meta-item">
@@ -549,10 +575,47 @@ onMounted(() => {
 </template>
 
 <style scoped lang="scss">
-@use 'sass:color';
-
 .poem-list-page {
   padding: $spacing-xl 0;
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.page-decoration {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.decoration-left {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.15;
+
+  .deco-img {
+    width: 200px;
+    height: auto;
+  }
+}
+
+.decoration-right {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.15;
+
+  .deco-img {
+    width: 200px;
+    height: auto;
+  }
 }
 
 .page-nav {
@@ -560,6 +623,8 @@ onMounted(() => {
   align-items: center;
   gap: $spacing-sm;
   margin-bottom: $spacing-lg;
+  position: relative;
+  z-index: 1;
 
   .el-button {
     color: $text-color-secondary;
@@ -576,16 +641,26 @@ onMounted(() => {
 }
 
 .page-header {
+  margin-bottom: $spacing-xl;
+  position: relative;
+  z-index: 1;
+}
+
+.header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: $spacing-xl;
+  background: linear-gradient(135deg, rgba($primary-color, 0.03), rgba($accent-color, 0.03));
+  border-radius: $border-radius-lg;
+  padding: $spacing-xl;
+  border: 1px solid rgba($primary-color, 0.1);
 }
 
 .header-left {
   display: flex;
   flex-direction: column;
-  gap: $spacing-xs;
+  gap: $spacing-sm;
+  align-items: center;
 }
 
 .header-right {
@@ -597,13 +672,34 @@ onMounted(() => {
   font-size: $font-size-title;
   color: $primary-color;
   font-family: $font-family-title;
+  margin: 0;
 }
 
 .page-subtitle {
-  font-size: $font-size-sm;
-  color: $text-color-light;
+  font-size: $font-size-base;
+  color: $text-color-secondary;
   font-family: $font-family-base;
   margin: 0;
+}
+
+.title-decoration {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  margin-top: $spacing-xs;
+}
+
+.deco-line {
+  width: 40px;
+  height: 1px;
+  background: linear-gradient(90deg, $primary-color, transparent);
+}
+
+.deco-icon {
+  font-size: $font-size-xs;
+  color: $primary-color;
+  font-family: $font-family-title;
+  opacity: 0.6;
 }
 
 .tab-section {
@@ -631,6 +727,8 @@ onMounted(() => {
 
 .filter-section {
   margin-bottom: $spacing-xl;
+  position: relative;
+  z-index: 1;
 }
 
 .filter-card {
@@ -671,6 +769,8 @@ onMounted(() => {
   margin-bottom: $spacing-md;
   font-size: $font-size-sm;
   color: $text-color-secondary;
+  position: relative;
+  z-index: 1;
 
   strong {
     color: $primary-color;
@@ -683,6 +783,12 @@ onMounted(() => {
   grid-template-columns: repeat(2, 1fr);
   gap: $spacing-lg;
   min-height: 400px;
+  position: relative;
+  z-index: 1;
+  max-height: calc(100vh - 300px);
+  overflow-y: auto;
+  padding-right: $spacing-sm;
+  @include scrollbar;
 
   @include responsive(lg) {
     grid-template-columns: repeat(2, 1fr);
@@ -690,6 +796,7 @@ onMounted(() => {
 
   @include responsive(md) {
     grid-template-columns: 1fr;
+    max-height: none;
   }
 }
 
@@ -700,15 +807,28 @@ onMounted(() => {
   display: flex;
   gap: $spacing-lg;
   position: relative;
+  border-left: 3px solid $primary-color;
+  transition: all $transition-base;
+
+  &:hover {
+    border-left-color: darken($primary-color, 10%);
+    transform: translateY(-2px);
+  }
 
   @include responsive(sm) {
     flex-direction: column;
+    border-left: none;
+    border-top: 3px solid $primary-color;
+
+    &:hover {
+      border-top-color: darken($primary-color, 10%);
+    }
   }
 }
 
 .poem-image {
-  width: 200px;
-  height: 150px;
+  width: 180px;
+  height: 140px;
   flex-shrink: 0;
   border-radius: $border-radius-sm;
   overflow: hidden;
@@ -716,7 +836,7 @@ onMounted(() => {
 
   @include responsive(sm) {
     width: 100%;
-    height: 180px;
+    height: 160px;
   }
 
   img {
@@ -729,34 +849,36 @@ onMounted(() => {
 
 .featured-badge {
   position: absolute;
-  top: $spacing-sm;
-  left: $spacing-sm;
+  top: $spacing-xs;
+  left: $spacing-xs;
   background: linear-gradient(135deg, #FFD700, #FFA500);
   color: white;
-  padding: $spacing-xs $spacing-sm;
+  padding: 2px 6px;
   border-radius: $border-radius-sm;
-  font-size: $font-size-xs;
+  font-size: 10px;
   display: flex;
   align-items: center;
-  gap: $spacing-xs;
+  gap: 2px;
   font-weight: bold;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  z-index: 2;
 }
 
 .original-badge {
   position: absolute;
-  top: $spacing-sm;
-  right: $spacing-sm;
+  top: $spacing-xs;
+  right: $spacing-xs;
   background: linear-gradient(135deg, #67C23A, #85ce61);
   color: white;
-  padding: $spacing-xs $spacing-sm;
+  padding: 2px $spacing-xs;
   border-radius: $border-radius-sm;
-  font-size: $font-size-xs;
+  font-size: 10px;
   display: flex;
   align-items: center;
-  gap: $spacing-xs;
+  gap: 2px;
   font-weight: bold;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  z-index: 1;
 }
 
 .poem-card:hover .poem-image img {
@@ -768,6 +890,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  padding-right: $spacing-lg;
 }
 
 .poem-header {
@@ -823,13 +946,22 @@ onMounted(() => {
   font-family: $font-family-base;
 }
 
-.poem-content {
+.poem-verses {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  min-height: 60px;
+}
+
+.verse-line {
   font-size: $font-size-base;
   color: $text-color-secondary;
-  line-height: $line-height-loose;
-  @include text-clamp(2);
-  flex: 1;
+  line-height: 1.6;
+  margin: 0;
   font-family: $font-family-base;
+  white-space: normal;
+  word-break: break-all;
 }
 
 .poem-footer {
@@ -900,7 +1032,7 @@ onMounted(() => {
     color: $danger-color;
 
     &:hover {
-      color: color.adjust($danger-color, $lightness: -10%);
+      color: darken($danger-color, 10%);
     }
   }
 }
@@ -909,5 +1041,17 @@ onMounted(() => {
   margin-top: $spacing-xl;
   display: flex;
   justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+
+.card-corner {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(135deg, transparent 50%, rgba($primary-color, 0.05) 50%);
+  pointer-events: none;
 }
 </style>

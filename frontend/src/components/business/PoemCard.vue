@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import type { Poem } from '@/types/model'
 
@@ -13,6 +14,13 @@ const router = useRouter()
 const goToDetail = () => {
   router.push(`/poem/${props.poem.id}`)
 }
+
+const formattedContent = computed(() => {
+  if (!props.poem.content) return []
+  const content = props.poem.content
+  const lines = content.split(/[。！？；\n]+/).filter(line => line.trim())
+  return lines.slice(0, 4)
+})
 </script>
 
 <template>
@@ -35,7 +43,11 @@ const goToDetail = () => {
         <span v-if="poem.dynastyName">{{ poem.dynastyName }}：</span>
         <span v-if="poem.poetName">{{ poem.poetName }}</span>
       </p>
-      <p class="poem-content">{{ poem.content }}</p>
+      <div class="poem-verses">
+        <p v-for="(line, index) in formattedContent" :key="index" class="verse-line">
+          {{ line.trim() }}
+        </p>
+      </div>
       <div class="poem-meta">
         <span class="meta-item">
           <el-icon><View /></el-icon>
@@ -51,6 +63,7 @@ const goToDetail = () => {
         </span>
       </div>
     </div>
+    <div class="card-decoration"></div>
   </div>
 </template>
 
@@ -61,11 +74,17 @@ const goToDetail = () => {
   overflow: hidden;
   display: flex;
   gap: $spacing-lg;
+  position: relative;
+  border-left: 3px solid $primary-color;
+
+  &:hover {
+    border-left-color: darken($primary-color, 10%);
+  }
 }
 
 .poem-image {
-  width: 200px;
-  height: 150px;
+  width: 180px;
+  height: 140px;
   flex-shrink: 0;
   border-radius: $border-radius-sm;
   overflow: hidden;
@@ -81,28 +100,31 @@ const goToDetail = () => {
 
 .original-badge {
   position: absolute;
-  top: $spacing-sm;
-  right: $spacing-sm;
+  top: $spacing-xs;
+  right: $spacing-xs;
   background: linear-gradient(135deg, #67C23A, #85ce61);
   color: white;
-  padding: $spacing-xs $spacing-sm;
+  padding: 2px 6px;
   border-radius: $border-radius-sm;
-  font-size: $font-size-xs;
+  font-size: 10px;
   display: flex;
   align-items: center;
-  gap: $spacing-xs;
+  gap: 2px;
   font-weight: bold;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  z-index: 2;
 }
 
 .poem-card:hover .poem-image img {
-  transform: scale(1.1);
+  transform: scale(1.08);
 }
 
 .poem-info {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  padding-right: $spacing-xl;
 }
 
 .poem-title-row {
@@ -116,6 +138,7 @@ const goToDetail = () => {
 .poem-title {
   font-size: $font-size-xl;
   color: $text-color;
+  font-family: $font-family-title;
   flex: 1;
   min-width: 0;
   @include text-ellipsis;
@@ -146,18 +169,30 @@ const goToDetail = () => {
   margin-bottom: $spacing-sm;
 }
 
-.poem-content {
+.poem-verses {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  min-height: 60px;
+}
+
+.verse-line {
   font-size: $font-size-base;
   color: $text-color-secondary;
-  line-height: $line-height-loose;
-  @include text-clamp(2);
-  flex: 1;
+  line-height: 1.6;
+  margin: 0;
+  font-family: $font-family-base;
+  white-space: normal;
+  word-break: break-all;
 }
 
 .poem-meta {
   display: flex;
   gap: $spacing-md;
   margin-top: $spacing-sm;
+  padding-top: $spacing-sm;
+  border-top: 1px dashed $border-color-light;
 }
 
 .meta-item {
@@ -171,5 +206,15 @@ const goToDetail = () => {
 .rating-meta {
   color: $warning-color;
   font-weight: 600;
+}
+
+.card-decoration {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, transparent 50%, rgba($primary-color, 0.05) 50%);
+  pointer-events: none;
 }
 </style>

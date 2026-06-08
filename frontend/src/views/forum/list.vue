@@ -157,8 +157,9 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .forum-list-page {
-  padding: $spacing-xl 0;
+  padding: $spacing-xl 0 $spacing-xxl;
   width: 100%;
+  min-height: 80vh;
 }
 
 .page-nav {
@@ -169,6 +170,7 @@ onMounted(() => {
 
   .el-button {
     color: $text-color-secondary;
+    transition: color $transition-fast;
 
     &:hover {
       color: $primary-color;
@@ -181,79 +183,167 @@ onMounted(() => {
   }
 }
 
+.page-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: $spacing-xl;
+  padding-bottom: $spacing-lg;
+  border-bottom: 1px solid $border-color-light;
+}
+
 .header-left {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: $spacing-xs;
+}
+
+.page-title {
+  font-size: $font-size-hero;
+  color: $primary-color;
+  font-family: $font-family-title;
+  letter-spacing: 2px;
+  position: relative;
+  text-align: center;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 3px;
+    background: linear-gradient(90deg, $primary-color, $accent-color);
+    border-radius: 2px;
+  }
+}
+
+.page-subtitle {
+  font-size: $font-size-base;
+  color: $text-color-light;
+  font-family: $font-family-base;
+  margin: 0;
+  margin-top: $spacing-sm;
 }
 
 .header-right {
   display: flex;
   gap: $spacing-sm;
-}
+  margin-top: $spacing-md;
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: $spacing-xl;
-}
+  .el-button {
+    border-radius: $border-radius-md;
+    padding: 10px 20px;
+    font-weight: 500;
+    transition: all $transition-fast;
 
-.page-title {
-  font-size: $font-size-title;
-  color: $primary-color;
-  font-family: $font-family-title;
-}
-
-.page-subtitle {
-  font-size: $font-size-sm;
-  color: $text-color-light;
-  font-family: $font-family-base;
-  margin: 0;
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: $box-shadow;
+    }
+  }
 }
 
 .search-section {
   margin-bottom: $spacing-xl;
 
+  :deep(.el-input) {
+    border-radius: $border-radius-lg;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+    transition: box-shadow $transition-fast;
+
+    &:focus-within {
+      box-shadow: 0 2px 16px rgba(139, 69, 19, 0.12);
+    }
+  }
+
+  :deep(.el-input__wrapper) {
+    padding: 8px 16px;
+    border-radius: $border-radius-lg;
+  }
+
   :deep(.el-input__inner) {
-    font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    font-family: $font-family-input;
     letter-spacing: 0.5px;
-    line-height: 1.5;
+    line-height: 1.6;
+    font-size: $font-size-base;
+  }
+
+  :deep(.el-input-group__append) {
+    background-color: $primary-color;
+    border-color: $primary-color;
+    border-radius: 0 $border-radius-lg $border-radius-lg 0;
+    padding: 0 20px;
+
+    .el-button {
+      color: #fff;
+      
+      &:hover {
+        color: #fff;
+        opacity: 0.9;
+      }
+    }
   }
 }
 
 .post-list {
   display: flex;
   flex-direction: column;
-  gap: $spacing-lg;
+  gap: $spacing-md;
   min-height: 400px;
-  border-radius: 0;
 }
 
 .post-card {
   @include card;
   cursor: pointer;
-  border-radius: $border-radius-md;
+  border-radius: $border-radius-lg;
+  padding: $spacing-lg $spacing-xl;
+  border: 1px solid transparent;
+  transition: all $transition-base;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: $box-shadow-lg;
+    border-color: $border-color-light;
+
+    .post-title {
+      color: $primary-color;
+    }
+  }
 }
 
 .post-header {
   display: flex;
   gap: $spacing-md;
   margin-bottom: $spacing-md;
+
+  .el-avatar {
+    flex-shrink: 0;
+    border: 2px solid $background-color;
+    box-shadow: $box-shadow;
+  }
 }
 
 .post-meta {
   flex: 1;
+  min-width: 0;
 }
 
 .post-title {
   font-size: $font-size-xl;
   color: $text-color;
   margin-bottom: $spacing-xs;
+  font-weight: 600;
+  transition: color $transition-fast;
+  @include text-ellipsis;
 }
 
 .post-info {
   display: flex;
+  align-items: center;
   gap: $spacing-md;
 }
 
@@ -265,38 +355,105 @@ onMounted(() => {
 
 .post-time {
   font-size: $font-size-sm;
-  color: $text-color-secondary;
+  color: $text-color-light;
+
+  &::before {
+    content: '·';
+    margin-right: $spacing-sm;
+    color: $border-color;
+  }
 }
 
 .post-content {
   margin-bottom: $spacing-md;
+  padding: 0 $spacing-xs;
   
   p {
     font-size: $font-size-base;
     color: $text-color-secondary;
     line-height: $line-height-loose;
-    @include text-clamp(3);
+    @include text-clamp(2);
   }
 }
 
 .post-footer {
   display: flex;
-  gap: $spacing-lg;
+  gap: $spacing-xl;
   padding-top: $spacing-md;
-  border-top: 1px solid $border-color;
+  border-top: 1px solid $border-color-light;
 }
 
 .meta-item {
   display: flex;
   align-items: center;
-  gap: $spacing-xs;
+  gap: 6px;
   font-size: $font-size-sm;
-  color: $text-color-secondary;
+  color: $text-color-light;
+  transition: color $transition-fast;
+
+  .el-icon {
+    font-size: 16px;
+  }
+
+  &:hover {
+    color: $primary-color;
+  }
 }
 
 .pagination-section {
-  margin-top: $spacing-xl;
+  margin-top: $spacing-xxl;
   display: flex;
   justify-content: center;
+
+  :deep(.el-pagination) {
+    --el-pagination-hover-color: #{$primary-color};
+  }
+}
+
+@include responsive(md) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: $spacing-md;
+  }
+
+  .header-right {
+    width: 100%;
+
+    .el-button {
+      flex: 1;
+    }
+  }
+
+  .post-card {
+    padding: $spacing-md;
+  }
+
+  .post-footer {
+    gap: $spacing-md;
+    flex-wrap: wrap;
+  }
+}
+
+@include responsive(sm) {
+  .forum-list-page {
+    padding: $spacing-md 0;
+  }
+
+  .page-title {
+    font-size: $font-size-title;
+  }
+
+  .page-subtitle {
+    font-size: $font-size-sm;
+  }
+
+  .post-header {
+    gap: $spacing-sm;
+  }
+
+  .post-title {
+    font-size: $font-size-lg;
+  }
 }
 </style>

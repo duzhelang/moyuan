@@ -121,114 +121,136 @@ watch(() => props.visible, (val) => {
 </template>
 
 <style scoped lang="scss">
+@use '@/assets/styles/variables' as *;
+@use '@/assets/styles/mixins' as *;
+
 .poetry-dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
   z-index: 2000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  @include flex-center;
 }
 
 .poetry-dialog {
   width: 680px;
   max-width: 92vw;
   max-height: 82vh;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  background: $background-color-light;
+  border-radius: $border-radius-lg;
+  box-shadow: $box-shadow-xl;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .dialog-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px 16px;
-  border-bottom: 1px solid #e8e8e8;
+  @include flex-between;
+  padding: $spacing-lg $spacing-lg $spacing-md;
+  border-bottom: 1px solid $border-color-light;
 }
 
 .dialog-title-area {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: $spacing-md;
 }
 
 .dialog-title {
-  font-size: 20px;
-  font-family: 'KaiTi', 'STKaiti', serif;
-  color: #8B4513;
+  font-size: $font-size-xxl;
+  font-family: $font-family-title;
+  color: $primary-color;
   margin: 0;
 }
 
 .dialog-author {
-  font-size: 14px;
-  color: #999;
+  font-size: $font-size-base;
+  color: $text-color-light;
 }
 
 .dialog-close {
   cursor: pointer;
   font-size: 20px;
-  color: #999;
-  padding: 4px;
-  border-radius: 4px;
-  transition: all 0.2s;
+  color: $text-color-light;
+  padding: $spacing-xs;
+  border-radius: $border-radius-sm;
+  transition: all $transition-fast;
 
   &:hover {
-    color: #F56C6C;
-    background: rgba(245, 108, 108, 0.08);
+    color: $danger-color;
+    background: rgba($danger-color, 0.06);
   }
 }
 
 .dialog-body {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 24px;
+  padding: $spacing-lg;
+  @include scrollbar;
 }
 
 .poem-original {
-  background: linear-gradient(135deg, rgba(139, 69, 19, 0.04), rgba(210, 105, 30, 0.03));
-  border-radius: 8px;
-  padding: 16px 20px;
-  margin-bottom: 20px;
-  border-left: 3px solid #8B4513;
+  background: linear-gradient(135deg, rgba($primary-color, 0.03), rgba($secondary-color, 0.02));
+  border-radius: $border-radius-md;
+  padding: $spacing-lg $spacing-lg;
+  margin-bottom: $spacing-lg;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: $spacing-md;
+    right: $spacing-md;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba($primary-color, 0.2), transparent);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: $spacing-md;
+    right: $spacing-md;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba($primary-color, 0.2), transparent);
+  }
 }
 
 .original-text {
-  font-size: 15px;
-  color: #333;
+  font-size: $font-size-lg;
+  color: $text-color;
   line-height: 2;
   margin: 0;
-  font-family: 'KaiTi', 'STKaiti', serif;
+  font-family: $font-family-title;
+  text-align: center;
 }
 
 .detail-tabs {
   display: flex;
-  gap: 4px;
-  border-bottom: 1px solid #e8e8e8;
-  margin-bottom: 16px;
+  gap: $spacing-xs;
+  border-bottom: 1px solid $border-color-light;
+  margin-bottom: $spacing-lg;
   overflow-x: auto;
 }
 
 .tab-item {
-  padding: 8px 14px;
-  font-size: 13px;
-  color: #666;
+  padding: $spacing-sm $spacing-md;
+  font-size: $font-size-sm;
+  color: $text-color-secondary;
   cursor: pointer;
   border-bottom: 2px solid transparent;
   white-space: nowrap;
-  transition: all 0.2s;
+  transition: all $transition-fast;
 
   &:hover {
-    color: #8B4513;
+    color: $primary-color;
   }
 
   &.active {
-    color: #8B4513;
-    border-bottom-color: #8B4513;
+    color: $primary-color;
+    border-bottom-color: $primary-color;
     font-weight: 600;
   }
 }
@@ -242,8 +264,8 @@ watch(() => props.visible, (val) => {
 }
 
 .content-text {
-  font-size: 14px;
-  color: #333;
+  font-size: $font-size-base;
+  color: $text-color;
   line-height: 1.9;
   text-indent: 2em;
   margin: 0;

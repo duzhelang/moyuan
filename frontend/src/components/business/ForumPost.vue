@@ -53,26 +53,51 @@ const goToDetail = () => {
 .forum-post {
   @include card;
   cursor: pointer;
+  border-radius: $border-radius-lg;
+  padding: $spacing-lg $spacing-xl;
+  border: 1px solid transparent;
+  transition: all $transition-base;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: $box-shadow-lg;
+    border-color: $border-color-light;
+
+    .post-title {
+      color: $primary-color;
+    }
+  }
 }
 
 .post-header {
   display: flex;
   gap: $spacing-md;
   margin-bottom: $spacing-md;
+
+  .el-avatar {
+    flex-shrink: 0;
+    border: 2px solid $background-color;
+    box-shadow: $box-shadow;
+  }
 }
 
 .post-meta {
   flex: 1;
+  min-width: 0;
 }
 
 .post-title {
   font-size: $font-size-xl;
   color: $text-color;
   margin-bottom: $spacing-xs;
+  font-weight: 600;
+  transition: color $transition-fast;
+  @include text-ellipsis;
 }
 
 .post-info {
   display: flex;
+  align-items: center;
   gap: $spacing-md;
 }
 
@@ -84,32 +109,69 @@ const goToDetail = () => {
 
 .post-time {
   font-size: $font-size-sm;
-  color: $text-color-secondary;
+  color: $text-color-light;
+
+  &::before {
+    content: '·';
+    margin-right: $spacing-sm;
+    color: $border-color;
+  }
 }
 
 .post-content {
   margin-bottom: $spacing-md;
+  padding: 0 $spacing-xs;
   
   p {
     font-size: $font-size-base;
     color: $text-color-secondary;
     line-height: $line-height-loose;
-    @include text-clamp(3);
+    @include text-clamp(2);
   }
 }
 
 .post-footer {
   display: flex;
-  gap: $spacing-lg;
+  gap: $spacing-xl;
   padding-top: $spacing-md;
-  border-top: 1px solid $border-color;
+  border-top: 1px solid $border-color-light;
 }
 
 .meta-item {
   display: flex;
   align-items: center;
-  gap: $spacing-xs;
+  gap: 6px;
   font-size: $font-size-sm;
-  color: $text-color-secondary;
+  color: $text-color-light;
+  transition: color $transition-fast;
+
+  .el-icon {
+    font-size: 16px;
+  }
+
+  &:hover {
+    color: $primary-color;
+  }
+}
+
+@include responsive(md) {
+  .forum-post {
+    padding: $spacing-md;
+  }
+
+  .post-footer {
+    gap: $spacing-md;
+    flex-wrap: wrap;
+  }
+}
+
+@include responsive(sm) {
+  .post-header {
+    gap: $spacing-sm;
+  }
+
+  .post-title {
+    font-size: $font-size-lg;
+  }
 }
 </style>

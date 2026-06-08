@@ -30,6 +30,7 @@ const showHeader = computed(() => !route.meta?.hideHeader)
   width: 100%;
   max-width: 1512px;
   margin: 0 auto;
-  padding: 0;
+  padding: 0px 0 20px;
+  min-height: calc(100vh - 55px);
 }
 </style>

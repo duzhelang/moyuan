@@ -16,6 +16,15 @@ export function setupRouterGuards(router: Router) {
       return
     }
 
+    if (to.meta.requiresAuth && userStore.isLoggedIn && !userStore.userInfo) {
+      try {
+        await userStore.fetchUserInfo()
+      } catch {
+        next({ name: 'Login', query: { redirect: to.fullPath } })
+        return
+      }
+    }
+
     if (to.meta.requiresAdmin) {
       if (!userStore.isLoggedIn) {
         next({ name: 'Login', query: { redirect: to.fullPath } })

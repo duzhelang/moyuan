@@ -221,8 +221,8 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .forum-detail-page {
-  padding: $spacing-xl 0;
-  min-height: 60vh;
+  padding: $spacing-xl 0 $spacing-xxl;
+  min-height: 80vh;
 }
 
 .post-header {
@@ -230,35 +230,53 @@ onMounted(() => {
 }
 
 .back-button {
-  margin-bottom: $spacing-md;
+  margin-bottom: $spacing-sm;
+  color: $text-color-secondary;
+  transition: all $transition-fast;
+
+  &:hover {
+    color: $primary-color;
+    transform: translateX(-2px);
+  }
 }
 
 .post-card {
   margin-bottom: $spacing-xl;
-  border-radius: $border-radius-md;
+  border-radius: $border-radius-lg;
+  box-shadow: $box-shadow;
+  overflow: hidden;
 }
 
 .post-title-section {
   margin-bottom: $spacing-xl;
   padding-bottom: $spacing-xl;
-  border-bottom: 1px solid $border-color;
+  border-bottom: 1px solid $border-color-light;
 }
 
 .post-title {
   font-size: $font-size-hero;
   color: $text-color;
   margin-bottom: $spacing-lg;
+  letter-spacing: 1px;
+  line-height: 1.4;
 }
 
 .post-meta {
   display: flex;
   align-items: center;
   gap: $spacing-md;
+
+  .el-avatar {
+    flex-shrink: 0;
+    border: 2px solid $background-color;
+    box-shadow: $box-shadow;
+  }
 }
 
 .meta-info {
   display: flex;
   flex-direction: column;
+  gap: 2px;
 }
 
 .meta-author {
@@ -269,35 +287,53 @@ onMounted(() => {
 
 .meta-time {
   font-size: $font-size-sm;
-  color: $text-color-secondary;
+  color: $text-color-light;
 }
 
 .post-content-section {
   margin-bottom: $spacing-xl;
+  padding: 0 $spacing-xs;
   
   p {
     font-size: $font-size-lg;
-    line-height: $line-height-loose;
+    line-height: 2;
     color: $text-color;
     white-space: pre-line;
+    letter-spacing: 0.5px;
   }
 }
 
 .post-actions {
   display: flex;
   align-items: center;
-  gap: $spacing-md;
+  gap: $spacing-lg;
   padding-top: $spacing-xl;
-  border-top: 1px solid $border-color;
+  border-top: 1px solid $border-color-light;
+
+  .el-button {
+    border-radius: $border-radius-md;
+    padding: 10px 24px;
+    font-weight: 500;
+    transition: all $transition-fast;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: $box-shadow;
+    }
+  }
 }
 
 .view-count,
 .comment-count {
   display: flex;
   align-items: center;
-  gap: $spacing-xs;
+  gap: 6px;
   font-size: $font-size-sm;
-  color: $text-color-secondary;
+  color: $text-color-light;
+
+  .el-icon {
+    font-size: 16px;
+  }
 }
 
 .comment-count {
@@ -315,26 +351,37 @@ onMounted(() => {
   padding-bottom: $spacing-sm;
   border-bottom: 2px solid $primary-color;
   display: inline-block;
+  font-weight: 600;
+  letter-spacing: 1px;
 }
 
 .comment-form {
   margin-bottom: $spacing-xl;
+  background: $background-color-light;
+  padding: $spacing-lg;
+  border-radius: $border-radius-lg;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 
   :deep(.el-textarea__inner) {
-    font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    font-family: $font-family-input;
     letter-spacing: 0.5px;
     line-height: 1.6;
+    border-radius: $border-radius-md;
+    padding: $spacing-md;
   }
 }
 
 .submit-button {
   margin-top: $spacing-md;
+  border-radius: $border-radius-md;
+  padding: 10px 28px;
+  font-weight: 500;
 }
 
 .comment-list {
   display: flex;
   flex-direction: column;
-  gap: $spacing-lg;
+  gap: $spacing-md;
 }
 
 .empty-comments {
@@ -344,6 +391,12 @@ onMounted(() => {
 .comment-item {
   @include card;
   padding: $spacing-lg;
+  border-radius: $border-radius-lg;
+  transition: all $transition-fast;
+
+  &:hover {
+    box-shadow: $box-shadow-md;
+  }
 }
 
 .comment-header {
@@ -351,11 +404,16 @@ onMounted(() => {
   align-items: center;
   gap: $spacing-md;
   margin-bottom: $spacing-md;
+
+  .el-avatar {
+    flex-shrink: 0;
+  }
 }
 
 .comment-meta {
   display: flex;
   flex-direction: column;
+  gap: 2px;
 }
 
 .comment-author {
@@ -366,11 +424,12 @@ onMounted(() => {
 
 .comment-time {
   font-size: $font-size-sm;
-  color: $text-color-secondary;
+  color: $text-color-light;
 }
 
 .comment-content {
   margin-bottom: $spacing-md;
+  padding: 0 $spacing-xs;
   
   p {
     font-size: $font-size-base;
@@ -382,11 +441,70 @@ onMounted(() => {
 .comment-actions {
   display: flex;
   gap: $spacing-sm;
+
+  .el-button {
+    color: $text-color-light;
+    transition: color $transition-fast;
+
+    &:hover {
+      color: $primary-color;
+    }
+  }
 }
 
 .comment-pagination {
   margin-top: $spacing-xl;
   display: flex;
   justify-content: center;
+
+  :deep(.el-pagination) {
+    --el-pagination-hover-color: #{$primary-color};
+  }
+}
+
+@include responsive(md) {
+  .post-title {
+    font-size: $font-size-title;
+  }
+
+  .post-content-section p {
+    font-size: $font-size-base;
+  }
+
+  .post-actions {
+    flex-wrap: wrap;
+    gap: $spacing-md;
+  }
+
+  .comment-form {
+    padding: $spacing-md;
+  }
+}
+
+@include responsive(sm) {
+  .forum-detail-page {
+    padding: $spacing-md 0;
+  }
+
+  .post-title {
+    font-size: $font-size-xxl;
+  }
+
+  .post-meta {
+    gap: $spacing-sm;
+  }
+
+  .meta-author {
+    font-size: $font-size-base;
+  }
+
+  .post-actions {
+    gap: $spacing-sm;
+
+    .el-button {
+      padding: 8px 16px;
+      font-size: $font-size-sm;
+    }
+  }
 }
 </style>

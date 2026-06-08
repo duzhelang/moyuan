@@ -926,7 +926,7 @@ onUnmounted(() => {
 }
 
 .sidebar-title {
-  font-size: 14px;
+  font-size: 48px;
   color: #8b4513;
   white-space: nowrap;
 }

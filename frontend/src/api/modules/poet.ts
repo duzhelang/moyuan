@@ -8,3 +8,7 @@ export function getPoetList(params?: { pageNum?: number; pageSize?: number; dyna
 export function getPoetById(id: number) {
   return request.get<Poet>(`/poets/${id}`)
 }
+
+export function submitPoetSuggestion(data: { poetId: number; section: string; content: string }) {
+  return request.post('/poet-suggestions', data)
+}

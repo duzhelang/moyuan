@@ -51,7 +51,7 @@ const openExternalLink = (url: string) => {
               <li @click="navigateTo('/poem')">诗词库</li>
               <li @click="navigateTo('/poet')">诗人风采</li>
               <li @click="navigateTo('/forum')">诗词论坛</li>
-              <li @click="navigateTo('/search')">诗词搜索</li>
+              <li @click="navigateTo('/poem')">诗词搜索</li>
             </ul>
           </div>
 
@@ -104,23 +104,39 @@ const openExternalLink = (url: string) => {
   color: #f0e4d7;
   font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
   padding: 0;
-  margin-top: 60px;
+  margin-top: 30px;
+  overflow: hidden;
+  position: relative;
+  z-index: 10;
+  border: none;
+  border-radius: 0;
+  float: none;
+  clear: both;
+
+  :deep(div) {
+    width: auto;
+    height: auto;
+    float: none;
+  }
 }
 
 .dibu-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 40px 40px 25px;
+  padding: 25px 40px 20px;
 }
 
 .dibu-top {
   display: flex;
   gap: 60px;
   margin-bottom: 30px;
+  justify-content: center;
+  align-items: flex-start;
 }
 
 .dibu-brand {
-  flex: 0 0 280px;
+  flex: 0 0 auto;
+  max-width: 280px;
 }
 
 .dibu-logo {
@@ -130,16 +146,18 @@ const openExternalLink = (url: string) => {
   margin-bottom: 20px;
 
   img {
-    width: 50px;
-    height: 50px;
+    width: 40px;
+    height: 40px;
     border-radius: 8px;
+    flex-shrink: 0;
   }
 
   .dibu-title {
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 600;
     color: #f8f0e6;
     letter-spacing: 2px;
+    white-space: nowrap;
   }
 }
 
@@ -156,8 +174,8 @@ const openExternalLink = (url: string) => {
 }
 
 .social-icon {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.15);
   display: flex;
@@ -165,6 +183,7 @@ const openExternalLink = (url: string) => {
   justify-content: center;
   cursor: pointer;
   transition: all 0.3s ease;
+  flex-shrink: 0;
 
   &:hover {
     background: rgba(212, 175, 135, 0.4);
@@ -173,6 +192,8 @@ const openExternalLink = (url: string) => {
 
   svg {
     color: #f0e4d7;
+    width: 18px;
+    height: 18px;
   }
 }
 
@@ -188,9 +209,9 @@ const openExternalLink = (url: string) => {
     font-size: 16px;
     font-weight: 600;
     color: #f8f0e6;
-    margin-bottom: 20px;
+    margin: 0 0 20px;
+    padding: 5px 0 10px;
     position: relative;
-    padding-bottom: 10px;
 
     &::after {
       content: '';

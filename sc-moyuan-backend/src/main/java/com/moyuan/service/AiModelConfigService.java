@@ -116,6 +116,16 @@ public class AiModelConfigService {
         return aiModuleConfigMapper.selectList(null);
     }
 
+    public AiModuleConfig getModuleConfigByCode(String moduleCode) {
+        AiModuleConfig config = aiModuleConfigMapper.selectOne(
+                new LambdaQueryWrapper<AiModuleConfig>().eq(AiModuleConfig::getModuleCode, moduleCode)
+        );
+        if (config == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "模块配置不存在");
+        }
+        return config;
+    }
+
     @Transactional
     public AiModuleConfig updateModuleConfig(AiModuleConfig config) {
         AiModuleConfig existing = aiModuleConfigMapper.selectOne(
@@ -124,7 +134,14 @@ public class AiModelConfigService {
         if (existing == null) {
             throw new BusinessException(ResultCode.NOT_FOUND, "模块配置不存在");
         }
-        existing.setModelId(config.getModelId());
+        if (config.getModelId() != null) existing.setModelId(config.getModelId());
+        if (config.getModuleName() != null) existing.setModuleName(config.getModuleName());
+        if (config.getDescription() != null) existing.setDescription(config.getDescription());
+        if (config.getPromptTemplate() != null) existing.setPromptTemplate(config.getPromptTemplate());
+        if (config.getMaxLength() != null) existing.setMaxLength(config.getMaxLength());
+        if (config.getResponseStyle() != null) existing.setResponseStyle(config.getResponseStyle());
+        if (config.getFirstResponseLength() != null) existing.setFirstResponseLength(config.getFirstResponseLength());
+        if (config.getEnableMarkdown() != null) existing.setEnableMarkdown(config.getEnableMarkdown());
         existing.setUpdateTime(null);
         aiModuleConfigMapper.updateById(existing);
         return existing;

@@ -1,6 +1,8 @@
 package com.moyuan.controller;
 
 import com.moyuan.common.R;
+import com.moyuan.entity.AiModuleConfig;
+import com.moyuan.service.AiModelConfigService;
 import com.moyuan.service.AiService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,6 +19,7 @@ import java.util.Map;
 public class AiController {
 
     private final AiService aiService;
+    private final AiModelConfigService aiModelConfigService;
 
     @Operation(summary = "AI问答")
     @PostMapping("/chat")
@@ -77,5 +80,12 @@ public class AiController {
                 "result", result,
                 "model", model
         ));
+    }
+
+    @Operation(summary = "获取模块AI配置")
+    @GetMapping("/config/{moduleCode}")
+    public R<AiModuleConfig> getModuleConfig(@PathVariable String moduleCode) {
+        AiModuleConfig config = aiModelConfigService.getModuleConfigByCode(moduleCode);
+        return R.success(config);
     }
 }

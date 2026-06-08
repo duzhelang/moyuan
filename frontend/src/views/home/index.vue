@@ -88,6 +88,7 @@ const showLoginDropdown = ref(false)
 const loginDropdownTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const searchQuery = ref('')
 const searchType = ref<'internal' | 'external'>('internal')
+const searchInputRef = ref<HTMLInputElement | null>(null)
 const quickLoginForm = ref({
   username: '',
   password: ''
@@ -444,6 +445,14 @@ const scrollToTop = () => {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+const scrollToSearch = () => {
+  const el = document.querySelector('.search-wrapper') as HTMLElement
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setTimeout(() => { searchInputRef.value?.focus() }, 500)
+  }
+}
+
 const formatDate = (dateStr: string) => {
   const date = new Date(dateStr)
   const now = new Date()
@@ -631,7 +640,10 @@ const handleSearch = () => {
     return
   }
   if (searchType.value === 'internal') {
-    router.push({ path: '/search', query: { keyword: q } })
+    poemSearchKeyword.value = q
+    handlePoemSearch()
+    const el = document.querySelector('.poem_selection_left') as HTMLElement
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   } else {
     window.open(`https://www.baidu.com/s?wd=${encodeURIComponent(q + ' 诗词')}`, '_blank')
   }
@@ -726,7 +738,7 @@ onUnmounted(() => {
         <div class="shijian" title="现在时间">{{ currentTime }}</div>
         <QrCodeLink text="了解我们" qrImage="/img/微信二维.jpg" alt="扫一扫查看" />
         <QrCodeLink text="联系我们" qrImage="/img/微信二维.jpg" alt="扫一扫联系" />
-        <template v-if="userStore.isLoggedIn">
+        <template v-if="userStore.isLoggedIn && userStore.userInfo">
           <el-dropdown trigger="click" @command="handleUserCommand">
             <div class="top-user-info">
               <el-avatar :src="userStore.avatar" :size="28">
@@ -772,9 +784,9 @@ onUnmounted(() => {
     <div class="lbye">
       <div class="sy_top_daohang_biao">
         <div class="toptub1"><a href="#luntan" title="交流论坛"><img src="/img/top_tubiao4.png" alt="交流论坛"></a></div>
-        <div class="toptub2" title="菜单"><a href="#sy_fljs"><img src="/img/top_tubiao2.png" alt="菜单"></a></div>
-        <div class="toptub3" title="搜索"><a href="javascript:void(0)"><img src="/img/top_tubiao1.png" alt="搜索"></a></div>
-        <div class="toptub4" title="去登录"><a href="/user/login"><img src="/img/top_tubiao3.png" alt="去登录"></a></div>
+        <div class="toptub2" title="诗词库"><a href="/poem" @click.prevent="router.push('/poem')"><img src="/img/top_tubiao2.png" alt="诗词库"></a></div>
+        <div class="toptub3" title="搜索" @click="scrollToSearch"><a href="javascript:void(0)"><img src="/img/top_tubiao1.png" alt="搜索"></a></div>
+        <div class="toptub4" :title="(userStore.isLoggedIn && userStore.userInfo) ? '个人中心' : '去登录'" @click="(userStore.isLoggedIn && userStore.userInfo) ? router.push('/user/profile') : router.push('/user/login')"><a href="javascript:void(0)"><img src="/img/top_tubiao3.png" :alt="(userStore.isLoggedIn && userStore.userInfo) ? '个人中心' : '去登录'"></a></div>
       </div>
       <div id="lb_jt_z" class="lb_jiantou_left" @click="prevSlide">
         <img :src="asset('/img/jianzu (3).png')" alt="">
@@ -835,7 +847,7 @@ onUnmounted(() => {
           <span>诗汇论坛</span>
         </li>
         <li
-          v-if="userStore.isLoggedIn"
+          v-if="userStore.isLoggedIn && userStore.userInfo"
           class="nav-publish-btn"
           @click="router.push('/poem/create')"
         >
@@ -848,7 +860,7 @@ onUnmounted(() => {
           @mouseleave="handleLoginDropdownLeave"
         >
           <el-icon><User /></el-icon>
-          <span>{{ userStore.isLoggedIn ? '我的' : '登录' }}</span>
+          <span>{{ (userStore.isLoggedIn && userStore.userInfo) ? '我的' : '登录' }}</span>
           <div class="dl_icon_wrapper">
             <img class="dl_icon dl_icon_default" src="/img/dl_tb1.png" alt="">
             <img class="dl_icon dl_icon_hover" src="/img/dl_tb2.png" alt="">
@@ -860,7 +872,7 @@ onUnmounted(() => {
             @mouseenter="handleLoginDropdownEnter"
             @mouseleave="handleLoginDropdownLeave"
           >
-            <template v-if="userStore.isLoggedIn">
+            <template v-if="userStore.isLoggedIn && userStore.userInfo">
               <div class="user-menu-container">
                 <div class="user-menu-header">
                   <el-avatar :src="userStore.avatar" :size="40">
@@ -920,6 +932,7 @@ onUnmounted(() => {
         <div class="search-wrapper">
           <form class="search-form" @submit.prevent="handleSearch">
             <input
+              ref="searchInputRef"
               type="text"
               :placeholder="searchType === 'internal' ? '搜索诗词、诗人、文章...' : '搜索全网诗词相关内容...'"
               v-model="searchQuery"
@@ -1707,6 +1720,8 @@ html {
   position: absolute;
   z-index: 31;
   display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 20px;
   cursor: pointer;
   top: 0;

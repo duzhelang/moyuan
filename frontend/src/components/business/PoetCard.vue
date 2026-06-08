@@ -50,16 +50,23 @@ const truncatedBiography = computed(() => {
   return bio.length > 120 ? bio.slice(0, 120) + '...' : bio
 })
 
+const isPlaceholder = computed(() => {
+  return props.poet.id < 0 || props.poet.name === '敬请期待'
+})
+
 const handleClick = () => {
+  if (isPlaceholder.value) return
   if (props.poet.poetId) {
     router.push(`/poet/${props.poet.poetId}`)
+  } else {
+    router.push({ path: '/poem', query: { keyword: props.poet.name } })
   }
 }
 </script>
 
 <template>
   <div
-    class="poet-flip-card"
+    :class="['poet-flip-card', { 'poet-flip-placeholder': isPlaceholder }]"
     @mouseenter="isFlipped = true"
     @mouseleave="isFlipped = false"
     @click="handleClick"
@@ -99,6 +106,16 @@ const handleClick = () => {
   margin: 0 12px;
   flex-shrink: 0;
   animation: poetCardEnter 0.6s cubic-bezier(0.23, 1, 0.32, 1) both;
+  transition: transform 0.3s ease;
+}
+
+.poet-flip-card:active:not(.poet-flip-placeholder) {
+  transform: scale(0.97);
+}
+
+.poet-flip-placeholder {
+  cursor: default;
+  opacity: 0.6;
 }
 
 .poet-flip-card:nth-child(2) { animation-delay: 0.08s; }

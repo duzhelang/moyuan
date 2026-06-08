@@ -6,6 +6,7 @@ import com.moyuan.entity.Poem;
 
 public interface PoemService extends IService<Poem> {
     IPage<Poem> getPoemList(int pageNum, int pageSize, Long dynastyId, Long poetId, Long categoryId, String keyword);
+    IPage<Poem> getModernPoems(int pageNum, int pageSize, Boolean isOriginal, Boolean hasCertifiedPoet, String sortBy);
     Poem getPoemDetail(Long id);
     void toggleLike(Long userId, Long poemId);
     boolean isLike(Long userId, Long poemId);

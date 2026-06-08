@@ -138,7 +138,7 @@ const handleUserCommand = (command: string) => {
         </div>
         <div class="divider"></div>
         <div class="user-actions">
-          <template v-if="userStore.isLoggedIn">
+          <template v-if="userStore.isLoggedIn && userStore.userInfo">
             <el-dropdown trigger="click" teleported @command="handleUserCommand">
               <div class="user-info">
                 <el-avatar 
@@ -207,7 +207,7 @@ const handleUserCommand = (command: string) => {
       :show-close="true"
     >
       <div class="mobile-menu-content">
-        <div class="mobile-user-section" v-if="userStore.isLoggedIn">
+        <div class="mobile-user-section" v-if="userStore.isLoggedIn && userStore.userInfo">
           <el-avatar :src="userStore.avatar" :size="48">
             {{ userStore.username?.charAt(0)?.toUpperCase() }}
           </el-avatar>
@@ -217,14 +217,14 @@ const handleUserCommand = (command: string) => {
           </div>
         </div>
         
-        <el-divider v-if="userStore.isLoggedIn" />
+        <el-divider v-if="userStore.isLoggedIn && userStore.userInfo" />
         
         <div class="mobile-menu-list">
           <div class="mobile-menu-item" @click="goToProfile">
             <el-icon><User /></el-icon>
             <span>个人中心</span>
           </div>
-          <div class="mobile-menu-item" @click="goToCreatePoem" v-if="userStore.isLoggedIn">
+          <div class="mobile-menu-item" @click="goToCreatePoem" v-if="userStore.isLoggedIn && userStore.userInfo">
             <el-icon><Edit /></el-icon>
             <span>发布新诗</span>
           </div>
@@ -237,7 +237,7 @@ const handleUserCommand = (command: string) => {
         <el-divider />
         
         <div class="mobile-menu-actions">
-          <template v-if="userStore.isLoggedIn">
+          <template v-if="userStore.isLoggedIn && userStore.userInfo">
             <el-button type="danger" @click="handleLogout" class="mobile-logout-btn">
               退出登录
             </el-button>
@@ -254,7 +254,9 @@ const handleUserCommand = (command: string) => {
 
 <style scoped lang="scss">
 .header {
-  position: relative;
+  position: fixed;
+  top: 0;
+  left: 0;
   z-index: 100;
   width: 100%;
   height: 55px;
@@ -413,7 +415,7 @@ const handleUserCommand = (command: string) => {
   font-size: 15px;
   font-family: cursive;
   background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(1.2px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 25px;

@@ -69,6 +69,23 @@ public class PoemController {
         return R.success(poemService.list(wrapper));
     }
 
+    @Operation(summary = "分页获取现代诗词")
+    @GetMapping("/modern/page")
+    public R<Map<String, Object>> getModernPoems(
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(required = false) Boolean isOriginal,
+            @RequestParam(required = false) Boolean hasCertifiedPoet,
+            @RequestParam(required = false, defaultValue = "latest") String sortBy) {
+        IPage<Poem> page = poemService.getModernPoems(pageNum, pageSize, isOriginal, hasCertifiedPoet, sortBy);
+        Map<String, Object> result = new HashMap<>();
+        result.put("list", page.getRecords());
+        result.put("total", page.getTotal());
+        result.put("pageNum", page.getCurrent());
+        result.put("pageSize", page.getSize());
+        return R.success(result);
+    }
+
     @Operation(summary = "创建诗词（用户发布）")
     @PostMapping
     public R<Poem> createPoem(@RequestBody Poem poem) {

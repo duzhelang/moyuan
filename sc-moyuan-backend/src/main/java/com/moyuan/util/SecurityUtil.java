@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class SecurityUtil {
 
-    public User getCurrentUser() {
+    public static User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new BusinessException(ResultCode.UNAUTHORIZED);
@@ -23,11 +23,11 @@ public class SecurityUtil {
         throw new BusinessException(ResultCode.UNAUTHORIZED);
     }
 
-    public Long getCurrentUserId() {
+    public static Long getCurrentUserId() {
         return getCurrentUser().getId();
     }
 
-    public String getCurrentUsername() {
+    public static String getCurrentUsername() {
         return getCurrentUser().getUsername();
     }
 }

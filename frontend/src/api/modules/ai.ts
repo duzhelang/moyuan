@@ -64,3 +64,21 @@ export interface CoupletResponse {
 export function matchCouplet(data: CoupletRequest) {
   return request.post<CoupletResponse>('/ai/couplet', data)
 }
+
+export interface AiModuleConfig {
+  id: number
+  moduleCode: string
+  moduleName: string
+  modelId: number | null
+  requireVision: number
+  description: string
+  promptTemplate: string
+  maxLength: number
+  responseStyle: string
+  firstResponseLength: number
+  enableMarkdown: number
+}
+
+export function getAiModuleConfig(moduleCode: string) {
+  return request.get<AiModuleConfig>(`/ai/config/${moduleCode}`)
+}

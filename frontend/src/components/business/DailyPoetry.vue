@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { getDailyPoetry } from '@/api/modules/external-poetry'
 import type { JinrishiciResponse } from '@/api/modules/external-poetry'
 
+const router = useRouter()
 const dailyPoetry = ref<JinrishiciResponse['data'] | null>(null)
 const loading = ref(true)
 const error = ref(false)
@@ -17,6 +19,18 @@ const fetchDailyPoetry = async () => {
     error.value = true
   } finally {
     loading.value = false
+  }
+}
+
+const goToPoemSearch = () => {
+  if (dailyPoetry.value?.origin?.title) {
+    router.push({ path: '/poem', query: { keyword: dailyPoetry.value.origin.title } })
+  }
+}
+
+const goToAuthorSearch = () => {
+  if (dailyPoetry.value?.origin?.author) {
+    router.push({ path: '/poem', query: { keyword: dailyPoetry.value.origin.author } })
   }
 }
 
@@ -44,8 +58,8 @@ onMounted(() => {
         <p class="poetry-line">{{ dailyPoetry.content }}</p>
       </div>
       <div class="poetry-info">
-        <span class="poetry-title">{{ dailyPoetry.origin.title }}</span>
-        <span class="poetry-author">〔{{ dailyPoetry.origin.dynasty }}〕{{ dailyPoetry.origin.author }}</span>
+        <span class="poetry-title" @click.stop="goToPoemSearch" title="点击查看相关诗词">{{ dailyPoetry.origin.title }}</span>
+        <span class="poetry-author" @click.stop="goToAuthorSearch" title="点击查看该诗人作品">〔{{ dailyPoetry.origin.dynasty }}〕{{ dailyPoetry.origin.author }}</span>
       </div>
       <div v-if="dailyPoetry.origin.translate && dailyPoetry.origin.translate.length > 0" class="poetry-translate">
         <p class="translate-label">译文：</p>
@@ -174,6 +188,13 @@ onMounted(() => {
   color: #8B4513;
   font-weight: 600;
   margin-bottom: 4px;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.poetry-title:hover {
+  color: #A0522D;
+  text-decoration: underline;
 }
 
 .poetry-author {
@@ -181,6 +202,13 @@ onMounted(() => {
   font-size: 14px;
   color: #666;
   font-style: italic;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.poetry-author:hover {
+  color: #8B4513;
+  text-decoration: underline;
 }
 
 .poetry-translate {

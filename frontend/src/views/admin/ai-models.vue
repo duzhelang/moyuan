@@ -27,6 +27,34 @@ const dialogVisible = ref(false)
 const editingModel = ref<AiModelConfig | null>(null)
 const submitting = ref(false)
 const formRef = ref<FormInstance>()
+const moduleConfigDialogVisible = ref(false)
+const moduleConfigSaving = ref(false)
+const moduleConfigFormRef = ref<FormInstance>()
+const moduleConfigForm = ref<AiModuleConfig>({
+  moduleCode: '',
+  moduleName: '',
+  modelId: null,
+  requireVision: 0,
+  description: '',
+  promptTemplate: '',
+  maxLength: 200,
+  responseStyle: 'concise',
+  firstResponseLength: 100,
+  enableMarkdown: 0
+})
+const moduleConfigRules: FormRules = {
+  maxLength: [
+    { required: true, message: '请输入最大回答长度', trigger: 'blur' },
+    { type: 'number', min: 50, max: 1000, message: '范围50-1000字', trigger: 'blur' }
+  ],
+  firstResponseLength: [
+    { required: true, message: '请输入首次回答长度', trigger: 'blur' },
+    { type: 'number', min: 30, max: 500, message: '范围30-500字', trigger: 'blur' }
+  ],
+  responseStyle: [
+    { required: true, message: '请选择回答风格', trigger: 'change' }
+  ]
+}
 
 const defaultForm: AiModelConfig = {
   name: '',
@@ -221,6 +249,29 @@ async function handleModuleModelChange(moduleCode: string, modelId: number | nul
   }
 }
 
+function openModuleConfigDialog(row: AiModuleConfig) {
+  moduleConfigForm.value = { ...row }
+  moduleConfigDialogVisible.value = true
+}
+
+async function handleSaveModuleConfig() {
+  if (!moduleConfigFormRef.value) return
+  const valid = await moduleConfigFormRef.value.validate().catch(() => false)
+  if (!valid) return
+
+  moduleConfigSaving.value = true
+  try {
+    await updateModuleConfig(moduleConfigForm.value.moduleCode, moduleConfigForm.value)
+    ElMessage.success('配置已保存')
+    moduleConfigDialogVisible.value = false
+    await loadModuleConfigs()
+  } catch (e: any) {
+    ElMessage.error(e.message || '保存失败')
+  } finally {
+    moduleConfigSaving.value = false
+  }
+}
+
 onMounted(() => {
   loadModels()
   loadProviders()
@@ -283,31 +334,29 @@ onMounted(() => {
           <template #header>
             <div class="card-header">
               <span>AI功能模块模型配置</span>
-              <el-tooltip content="为每个AI功能模块指定使用的模型，识图类功能只能选择支持视觉的模型" placement="top">
+              <el-tooltip content="为每个AI功能模块指定使用的模型和提示词约束" placement="top">
                 <el-tag type="info">配置说明</el-tag>
               </el-tooltip>
             </div>
           </template>
 
           <el-table :data="moduleConfigs" stripe style="width: 100%">
-            <el-table-column prop="moduleName" label="模块名称" width="150" />
-            <el-table-column prop="moduleCode" label="模块编码" width="120" />
-            <el-table-column prop="description" label="模块描述" min-width="200" />
-            <el-table-column label="需要视觉" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.requireVision === 1 ? 'warning' : 'info'" size="small">
-                  {{ row.requireVision === 1 ? '是' : '否' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="当前模型" width="150">
+            <el-table-column prop="moduleName" label="模块名称" width="120" />
+            <el-table-column prop="moduleCode" label="模块编码" width="100" />
+            <el-table-column prop="description" label="角色设定" min-width="180" show-overflow-tooltip />
+            <el-table-column label="当前模型" width="120">
               <template #default="{ row }">
                 <el-tag :type="row.modelId ? 'success' : 'danger'" size="small">
                   {{ getModelName(row.modelId) }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="配置模型" width="250">
+            <el-table-column label="回答长度" width="100">
+              <template #default="{ row }">
+                <span>{{ row.maxLength || 200 }}字</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="配置模型" width="200">
               <template #default="{ row }">
                 <el-select
                   :model-value="row.modelId"
@@ -319,19 +368,71 @@ onMounted(() => {
                   <el-option
                     v-for="model in getAvailableModels(row.requireVision)"
                     :key="model.id"
-                    :label="`${model.displayName} (${model.modelId})`"
+                    :label="model.displayName"
                     :value="model.id!"
                   />
                 </el-select>
-                <div v-if="row.requireVision === 1" class="vision-tip">
-                  仅显示支持视觉的模型
-                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="100" fixed="right">
+              <template #default="{ row }">
+                <el-button size="small" type="primary" @click="openModuleConfigDialog(row)">配置</el-button>
               </template>
             </el-table-column>
           </el-table>
         </el-card>
       </el-tab-pane>
     </el-tabs>
+
+    <el-dialog v-model="moduleConfigDialogVisible" title="模块AI配置" width="700px">
+      <el-form :model="moduleConfigForm" :rules="moduleConfigRules" ref="moduleConfigFormRef" label-width="120px">
+        <el-form-item label="模块名称">
+          <el-input v-model="moduleConfigForm.moduleName" disabled />
+        </el-form-item>
+        <el-form-item label="模块编码">
+          <el-input v-model="moduleConfigForm.moduleCode" disabled />
+        </el-form-item>
+        <el-form-item label="角色设定">
+          <el-input v-model="moduleConfigForm.description" type="textarea" :rows="2" placeholder="AI角色描述" />
+        </el-form-item>
+        <el-form-item label="提示词模板">
+          <el-input v-model="moduleConfigForm.promptTemplate" type="textarea" :rows="4" placeholder="支持变量：{poetName}诗人名称, {maxLength}最大长度, {styleHint}风格提示" />
+          <div class="form-tip">可用变量：{poetName} - 诗人名称, {maxLength} - 最大回答长度, {styleHint} - 风格提示</div>
+        </el-form-item>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="最大回答长度" prop="maxLength">
+              <el-input-number v-model="moduleConfigForm.maxLength" :min="50" :max="1000" :step="50" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="首次回答长度" prop="firstResponseLength">
+              <el-input-number v-model="moduleConfigForm.firstResponseLength" :min="30" :max="500" :step="10" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="回答风格" prop="responseStyle">
+              <el-select v-model="moduleConfigForm.responseStyle" style="width: 100%">
+                <el-option label="简洁" value="concise" />
+                <el-option label="均衡" value="balanced" />
+                <el-option label="详细" value="detailed" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="允许Markdown">
+              <el-switch v-model="moduleConfigForm.enableMarkdown" :active-value="1" :inactive-value="0" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <template #footer>
+        <el-button @click="moduleConfigDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="moduleConfigSaving" @click="handleSaveModuleConfig">保存</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="dialogVisible" :title="editingModel ? '编辑模型' : '新增模型'" width="650px">
       <el-form :model="form" label-width="90px" :rules="rules" ref="formRef">
@@ -413,6 +514,13 @@ onMounted(() => {
   font-size: 12px;
   color: #e6a23c;
   margin-top: 4px;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+  line-height: 1.5;
 }
 
 :deep(.el-dialog) {

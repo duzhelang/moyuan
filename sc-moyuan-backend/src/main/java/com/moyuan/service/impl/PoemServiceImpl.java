@@ -54,6 +54,29 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
     }
 
     @Override
+    public IPage<Poem> getModernPoems(int pageNum, int pageSize, Boolean isOriginal, Boolean hasCertifiedPoet, String sortBy) {
+        LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Poem::getStatus, 1);
+        wrapper.eq(Poem::getDynastyId, 13);
+        if (isOriginal != null) {
+            wrapper.eq(Poem::getIsOriginal, isOriginal ? 1 : 0);
+        }
+        if (hasCertifiedPoet != null && hasCertifiedPoet) {
+            wrapper.isNotNull(Poem::getPoetId);
+        }
+        if ("popular".equals(sortBy)) {
+            wrapper.orderByDesc(Poem::getViewCount);
+        } else if ("likes".equals(sortBy)) {
+            wrapper.orderByDesc(Poem::getLikeCount);
+        } else {
+            wrapper.orderByDesc(Poem::getCreateTime);
+        }
+        IPage<Poem> page = poemMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
+        populatePoetAndDynasty(page.getRecords());
+        return page;
+    }
+
+    @Override
     public Poem getPoemDetail(Long id) {
         Poem poem = poemMapper.selectById(id);
         if (poem == null || poem.getStatus() != 1) {

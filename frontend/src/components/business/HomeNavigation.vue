@@ -230,6 +230,14 @@ const handleMouseLeave = () => {
 }
 
 const handleClick = (item: NavigationItem) => {
+  if (!item.linkId && item.linkId !== 0) {
+    if (item.linkType === 'poem' || item.linkType === 'category' || item.linkType === 'dynasty') {
+      router.push('/poem')
+    } else if (item.linkType === 'poet') {
+      router.push('/poet')
+    }
+    return
+  }
   if (item.linkType === 'poem') {
     router.push(`/poem/${item.linkId}`)
   } else if (item.linkType === 'poet') {
@@ -238,6 +246,16 @@ const handleClick = (item: NavigationItem) => {
     router.push({ path: '/poem', query: { categoryId: String(item.linkId) } })
   } else if (item.linkType === 'dynasty') {
     router.push({ path: '/poem', query: { dynastyId: String(item.linkId) } })
+  } else {
+    router.push('/poem')
+  }
+}
+
+const handleTitleClick = () => {
+  if (props.type === 'works' || props.type === 'genres') {
+    router.push('/poem')
+  } else if (props.type === 'dynasties') {
+    router.push('/poem')
   }
 }
 
@@ -264,7 +282,7 @@ onUnmounted(() => {
 
 <template>
   <div class="h6" @mouseenter="handleMouseEnter" @mouseleave="handleMouseLeave">
-    <h1 class="nav-title">{{ title }}</h1>
+    <h1 class="nav-title nav-title-clickable" @click="handleTitleClick" :title="`查看全部${title}`">{{ title }}</h1>
     <div class="scrollableDiv">
       <button class="arrow-btn arrow-left" @click.stop="handleArrowClick('left')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -294,10 +312,10 @@ onUnmounted(() => {
 .h6 {
   position: relative;
   height: auto !important;
-  width: 100% !important;
-  margin: 15px auto 0 !important;
+  width: 95% !important;
+  margin: 12px auto 10px !important;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
 }
 
 .nav-title {
@@ -305,7 +323,7 @@ onUnmounted(() => {
   font-size: 50px;
   font-weight: 600;
   color: #333;
-  margin: 8px 0 0 10px;
+  margin: 0 20px 0 0 !important;
   display: block !important;
   width: auto !important;
   text-align: left !important;
@@ -315,11 +333,32 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
+.nav-title-clickable {
+  cursor: pointer;
+  transition: color 0.3s ease, transform 0.2s ease;
+  user-select: none;
+}
+
+.nav-title-clickable:hover {
+  color: #8B4513;
+  transform: scale(1.05);
+}
+
+.nav-title-clickable:active {
+  transform: scale(0.98);
+}
+
 .scrollableDiv {
   position: relative;
   overflow: hidden;
   flex: 1;
   min-width: 0;
+  display: block !important;
+  flex-direction: unset !important;
+  align-items: unset !important;
+  justify-content: unset !important;
+  border-radius: 0 !important;
+  flex-wrap: nowrap !important;
 }
 
 .arrow-btn {
@@ -383,9 +422,10 @@ onUnmounted(() => {
 
 .nav-grid {
   display: grid !important;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 5px;
-  padding: 0 35px;
+  grid-template-columns: repeat(4, 295px);
+  gap: 12px;
+  justify-content: center !important;
+  padding: 0 5px;
   flex-direction: row !important;
   flex-wrap: nowrap !important;
   align-items: center !important;

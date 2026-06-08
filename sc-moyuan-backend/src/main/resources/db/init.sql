@@ -327,7 +327,9 @@ INSERT IGNORE INTO `category` (`id`, `name`, `parent_id`, `description`, `sort_o
 (3, '外国诗歌', 0, '世界各国优秀诗歌作品，涵盖欧美、东方、拉美等地区', 3),
 (4, '主题专题诗词', 0, '按场景、主题分类的诗词，适合专题阅读与赏析', 4),
 (5, '当代青年原创诗歌', 0, '青年创作的现代诗与旧体诗，包含校园诗歌、网络诗歌等', 5),
-(6, '特殊体裁与韵文', 0, '戏曲唱词、辞赋、趣味诗词、童谣民谣等特殊文学形式', 6);
+(6, '特殊体裁与韵文', 0, '戏曲唱词、辞赋、趣味诗词、童谣民谣等特殊文学形式', 6),
+(73, '朝代', 0, '按历史朝代分类，涵盖先秦至清代各朝代的诗词作品', 7),
+(74, '流派', 0, '按诗词流派分类，涵盖婉约、豪放、山水田园等经典流派', 8);
 
 -- 二级分类：中国古典诗词（parent_id = 1）- 按体裁
 INSERT IGNORE INTO `category` (`id`, `name`, `parent_id`, `description`, `sort_order`) VALUES
@@ -408,6 +410,28 @@ INSERT IGNORE INTO `category` (`id`, `name`, `parent_id`, `description`, `sort_o
 (54, '趣味诗词', 6, '回文诗、藏头诗、宝塔诗、神智体等趣味形式', 3),
 (55, '童谣/儿歌', 6, '儿童传唱的歌谣，语言简练，节奏明快', 4),
 (56, '民谣/民歌', 6, '民间传唱的歌谣，反映民间生活与情感', 5);
+
+-- 二级分类：朝代（parent_id = 73）
+INSERT IGNORE INTO `category` (`id`, `name`, `parent_id`, `description`, `sort_order`) VALUES
+(57, '先秦', 73, '《诗经》《楚辞》及诸子散文中的诗歌，中国诗歌的源头', 1),
+(58, '秦汉', 73, '汉乐府民歌与文人诗，如《孔雀东南飞》《古诗十九首》', 2),
+(59, '魏晋南北朝', 73, '建安风骨、田园山水诗兴起，代表诗人曹操、陶渊明、谢灵运', 3),
+(60, '唐代', 73, '中国古典诗歌的巅峰，代表诗人李白、杜甫、王维、白居易等', 4),
+(61, '宋代', 73, '词的黄金时代，代表词人苏轼、李清照、辛弃疾、柳永等', 5),
+(62, '元代', 73, '散曲与剧曲兴盛，代表曲家马致远、关汉卿、张养浩等', 6),
+(63, '明代', 73, '诗文复古与戏曲繁荣，代表诗人高启、杨慎、于谦等', 7),
+(64, '清代', 73, '诗词集大成，代表诗人纳兰性德、龚自珍、黄景仁等', 8);
+
+-- 二级分类：流派（parent_id = 74）
+INSERT IGNORE INTO `category` (`id`, `name`, `parent_id`, `description`, `sort_order`) VALUES
+(65, '婉约派', 74, '词风婉转含蓄、情感细腻，代表词人柳永、李清照、晏殊、秦观', 1),
+(66, '豪放派', 74, '词风豪迈奔放、意境开阔，代表词人苏轼、辛弃疾、岳飞', 2),
+(67, '山水田园诗派', 74, '以自然山水和田园生活为题材，代表诗人王维、孟浩然、陶渊明', 3),
+(68, '边塞诗派', 74, '以边疆军旅生活为题材，代表诗人高适、岑参、王昌龄、王之涣', 4),
+(69, '新乐府运动', 74, '主张"文章合为时而著，歌诗合为事而作"，代表诗人白居易、元稹', 5),
+(70, '江西诗派', 74, '宋代影响最大的诗歌流派，主张"无一字无来处"，代表诗人黄庭坚、陈师道', 6),
+(71, '花间词派', 74, '晚唐五代词派，词风绮丽柔靡，代表词人温庭筠、韦庄', 7),
+(72, '桐城派', 74, '清代散文流派，主张"义法"，代表人物方苞、姚鼐、刘大櫆', 8);
 
 -- ============================================================
 -- 初始数据：诗人
@@ -547,7 +571,12 @@ CREATE TABLE IF NOT EXISTS `ai_module_config` (
   `module_name` VARCHAR(100) NOT NULL COMMENT '模块名称',
   `model_id` BIGINT DEFAULT NULL COMMENT '关联的AI模型ID',
   `require_vision` TINYINT NOT NULL DEFAULT 0 COMMENT '是否需要视觉能力：0-否，1-是',
-  `description` VARCHAR(255) DEFAULT NULL COMMENT '模块描述',
+  `description` VARCHAR(255) DEFAULT NULL COMMENT '模块描述/角色设定',
+  `prompt_template` TEXT DEFAULT NULL COMMENT '提示词模板，支持{poetName}等变量',
+  `max_response_length` INT NOT NULL DEFAULT 200 COMMENT '最大回答长度(字数)',
+  `response_style` VARCHAR(50) DEFAULT 'concise' COMMENT '回答风格：concise-简洁，detailed-详细，balanced-均衡',
+  `first_response_length` INT NOT NULL DEFAULT 100 COMMENT '首次回答最大长度(字数)',
+  `enable_markdown` TINYINT NOT NULL DEFAULT 0 COMMENT '是否允许Markdown格式：0-否，1-是',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
@@ -556,11 +585,12 @@ CREATE TABLE IF NOT EXISTS `ai_module_config` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI模块模型配置表';
 
 -- 初始数据：AI模块配置
-INSERT IGNORE INTO `ai_module_config` (`module_code`, `module_name`, `require_vision`, `description`) VALUES
-('chat', 'AI诗词问答', 0, '资深诗词文化顾问，精通先秦至近现代诗词典籍，擅长诗词鉴赏、创作指导、诗人生平解读、格律讲解及诗词推荐，以博学儒雅的学者风范为用户答疑解惑'),
-('write_poem', '看图写诗', 1, '古典诗词创作大师，擅长捕捉画面意境并转化为诗词意象，精通五言七言律诗绝句及各词牌创作，作品讲究格律严谨、意象优美、情景交融，兼具古典韵味与艺术感染力'),
-('analyze', '诗词鉴赏分析', 0, '诗词学术研究专家，从意境营造、修辞手法、情感表达、历史背景、艺术特色等多维度深入解读诗词，分析鞭辟入里、引经据典，兼顾学术严谨与通俗易懂'),
-('couplet', 'AI对对联', 0, '对联艺术大师，深谙平仄声律、词性对仗、意境相承之道，能根据上联创作工整合律的下联，对仗精巧、意境深远，既遵循传统对联规范又富有文采');
+INSERT IGNORE INTO `ai_module_config` (`module_code`, `module_name`, `require_vision`, `description`, `prompt_template`, `max_response_length`, `response_style`, `first_response_length`, `enable_markdown`) VALUES
+('chat', 'AI诗词问答', 0, '资深诗词文化顾问，精通先秦至近现代诗词典籍，擅长诗词鉴赏、创作指导、诗人生平解读、格律讲解及诗词推荐', '你是一个古典诗词文化助手。回答要求：1.语言简洁精炼，避免冗余；2.使用通俗易懂的中文；3.重点突出，条理清晰；4.不要使用markdown格式，直接输出纯文本；5.根据问题复杂度适当展开，但不超过{maxLength}字', 200, 'concise', 100, 0),
+('poet_chat', '诗人对话', 0, '诗人介绍助手，专门回答关于诗人的问题', '你是一个古典诗词文化助手，正在为用户介绍诗人{poetName}。回答要求：1.语言简洁精炼，避免冗余；2.使用通俗易懂的中文；3.重点突出，条理清晰；4.不要使用markdown格式，直接输出纯文本；{styleHint}', 150, 'concise', 80, 0),
+('write_poem', '看图写诗', 1, '古典诗词创作大师，擅长捕捉画面意境并转化为诗词意象，精通五言七言律诗绝句及各词牌创作', '你是一位古典诗词创作大师，擅长捕捉画面意境并转化为诗词意象。请根据图片内容创作一首诗词，讲究格律严谨、意象优美、情景交融。', 300, 'balanced', 300, 1),
+('analyze', '诗词鉴赏分析', 0, '诗词学术研究专家，从意境营造、修辞手法、情感表达、历史背景、艺术特色等多维度深入解读诗词', '你是诗词学术研究专家，请从意境营造、修辞手法、情感表达、历史背景、艺术特色等多维度深入解读诗词，分析鞭辟入里、引经据典，兼顾学术严谨与通俗易懂。', 500, 'detailed', 500, 1),
+('couplet', 'AI对对联', 0, '对联艺术大师，深谙平仄声律、词性对仗、意境相承之道', '你是对联艺术大师，深谙平仄声律、词性对仗、意境相承之道。请根据上联创作工整合律的下联，对仗精巧、意境深远。', 100, 'concise', 100, 0);
 
 -- ============================================================
 -- 初始数据：测试用户
