@@ -12,14 +12,14 @@ import { getVisionArticleList } from '@/api/modules/visionArticle'
 import { searchPoemsWithRecommend, getRecommendedPoems } from '@/api/modules/external-poetry'
 import type { PoemSearchResult } from '@/api/modules/external-poetry'
 import { ElMessage } from 'element-plus'
-import { HomeFilled, Document, UserFilled, Reading, ChatDotRound, Notebook, EditPen } from '@element-plus/icons-vue'
 import type { ForumPost, VisionArticle, Comment } from '@/types/model'
 import { useUserStore } from '@/stores/user'
-import { getItem } from '@/utils/storage'
 import PoetCard from '@/components/business/PoetCard.vue'
 import HomeNavigation from '@/components/business/HomeNavigation.vue'
 import DailyPoetry from '@/components/business/DailyPoetry.vue'
 import QrCodeLink from '@/components/common/QrCodeLink.vue'
+import PoetryDetailDialog from '@/components/business/PoetryDetailDialog.vue'
+import HomeNavBar from '@/components/business/HomeNavBar.vue'
 
 const NAV_ANIMATION_KEY = 'home_nav_animation_config'
 
@@ -84,30 +84,7 @@ const loadAnimationConfig = () => {
   } catch {}
 }
 
-const showLoginDropdown = ref(false)
-const loginDropdownTimer = ref<ReturnType<typeof setTimeout> | null>(null)
-const searchQuery = ref('')
-const searchType = ref<'internal' | 'external'>('internal')
-const searchInputRef = ref<HTMLInputElement | null>(null)
-const quickLoginForm = ref({
-  username: '',
-  password: ''
-})
-
-const handleLoginDropdownEnter = () => {
-  if (loginDropdownTimer.value) {
-    clearTimeout(loginDropdownTimer.value)
-    loginDropdownTimer.value = null
-  }
-  showLoginDropdown.value = true
-}
-
-const handleLoginDropdownLeave = () => {
-  loginDropdownTimer.value = setTimeout(() => {
-    showLoginDropdown.value = false
-    loginDropdownTimer.value = null
-  }, 3000)
-}
+const navBarRef = ref<InstanceType<typeof HomeNavBar> | null>(null)
 
 const aiModel = ref('zhipu')
 const visionModel = ref('glm-4.6v-flash')
@@ -320,6 +297,21 @@ const clearPoemSearch = () => {
   poemSearchMode.value = 'default'
 }
 
+// 诗词鉴赏弹窗
+const poetryDialogVisible = ref(false)
+const poetryDialogTitle = ref('')
+const poetryDialogAuthor = ref('')
+
+const openPoemDetail = (poem: PoemSearchResult) => {
+  if (poem.source === 'local' && poem.id) {
+    router.push(`/poem/${poem.id}`)
+  } else {
+    poetryDialogTitle.value = poem.title
+    poetryDialogAuthor.value = poem.author || ''
+    poetryDialogVisible.value = true
+  }
+}
+
 const contemporaryPoems: PoemCard[] = [
   { date: '2019年6月24日', content: '愿如花已落千行，未闻花语浅别殇。幽僻心境漫过少，唯有诗语解锁缰。金甲未脱抬眼望，怒剑难收向疆场。笑祝功成人与事，再鼓一旬又何妨。', author: '常平逼王', image: '/img/lt_jx (4).jpg' },
   { date: '2019年6月24日', content: '愿如花已落千行，未闻花语浅别殇。幽僻心境漫过少，唯有诗语解锁缰。金甲未脱抬眼望，怒剑难收向疆场。笑祝功成人与事，再鼓一旬又何妨。', author: '常平逼王', image: '/img/lt_jx (1).jpg' },
@@ -449,7 +441,7 @@ const scrollToSearch = () => {
   const el = document.querySelector('.search-wrapper') as HTMLElement
   if (el) {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    setTimeout(() => { searchInputRef.value?.focus() }, 500)
+    setTimeout(() => { navBarRef.value?.searchInputRef?.focus() }, 500)
   }
 }
 
@@ -603,9 +595,9 @@ const handleAnalyzePoem = async () => {
 
 
 
-const handleLogout = async () => {
+const handleLogout = () => {
   try {
-    await userStore.logout()
+    userStore.logout()
     ElMessage.success('已退出登录')
     router.push('/')
   } catch {
@@ -633,19 +625,18 @@ const handleUserCommand = (command: string) => {
   }
 }
 
-const handleSearch = () => {
-  const q = searchQuery.value.trim()
-  if (!q) {
+const onNavSearch = (payload: { query: string; type: 'internal' | 'external' }) => {
+  if (!payload.query) {
     ElMessage.warning('请输入搜索内容')
     return
   }
-  if (searchType.value === 'internal') {
-    poemSearchKeyword.value = q
+  if (payload.type === 'internal') {
+    poemSearchKeyword.value = payload.query
     handlePoemSearch()
     const el = document.querySelector('.poem_selection_left') as HTMLElement
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   } else {
-    window.open(`https://www.baidu.com/s?wd=${encodeURIComponent(q + ' 诗词')}`, '_blank')
+    window.open(`https://www.baidu.com/s?wd=${encodeURIComponent(payload.query + ' 诗词')}`, '_blank')
   }
 }
 
@@ -671,12 +662,6 @@ onMounted(async () => {
   updateShiwen()
 
   window.addEventListener('scroll', handleScroll)
-
-  const savedAccount = getItem<{ username: string; password: string }>('remembered_account')
-  if (savedAccount) {
-    quickLoginForm.value.username = savedAccount.username
-    quickLoginForm.value.password = savedAccount.password
-  }
 
   fetchRandomPoets()
   poetRefreshTimer.value = setInterval(fetchRandomPoets, 20000)
@@ -713,10 +698,6 @@ onUnmounted(() => {
   if (ltTimer.value) clearInterval(ltTimer.value)
   if (shiwenTimer.value) clearInterval(shiwenTimer.value)
   if (poetRefreshTimer.value) clearInterval(poetRefreshTimer.value)
-  if (loginDropdownTimer.value) {
-    clearTimeout(loginDropdownTimer.value)
-    loginDropdownTimer.value = null
-  }
   if (clockTimer.value) {
     clearInterval(clockTimer.value)
     clockTimer.value = null
@@ -809,156 +790,7 @@ onUnmounted(() => {
 
     <hr class="hr">
     <hr>
-    <div :class="['daohang', { fixed: isNavFixed }]">
-      <ul>
-        <li @click="router.push('/')">
-          <el-icon><HomeFilled /></el-icon>
-          <span>首页</span>
-        </li>
-        <li @click="router.push('/poem')">
-          <el-icon><Document /></el-icon>
-          <span>诗词库</span>
-          <ul>
-            <li @click.stop="router.push('/poem')">全部诗词</li>
-            <li @click.stop="router.push('/poem')">古体诗词</li>
-            <li @click.stop="router.push('/poem')">现代诗歌</li>
-            <li @click.stop="router.push('/poem')">外国诗歌</li>
-          </ul>
-        </li>
-        <li @click="router.push('/poet')">
-          <el-icon><UserFilled /></el-icon>
-          <span>诗人馆</span>
-          <ul>
-            <li @click.stop="router.push('/poet')">诗人风采</li>
-            <li @click.stop="router.push('/poet')">朝代浏览</li>
-            <li @click.stop="router.push('/poet')">流派探索</li>
-          </ul>
-        </li>
-        <li @click="router.push('/vision')">
-          <el-icon><Reading /></el-icon>
-          <span>诗话视野</span>
-        </li>
-        <li @click="router.push('/communicate')">
-          <el-icon><ChatDotRound /></el-icon>
-          <span>交流广场</span>
-        </li>
-        <li @click="router.push('/forum')">
-          <el-icon><Notebook /></el-icon>
-          <span>诗汇论坛</span>
-        </li>
-        <li
-          v-if="userStore.isLoggedIn && userStore.userInfo"
-          class="nav-publish-btn"
-          @click="router.push('/poem/create')"
-        >
-          <el-icon><EditPen /></el-icon>
-          <span>发布</span>
-        </li>
-        <li
-          id="xdl_kaiguan"
-          @mouseenter="handleLoginDropdownEnter"
-          @mouseleave="handleLoginDropdownLeave"
-        >
-          <el-icon><User /></el-icon>
-          <span>{{ (userStore.isLoggedIn && userStore.userInfo) ? '我的' : '登录' }}</span>
-          <div class="dl_icon_wrapper">
-            <img class="dl_icon dl_icon_default" src="/img/dl_tb1.png" alt="">
-            <img class="dl_icon dl_icon_hover" src="/img/dl_tb2.png" alt="">
-          </div>
-          <div
-            id="sy_xdlchuang"
-            class="sy_xdlchuang"
-            v-show="showLoginDropdown"
-            @mouseenter="handleLoginDropdownEnter"
-            @mouseleave="handleLoginDropdownLeave"
-          >
-            <template v-if="userStore.isLoggedIn && userStore.userInfo">
-              <div class="user-menu-container">
-                <div class="user-menu-header">
-                  <el-avatar :src="userStore.avatar" :size="40">
-                    {{ userStore.username?.charAt(0)?.toUpperCase() }}
-                  </el-avatar>
-                  <span class="user-menu-name">{{ userStore.userInfo?.nickname || userStore.username }}</span>
-                </div>
-                <div class="user-menu-items">
-                  <div class="user-menu-item" @click="router.push('/user/profile')">
-                    <el-icon><User /></el-icon>
-                    <span>个人中心</span>
-                  </div>
-                  <div class="user-menu-item" @click="router.push('/user/profile?tab=favorites')">
-                    <el-icon><Star /></el-icon>
-                    <span>我的收藏</span>
-                  </div>
-                  <div class="user-menu-item" @click="router.push('/user/profile?tab=history')">
-                    <el-icon><Clock /></el-icon>
-                    <span>浏览历史</span>
-                  </div>
-                  <div v-if="userStore.userInfo?.role === 'admin'" class="user-menu-item admin-item" @click="router.push('/admin/dashboard')">
-                    <el-icon><Setting /></el-icon>
-                    <span>后台管理</span>
-                  </div>
-                  <div class="user-menu-item logout-item" @click="handleLogout">
-                    <el-icon><SwitchButton /></el-icon>
-                    <span>退出登录</span>
-                  </div>
-                </div>
-              </div>
-            </template>
-            <template v-else>
-              <div class="login-container">
-                <h2 class="login-title">登&nbsp;&nbsp;&nbsp;&nbsp;录</h2>
-                <div class="lieb">
-                  <label for="username" class="dl_ts">用户名:</label>
-                  <input type="text" id="username" v-model="quickLoginForm.username" class="input-field" placeholder="请输入用户名">
-                </div>
-                <div class="lieb">
-                  <label for="password" class="dl_ts">密&nbsp;&nbsp;码:</label>
-                  <input type="password" id="password" v-model="quickLoginForm.password" class="input-field" placeholder="请输入密码" required>
-                </div>
-                <button type="button" class="login-button" @click="router.push('/user/login')">登录</button>
-                <div class="forgot-password">
-                  <a class="fuzhu" href="/user/login">忘记密码?</a>
-                </div>
-                <div class="register-link">
-                  <a class="fuzhu" href="/user/register">还没有账号?注册</a>
-                </div>
-              </div>
-            </template>
-          </div>
-        </li>
-        </ul>
-      </div>
-      <div :class="['search-section', { fixed: isNavFixed }]">
-        <div class="search-wrapper">
-          <form class="search-form" @submit.prevent="handleSearch">
-            <input
-              ref="searchInputRef"
-              type="text"
-              :placeholder="searchType === 'internal' ? '搜索诗词、诗人、文章...' : '搜索全网诗词相关内容...'"
-              v-model="searchQuery"
-              @keydown.enter="handleSearch"
-            >
-          </form>
-          <div class="search-tabs">
-            <button
-              :class="['search-tab', { active: searchType === 'internal' }]"
-              @click="searchType = 'internal'"
-            >
-              站内
-            </button>
-            <button
-              :class="['search-tab', { active: searchType === 'external' }]"
-              @click="searchType = 'external'"
-            >
-              全网
-            </button>
-          </div>
-          <button type="button" class="search-submit-btn" @click="handleSearch">
-            <el-icon><Search /></el-icon>
-            <span>搜索</span>
-          </button>
-        </div>
-      </div>
+    <HomeNavBar ref="navBarRef" :is-nav-fixed="isNavFixed" @search="onNavSearch" />
 
     <div class="shiwen-wrapper">
       <div class="lbye_shiwen">
@@ -1393,6 +1225,7 @@ onUnmounted(() => {
                     v-for="(poem, idx) in poemSearchResults"
                     :key="'search-' + idx"
                     class="poem_card poem_search_card"
+                    @click="openPoemDetail(poem)"
                   >
                     <div class="poem_card_body">
                       <div class="poem_title">{{ poem.title }}</div>
@@ -1422,6 +1255,7 @@ onUnmounted(() => {
                     v-for="(poem, idx) in recommendedPoems"
                     :key="'recommend-' + idx"
                     class="poem_card poem_recommend_card"
+                    @click="openPoemDetail(poem)"
                   >
                     <div class="poem_card_body">
                       <div class="poem_title">{{ poem.title }}</div>
@@ -1546,6 +1380,12 @@ onUnmounted(() => {
       </div>
     </div>
   </div>
+
+  <PoetryDetailDialog
+    v-model:visible="poetryDialogVisible"
+    :title="poetryDialogTitle"
+    :author="poetryDialogAuthor"
+  />
 </template>
 
 <style>
@@ -1818,489 +1658,9 @@ html {
   border-radius: 50px;
 }
 
-.daohang {
-  width: 80%;
-  height: 58px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  position: relative;
-  z-index: 50;
-}
 
-.daohang ul {
-  list-style: none;
-  display: flex;
-  font-weight: 600;
-  background-color: rgba(100, 100, 100, 0.75);
-  font-size: 15px;
-  border-radius: 7px;
-  margin: 0 auto;
-  padding: 0;
-}
 
-.daohang > ul > li {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 160px;
-  height: 38px;
-  line-height: 38px;
-  text-align: center;
-  border: 1px solid gainsboro;
-  border-radius: 5px;
-  color: wheat;
-  position: relative;
-  cursor: pointer;
-  list-style: none;
-  transition: all 0.3s ease;
-  font-size: 15px;
-}
 
-.daohang > ul > li:hover {
-  color: yellow;
-}
-
-.daohang > ul > li > .el-icon {
-  font-size: 18px;
-}
-
-.daohang > ul > li > ul {
-  display: none;
-  position: absolute;
-  top: 38px;
-  left: -1px;
-  z-index: 51;
-  font-size: 14px;
-  background: rgba(80, 80, 80, 0.85);
-  min-width: 160px;
-  border: 1px solid gainsboro;
-  border-radius: 7px;
-  padding: 0;
-  list-style: none;
-}
-
-.daohang > ul > li:hover > ul {
-  display: block;
-}
-
-.daohang > ul > li > ul > li {
-  width: 100%;
-  height: 35px;
-  line-height: 35px;
-  text-align: center;
-  color: wheat;
-  cursor: pointer;
-  border-bottom: 1px solid rgba(200, 200, 200, 0.2);
-  list-style: none;
-}
-
-.daohang > ul > li > ul > li:last-child {
-  border-bottom: none;
-}
-
-.daohang > ul > li > ul > li:hover {
-  color: yellow;
-  background-color: rgba(100, 100, 100, 0.5);
-}
-
-.nav-publish-btn {
-  background: rgba(70, 130, 200, 0.6) !important;
-  color: #fff !important;
-}
-
-.nav-publish-btn:hover {
-  background: rgba(80, 145, 220, 0.8) !important;
-}
-
-.daohang.fixed {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  width: 100%;
-  background: url('/img/dt_0.0.jpg');
-  background-size: cover;
-  background-repeat: no-repeat;
-  background-position: 0px -320px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, .2);
-  z-index: 61;
-}
-
-.search-section {
-  width: 80%;
-  margin: 0 auto;
-  padding: 12px 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  position: relative;
-  z-index: 49;
-}
-
-.search-section.fixed {
-  position: fixed;
-  top: 50px;
-  left: 0;
-  right: 0;
-  width: 100%;
-  z-index: 50;
-  background: rgba(245, 240, 232, 0.95);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  padding: 8px 0;
-}
-
-.search-wrapper {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  width: 65%;
-  max-width: 900px;
-  height: 44px;
-  border-radius: 22px;
-  overflow: hidden;
-  box-shadow: 0 2px 12px rgba(139, 69, 19, 0.12);
-  transition: box-shadow 0.3s ease;
-}
-
-.search-wrapper:hover {
-  box-shadow: 0 4px 18px rgba(139, 69, 19, 0.2);
-}
-
-.search-tabs {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  height: 100%;
-}
-
-.search-tab {
-  padding: 0 14px;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-left: 1px solid rgba(200, 184, 160, 0.5);
-  background: #f0e8d8;
-  color: #8B6914;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.25s ease;
-  white-space: nowrap;
-  letter-spacing: 1px;
-}
-
-.search-tab:first-child {
-  border-left: 1px solid rgba(200, 184, 160, 0.5);
-  border-bottom: 1px solid rgba(200, 184, 160, 0.3);
-}
-
-.search-tab:last-child {
-  border-top: 1px solid rgba(200, 184, 160, 0.3);
-}
-
-.search-tab:hover {
-  background: #e8dcc8;
-  color: #6B4513;
-}
-
-.search-tab.active {
-  background: #8B4513;
-  color: #fff;
-}
-
-.search-form {
-  display: flex;
-  flex: 1;
-  height: 44px;
-  border: none;
-  overflow: hidden;
-}
-
-.search-form input {
-  flex: 1;
-  height: 44px;
-  padding: 0 18px;
-  border: none;
-  background: #faf6f0;
-  font-size: 14px;
-  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-  color: #333;
-  outline: none;
-  transition: background 0.25s ease;
-}
-
-.search-form input:focus {
-  background: #fff;
-}
-
-.search-form input::placeholder {
-  color: #a09585;
-  font-style: normal;
-}
-
-.search-submit-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 0 22px;
-  height: 44px;
-  background: linear-gradient(135deg, #8B4513, #A0522D);
-  border: none;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.25s ease;
-  white-space: nowrap;
-  letter-spacing: 1px;
-}
-
-.search-submit-btn:hover {
-  background: linear-gradient(135deg, #A0522D, #8B4513);
-}
-
-.search-submit-btn:active {
-  transform: scale(0.97);
-}
-
-#xdl_kaiguan {
-  position: relative;
-  cursor: pointer;
-}
-
-.dl_icon_wrapper {
-  position: absolute;
-  top: 40%;
-  right: 5px;
-  transform: translateY(-50%);
-  width: 28px;
-  height: 28px;
-  cursor: pointer;
-}
-
-.dl_icon {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  transition: all 0.3s ease;
-}
-
-.dl_icon_default {
-  opacity: 1;
-  filter: drop-shadow(0 0 0 transparent);
-}
-
-.dl_icon_hover {
-  opacity: 0;
-  filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.8)) brightness(1.3) contrast(1.2);
-}
-
-#xdl_kaiguan:hover .dl_icon_default {
-  opacity: 0;
-  transform: scale(0.9);
-}
-
-#xdl_kaiguan:hover .dl_icon_hover {
-  opacity: 1;
-  transform: scale(1.1);
-}
-
-.sy_xdlchuang {
-  position: absolute;
-  right: 0;
-  top: 38px;
-  z-index: 51;
-  cursor: pointer;
-}
-
-.login-container {
-  background: url('/img/dt_0.0.jpg') no-repeat -155px 0 / cover;
-  width: 366px;
-  height: 220px;
-  background-color: #f4f4f4;
-  border: 1px solid #ccc;
-  border-radius: 50px;
-  border-top-left-radius: 15px;
-  border-bottom-right-radius: 15px;
-  padding: 10px 20px;
-  box-sizing: border-box;
-}
-
-.login-title {
-  text-align: center;
-  font-size: 28px;
-  font-weight: 600;
-  color: #000;
-  margin: 2px 0;
-}
-
-.lieb {
-  display: flex;
-  align-items: center;
-  color: #000;
-  margin: 5px 0;
-}
-
-.dl_ts {
-  font-size: 14px;
-  width: 60px;
-  text-align: right;
-  margin-right: 8px;
-}
-
-.input-field {
-  flex: 1;
-  height: 30px;
-  background-color: #ffffff;
-  color: #000;
-  border-radius: 10px;
-  border: 1px solid #ccc;
-  padding: 0 10px;
-  font-size: 14px;
-  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
-  letter-spacing: 0.5px;
-  line-height: 1.5;
-}
-
-.login-button {
-  width: 100px;
-  height: 32px;
-  background-color: #007BFF;
-  color: white;
-  border: none;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 14px;
-  margin-top: 8px;
-}
-
-.login-button:hover {
-  background-color: #0056b3;
-}
-
-.forgot-password {
-  text-align: center;
-  margin-top: 3px;
-}
-
-.forgot-password a {
-  background-color: rgba(204, 204, 204, 0.7);
-  text-shadow: 0 0 10px white;
-  color: #55aaff;
-  text-decoration: none;
-  font-size: 14px;
-}
-
-.forgot-password a:hover {
-  color: #007BFF;
-}
-
-.register-link {
-  text-align: right;
-  margin-top: 2px;
-}
-
-.register-link a {
-  background-color: rgba(204, 204, 204, 0.7);
-  text-shadow: 0 0 10px white;
-  color: #55aaff;
-  text-decoration: none;
-  font-size: 14px;
-}
-
-.register-link a:hover {
-  color: #007BFF;
-}
-
-.user-menu-container {
-  background: url('/img/dt_0.0.jpg') no-repeat -155px 0 / cover;
-  width: 220px;
-  background-color: #f4f4f4;
-  border: 1px solid #ccc;
-  border-radius: 15px;
-  border-top-left-radius: 15px;
-  border-bottom-right-radius: 15px;
-  padding: 15px;
-  box-sizing: border-box;
-}
-
-.user-menu-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-  margin-bottom: 8px;
-}
-
-.user-menu-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.user-menu-items {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.user-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  color: #333;
-  font-size: 14px;
-}
-
-.user-menu-item:hover {
-  background-color: rgba(0, 123, 255, 0.1);
-  color: #007BFF;
-}
-
-.user-menu-item .el-icon {
-  font-size: 16px;
-}
-
-.admin-item {
-  color: #e6a23c;
-  margin-top: 4px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
-  padding-top: 12px;
-}
-
-.admin-item:hover {
-  background-color: rgba(230, 162, 60, 0.1);
-  color: #e6a23c;
-}
-
-.logout-item {
-  color: #f56c6c;
-  margin-top: 4px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
-  padding-top: 12px;
-}
-
-.logout-item:hover {
-  background-color: rgba(245, 108, 108, 0.1);
-  color: #f56c6c;
-}
 
 
 
@@ -2751,6 +2111,7 @@ html {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   overflow: hidden;
 }
 
@@ -2928,6 +2289,7 @@ html {
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -4094,6 +3456,7 @@ html {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
+  line-clamp: 4;
 }
 
 .luntan_ddjx .poem_date {
@@ -4376,6 +3739,7 @@ html {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
+  line-clamp: 4;
   overflow: hidden;
 }
 
