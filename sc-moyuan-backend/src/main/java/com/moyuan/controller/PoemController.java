@@ -26,7 +26,6 @@ public class PoemController {
 
     private final PoemService poemService;
     private final UserService userService;
-    private final SecurityUtil securityUtil;
 
     @Operation(summary = "获取诗词列表")
     @GetMapping
@@ -89,7 +88,7 @@ public class PoemController {
     @Operation(summary = "创建诗词（用户发布）")
     @PostMapping
     public R<Poem> createPoem(@RequestBody Poem poem) {
-        Long userId = securityUtil.getCurrentUserId();
+        SecurityUtil.getCurrentUserId();
         poem.setViewCount(0);
         poem.setLikeCount(0);
         poem.setFavoriteCount(0);
@@ -108,7 +107,7 @@ public class PoemController {
     @Operation(summary = "点赞/取消点赞")
     @PostMapping("/{id}/like")
     public R<Void> toggleLike(@PathVariable Long id) {
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         poemService.toggleLike(userId, id);
         return R.success();
     }
@@ -116,7 +115,7 @@ public class PoemController {
     @Operation(summary = "检查是否点赞")
     @GetMapping("/{id}/like")
     public R<Map<String, Boolean>> isLike(@PathVariable Long id) {
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         Map<String, Boolean> result = new HashMap<>();
         result.put("liked", poemService.isLike(userId, id));
         return R.success(result);
@@ -125,7 +124,7 @@ public class PoemController {
     @Operation(summary = "收藏/取消收藏")
     @PostMapping("/{id}/favorite")
     public R<Void> toggleFavorite(@PathVariable Long id) {
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         userService.toggleFavorite(userId, id);
         return R.success();
     }
@@ -133,7 +132,7 @@ public class PoemController {
     @Operation(summary = "检查是否收藏")
     @GetMapping("/{id}/favorite")
     public R<Map<String, Boolean>> isFavorite(@PathVariable Long id) {
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         Map<String, Boolean> result = new HashMap<>();
         result.put("favorited", userService.isFavorite(userId, id));
         return R.success(result);
@@ -144,7 +143,7 @@ public class PoemController {
     public R<Map<String, Object>> getFavorites(
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "10") int pageSize) {
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         IPage<Poem> page = poemService.getFavorites(userId, pageNum, pageSize);
         Map<String, Object> result = new HashMap<>();
         result.put("list", page.getRecords());

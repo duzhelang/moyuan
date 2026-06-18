@@ -19,11 +19,11 @@ export function createPoem(data: PoemCreateRequest) {
 }
 
 export function updatePoem(data: PoemUpdateRequest) {
-  return request.put<Poem>(`/poems/${data.id}`, data)
+  return request.put<Poem>(`/admin/poems/${data.id}`, data)
 }
 
 export function deletePoem(id: number) {
-  return request.delete<void>(`/poems/${id}`)
+  return request.delete<void>(`/admin/poems/${id}`)
 }
 
 export function searchPoems(keyword: string) {

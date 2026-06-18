@@ -24,7 +24,6 @@ public class Poet {
     private String evaluation;
     private String anecdotes;
     private String avatar;
-    @TableField(exist = false)
     private String poetType;
     private Integer status;
     @TableField(fill = FieldFill.INSERT)

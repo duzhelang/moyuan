@@ -1,6 +1,5 @@
 package com.moyuan.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.moyuan.entity.Category;
 import com.moyuan.exception.BusinessException;
 import com.moyuan.mapper.CategoryMapper;
@@ -41,7 +40,7 @@ class CategoryServiceImplTest {
 
         List<Category> expectedCategories = Arrays.asList(category1, category2);
 
-        when(categoryMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(expectedCategories);
+        when(categoryMapper.selectList(any())).thenReturn(expectedCategories);
 
         List<Category> actualCategories = categoryService.getAllCategories();
 

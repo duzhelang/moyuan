@@ -25,6 +25,7 @@ public class Poem {
     private Integer status;
     private Integer isFeatured;
     private Integer isOriginal;
+    private String poemType;
     private Integer auditStatus;
     private LocalDateTime auditTime;
     private String auditReason;

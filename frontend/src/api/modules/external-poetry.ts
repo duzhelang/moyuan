@@ -151,7 +151,7 @@ export async function searchPoemsWithRecommend(
   size: number = 10
 ): Promise<PoemSearchResult[]> {
   try {
-    const response = await request.get('/api/search/poems', {
+    const response = await request.get('/search/poems', {
       params: { keyword, page, size }
     })
     return response.data || []
@@ -166,7 +166,7 @@ export async function searchPoemsWithRecommend(
  */
 export async function getRecommendedPoems(limit: number = 10): Promise<PoemSearchResult[]> {
   try {
-    const response = await request.get('/api/search/poems/recommended', {
+    const response = await request.get('/search/poems/recommended', {
       params: { limit }
     })
     return response.data || []
@@ -181,7 +181,7 @@ export async function getRecommendedPoems(limit: number = 10): Promise<PoemSearc
  */
 export async function getPopularPoems(limit: number = 10): Promise<PoemSearchResult[]> {
   try {
-    const response = await request.get('/api/search/poems/popular', {
+    const response = await request.get('/search/poems/popular', {
       params: { limit }
     })
     return response.data || []
@@ -199,7 +199,7 @@ export async function getExternalPoems(
   limit: number = 5
 ): Promise<PoemSearchResult[]> {
   try {
-    const response = await request.get('/api/search/poems/external', {
+    const response = await request.get('/search/poems/external', {
       params: { keyword, limit }
     })
     return response.data || []
@@ -247,6 +247,37 @@ export interface ApihzResponse {
 function stripHtml(html: string | null): string | null {
   if (!html) return null
   return html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim() || null
+}
+
+export async function searchApihzPoems(
+  keyword: string,
+  limit: number = 10
+): Promise<PoemSearchResult[]> {
+  try {
+    const response = await axios.get<ApihzResponse>(`${APIHZ_BASE}/poetry.php`, {
+      params: {
+        id: APIHZ_ID,
+        key: APIHZ_KEY,
+        words: keyword,
+        page: 1
+      }
+    })
+    if (response.data.code === 200 && response.data.data?.length > 0) {
+      return response.data.data.slice(0, limit).map(item => ({
+        title: item.name,
+        content: stripHtml(item.content) || item.content,
+        author: item.author,
+        dynasty: item.dynasty,
+        source: 'external' as const,
+        recommendScore: 0.5,
+        recommendReason: '古诗词库推荐'
+      }))
+    }
+    return []
+  } catch (error) {
+    console.error('外部诗词搜索失败:', error)
+    return []
+  }
 }
 
 export async function getApihzPoetryDetail(

@@ -4,8 +4,17 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { ForumPost } from '@/types/model'
 import { getForumPostList } from '@/api/modules/forum'
+import { useParticles } from '@/composables/useParticles'
 
 const router = useRouter()
+
+const particleCanvasRef = ref<HTMLCanvasElement | null>(null)
+useParticles(particleCanvasRef, {
+  count: 60,
+  colors: ['#d4af87', '#f0e4d7', '#c9a06c'],
+  opacityRange: [0.15, 0.3],
+  sizeRange: [1, 2.5]
+})
 
 const loading = ref(false)
 const posts = ref<ForumPost[]>([])
@@ -56,6 +65,7 @@ onMounted(() => {
 
 <template>
   <div class="forum-list-page">
+    <canvas ref="particleCanvasRef" class="particle-bg"></canvas>
     <div class="container">
       <div class="page-nav">
         <el-button text @click="router.push('/')">
@@ -160,6 +170,22 @@ onMounted(() => {
   padding: $spacing-xl 0 $spacing-xxl;
   width: 100%;
   min-height: 80vh;
+  position: relative;
+}
+
+.particle-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.container {
+  position: relative;
+  z-index: 1;
 }
 
 .page-nav {

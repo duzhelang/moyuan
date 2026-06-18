@@ -16,12 +16,11 @@ import org.springframework.web.bind.annotation.*;
 public class PoetProfileController {
 
     private final PoetProfileService poetProfileService;
-    private final SecurityUtil securityUtil;
 
     @GetMapping("/me")
     @Operation(summary = "获取当前用户诗人资料")
     public R<PoetProfile> getMyProfile() {
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         PoetProfile profile = poetProfileService.getByUserId(userId);
         if (profile == null) {
             return R.error("诗人资料不存在");
@@ -32,7 +31,7 @@ public class PoetProfileController {
     @PostMapping("/apply")
     @Operation(summary = "申请诗人认证")
     public R<Void> applyVerification(@RequestBody PoetProfile profile) {
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         poetProfileService.applyVerification(userId, profile);
         return R.success();
     }
@@ -44,7 +43,7 @@ public class PoetProfileController {
         if (profile == null) {
             return R.error("诗人资料不存在");
         }
-        Long currentUserId = securityUtil.getCurrentUserId();
+        Long currentUserId = SecurityUtil.getCurrentUserId();
         if (!currentUserId.equals(userId)) {
             profile.setContactInfo(null);
         }

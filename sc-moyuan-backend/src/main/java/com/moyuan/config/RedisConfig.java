@@ -8,8 +8,11 @@ import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
+import org.springframework.cache.interceptor.CacheErrorHandler;
+import org.springframework.cache.interceptor.SimpleCacheErrorHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -26,7 +29,7 @@ import java.time.Duration;
 @Slf4j
 @Configuration
 @EnableCaching
-public class RedisConfig {
+public class RedisConfig implements CachingConfigurer {
 
     private boolean isRedisAvailable(RedisConnectionFactory connectionFactory) {
         try {
@@ -91,5 +94,30 @@ public class RedisConfig {
 
         log.warn("Redis 不可用，降级为内存缓存");
         return new ConcurrentMapCacheManager();
+    }
+
+    @Override
+    public CacheErrorHandler errorHandler() {
+        return new SimpleCacheErrorHandler() {
+            @Override
+            public void handleCacheGetError(RuntimeException e, org.springframework.cache.Cache cache, Object key) {
+                log.warn("Redis缓存读取失败: cache={}, key={}, error={}", cache.getName(), key, e.getMessage());
+            }
+
+            @Override
+            public void handleCachePutError(RuntimeException e, org.springframework.cache.Cache cache, Object key, Object value) {
+                log.warn("Redis缓存写入失败: cache={}, key={}, error={}", cache.getName(), key, e.getMessage());
+            }
+
+            @Override
+            public void handleCacheEvictError(RuntimeException e, org.springframework.cache.Cache cache, Object key) {
+                log.warn("Redis缓存删除失败: cache={}, key={}, error={}", cache.getName(), key, e.getMessage());
+            }
+
+            @Override
+            public void handleCacheClearError(RuntimeException e, org.springframework.cache.Cache cache) {
+                log.warn("Redis缓存清空失败: cache={}, error={}", cache.getName(), e.getMessage());
+            }
+        };
     }
 }

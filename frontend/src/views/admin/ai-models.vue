@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -128,9 +128,7 @@ async function loadModels() {
   loading.value = true
   try {
     const res = await getAllModels()
-    if (res.data && res.data.code === 200) {
-      models.value = res.data.data || []
-    }
+    models.value = res.data || []
   } catch (e) {
     console.error('加载模型列表失败', e)
   } finally {
@@ -141,9 +139,7 @@ async function loadModels() {
 async function loadModuleConfigs() {
   try {
     const res = await getAllModuleConfigs()
-    if (res.data && res.data.code === 200) {
-      moduleConfigs.value = res.data.data || []
-    }
+    moduleConfigs.value = res.data || []
   } catch (e) {
     console.error('加载模块配置失败', e)
   }
@@ -152,9 +148,7 @@ async function loadModuleConfigs() {
 async function loadProviders() {
   try {
     const res = await getProviders()
-    if (res.data && res.data.code === 200) {
-      providers.value = res.data.data || []
-    }
+    providers.value = res.data || []
   } catch (e) {
     console.error('加载提供商列表失败', e)
   }
@@ -228,11 +222,7 @@ async function handleTest(model: AiModelConfig) {
   try {
     const res = await testConnection(model.id!)
     loadingInstance.close()
-    if (res.data && res.data.code === 200) {
-      ElMessage.success('连接测试成功：' + res.data.data)
-    } else {
-      ElMessage.warning('连接测试返回异常')
-    }
+    ElMessage.success('连接测试成功：' + res.data)
   } catch (e: any) {
     loadingInstance.close()
     ElMessage.error('连接测试失败：' + (e.message || '未知错误'))
@@ -396,8 +386,8 @@ onMounted(() => {
           <el-input v-model="moduleConfigForm.description" type="textarea" :rows="2" placeholder="AI角色描述" />
         </el-form-item>
         <el-form-item label="提示词模板">
-          <el-input v-model="moduleConfigForm.promptTemplate" type="textarea" :rows="4" placeholder="支持变量：{poetName}诗人名称, {maxLength}最大长度, {styleHint}风格提示" />
-          <div class="form-tip">可用变量：{poetName} - 诗人名称, {maxLength} - 最大回答长度, {styleHint} - 风格提示</div>
+          <el-input v-model="moduleConfigForm.promptTemplate" type="textarea" :rows="4" placeholder="支持变量：{poetName}诗人名称, {poemTitle}诗词标题, {poemContent}诗词内容, {maxLength}最大长度, {styleHint}风格提示" />
+          <div class="form-tip">可用变量：{poetName} - 诗人名称, {poemTitle} - 诗词标题, {poemContent} - 诗词内容, {maxLength} - 最大回答长度, {styleHint} - 风格提示</div>
         </el-form-item>
         <el-row :gutter="16">
           <el-col :span="12">

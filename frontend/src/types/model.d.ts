@@ -39,7 +39,7 @@ export interface Poem {
   isFavorited?: boolean
   isOriginal?: boolean
   poemType?: 'classical' | 'modern'
-  averageScore?: number
+  avgScore?: number
   ratingCount?: number
   createTime: string
   updateTime: string
@@ -63,7 +63,8 @@ export interface Poet {
   avatar?: string
   poetType?: string
   status?: number
-  createdAt: string
+  createTime: string
+  updateTime?: string
 }
 
 export interface Dynasty {
@@ -102,7 +103,7 @@ export interface UserHistory {
   userId: number
   targetId: number
   targetType: number
-  createdAt: string
+  createTime: string
 }
 
 export interface Comment {

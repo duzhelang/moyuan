@@ -42,10 +42,18 @@ const adminMenus = [
     ]
   },
   {
+    label: '审核管理',
+    icon: 'Checked',
+    children: [
+      { path: '/admin/poet-suggestions', name: 'AdminPoetSuggestions', icon: 'Checked', label: '诗人内容审核' }
+    ]
+  },
+  {
     label: '系统管理',
     icon: 'Setting',
     children: [
-      { path: '/admin/logs', name: 'AdminLogs', icon: 'Document', label: '操作日志' }
+      { path: '/admin/logs', name: 'AdminLogs', icon: 'Document', label: '操作日志' },
+      { path: '/admin/static-pages', name: 'AdminStaticPages', icon: 'Document', label: '静态页面管理' }
     ]
   }
 ]

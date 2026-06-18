@@ -4,8 +4,17 @@ import { useRouter } from 'vue-router'
 import type { Poet, Dynasty } from '@/types/model'
 import { getPoetList } from '@/api/modules/poet'
 import { getDynastyList } from '@/api/modules/dynasty'
+import { useParticles } from '@/composables/useParticles'
 
 const router = useRouter()
+
+const particleCanvasRef = ref<HTMLCanvasElement | null>(null)
+useParticles(particleCanvasRef, {
+  count: 60,
+  colors: ['#d4af87', '#f0e4d7', '#c9a06c'],
+  opacityRange: [0.15, 0.3],
+  sizeRange: [1, 2.5]
+})
 
 const loading = ref(false)
 const poets = ref<Poet[]>([])
@@ -55,8 +64,8 @@ const fetchDynasties = async () => {
   }
 }
 
-const handleTabChange = (tab: string) => {
-  activeTab.value = tab
+const handleTabChange = (tab: string | number | boolean | undefined) => {
+  activeTab.value = String(tab)
   currentPage.value = 1
   filters.value.dynastyId = undefined
   filters.value.keyword = ''
@@ -91,6 +100,7 @@ onMounted(() => {
 
 <template>
   <div class="poet-list-page">
+    <canvas ref="particleCanvasRef" class="particle-bg"></canvas>
     <div class="container">
       <div class="page-nav">
         <el-button text @click="router.push('/')">
@@ -108,6 +118,12 @@ onMounted(() => {
       <div class="page-header">
         <h1 class="page-title">诗人风采</h1>
         <p class="page-subtitle">穿越千年时光，领略文人墨客的风采与情怀</p>
+        <div class="header-actions">
+          <el-button @click="router.push('/poem')">
+            <el-icon><Notebook /></el-icon>
+            诗词鉴赏
+          </el-button>
+        </div>
       </div>
 
       <div class="poet-tabs">
@@ -208,6 +224,23 @@ onMounted(() => {
 <style scoped lang="scss">
 .poet-list-page {
   padding: $spacing-xl 0;
+  position: relative;
+  min-height: 100vh;
+}
+
+.particle-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.container {
+  position: relative;
+  z-index: 1;
 }
 
 .page-nav {
@@ -232,7 +265,7 @@ onMounted(() => {
 
 .page-header {
   text-align: center;
-  margin-bottom: $spacing-xl;
+  margin-bottom: 0;
 }
 
 .page-title {
@@ -248,6 +281,13 @@ onMounted(() => {
   color: $text-color-light;
   font-family: $font-family-base;
   margin: 0;
+}
+
+.header-actions {
+  margin-top: $spacing-md;
+  display: flex;
+  justify-content: center;
+  gap: $spacing-sm;
 }
 
 .filter-section {

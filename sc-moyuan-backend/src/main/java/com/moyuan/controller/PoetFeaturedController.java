@@ -1,6 +1,5 @@
 package com.moyuan.controller;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.moyuan.common.R;
 import com.moyuan.entity.PoetFeatured;
 import com.moyuan.service.PoetFeaturedService;

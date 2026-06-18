@@ -94,7 +94,10 @@ public class AiModelConfigController {
                 {"zhipu", "智谱AI"},
                 {"deepseek", "DeepSeek"},
                 {"kimi", "Kimi (月之暗面)"},
-                {"nvidia", "NVIDIA NIM"}
+                {"nvidia", "NVIDIA NIM"},
+                {"qwen", "千问"},
+                {"mimo", "小米MiMo"},
+                {"openrouter", "OpenRouter"}
         };
         for (String[] item : data) {
             Map<String, String> provider = new HashMap<>();

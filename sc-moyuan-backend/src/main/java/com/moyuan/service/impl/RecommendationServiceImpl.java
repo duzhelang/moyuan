@@ -39,8 +39,13 @@ public class RecommendationServiceImpl implements RecommendationService {
     @Value("${external.poetry.api.enabled:true}")
     private boolean externalApiEnabled;
 
-    @Value("${external.poetry.api.url:https://v2.jinrishici.com}")
-    private String externalApiUrl;
+    @Value("${apihz.id}")
+    private String apihzId;
+
+    @Value("${apihz.key}")
+    private String apihzKey;
+
+    private static final String APIHZ_POETRY_URL = "https://cn.apihz.cn/api/zici/poetry.php";
 
     // ==================== 诗人推荐 ====================
 
@@ -165,22 +170,28 @@ public class RecommendationServiceImpl implements RecommendationService {
     public List<Map<String, Object>> getExternalPoems(String keyword, int limit) {
         List<Map<String, Object>> results = new ArrayList<>();
         try {
-            String url = externalApiUrl + "/search?keyword=" + keyword + "&limit=" + limit;
+            String url = String.format("%s?id=%s&key=%s&words=%s&page=1",
+                    APIHZ_POETRY_URL, apihzId, apihzKey, keyword);
+            @SuppressWarnings("unchecked")
             Map<String, Object> response = restTemplate.getForObject(url, Map.class);
 
-            if (response != null && "success".equals(response.get("status"))) {
+            if (response != null && Integer.valueOf(200).equals(response.get("code"))) {
+                @SuppressWarnings("unchecked")
                 List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
                 if (data != null) {
+                    int count = 0;
                     for (Map<String, Object> item : data) {
+                        if (count >= limit) break;
                         Map<String, Object> poem = new HashMap<>();
-                        poem.put("title", item.get("title"));
-                        poem.put("content", String.join("\n", (List<String>) item.get("content")));
+                        poem.put("title", item.get("name"));
+                        poem.put("content", stripHtml((String) item.get("content")));
                         poem.put("author", item.get("author"));
                         poem.put("dynasty", item.get("dynasty"));
                         poem.put("source", "external");
                         poem.put("recommendScore", 0.5);
                         poem.put("recommendReason", "古诗词库推荐");
                         results.add(poem);
+                        count++;
                     }
                 }
             }
@@ -188,6 +199,11 @@ public class RecommendationServiceImpl implements RecommendationService {
             log.error("调用外部诗词API失败: {}", e.getMessage());
         }
         return results;
+    }
+
+    private String stripHtml(String html) {
+        if (html == null) return null;
+        return html.replaceAll("<[^>]+>", "").replaceAll("&nbsp;", " ").trim();
     }
 
     // ==================== 通用协同过滤算法 ====================

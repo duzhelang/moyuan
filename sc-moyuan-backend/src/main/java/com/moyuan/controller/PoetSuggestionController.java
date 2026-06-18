@@ -6,6 +6,7 @@ import com.moyuan.entity.PoetSuggestion;
 import com.moyuan.entity.User;
 import com.moyuan.service.PoetSuggestionService;
 import com.moyuan.util.SecurityUtil;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,9 +18,11 @@ public class PoetSuggestionController {
     private final PoetSuggestionService poetSuggestionService;
 
     @PostMapping("/poet-suggestions")
-    public R<Void> submitSuggestion(@RequestBody PoetSuggestion suggestion) {
+    public R<Void> submitSuggestion(@RequestBody PoetSuggestion suggestion, HttpServletRequest request) {
         User currentUser = SecurityUtil.getCurrentUser();
         suggestion.setUserId(currentUser.getId());
+        suggestion.setIp(getClientIp(request));
+        suggestion.setContent(sanitizeInput(suggestion.getContent()));
         poetSuggestionService.submitSuggestion(suggestion);
         return R.success();
     }
@@ -40,5 +43,27 @@ public class PoetSuggestionController {
         User currentUser = SecurityUtil.getCurrentUser();
         poetSuggestionService.reviewSuggestion(id, status, reviewComment, currentUser.getId());
         return R.success();
+    }
+
+    private String sanitizeInput(String input) {
+        if (input == null) return null;
+        return input.replaceAll("<[^>]*>", "")
+                .replaceAll("javascript:", "")
+                .replaceAll("on\\w+\\s*=", "")
+                .trim();
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("X-Real-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }

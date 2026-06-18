@@ -7,7 +7,12 @@ const asset = (path: string) => path
 const currentYear = new Date().getFullYear()
 
 const navigateTo = (path: string) => {
-  router.push(path)
+  if (path.includes('tab=')) {
+    const tab = path.split('tab=')[1]
+    router.push({ path: '/', query: { tab } })
+  } else {
+    router.push(path)
+  }
 }
 
 const openExternalLink = (url: string) => {
@@ -20,8 +25,8 @@ const openExternalLink = (url: string) => {
     <div class="dibu-container">
       <div class="dibu-top">
         <div class="dibu-brand">
-          <div class="dibu-logo">
-            <img :src="asset('/img/tubiao (2).png')" alt="古诗词汇">
+          <div class="dibu-logo" @click="navigateTo('/')">
+            <img :src="asset('/img/lg-1.png')" alt="古诗词汇">
             <span class="dibu-title">古诗词汇</span>
           </div>
           <p class="dibu-desc">传承千年文脉，品味诗词之美。让古典诗词在数字时代焕发新生。</p>
@@ -58,9 +63,9 @@ const openExternalLink = (url: string) => {
           <div class="dibu-nav-section">
             <h4>智能体验</h4>
             <ul>
-              <li @click="navigateTo('/')">看图写诗</li>
-              <li @click="navigateTo('/')">智能解析</li>
-              <li @click="navigateTo('/')">诗词问答</li>
+              <li @click="navigateTo('/?tab=poem')">看图写诗</li>
+              <li @click="navigateTo('/?tab=analyze')">智能解析</li>
+              <li @click="navigateTo('/?tab=explore')">诗词问答</li>
             </ul>
           </div>
 
@@ -84,13 +89,13 @@ const openExternalLink = (url: string) => {
           <span>传承经典 · 品味诗词</span>
         </div>
         <div class="dibu-links">
-          <span class="dibu-link" @click="navigateTo('/')">关于我们</span>
+          <span class="dibu-link" @click="navigateTo('/static/about')">关于我们</span>
           <span class="dibu-separator">|</span>
-          <span class="dibu-link" @click="navigateTo('/')">使用条款</span>
+          <span class="dibu-link" @click="navigateTo('/static/terms')">使用条款</span>
           <span class="dibu-separator">|</span>
-          <span class="dibu-link" @click="navigateTo('/')">隐私政策</span>
+          <span class="dibu-link" @click="navigateTo('/static/privacy')">隐私政策</span>
           <span class="dibu-separator">|</span>
-          <span class="dibu-link" @click="navigateTo('/')">联系我们</span>
+          <span class="dibu-link" @click="navigateTo('/static/contact')">联系我们</span>
         </div>
       </div>
     </div>
@@ -142,14 +147,24 @@ const openExternalLink = (url: string) => {
 .dibu-logo {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   margin-bottom: 20px;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+
+  &:hover {
+    opacity: 0.8;
+  }
 
   img {
-    width: 40px;
+    width: 100px;
     height: 40px;
     border-radius: 8px;
     flex-shrink: 0;
+    object-fit: cover;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 4px;
   }
 
   .dibu-title {
@@ -294,10 +309,6 @@ const openExternalLink = (url: string) => {
   .dibu-brand {
     flex: none;
     text-align: center;
-  }
-
-  .dibu-logo {
-    justify-content: center;
   }
 
   .dibu-social {

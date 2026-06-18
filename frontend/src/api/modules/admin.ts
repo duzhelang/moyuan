@@ -170,3 +170,13 @@ export function updateHomeNavigation(id: number, data: any) {
 export function deleteHomeNavigation(id: number) {
   return request.delete<void>(`/admin/home-navigation/${id}`)
 }
+
+export function getAdminPoetSuggestions(params: { pageNum?: number; pageSize?: number; status?: string }) {
+  return request.get<{ records: any[]; total: number }>('/admin/poet-suggestions', { params })
+}
+
+export function reviewPoetSuggestion(id: number, status: string, reviewComment?: string) {
+  return request.put(`/admin/poet-suggestions/${id}/review`, null, {
+    params: { status, reviewComment }
+  })
+}

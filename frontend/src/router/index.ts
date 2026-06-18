@@ -84,6 +84,12 @@ const routes: RouteRecordRaw[] = [
         name: 'UserHomepage',
         component: () => import('@/views/user/homepage.vue'),
         meta: { title: '用户主页' }
+      },
+      {
+        path: 'static/:type',
+        name: 'StaticPage',
+        component: () => import('@/views/static/index.vue'),
+        meta: { title: '页面信息' }
       }
     ]
   },
@@ -174,6 +180,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '操作日志', requiresAuth: true, requiresAdmin: true }
       },
       {
+        path: 'poet-suggestions',
+        name: 'AdminPoetSuggestions',
+        component: () => import('@/views/admin/poet-suggestions.vue'),
+        meta: { title: '诗人内容审核', requiresAuth: true, requiresAdmin: true }
+      },
+      {
         path: 'ai-models',
         name: 'AdminAiModels',
         component: () => import('@/views/admin/ai-models.vue'),
@@ -184,6 +196,12 @@ const routes: RouteRecordRaw[] = [
         name: 'AdminHomeNavigation',
         component: () => import('@/views/admin/home-navigation.vue'),
         meta: { title: '首页导航管理', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'static-pages',
+        name: 'AdminStaticPages',
+        component: () => import('@/views/admin/static-pages.vue'),
+        meta: { title: '静态页面管理', requiresAuth: true, requiresAdmin: true }
       }
     ]
   },

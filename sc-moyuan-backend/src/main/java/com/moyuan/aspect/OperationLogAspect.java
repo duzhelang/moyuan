@@ -32,7 +32,6 @@ public class OperationLogAspect {
     );
 
     private final OperationLogMapper operationLogMapper;
-    private final SecurityUtil securityUtil;
     private final ObjectMapper objectMapper;
 
     @Pointcut("execution(* com.moyuan.controller.*.*(..))")
@@ -55,8 +54,8 @@ public class OperationLogAspect {
             operationLog.setParams(sanitizeParams(joinPoint.getArgs()));
 
             try {
-                operationLog.setUserId(securityUtil.getCurrentUserId());
-                operationLog.setUsername(securityUtil.getCurrentUsername());
+                operationLog.setUserId(SecurityUtil.getCurrentUserId());
+                operationLog.setUsername(SecurityUtil.getCurrentUsername());
             } catch (Exception ignored) {
             }
 

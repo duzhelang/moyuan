@@ -57,9 +57,9 @@ const formattedContent = computed(() => {
           <el-icon><Star /></el-icon>
           {{ poem.likeCount }}
         </span>
-        <span class="meta-item rating-meta" v-if="poem.averageScore">
+        <span class="meta-item rating-meta" v-if="poem.avgScore">
           <el-icon><Trophy /></el-icon>
-          {{ poem.averageScore.toFixed(1) }}
+          {{ poem.avgScore.toFixed(1) }}
         </span>
       </div>
     </div>
@@ -68,6 +68,8 @@ const formattedContent = computed(() => {
 </template>
 
 <style scoped lang="scss">
+@use 'sass:color';
+
 .poem-card {
   @include card;
   cursor: pointer;
@@ -78,7 +80,7 @@ const formattedContent = computed(() => {
   border-left: 3px solid $primary-color;
 
   &:hover {
-    border-left-color: darken($primary-color, 10%);
+    border-left-color: color.adjust($primary-color, $lightness: -10%);
   }
 }
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePoemStore } from '@/stores/poem'
 import { useUserStore } from '@/stores/user'
@@ -8,6 +8,8 @@ import type { Comment, PoemRatingsData } from '@/types/model'
 import { likePoem, favoritePoem, getPoemRatings, ratePoem, requestAiRating } from '@/api/modules/poem'
 import { getComments, createComment, likeComment } from '@/api/modules/forum'
 import { addHistory } from '@/api/modules/history'
+import { getAiModuleConfig, type AiModuleConfig } from '@/api/modules/ai'
+import LoginPrompt from '@/components/common/LoginPrompt.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -32,6 +34,28 @@ const userComment = ref('')
 const submittingRating = ref(false)
 const requestingAi = ref(false)
 const aiPollTimer = ref<ReturnType<typeof setInterval> | null>(null)
+
+const loginPromptVisible = ref(false)
+
+interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: number
+}
+const aiChatVisible = ref(false)
+const aiChatMessages = ref<ChatMessage[]>([])
+const aiChatInput = ref('')
+const aiChatLoading = ref(false)
+const aiChatContainerRef = ref<HTMLElement | null>(null)
+const aiConfig = ref<AiModuleConfig | null>(null)
+
+const poemSentences = computed(() => {
+  if (!poem.value?.content) return []
+  return poem.value.content
+    .split(/[。！？；\n]+/)
+    .map((s: string) => s.trim())
+    .filter((s: string) => s.length > 0)
+})
 
 const fetchPoem = async () => {
   loading.value = true
@@ -207,6 +231,130 @@ const handleCommentPageChange = (page: number) => {
   fetchComments()
 }
 
+const openExternalLink = (url: string) => {
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+const scrollToAiChatBottom = () => {
+  nextTick(() => {
+    if (aiChatContainerRef.value) {
+      aiChatContainerRef.value.scrollTop = aiChatContainerRef.value.scrollHeight
+    }
+  })
+}
+
+const fetchAiConfig = async (showPrompt: boolean = false) => {
+  if (!userStore.isLoggedIn) {
+    if (showPrompt) {
+      loginPromptVisible.value = true
+    }
+    return
+  }
+  try {
+    const res = await getAiModuleConfig('chat')
+    aiConfig.value = res.data
+  } catch {
+    console.error('获取AI配置失败')
+  }
+}
+
+const buildAiPrompt = (userMessage: string, isFirst: boolean = false) => {
+  const poemTitle = poem.value?.title || '这首诗'
+  const poemContent = poem.value?.content || ''
+  const config = aiConfig.value
+
+  let systemConstraint = ''
+  if (config?.promptTemplate) {
+    const maxLength = isFirst ? (config.firstResponseLength || 80) : (config.maxLength || 200)
+    const styleHint = isFirst
+      ? `这是首次提问，请用2-3句话简要概括即可，不超过${config.firstResponseLength || 80}字`
+      : `根据问题复杂度适当展开，但不超过${maxLength}字`
+
+    systemConstraint = config.promptTemplate
+      .replace(/\{poetName\}/g, poem.value?.poetName || '')
+      .replace(/\{poemTitle\}/g, poemTitle)
+      .replace(/\{poemContent\}/g, poemContent)
+      .replace(/\{maxLength\}/g, String(maxLength))
+      .replace(/\{styleHint\}/g, styleHint)
+
+    if (!systemConstraint.includes(poemTitle)) {
+      systemConstraint += `\n\n当前诗词：《${poemTitle}》\n诗词内容：${poemContent}`
+    }
+  } else {
+    systemConstraint = `你是一位文化渊博的大学者，精通古今中外诗歌知识。你正在为用户赏析诗歌《${poemTitle}》。
+
+诗词内容：
+${poemContent}
+
+回答要求：
+1. 语言简洁精炼，避免冗余
+2. 使用通俗易懂的中文
+3. 重点突出，条理清晰
+4. 不要使用markdown格式，直接输出纯文本
+${isFirst ? '5. 这是首次提问，请用2-3句话简要概括即可' : '5. 根据问题复杂度适当展开，但不超过200字'}`
+  }
+
+  return `【系统设定】${systemConstraint}\n\n【用户问题】${userMessage}`
+}
+
+const sendAiChatMessage = async (message?: string, isFirst: boolean = false) => {
+  const msg = message || aiChatInput.value.trim()
+  if (!msg || aiChatLoading.value) return
+
+  if (!userStore.isLoggedIn) {
+    loginPromptVisible.value = true
+    return
+  }
+
+  if (!aiConfig.value) {
+    await fetchAiConfig(false)
+  }
+
+  aiChatMessages.value.push({
+    role: 'user',
+    content: msg,
+    timestamp: Date.now()
+  })
+  aiChatInput.value = ''
+  aiChatLoading.value = true
+  scrollToAiChatBottom()
+
+  try {
+    const { chat } = await import('@/api/modules/ai')
+    const prompt = buildAiPrompt(msg, isFirst)
+    const res = await chat({ message: prompt })
+    aiChatMessages.value.push({
+      role: 'assistant',
+      content: res.data.reply || '抱歉，暂时无法回答',
+      timestamp: Date.now()
+    })
+  } catch {
+    aiChatMessages.value.push({
+      role: 'assistant',
+      content: 'AI服务暂时不可用，请稍后重试',
+      timestamp: Date.now()
+    })
+  } finally {
+    aiChatLoading.value = false
+    scrollToAiChatBottom()
+  }
+}
+
+const handleAiChatKeydown = (e: Event | KeyboardEvent) => {
+  if ((e as KeyboardEvent).key === 'Enter' && !(e as KeyboardEvent).shiftKey) {
+    e.preventDefault()
+    sendAiChatMessage()
+  }
+}
+
+const toggleAiChat = () => {
+  aiChatVisible.value = !aiChatVisible.value
+  if (aiChatVisible.value && userStore.isLoggedIn && aiChatMessages.value.length === 0) {
+    fetchAiConfig()
+    sendAiChatMessage('请简要介绍一下这首诗', true)
+  }
+}
+
 onMounted(() => {
   fetchPoem()
   fetchComments()
@@ -235,17 +383,23 @@ onMounted(() => {
       
       <el-card class="poem-card">
         <div class="poem-title-section">
+          <div class="title-decoration">
+            <span class="deco-line"></span>
+            <span class="deco-dot"></span>
+            <span class="deco-line"></span>
+          </div>
           <h1 class="poem-title">{{ poem.title }}</h1>
+          <div class="title-underline"></div>
           <div class="poem-meta">
-            <span v-if="poem.dynastyName" class="meta-item">
+            <span v-if="poem.dynastyName" class="meta-tag">
               <el-icon><Calendar /></el-icon>
               {{ poem.dynastyName }}
             </span>
-            <span v-if="poem.poetName" class="meta-item">
+            <span v-if="poem.poetName" class="meta-tag">
               <el-icon><User /></el-icon>
               {{ poem.poetName }}
             </span>
-            <span v-if="poem.categoryName" class="meta-item">
+            <span v-if="poem.categoryName" class="meta-tag">
               <el-icon><Collection /></el-icon>
               {{ poem.categoryName }}
             </span>
@@ -254,7 +408,9 @@ onMounted(() => {
         
         <div class="poem-content-section">
           <div class="poem-text">
-            <p>{{ poem.content }}</p>
+            <p v-for="(sentence, index) in poemSentences" :key="index" class="poem-sentence">
+              {{ sentence }}
+            </p>
           </div>
           
           <div class="poem-source" v-if="poem.source">
@@ -278,12 +434,107 @@ onMounted(() => {
         </div>
       </el-card>
 
+      <div class="poem-info-section">
+        <div class="info-grid">
+          <div class="poet-brief-card info-card">
+            <div class="info-card-header">
+              <el-icon><User /></el-icon>
+              <h3>诗人简介</h3>
+            </div>
+            <div class="info-card-body">
+              <div v-if="poem.poetId" class="poet-brief-content">
+                <div class="poet-brief-meta">
+                  <el-avatar :size="48">{{ poem.poetName?.charAt(0) }}</el-avatar>
+                  <div class="poet-brief-info">
+                    <span class="poet-brief-name">{{ poem.poetName }}</span>
+                    <span class="poet-brief-dynasty" v-if="poem.dynastyName">{{ poem.dynastyName }}</span>
+                  </div>
+                </div>
+                <router-link :to="`/poet/${poem.poetId}`" class="poet-link">
+                  了解更多诗人信息 →
+                </router-link>
+              </div>
+              <div v-else class="info-empty">
+                <p>暂无诗人信息</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="poem-background-card info-card">
+            <div class="info-card-header">
+              <el-icon><Document /></el-icon>
+              <h3>创作背景</h3>
+            </div>
+            <div class="info-card-body">
+              <div v-if="poem.background" class="info-content">
+                <p>{{ poem.background }}</p>
+              </div>
+              <div v-else class="info-empty">
+                <p>暂无创作背景信息</p>
+                <el-button type="primary" size="small" plain @click="sendAiChatMessage('请介绍一下这首诗的创作背景')">
+                  <el-icon><MagicStick /></el-icon>
+                  请求AI分析
+                </el-button>
+              </div>
+            </div>
+          </div>
+
+          <div class="poem-appreciation-card info-card">
+            <div class="info-card-header">
+              <el-icon><Reading /></el-icon>
+              <h3>作品赏析</h3>
+            </div>
+            <div class="info-card-body">
+              <div v-if="poem.appreciation" class="info-content">
+                <p>{{ poem.appreciation }}</p>
+              </div>
+              <div v-else-if="poem.translation" class="info-content">
+                <p>{{ poem.translation }}</p>
+              </div>
+              <div v-else class="info-empty">
+                <p>暂无赏析内容</p>
+                <el-button type="primary" size="small" plain @click="sendAiChatMessage('请对这首诗进行翻译赏析')">
+                  <el-icon><MagicStick /></el-icon>
+                  请求AI翻译赏析
+                </el-button>
+              </div>
+            </div>
+          </div>
+
+          <div class="poem-resources-card info-card">
+            <div class="info-card-header">
+              <el-icon><Link /></el-icon>
+              <h3>相关资源</h3>
+            </div>
+            <div class="info-card-body">
+              <div class="resource-list">
+                <div class="resource-item" @click="openExternalLink('https://www.gushiwen.org/')">
+                  <el-icon><Document /></el-icon>
+                  <span>古诗文网</span>
+                  <el-icon class="link-icon"><Top /></el-icon>
+                </div>
+                <div class="resource-item" @click="openExternalLink('https://www.zhonghuadiancang.com/')">
+                  <el-icon><Document /></el-icon>
+                  <span>中华典藏</span>
+                  <el-icon class="link-icon"><Top /></el-icon>
+                </div>
+                <div class="resource-item" @click="openExternalLink('https://ctext.org/')">
+                  <el-icon><Document /></el-icon>
+                  <span>中国哲学书电子化计划</span>
+                  <el-icon class="link-icon"><Top /></el-icon>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="rating-section" v-if="ratingsData">
         <h2 class="section-title">评分区域</h2>
 
         <div class="rating-overview">
           <div class="rating-score">
-            <span class="score-value">{{ ratingsData.averageScore.toFixed(1) }}</span>
+            <span class="score-value">{{ (ratingsData.averageScore || 0).toFixed(1) }}</span>
             <span class="score-label">综合评分</span>
           </div>
           <div class="rating-count">
@@ -304,7 +555,7 @@ onMounted(() => {
             </template>
             <div class="ai-rating-content">
               <div class="ai-score">
-                <span class="score-value">{{ ratingsData.aiRating.score.toFixed(1) }}</span>
+                <span class="score-value">{{ (ratingsData.aiRating.score || 0).toFixed(1) }}</span>
               </div>
               <div class="ai-analysis" v-if="ratingsData.aiRating.aiAnalysis">
                 <p>{{ ratingsData.aiRating.aiAnalysis }}</p>
@@ -447,12 +698,78 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <div class="ai-float-btn" @click="toggleAiChat" :class="{ active: aiChatVisible }">
+      <el-icon :size="24"><MagicStick /></el-icon>
+    </div>
+
+    <Teleport to="body">
+      <Transition name="ai-chat-slide">
+        <div v-if="aiChatVisible" class="ai-chat-dialog">
+          <div class="ai-chat-header">
+            <div class="ai-chat-title">
+              <el-icon><MagicStick /></el-icon>
+              <span>AI诗词助手</span>
+            </div>
+            <el-icon class="ai-chat-close" @click="aiChatVisible = false"><Close /></el-icon>
+          </div>
+          <div class="ai-chat-messages" ref="aiChatContainerRef">
+            <div
+              v-for="(msg, index) in aiChatMessages"
+              :key="index"
+              :class="['chat-message', msg.role]"
+            >
+              <div class="message-avatar">
+                <el-avatar :size="32" v-if="msg.role === 'user'">我</el-avatar>
+                <el-avatar :size="32" v-else class="ai-avatar">AI</el-avatar>
+              </div>
+              <div class="message-body">
+                <div class="message-content">{{ msg.content }}</div>
+              </div>
+            </div>
+            <div v-if="aiChatLoading" class="chat-message assistant">
+              <div class="message-avatar">
+                <el-avatar :size="32" class="ai-avatar">AI</el-avatar>
+              </div>
+              <div class="message-body">
+                <div class="message-content loading">思考中...</div>
+              </div>
+            </div>
+          </div>
+          <div class="ai-chat-input">
+            <el-input
+              v-model="aiChatInput"
+              type="textarea"
+              :rows="2"
+              placeholder="输入问题，按Enter发送..."
+              @keydown="handleAiChatKeydown"
+              :disabled="aiChatLoading"
+            />
+            <el-button
+              type="primary"
+              @click="sendAiChatMessage()"
+              :loading="aiChatLoading"
+              :disabled="!aiChatInput.trim()"
+            >
+              <el-icon><Promotion /></el-icon>
+            </el-button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <LoginPrompt
+      v-model:visible="loginPromptVisible"
+      message="AI对话功能需要登录后才能使用"
+    />
   </div>
 </template>
 
 <style scoped lang="scss">
+@use 'sass:color';
+
 .poem-detail-page {
-  padding: $spacing-xl 0;
+  padding: 70px 0 $spacing-xl;
   min-height: 60vh;
   position: relative;
   overflow-x: hidden;
@@ -510,13 +827,34 @@ onMounted(() => {
 .poem-card {
   margin-bottom: $spacing-xl;
   border-radius: $border-radius-md;
+  padding: $spacing-xl;
 }
 
 .poem-title-section {
   text-align: center;
   margin-bottom: $spacing-xl;
   padding-bottom: $spacing-xl;
-  border-bottom: 1px solid $border-color;
+}
+
+.title-decoration {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-lg;
+
+  .deco-line {
+    width: 60px;
+    height: 1px;
+    background: linear-gradient(to right, transparent, $primary-color, transparent);
+  }
+
+  .deco-dot {
+    width: 6px;
+    height: 6px;
+    background: $primary-color;
+    border-radius: 50%;
+  }
 }
 
 .poem-title {
@@ -524,45 +862,71 @@ onMounted(() => {
   color: $primary-color;
   font-family: $font-family-title;
   margin-bottom: $spacing-md;
+  letter-spacing: 4px;
+}
+
+.title-underline {
+  width: 80px;
+  height: 2px;
+  background: linear-gradient(to right, transparent, $primary-color, transparent);
+  margin: $spacing-md auto $spacing-lg;
 }
 
 .poem-meta {
   display: flex;
   justify-content: center;
-  gap: $spacing-lg;
+  gap: $spacing-md;
+  flex-wrap: wrap;
 }
 
-.meta-item {
-  display: flex;
+.meta-tag {
+  display: inline-flex;
   align-items: center;
   gap: $spacing-xs;
-  font-size: $font-size-base;
+  padding: $spacing-xs $spacing-md;
+  background: rgba($primary-color, 0.06);
+  border: 1px solid rgba($primary-color, 0.15);
+  border-radius: 20px;
+  font-size: $font-size-sm;
   color: $text-color-secondary;
+  transition: all $transition-fast;
+
+  &:hover {
+    background: rgba($primary-color, 0.1);
+    border-color: rgba($primary-color, 0.25);
+  }
 }
 
 .poem-content-section {
   margin-bottom: $spacing-xl;
+  padding: $spacing-xl 0;
 }
 
 .poem-text {
   text-align: center;
   margin-bottom: $spacing-lg;
   
-  p {
+  .poem-sentence {
     font-size: $font-size-xl;
-    line-height: 2;
+    line-height: 2.2;
+    letter-spacing: 2px;
     color: $text-color;
-    white-space: pre-line;
+    font-family: $font-family-title;
+    margin-bottom: $spacing-xs;
   }
 }
 
 .poem-source {
   text-align: center;
+  margin-top: $spacing-xl;
+  padding-top: $spacing-lg;
+  border-top: 1px dashed $border-color-light;
   
   p {
     font-size: $font-size-sm;
-    color: $text-color-secondary;
+    color: $text-color-light;
     font-style: italic;
+    margin: 0;
   }
 }
 
@@ -572,6 +936,165 @@ onMounted(() => {
   gap: $spacing-md;
   padding-top: $spacing-xl;
   border-top: 1px solid $border-color;
+}
+
+.poem-info-section {
+  margin-top: $spacing-xl;
+  margin-bottom: $spacing-xl;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: $spacing-lg;
+
+  @include responsive(md) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.info-card {
+  background: $background-color-light;
+  border-radius: $border-radius-md;
+  box-shadow: $box-shadow;
+  overflow: hidden;
+  transition: all $transition-fast;
+
+  &:hover {
+    box-shadow: $box-shadow-md;
+    transform: translateY(-2px);
+  }
+}
+
+.info-card-header {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: $spacing-md $spacing-lg;
+  background: linear-gradient(135deg, rgba($primary-color, 0.05), rgba($primary-color, 0.02));
+  border-bottom: 1px solid $border-color-light;
+
+  .el-icon {
+    color: $primary-color;
+    font-size: 18px;
+  }
+
+  h3 {
+    font-size: $font-size-base;
+    font-weight: 600;
+    color: $text-color;
+    margin: 0;
+    font-family: $font-family-title;
+  }
+}
+
+.info-card-body {
+  padding: $spacing-lg;
+}
+
+.poet-brief-content {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+}
+
+.poet-brief-meta {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+}
+
+.poet-brief-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.poet-brief-name {
+  font-size: $font-size-lg;
+  font-weight: 600;
+  color: $text-color;
+}
+
+.poet-brief-dynasty {
+  font-size: $font-size-sm;
+  color: $text-color-secondary;
+}
+
+.poet-link {
+  display: inline-flex;
+  align-items: center;
+  color: $primary-color;
+  font-size: $font-size-sm;
+  text-decoration: none;
+  transition: color $transition-fast;
+
+  &:hover {
+    color: color.adjust($primary-color, $lightness: -10%);
+    text-decoration: underline;
+  }
+}
+
+.info-content {
+  p {
+    font-size: $font-size-base;
+    color: $text-color;
+    line-height: $line-height-loose;
+    margin: 0;
+    white-space: pre-line;
+  }
+}
+
+.info-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $spacing-md;
+  padding: $spacing-md 0;
+
+  p {
+    font-size: $font-size-sm;
+    color: $text-color-light;
+    margin: 0;
+  }
+}
+
+.resource-list {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.resource-item {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: $spacing-sm $spacing-md;
+  border-radius: $border-radius-sm;
+  cursor: pointer;
+  transition: all $transition-fast;
+  border: 1px solid transparent;
+
+  .el-icon {
+    color: $primary-color;
+    font-size: 16px;
+  }
+
+  span {
+    flex: 1;
+    font-size: $font-size-sm;
+    color: $text-color;
+  }
+
+  .link-icon {
+    color: $text-color-light;
+    font-size: 14px;
+    transform: rotate(45deg);
+  }
+
+  &:hover {
+    background: rgba($primary-color, 0.05);
+    border-color: rgba($primary-color, 0.1);
+  }
 }
 
 .view-count {
@@ -606,11 +1129,35 @@ onMounted(() => {
   padding: $spacing-lg;
   background: $background-color;
   border-radius: $border-radius-md;
+  position: relative;
+  z-index: 2;
+
+  :deep(.el-textarea) {
+    width: 100%;
+  }
 
   :deep(.el-textarea__inner) {
     font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    color: #333;
     letter-spacing: 0.5px;
     line-height: 1.6;
+    resize: vertical;
+    min-height: 80px;
+    padding: 12px;
+    background-color: #fff;
+    border: 1px solid $border-color;
+    border-radius: $border-radius-sm;
+    transition: border-color 0.2s, box-shadow 0.2s;
+
+    &::placeholder {
+      color: #999;
+    }
+
+    &:focus {
+      border-color: $primary-color;
+      box-shadow: 0 0 0 2px rgba($primary-color, 0.15);
+      outline: none;
+    }
   }
 }
 
@@ -813,8 +1360,26 @@ onMounted(() => {
   .comment-input {
     :deep(.el-textarea__inner) {
       font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+      color: #333;
       letter-spacing: 0.5px;
       line-height: 1.6;
+      resize: vertical;
+      min-height: 60px;
+      padding: 12px;
+      background-color: #fff;
+      border: 1px solid $border-color;
+      border-radius: $border-radius-sm;
+      transition: border-color 0.2s, box-shadow 0.2s;
+
+      &::placeholder {
+        color: #999;
+      }
+
+      &:focus {
+        border-color: $primary-color;
+        box-shadow: 0 0 0 2px rgba($primary-color, 0.15);
+        outline: none;
+      }
     }
   }
 }
@@ -863,5 +1428,210 @@ onMounted(() => {
     line-height: $line-height-loose;
     margin: 0;
   }
+}
+
+.ai-float-btn {
+  position: fixed;
+  right: 30px;
+  bottom: 30px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1000;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  transition: all $transition-fast;
+
+  .el-icon {
+    color: white;
+    font-size: 24px;
+  }
+
+  &:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+  }
+
+  &.active {
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  }
+}
+
+.ai-chat-dialog {
+  position: fixed;
+  right: 90px;
+  bottom: 90px;
+  width: 380px;
+  height: 500px;
+  background: $background-color-light;
+  border-radius: $border-radius-lg;
+  box-shadow: $box-shadow-xl;
+  display: flex;
+  flex-direction: column;
+  z-index: 1001;
+  overflow: hidden;
+}
+
+.ai-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-md $spacing-lg;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+
+  .ai-chat-title {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    font-size: $font-size-base;
+    font-weight: 600;
+  }
+
+  .ai-chat-close {
+    cursor: pointer;
+    font-size: 18px;
+    opacity: 0.8;
+    transition: opacity $transition-fast;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+}
+
+.ai-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: $spacing-md;
+  @include scrollbar;
+
+  .chat-message {
+    display: flex;
+    gap: $spacing-sm;
+    margin-bottom: $spacing-md;
+    align-items: flex-start;
+    animation: fadeIn 0.3s ease;
+
+    &.user {
+      flex-direction: row-reverse;
+
+      .message-content {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 18px 18px 4px 18px;
+      }
+    }
+
+    &.assistant {
+      .message-content {
+        background: #f4f4f5;
+        color: $text-color;
+        border-radius: 18px 18px 18px 4px;
+      }
+    }
+  }
+
+  .message-avatar {
+    flex-shrink: 0;
+
+    .ai-avatar {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+  }
+
+  .message-body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .message-content {
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 10px 14px;
+    word-break: break-word;
+
+    &.loading {
+      color: $text-color-secondary;
+      font-style: italic;
+    }
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ai-chat-input {
+  padding: $spacing-md;
+  border-top: 1px solid $border-color;
+  display: flex;
+  gap: $spacing-sm;
+  align-items: flex-end;
+  background: linear-gradient(to bottom, #fafafa, #f5f5f5);
+
+  .el-textarea {
+    flex: 1;
+
+    :deep(.el-textarea__inner) {
+      border-radius: 20px;
+      padding: 10px 16px;
+      resize: none;
+      border-color: $border-color;
+      font-size: $font-size-sm;
+      line-height: 1.5;
+      transition: all $transition-fast;
+      background: white;
+
+      &::placeholder {
+        font-size: $font-size-sm;
+        color: $text-color-light;
+      }
+
+      &:focus {
+        border-color: $primary-color;
+        box-shadow: 0 0 0 3px rgba($primary-color, 0.15);
+      }
+    }
+  }
+
+  .el-button {
+    border-radius: 20px;
+    padding: 10px 24px;
+    font-weight: 500;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+
+    &:hover {
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+  }
+}
+
+.ai-chat-slide-enter-active,
+.ai-chat-slide-leave-active {
+  transition: all 0.3s ease;
+}
+
+.ai-chat-slide-enter-from,
+.ai-chat-slide-leave-to {
+  opacity: 0;
+  transform: translateY(20px) scale(0.95);
 }
 </style>

@@ -19,7 +19,6 @@ import java.util.Map;
 public class PoemRatingController {
 
     private final PoemRatingService poemRatingService;
-    private final SecurityUtil securityUtil;
 
     @GetMapping
     @Operation(summary = "获取诗词评分详情")
@@ -35,7 +34,7 @@ public class PoemRatingController {
         if (score.compareTo(BigDecimal.ONE) < 0 || score.compareTo(new BigDecimal("5")) > 0) {
             return R.error("评分范围应在 1.0-5.0 之间");
         }
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         poemRatingService.ratePoem(poemId, userId, score, comment);
         return R.success();
     }

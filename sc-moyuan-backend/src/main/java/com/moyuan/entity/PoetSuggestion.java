@@ -22,7 +22,11 @@ public class PoetSuggestion {
 
     private String content;
 
+    private String category;
+
     private String status;
+
+    private String ip;
 
     private String reviewComment;
 

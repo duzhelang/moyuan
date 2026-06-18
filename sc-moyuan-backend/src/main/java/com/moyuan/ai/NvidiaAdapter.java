@@ -42,7 +42,7 @@ public class NvidiaAdapter implements AiModelAdapter {
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
         try {
-            ResponseEntity<Map> response = restTemplate.postForEntity(model.getApiUrl(), request, Map.class);
+            ResponseEntity<Map<String, Object>> response = restTemplate.postForEntity(model.getApiUrl(), request, (Class<Map<String, Object>>) (Class<?>) Map.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 return extractContent(response.getBody());
             }
@@ -63,6 +63,7 @@ public class NvidiaAdapter implements AiModelAdapter {
         return "nvidia".equals(provider);
     }
 
+    @SuppressWarnings("unchecked")
     private String extractContent(Map<String, Object> responseBody) {
         List<Map<String, Object>> choices = (List<Map<String, Object>>) responseBody.get("choices");
         if (choices != null && !choices.isEmpty()) {

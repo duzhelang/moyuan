@@ -52,9 +52,9 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
             wrapper.like(Poet::getName, keyword);
         }
         if ("ancient".equals(poetType)) {
-            wrapper.and(w -> w.ne(Poet::getDynastyId, 13).or().isNull(Poet::getDynastyId));
+            wrapper.eq(Poet::getPoetType, "ancient");
         } else if ("modern".equals(poetType)) {
-            wrapper.eq(Poet::getDynastyId, 13);
+            wrapper.eq(Poet::getPoetType, "modern");
         }
         wrapper.orderByDesc(Poet::getCreateTime);
         IPage<Poet> page = poetMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
@@ -63,7 +63,6 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
                 Dynasty dynasty = dynastyMapper.selectById(poet.getDynastyId());
                 if (dynasty != null) {
                     poet.setDynastyName(dynasty.getName());
-                    poet.setPoetType("modern".equals(dynasty.getName()) ? "modern" : "ancient");
                 }
             }
         });
@@ -81,7 +80,6 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
             Dynasty dynasty = dynastyMapper.selectById(poet.getDynastyId());
             if (dynasty != null) {
                 poet.setDynastyName(dynasty.getName());
-                poet.setPoetType("modern".equals(dynasty.getName()) ? "modern" : "ancient");
             }
         }
         // 懒加载：如果诗人信息不完整，从API获取
@@ -105,12 +103,14 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
             String url = String.format("%s?id=%s&key=%s&name=%s&page=1", API_URL, apihzId, apihzKey, poet.getName());
             log.info("懒加载诗人数据: {}", poet.getName());
 
-            Map response = restTemplate.getForObject(url, Map.class);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> response = restTemplate.getForObject(url, Map.class);
             if (response == null || !Integer.valueOf(200).equals(response.get("code"))) {
                 log.warn("获取诗人数据失败: {}", poet.getName());
                 return;
             }
 
+            @SuppressWarnings("unchecked")
             List<Map<String, Object>> dataList = (List<Map<String, Object>>) response.get("data");
             if (dataList == null || dataList.isEmpty()) {
                 log.warn("未找到诗人数据: {}", poet.getName());

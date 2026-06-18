@@ -76,4 +76,3 @@ external:
   poetry:
     api:
       enabled: true
-      url: https://v2.jinrishici.com

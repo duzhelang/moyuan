@@ -27,7 +27,6 @@ public class ForumController {
 
     private final ForumPostService forumPostService;
     private final CommentService commentService;
-    private final SecurityUtil securityUtil;
 
     @Operation(summary = "获取帖子列表")
     @GetMapping("/posts")
@@ -54,21 +53,21 @@ public class ForumController {
     @Operation(summary = "创建帖子")
     @PostMapping("/posts")
     public R<ForumPost> createPost(@Valid @RequestBody ForumPostCreateRequest request) {
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         return R.success(forumPostService.createPost(userId, request));
     }
 
     @Operation(summary = "更新帖子")
     @PutMapping("/posts/{id}")
     public R<ForumPost> updatePost(@PathVariable Long id, @Valid @RequestBody ForumPostUpdateRequest request) {
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         return R.success(forumPostService.updatePost(userId, id, request));
     }
 
     @Operation(summary = "删除帖子")
     @DeleteMapping("/posts/{id}")
     public R<Void> deletePost(@PathVariable Long id) {
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         forumPostService.deletePost(userId, id);
         return R.success();
     }
@@ -76,7 +75,7 @@ public class ForumController {
     @Operation(summary = "点赞/取消点赞帖子")
     @PostMapping("/posts/{id}/like")
     public R<Void> togglePostLike(@PathVariable Long id) {
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         forumPostService.toggleLike(userId, id);
         return R.success();
     }
@@ -84,7 +83,7 @@ public class ForumController {
     @Operation(summary = "检查是否点赞帖子")
     @GetMapping("/posts/{id}/like")
     public R<Map<String, Boolean>> isPostLike(@PathVariable Long id) {
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         Map<String, Boolean> result = new HashMap<>();
         result.put("liked", forumPostService.isLike(userId, id));
         return R.success(result);
@@ -109,14 +108,14 @@ public class ForumController {
     @Operation(summary = "创建评论")
     @PostMapping("/comments")
     public R<Comment> createComment(@Valid @RequestBody CommentCreateRequest request) {
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         return R.success(commentService.createComment(userId, request));
     }
 
     @Operation(summary = "删除评论")
     @DeleteMapping("/comments/{id}")
     public R<Void> deleteComment(@PathVariable Long id) {
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         commentService.deleteComment(userId, id);
         return R.success();
     }
@@ -124,7 +123,7 @@ public class ForumController {
     @Operation(summary = "点赞/取消点赞评论")
     @PostMapping("/comments/{id}/like")
     public R<Void> toggleCommentLike(@PathVariable Long id) {
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         commentService.toggleLike(userId, id);
         return R.success();
     }

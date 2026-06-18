@@ -23,7 +23,6 @@ import java.time.LocalDate;
 public class VisitLogAspect {
 
     private final VisitLogMapper visitLogMapper;
-    private final SecurityUtil securityUtil;
 
     @Pointcut("execution(* com.moyuan.controller.*.*(..))")
     public void controllerPointcut() {}
@@ -44,7 +43,7 @@ public class VisitLogAspect {
                     visitLog.setVisitDate(LocalDate.now());
 
                     try {
-                        Long userId = securityUtil.getCurrentUserId();
+                        Long userId = SecurityUtil.getCurrentUserId();
                         visitLog.setUserId(userId);
                     } catch (Exception ignored) {
                     }

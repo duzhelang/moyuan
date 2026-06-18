@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS `poet` (
   `evaluation` TEXT DEFAULT NULL COMMENT '历史评价',
   `anecdotes` TEXT DEFAULT NULL COMMENT '轶事典故',
   `avatar` VARCHAR(255) DEFAULT NULL COMMENT '头像URL',
+  `poet_type` VARCHAR(20) DEFAULT 'ancient' COMMENT '诗人类型：ancient-古籍，modern-现代',
   `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -90,6 +91,7 @@ CREATE TABLE IF NOT EXISTS `poem` (
   `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-草稿，1-已发布，2-待审核',
   `is_featured` TINYINT NOT NULL DEFAULT 0 COMMENT '是否精选：0-否，1-是',
   `is_original` TINYINT NOT NULL DEFAULT 0 COMMENT '是否原创：0-否，1-是',
+  `poem_type` VARCHAR(20) DEFAULT 'classical' COMMENT '诗词类型：classical-古籍，modern-现代',
   `audit_status` TINYINT NOT NULL DEFAULT 1 COMMENT '审核状态：0-待审核，1-已通过，2-已拒绝',
   `audit_time` DATETIME DEFAULT NULL COMMENT '审核时间',
   `audit_reason` VARCHAR(500) DEFAULT NULL COMMENT '审核备注',
@@ -436,32 +438,32 @@ INSERT IGNORE INTO `category` (`id`, `name`, `parent_id`, `description`, `sort_o
 -- ============================================================
 -- 初始数据：诗人
 -- ============================================================
-INSERT IGNORE INTO `poet` (`name`, `dynasty_id`, `biography`, `status`) VALUES
-('常平逼王', 13, '现代诗人，作品多表现个人情感与生活感悟', 1),
-('陆游', 8, '（1125年—1210年），字务观，号放翁，越州山阴（今浙江绍兴）人。南宋文学家、史学家、爱国诗人。一生笔耕不辍，诗词文俱有很高成就，其诗语言平易晓畅、章法整饬谨严，兼具李白的雄奇奔放与杜甫的沉郁悲凉，尤以饱含爱国热情对后世影响深远。', 1),
-('唐婉', 8, '（约1128年—约1156年），字蕙仙，越州山阴（今浙江绍兴）人。南宋才女，陆游的前妻。自幼聪慧，才华横溢，擅长诗词。与陆游的爱情悲剧令人扼腕，其《钗头凤·世情薄》传诵千古。', 1),
-('李煜', 7, '（937年—978年），初名从嘉，字重光，号钟隐、莲峰居士，彭城（今江苏徐州）人。南唐末代君主，世称南唐后主。精书法、工绘画、通音律，诗文均有一定造诣，尤以词的成就最高。其词作在晚唐五代词中别树一帜，对后世词坛影响深远。', 1),
-('森垚', 13, '现代诗人，作品风格独特，善于运用古典意象表达现代情感。', 1);
+INSERT IGNORE INTO `poet` (`name`, `dynasty_id`, `biography`, `poet_type`, `status`) VALUES
+('常平逼王', 13, '现代诗人，作品多表现个人情感与生活感悟', 'modern', 1),
+('陆游', 8, '（1125年—1210年），字务观，号放翁，越州山阴（今浙江绍兴）人。南宋文学家、史学家、爱国诗人。一生笔耕不辍，诗词文俱有很高成就，其诗语言平易晓畅、章法整饬谨严，兼具李白的雄奇奔放与杜甫的沉郁悲凉，尤以饱含爱国热情对后世影响深远。', 'ancient', 1),
+('唐婉', 8, '（约1128年—约1156年），字蕙仙，越州山阴（今浙江绍兴）人。南宋才女，陆游的前妻。自幼聪慧，才华横溢，擅长诗词。与陆游的爱情悲剧令人扼腕，其《钗头凤·世情薄》传诵千古。', 'ancient', 1),
+('李煜', 7, '（937年—978年），初名从嘉，字重光，号钟隐、莲峰居士，彭城（今江苏徐州）人。南唐末代君主，世称南唐后主。精书法、工绘画、通音律，诗文均有一定造诣，尤以词的成就最高。其词作在晚唐五代词中别树一帜，对后世词坛影响深远。', 'ancient', 1),
+('森垚', 13, '现代诗人，作品风格独特，善于运用古典意象表达现代情感。', 'modern', 1);
 
 -- ============================================================
 -- 初始数据：诗词
 -- ============================================================
-INSERT IGNORE INTO `poem` (`title`, `content`, `poet_id`, `dynasty_id`, `category_id`, `source`, `status`, `is_featured`) VALUES
-('愿如花已落千行', '愿如花已落千行，未闻花语浅别殇。\n幽僻心境漫过少，唯有诗语解锁缰。\n金甲未脱抬眼望，怒剑难收向疆场。\n笑祝功成人与事，再鼓一旬又何妨。', 1, 13, 47, '常平逼王', 1, 1),
-('西江月.未语', '华灯初照白路，夜来树影凄楚，俳徊只与月相伴，茫然一片迷雾。\n离人兀自心扬，未语难避哀伤，只若通明过后，真心但化霓裳。', 1, 13, 9, '常平逼王', 1, 1),
-('忆江南.哀', '秋风寒，\n落红自凋残。\n未识伊人愁几许，\n伊人兀自笑颜开。\n吾心不胜哀！', 1, 13, 9, '常平逼王', 1, 1),
-('东风吹起白蝴蝶', '东风吹起白蝴蝶，散入云幕尽青烟。\n但觉离魂归来少，春日暖暖艳阳天。\n松柏长青久可立，香印再燃意更坚。\n思情尽付潇湘处，绵远流长年复年。', 1, 13, 47, '常平逼王', 1, 1),
-('清平乐.梦怀', '雨落窗外，淅声渐消潺，一帘凝愁入梦来，若雾浸湿枕畔。\n经年离愁之初，再会此情更苦，最是万千惆怅，与白共登天目!', 1, 13, 9, '常平逼王', 1, 1),
-('乌夜啼.叹城府', '淡雾兀遮明眸，更愁，独倚玉阑不觉泪空流。\n人情恶，谁易错，自长酌，一心明月向沟成污浊。', 1, 13, 9, '常平逼王', 1, 1),
-('新桃映红把福迎', '新桃映红把福迎，银烛高照万家兴。\n火尾连排上清夜，笑语欢声动耳惊。\n奈何遣词功夫浅，此夜此景休论明。\n唯愿持酒歌一曲，与君同乐一身轻', 1, 13, 47, '常平逼王', 1, 1),
-('回首一九已成空', '回首一九已成空，展望二零佳意浓。\n世事岂敢轻年少，天意哪可断前程。\n唐猊又着战意显，三尺重出徙侣从。\n烂柯沉木枉悲夫，夫且若怡也可容。', 1, 13, 47, '常平逼王', 1, 1),
-('沉影迷叠千层障', '沉影迷叠千层障，乱云归处是它乡。\n酒酣仍识昔日客，心迷难辨眼前芳。\n纵把凡锦比仙缎，不需经年多思量。\n一笑即随羊角去，九风还作万华芳。', 1, 13, 47, '常平逼王', 1, 1),
-('一剪梅.无题', '一别三秋未招摇，\n山也迢迢，水也昭昭。\n何人再添新衣袍，\n笑意盈绕，喜上眉梢。\n忆昔花开岁月好，\n蜂字飘摇，蝶字舞蹈。\n而今方知云未晓，\n风又飘飘，雨又萧萧。', 1, 13, 9, '常平逼王', 1, 1),
-('清平乐.情(道姑)', '幽情迷朦，三年怀一梦，一遭尘世皆为恒，无怨无悔无憎。\n来日打马南屏，忆昔紫夜流萤，纵剑吴钩霜雪，锦夜孤灯长明。', 1, 13, 10, '初芒', 1, 1),
-('钗头凤·世情薄', '世情薄，人情恶，雨送黄昏花易落。晓风干，泪痕残，欲笺心事，独语斜阑。难，难，难！\n人成各，今非昨，病魂常似秋千索。角声寒，夜阑珊，怕人寻问，咽泪装欢。瞒，瞒，瞒！', 3, 8, 9, '唐婉词', 1, 1),
-('钗头凤·红酥手', '红酥手，黄縢酒，满城春色宫墙柳。东风恶，欢情薄。一怀愁绪，几年离索。错、错、错。\n春如旧，人空瘦，泪痕红浥鲛绡透。桃花落，闲池阁。山盟虽在，锦书难托。莫、莫、莫。', 2, 8, 9, '陆游词', 1, 1),
-('长相思·一重山', '一重山，两重山，山远天高烟水寒，相思枫叶丹。\n菊花开，菊花残，塞雁高飞人未还，一帘风月闲。', 4, 7, 9, '李煜词', 1, 1),
-('白夜月望', '经日积灰新作旧，魂安大腹杯弓痛。\n可怜嫦娥广寒丑，才识沧桑无激流。', 5, 13, 25, '森垚', 1, 1);
+INSERT IGNORE INTO `poem` (`title`, `content`, `poet_id`, `dynasty_id`, `category_id`, `source`, `status`, `is_featured`, `poem_type`) VALUES
+('愿如花已落千行', '愿如花已落千行，未闻花语浅别殇。\n幽僻心境漫过少，唯有诗语解锁缰。\n金甲未脱抬眼望，怒剑难收向疆场。\n笑祝功成人与事，再鼓一旬又何妨。', 1, 13, 47, '常平逼王', 1, 1, 'modern'),
+('西江月.未语', '华灯初照白路，夜来树影凄楚，俳徊只与月相伴，茫然一片迷雾。\n离人兀自心扬，未语难避哀伤，只若通明过后，真心但化霓裳。', 1, 13, 9, '常平逼王', 1, 1, 'modern'),
+('忆江南.哀', '秋风寒，\n落红自凋残。\n未识伊人愁几许，\n伊人兀自笑颜开。\n吾心不胜哀！', 1, 13, 9, '常平逼王', 1, 1, 'modern'),
+('东风吹起白蝴蝶', '东风吹起白蝴蝶，散入云幕尽青烟。\n但觉离魂归来少，春日暖暖艳阳天。\n松柏长青久可立，香印再燃意更坚。\n思情尽付潇湘处，绵远流长年复年。', 1, 13, 47, '常平逼王', 1, 1, 'modern'),
+('清平乐.梦怀', '雨落窗外，淅声渐消潺，一帘凝愁入梦来，若雾浸湿枕畔。\n经年离愁之初，再会此情更苦，最是万千惆怅，与白共登天目!', 1, 13, 9, '常平逼王', 1, 1, 'modern'),
+('乌夜啼.叹城府', '淡雾兀遮明眸，更愁，独倚玉阑不觉泪空流。\n人情恶，谁易错，自长酌，一心明月向沟成污浊。', 1, 13, 9, '常平逼王', 1, 1, 'modern'),
+('新桃映红把福迎', '新桃映红把福迎，银烛高照万家兴。\n火尾连排上清夜，笑语欢声动耳惊。\n奈何遣词功夫浅，此夜此景休论明。\n唯愿持酒歌一曲，与君同乐一身轻', 1, 13, 47, '常平逼王', 1, 1, 'modern'),
+('回首一九已成空', '回首一九已成空，展望二零佳意浓。\n世事岂敢轻年少，天意哪可断前程。\n唐猊又着战意显，三尺重出徙侣从。\n烂柯沉木枉悲夫，夫且若怡也可容。', 1, 13, 47, '常平逼王', 1, 1, 'modern'),
+('沉影迷叠千层障', '沉影迷叠千层障，乱云归处是它乡。\n酒酣仍识昔日客，心迷难辨眼前芳。\n纵把凡锦比仙缎，不需经年多思量。\n一笑即随羊角去，九风还作万华芳。', 1, 13, 47, '常平逼王', 1, 1, 'modern'),
+('一剪梅.无题', '一别三秋未招摇，\n山也迢迢，水也昭昭。\n何人再添新衣袍，\n笑意盈绕，喜上眉梢。\n忆昔花开岁月好，\n蜂字飘摇，蝶字舞蹈。\n而今方知云未晓，\n风又飘飘，雨又萧萧。', 1, 13, 9, '常平逼王', 1, 1, 'modern'),
+('清平乐.情(道姑)', '幽情迷朦，三年怀一梦，一遭尘世皆为恒，无怨无悔无憎。\n来日打马南屏，忆昔紫夜流萤，纵剑吴钩霜雪，锦夜孤灯长明。', 1, 13, 10, '初芒', 1, 1, 'modern'),
+('钗头凤·世情薄', '世情薄，人情恶，雨送黄昏花易落。晓风干，泪痕残，欲笺心事，独语斜阑。难，难，难！\n人成各，今非昨，病魂常似秋千索。角声寒，夜阑珊，怕人寻问，咽泪装欢。瞒，瞒，瞒！', 3, 8, 9, '唐婉词', 1, 1, 'classical'),
+('钗头凤·红酥手', '红酥手，黄縢酒，满城春色宫墙柳。东风恶，欢情薄。一怀愁绪，几年离索。错、错、错。\n春如旧，人空瘦，泪痕红浥鲛绡透。桃花落，闲池阁。山盟虽在，锦书难托。莫、莫、莫。', 2, 8, 9, '陆游词', 1, 1, 'classical'),
+('长相思·一重山', '一重山，两重山，山远天高烟水寒，相思枫叶丹。\n菊花开，菊花残，塞雁高飞人未还，一帘风月闲。', 4, 7, 9, '李煜词', 1, 1, 'classical'),
+('白夜月望', '经日积灰新作旧，魂安大腹杯弓痛。\n可怜嫦娥广寒丑，才识沧桑无激流。', 5, 13, 25, '森垚', 1, 1, 'modern');
 
 -- ============================================================
 -- 更新诗词翻译和赏析
@@ -588,6 +590,7 @@ CREATE TABLE IF NOT EXISTS `ai_module_config` (
 INSERT IGNORE INTO `ai_module_config` (`module_code`, `module_name`, `require_vision`, `description`, `prompt_template`, `max_response_length`, `response_style`, `first_response_length`, `enable_markdown`) VALUES
 ('chat', 'AI诗词问答', 0, '资深诗词文化顾问，精通先秦至近现代诗词典籍，擅长诗词鉴赏、创作指导、诗人生平解读、格律讲解及诗词推荐', '你是一个古典诗词文化助手。回答要求：1.语言简洁精炼，避免冗余；2.使用通俗易懂的中文；3.重点突出，条理清晰；4.不要使用markdown格式，直接输出纯文本；5.根据问题复杂度适当展开，但不超过{maxLength}字', 200, 'concise', 100, 0),
 ('poet_chat', '诗人对话', 0, '诗人介绍助手，专门回答关于诗人的问题', '你是一个古典诗词文化助手，正在为用户介绍诗人{poetName}。回答要求：1.语言简洁精炼，避免冗余；2.使用通俗易懂的中文；3.重点突出，条理清晰；4.不要使用markdown格式，直接输出纯文本；{styleHint}', 150, 'concise', 80, 0),
+('poetry_chat', '诗词AI助手', 0, '诗词鉴赏与解析助手，专门回答关于诗词的问题，包括译文注释、鉴赏赏析、创作背景、历史文化背景等', '你是一个文化渊博的大学者，精通古今中外诗歌知识。回答要求：1.语言简洁精炼，避免冗余；2.使用通俗易懂的中文；3.重点突出，条理清晰；4.不要使用markdown格式，直接输出纯文本；{styleHint}', 300, 'concise', 120, 0),
 ('write_poem', '看图写诗', 1, '古典诗词创作大师，擅长捕捉画面意境并转化为诗词意象，精通五言七言律诗绝句及各词牌创作', '你是一位古典诗词创作大师，擅长捕捉画面意境并转化为诗词意象。请根据图片内容创作一首诗词，讲究格律严谨、意象优美、情景交融。', 300, 'balanced', 300, 1),
 ('analyze', '诗词鉴赏分析', 0, '诗词学术研究专家，从意境营造、修辞手法、情感表达、历史背景、艺术特色等多维度深入解读诗词', '你是诗词学术研究专家，请从意境营造、修辞手法、情感表达、历史背景、艺术特色等多维度深入解读诗词，分析鞭辟入里、引经据典，兼顾学术严谨与通俗易懂。', 500, 'detailed', 500, 1),
 ('couplet', 'AI对对联', 0, '对联艺术大师，深谙平仄声律、词性对仗、意境相承之道', '你是对联艺术大师，深谙平仄声律、词性对仗、意境相承之道。请根据上联创作工整合律的下联，对仗精巧、意境深远。', 100, 'concise', 100, 0);
@@ -824,7 +827,24 @@ CREATE TABLE IF NOT EXISTS `poem_rating` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='诗词评分表';
 
 -- ============================================================
--- 21. 韵脚表（平水韵）
+-- 21. 诗词内容缓存表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `poem_content_cache` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `poem_title` VARCHAR(100) NOT NULL COMMENT '诗词标题',
+  `poet_name` VARCHAR(50) NOT NULL DEFAULT '' COMMENT '诗人姓名',
+  `content_type` VARCHAR(50) NOT NULL COMMENT '内容类型：annotation/appreciation/background/author_info/knowledge_dynastyPoetry/knowledge_literarySchool/knowledge_historicalContext',
+  `content` TEXT NOT NULL COMMENT '缓存内容',
+  `source` VARCHAR(20) NOT NULL DEFAULT 'ai' COMMENT '来源：ai/manual',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_poem_content_cache` (`poem_title`, `poet_name`, `content_type`),
+  KEY `idx_poem_content_cache_title` (`poem_title`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='诗词内容缓存表';
+
+-- ============================================================
+-- 22. 韵脚表（平水韵）
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `rhyme` (
   `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
@@ -1042,3 +1062,55 @@ INSERT IGNORE INTO `rhyme` (`character`, `rhyme_group`, `tone_type`, `rhyme_cate
 ('阔', '月', '入声', '入声', 4), ('歇', '月', '入声', '入声', 5), ('没', '月', '入声', '入声', 6),
 ('节', '月', '入声', '入声', 7), ('雪', '月', '入声', '入声', 8), ('别', '月', '入声', '入声', 9),
 ('灭', '月', '入声', '入声', 10), ('绝', '月', '入声', '入声', 11), ('说', '月', '入声', '入声', 12);
+
+-- ============================================================
+-- 增强 poet_suggestion 表（新增 category 和 ip 字段）
+-- ============================================================
+ALTER TABLE `poet_suggestion`
+  ADD COLUMN IF NOT EXISTS `category` VARCHAR(50) DEFAULT 'other' COMMENT '意见分类：biography/life_story/influence/evaluation/anecdotes/other' AFTER `content`,
+  ADD COLUMN IF NOT EXISTS `ip` VARCHAR(50) DEFAULT NULL COMMENT '提交者IP' AFTER `reviewer_id`;
+
+-- ============================================================
+-- 22. 诗人内容草稿表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `poet_draft` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `poet_id` BIGINT NOT NULL COMMENT '诗人ID',
+  `section` VARCHAR(50) NOT NULL COMMENT '编辑板块：biography/life_story/influence/evaluation/anecdotes',
+  `content` TEXT NOT NULL COMMENT '草稿内容',
+  `original_content` TEXT DEFAULT NULL COMMENT '修改前的原始内容',
+  `editor_id` BIGINT NOT NULL COMMENT '编辑者ID（管理员）',
+  `status` TINYINT NOT NULL DEFAULT 0 COMMENT '状态：0-待审核，1-已通过（已发布），2-已拒绝',
+  `reviewer_id` BIGINT DEFAULT NULL COMMENT '审核者ID',
+  `review_comment` VARCHAR(500) DEFAULT NULL COMMENT '审核备注',
+  `review_time` DATETIME DEFAULT NULL COMMENT '审核时间',
+  `ip` VARCHAR(50) DEFAULT NULL COMMENT '编辑者IP',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_poet_draft_poet_id` (`poet_id`),
+  KEY `idx_poet_draft_editor_id` (`editor_id`),
+  KEY `idx_poet_draft_status` (`status`),
+  KEY `idx_poet_draft_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='诗人内容草稿表';
+
+-- ============================================================
+-- 23. 静态页面内容表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `static_page` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `page_key` VARCHAR(50) NOT NULL COMMENT '页面标识（如：terms、privacy、contact）',
+  `title` VARCHAR(100) NOT NULL COMMENT '页面标题',
+  `content` TEXT NOT NULL COMMENT '页面内容',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-启用',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_static_page_key` (`page_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='静态页面内容表';
+
+-- 初始数据：静态页面（content 为 JSON 格式的章节数组）
+INSERT IGNORE INTO `static_page` (`page_key`, `title`, `content`) VALUES
+('terms', '使用条款', '[{"title":"服务说明","content":"古诗词汇是一个提供古典诗词内容浏览、学习和交流服务的在线平台。用户通过注册账号可以享受更多个性化服务。"},{"title":"用户注册","content":"1. 用户应提供真实、准确的注册信息\n2. 用户应妥善保管账号密码，因个人原因导致的账号安全问题由用户自行负责\n3. 每个用户只能注册一个账号"},{"title":"用户行为规范","content":"1. 用户应遵守国家法律法规，不得利用平台从事违法违规活动\n2. 用户应尊重其他用户，不得发布侮辱、诽谤、色情等不良信息\n3. 用户应尊重知识产权，不得侵犯他人著作权"},{"title":"知识产权","content":"1. 平台上的诗词内容版权归原作者或授权方所有\n2. 用户发布的内容应为原创或已获得授权\n3. 未经授权，不得将平台内容用于商业用途"},{"title":"免责声明","content":"1. 平台不对用户发布的内容承担法律责任\n2. 因不可抗力导致的服务中断，平台不承担责任\n3. 平台有权对违规内容进行删除或处理"},{"title":"条款修改","content":"平台有权根据需要修改使用条款，修改后的条款将在平台上公布。继续使用平台即视为同意修改后的条款。"}]'),
+('privacy', '隐私政策', '[{"title":"信息收集","content":"我们可能收集以下信息：\n1. 注册信息：用户名、邮箱、手机号等\n2. 使用数据：浏览记录、搜索历史、收藏内容等\n3. 设备信息：设备型号、操作系统、浏览器类型等"},{"title":"信息使用","content":"我们使用收集的信息用于：\n1. 提供和维护服务\n2. 个性化用户体验\n3. 改进平台功能\n4. 发送服务通知\n5. 防范安全风险"},{"title":"信息保护","content":"我们采取以下措施保护您的信息：\n1. 数据加密存储和传输\n2. 访问权限控制\n3. 定期安全审计\n4. 员工保密培训"},{"title":"信息共享","content":"未经您的同意，我们不会向第三方共享您的个人信息，但以下情况除外：\n1. 法律法规要求\n2. 保护平台或用户的合法权益\n3. 经您明确同意"},{"title":"Cookie使用","content":"我们使用Cookie来提升用户体验，您可以通过浏览器设置管理Cookie。"},{"title":"隐私政策更新","content":"我们可能会不时更新隐私政策，更新后的政策将在平台上公布。"},{"title":"联系我们","content":"如对隐私政策有任何疑问，请通过平台联系我们。"}]'),
+('contact', '联系我们', '[{"title":"联系方式","content":"• 客服邮箱：support@gushihui.com\n• 商务合作：business@gushihui.com\n• 意见反馈：feedback@gushihui.com"},{"title":"工作时间","content":"周一至周五：9:00 - 18:00\n法定节假日除外"},{"title":"常见问题","content":"1. 账号问题：如忘记密码、账号异常等\n2. 内容问题：如诗词纠错、诗人信息补充等\n3. 功能建议：如新功能需求、界面优化等\n4. 合作洽谈：如内容授权、广告合作等"},{"title":"反馈渠道","content":"1. 邮件反馈：发送邮件至上述邮箱\n2. 在线反馈：通过平台\"意见反馈\"功能提交\n3. 社交媒体：关注我们的官方微博、微信公众号"},{"title":"地址","content":"[公司地址信息]"}]');

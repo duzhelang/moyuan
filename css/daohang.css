@@ -53,6 +53,7 @@
  	border: 1px solid gainsboro;
  	border-radius: 5px;
  	color: wheat;
+ 	position: relative;
  }
 
  .daohang ul li a {
@@ -82,17 +83,17 @@
 
  .daohang ul li .sy_xdlchuang {
  	position: absolute;
- 	right: -60px;
+ 	top: 100%;
+ 	left: 50%;
+ 	transform: translateX(-50%);
  	z-index: 51;
  	/* 小登录窗显示 */
- 	display: none;
-
+ 	/* 由Vue的v-show控制显示，移除CSS的hover规则 */
  	cursor: pointer;
  	/*手型*/
- }
-
- .daohang ul li:hover .sy_xdlchuang {
- 	display: block;
+ 	padding-top: 5px;
+ 	margin-top: -5px;
+ 	width: 366px;
  }
 
  /* 当有 'active' 类时显示 */
@@ -118,7 +119,8 @@
  	/* background-size: contain;/*保持比例，可能出现空白*/
 
  	width: 366px;
- 	height: 205px;
+ 	padding: 15px 20px;
+ 	box-sizing: border-box;
 
  	background-color: #f4f4f4;
  	border: 1px solid #ccc;
@@ -132,47 +134,59 @@
 
  .login-container .lieb {
  	display: flex;
+ 	align-items: center;
  	color: #000;
+ 	margin-bottom: 15px;
  }
 
  .login-container label {
  	font-size: 15px;
  	display: inline-block;
+ 	min-width: 70px;
  }
 
  /* 标题样式 */
  .login-title {
  	text-align: center;
- 	font-size: 30px;
+ 	font-size: 26px;
  	font-weight: 600;
- 	margin: 2px 0px auto;
- 	/* margin-bottom: 20px; */
+ 	margin: 0 0 12px 0;
  	color: #000;
- 	/* font-size: 35px; */
  }
 
  /* 输入框样式 */
  .sy_xdlchuang .login-container .input-field {
  	display: inline-block;
- 	width: 60%;
+ 	flex: 1;
  	background-color: #ffffff;
  	height: 32px;
- 	padding: 0px;
+ 	padding: 0 10px;
  	color: #000;
- 	border-radius: 10px;
+ 	border-radius: 8px;
  	border: 1px solid #ccc;
+ 	box-sizing: border-box;
+ 	min-width: 0;
+ 	font-size: 14px;
+ }
 
+ .sy_xdlchuang .login-container .input-field::placeholder {
+ 	color: #999;
+ 	font-size: 13px;
+ 	white-space: nowrap;
+ 	overflow: visible;
  }
 
  /* 登录按钮样式 */
  .sy_xdlchuang .login-container .login-button {
- 	width: 100px;
- 	height: 32px;
+ 	width: 100%;
+ 	height: 36px;
  	background-color: #007BFF;
  	color: white;
  	border: none;
- 	border-radius: 3px;
+ 	border-radius: 5px;
  	cursor: pointer;
+ 	margin-top: 10px;
+ 	font-size: 15px;
  	/*手型*/
  }
 
@@ -180,31 +194,36 @@
  	background-color: #0056b3;
  }
 
+ /* 链接容器样式 */
+ .login-container .login-links {
+ 	display: flex;
+ 	justify-content: center;
+ 	align-items: center;
+ 	margin-top: 6px;
+ 	gap: 6px;
+ 	width: 100%;
+ 	box-sizing: border-box;
+ }
+
  /* 忘记密码和注册链接样式 */
  .login-container .forgot-password,
  .login-container .register-link {
- 	font-size: 20px;
+ 	font-size: 11px;
  	text-align: center;
- 	margin-top: 0px;
  }
 
  .login-container .forgot-password .fuzhu,
  .login-container .register-link .fuzhu {
-
  	background-color: rgba(204, 204, 204, 0.7);
- 	line-height: 0px;
- 	/* text-stroke: 1px black;/*字体边框*/
+ 	padding: 2px 5px;
+ 	border-radius: 3px;
  	text-shadow: 0 0 10px white;
- 	/*字体外发光*/
- 	/* -webkit-text-stroke: 1px black;/*字体边框..浏览器兼容*/
  	color: #55aaff;
+ 	text-decoration: none;
+ 	white-space: nowrap;
  }
 
  .login-container .register-link {
- 	/* height: 25px; */
- 	position: absolute;
- 	bottom: 1px;
- 	right: 3px;
  }
 
  .login-container .forgot-password .fuzhu:hover,
@@ -219,7 +238,9 @@
  	flood-color: aqua;
  	background: gray;
  	/* opacity: 0.8; */
- 	position: relative;
+ 	position: absolute;
+ 	top: 100%;
+ 	left: -10px;
  	z-index: 51;
  	font-size: 20px;
 
@@ -228,9 +249,10 @@
  	width: 180px;
  	height: 265px;
  	margin-top: 0px;
- 	margin-left: -1px;
  	border: 1px solid gainsboro;
  	border-radius: 7px;
+ 	padding-top: 5px;
+ 	margin-top: -5px;
  }
 
  ul li a:hover,

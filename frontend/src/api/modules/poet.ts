@@ -9,6 +9,6 @@ export function getPoetById(id: number) {
   return request.get<Poet>(`/poets/${id}`)
 }
 
-export function submitPoetSuggestion(data: { poetId: number; section: string; content: string }) {
+export function submitPoetSuggestion(data: { poetId: number; section: string; content: string; category?: string }) {
   return request.post('/poet-suggestions', data)
 }

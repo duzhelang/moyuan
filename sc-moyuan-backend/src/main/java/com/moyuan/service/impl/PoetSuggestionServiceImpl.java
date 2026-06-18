@@ -22,6 +22,9 @@ public class PoetSuggestionServiceImpl implements PoetSuggestionService {
     @Transactional
     public void submitSuggestion(PoetSuggestion suggestion) {
         suggestion.setStatus("pending");
+        if (suggestion.getCategory() == null || suggestion.getCategory().isEmpty()) {
+            suggestion.setCategory("other");
+        }
         suggestion.setCreateTime(LocalDateTime.now());
         suggestion.setUpdateTime(LocalDateTime.now());
         poetSuggestionMapper.insert(suggestion);

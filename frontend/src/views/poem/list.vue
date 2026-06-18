@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { usePoemStore } from '@/stores/poem'
 import { useUserStore } from '@/stores/user'
 import { usePreferencesStore } from '@/stores/preferences'
@@ -11,12 +11,36 @@ import { getCategoryList } from '@/api/modules/category'
 import { likePoem, favoritePoem, getModernPoems } from '@/api/modules/poem'
 import { getPoetList } from '@/api/modules/poet'
 import { getCache, setCache } from '@/utils/storage'
+import { searchApihzPoems, getApihzPoetryDetail } from '@/api/modules/external-poetry'
+import type { PoemSearchResult } from '@/api/modules/external-poetry'
+import { getAiModuleConfig, type AiModuleConfig } from '@/api/modules/ai'
+import { smartSearch, getSearchSuggestions, getHotSearches, getSearchHistory, clearSearchHistory } from '@/api/modules/search'
+import type { SmartSearchResult } from '@/api/modules/search'
+import { getCachedContent as getPoemCachedContent, saveCachedContent as savePoemCachedContent } from '@/api/modules/poem-content'
+import LoginPrompt from '@/components/common/LoginPrompt.vue'
+import { useParticles } from '@/composables/useParticles'
 
 const router = useRouter()
 const route = useRoute()
 const poemStore = usePoemStore()
 const userStore = useUserStore()
 const preferencesStore = usePreferencesStore()
+
+const particleCanvasRef = ref<HTMLCanvasElement | null>(null)
+useParticles(particleCanvasRef, {
+  count: 60,
+  colors: ['#d4af87', '#f0e4d7', '#c9a06c'],
+  opacityRange: [0.15, 0.3],
+  sizeRange: [1, 2.5]
+})
+
+const bannerCanvasRef = ref<HTMLCanvasElement | null>(null)
+useParticles(bannerCanvasRef, {
+  count: 40,
+  colors: ['#d4af87', '#f0e4d7'],
+  opacityRange: [0.25, 0.4],
+  sizeRange: [1, 2.5]
+})
 
 const loading = ref(false)
 const dynasties = ref<Dynasty[]>([])
@@ -58,6 +82,70 @@ const total = computed(() => {
 const modernPoemList = ref<Poem[]>([])
 const modernTotal = ref(0)
 
+const externalPoemResults = ref<PoemSearchResult[]>([])
+const externalSearching = ref(false)
+const selectedExternalPoem = ref<PoemSearchResult | null>(null)
+const externalPoemDetail = ref<any>(null)
+const externalDetailLoading = ref(false)
+const externalActiveTab = ref('translation')
+
+const poemHistory = ref<PoemSearchResult[]>([])
+const hoveredLineIdx = ref<number | null>(null)
+const explainedLineIdxs = ref<Set<number>>(new Set())
+const lineExplanations = ref<Map<number, string>>(new Map())
+const lineExplaining = ref<Set<number>>(new Set())
+
+const searchSuggestions = ref<string[]>([])
+const hotSearches = ref<string[]>([])
+const searchHistoryList = ref<string[]>([])
+const showSearchPanel = ref(false)
+const searchLevel = ref<string>('')
+const searchMessage = ref('')
+
+const annotationContent = ref('')
+const appreciationContent = ref('')
+const backgroundContent = ref('')
+const annotationLoading = ref(false)
+const appreciationLoading = ref(false)
+const backgroundLoading = ref(false)
+
+const authorInfoExpanded = ref(false)
+const authorInfoContent = ref('')
+const authorInfoLoading = ref(false)
+
+const backgroundKnowledge = ref({
+  dynastyPoetry: { content: '', loading: false, loaded: false },
+  literarySchool: { content: '', loading: false, loaded: false },
+  historicalContext: { content: '', loading: false, loaded: false }
+})
+const activeKnowledgePanels = ref<string[]>([])
+
+const contentCache = ref<Map<string, string>>(new Map())
+
+const activePanel = ref<'annotation' | 'appreciation' | 'background' | null>(null)
+const showEnlargedContent = ref(false)
+
+interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: number
+}
+
+const aiChatVisible = ref(false)
+const aiChatMessages = ref<ChatMessage[]>([])
+const aiChatInput = ref('')
+const aiChatLoading = ref(false)
+const aiChatContainerRef = ref<HTMLElement | null>(null)
+const aiConfig = ref<AiModuleConfig | null>(null)
+const loginPromptVisible = ref(false)
+let aiChatInitialized = false
+
+const resources = [
+  { name: '古诗文网', url: 'https://www.gushiwen.org', desc: '经典古诗文鉴赏' },
+  { name: '中华典藏', url: 'https://www.zhonghuadiancang.com', desc: '中华古籍全文检索' },
+  { name: '中国哲学书电子化计划', url: 'https://ctext.org', desc: '先秦至清代文献' },
+]
+
 const sortOptions = [
   { value: 'latest', label: '最新发布' },
   { value: 'popular', label: '最多浏览' },
@@ -66,9 +154,13 @@ const sortOptions = [
 
 const fetchPoems = async () => {
   loading.value = true
+  externalPoemResults.value = []
+  searchLevel.value = ''
+  searchMessage.value = ''
+  
   try {
     if (activeTab.value === 'classical') {
-      await poemStore.fetchPoemList({
+      const result: SmartSearchResult = await smartSearch({
         pageNum: currentPage.value,
         pageSize: pageSize.value,
         dynastyId: filters.value.dynastyId,
@@ -77,6 +169,87 @@ const fetchPoems = async () => {
         keyword: filters.value.keyword,
         sortBy: filters.value.sortBy
       })
+
+      poemStore.poemList = result.list
+      poemStore.total = result.total
+      searchLevel.value = result.searchLevel
+      searchMessage.value = result.message
+
+      if (result.searchLevel === 'fuzzy' || result.searchLevel === 'pinyin') {
+        ElMessage.info(result.message)
+      }
+
+      if (result.suggestExternal && filters.value.keyword) {
+        const cacheKey = `external_search_keyword_${filters.value.keyword}`
+        const cachedResults = getCache<PoemSearchResult[]>(cacheKey)
+        
+        if (cachedResults && cachedResults.length > 0) {
+          externalPoemResults.value = cachedResults
+          ElMessage.info('已加载缓存的搜索结果')
+          if (externalPoemResults.value.length > 0 && externalPoemResults.value.length <= 2) {
+            await openPoemDetail(externalPoemResults.value[0])
+          }
+        } else {
+          try {
+            await ElMessageBox.confirm(
+              '本地未找到相关诗词，是否进行全网搜索？（搜索时间较长）',
+              '提示',
+              {
+                confirmButtonText: '全网搜索',
+                cancelButtonText: '取消',
+                type: 'info'
+              }
+            )
+            externalSearching.value = true
+            externalPoemResults.value = await searchApihzPoems(filters.value.keyword, 20)
+            
+            if (externalPoemResults.value.length > 0) {
+              setCache(cacheKey, externalPoemResults.value, 24 * 60 * 60 * 1000)
+            }
+            
+            if (externalPoemResults.value.length > 0 && externalPoemResults.value.length <= 2) {
+              await openPoemDetail(externalPoemResults.value[0])
+            }
+          } catch {
+            // 用户取消
+          } finally {
+            externalSearching.value = false
+          }
+        }
+      } else if (result.suggestExternal && filters.value.categoryId) {
+        const category = categories.value.find(c => c.id === filters.value.categoryId)
+        if (category) {
+          const cacheKey = `external_search_category_${filters.value.categoryId}`
+          const cachedResults = getCache<PoemSearchResult[]>(cacheKey)
+          
+          if (cachedResults && cachedResults.length > 0) {
+            externalPoemResults.value = cachedResults
+            ElMessage.info('已加载缓存的搜索结果')
+          } else {
+            try {
+              await ElMessageBox.confirm(
+                `本地没有"${category.name}"分类的诗词，是否进行全网搜索？（搜索时间较长）`,
+                '提示',
+                {
+                  confirmButtonText: '全网搜索',
+                  cancelButtonText: '取消',
+                  type: 'info'
+                }
+              )
+              externalSearching.value = true
+              externalPoemResults.value = await searchApihzPoems(category.name, 20)
+              
+              if (externalPoemResults.value.length > 0) {
+                setCache(cacheKey, externalPoemResults.value, 24 * 60 * 60 * 1000)
+              }
+            } catch {
+              // 用户取消
+            } finally {
+              externalSearching.value = false
+            }
+          }
+        }
+      }
     } else {
       const res = await getModernPoems({
         pageNum: currentPage.value,
@@ -94,6 +267,605 @@ const fetchPoems = async () => {
     loading.value = false
   }
 }
+
+const openPoemDetail = async (poem: PoemSearchResult) => {
+  if (poem.source === 'local' && poem.id) {
+    router.push(`/poem/${poem.id}`)
+  } else {
+    selectedExternalPoem.value = poem
+    externalDetailLoading.value = true
+    externalActiveTab.value = 'translation'
+    explainedLineIdxs.value = new Set()
+    lineExplanations.value = new Map()
+    lineExplaining.value = new Set()
+    aiChatMessages.value = []
+    aiChatInitialized = false
+    annotationContent.value = ''
+    appreciationContent.value = ''
+    backgroundContent.value = ''
+    activePanel.value = null
+    showEnlargedContent.value = false
+
+    const exists = poemHistory.value.find(h => h.title === poem.title)
+    if (!exists) {
+      poemHistory.value.push(poem)
+      if (poemHistory.value.length > 10) {
+        poemHistory.value.shift()
+      }
+    }
+
+    setCache(`external_poem_${poem.title}`, poem, 24 * 60 * 60 * 1000)
+    syncFiltersToUrl()
+
+    try {
+      const result = await getApihzPoetryDetail(poem.title)
+      externalPoemDetail.value = result
+    } catch (e) {
+      console.error('获取诗词详情失败:', e)
+      externalPoemDetail.value = null
+    } finally {
+      externalDetailLoading.value = false
+    }
+  }
+}
+
+const goBackInHistory = () => {
+  if (poemHistory.value.length > 1) {
+    poemHistory.value.pop()
+    const prevPoem = poemHistory.value[poemHistory.value.length - 1]
+    openPoemDetail(prevPoem)
+  }
+}
+
+const ensureAiConfig = async () => {
+  if (!aiConfig.value) {
+    try {
+      const res = await getAiModuleConfig('poetry_chat')
+      aiConfig.value = res.data
+    } catch {
+      console.error('获取AI配置失败')
+    }
+  }
+}
+
+
+
+const generateAnnotation = async () => {
+  if (!userStore.isLoggedIn) {
+    loginPromptVisible.value = true
+    return
+  }
+
+  activePanel.value = 'annotation'
+  showEnlargedContent.value = true
+
+  const poemTitle = selectedExternalPoem.value?.title || ''
+  const poemAuthor = selectedExternalPoem.value?.author || ''
+  const poemContent = poemSentences.value.join('\n')
+
+  const cached = await getCachedContent(poemTitle, poemAuthor, 'annotation')
+  if (cached) {
+    annotationContent.value = cached
+    return
+  }
+
+  annotationLoading.value = true
+  annotationContent.value = ''
+
+  try {
+    await ensureAiConfig()
+    const prompt = `【系统设定】你是一个文化渊博的大学者，精通古今中外诗歌知识。请为这首诗提供详细的译文注释。
+
+当前诗词：《${poemTitle}》${poemAuthor ? ' - ' + poemAuthor : ''}
+诗词内容：
+${poemContent}
+
+回答要求：
+1. 逐句翻译，用现代汉语解释每句诗的含义
+2. 对关键词语进行注释，解释其在古代的含义
+3. 语言简洁易懂，适合普通读者阅读
+4. 不要使用markdown格式，直接输出纯文本
+
+【用户问题】请为这首诗提供译文注释`
+
+    const { chat } = await import('@/api/modules/ai')
+    const res = await chat({ message: prompt })
+    annotationContent.value = res.data.reply || '抱歉，暂时无法生成注释'
+    await saveCachedContent(poemTitle, poemAuthor, 'annotation', annotationContent.value, 'ai')
+  } catch {
+    annotationContent.value = 'AI服务暂时不可用，请稍后重试'
+  } finally {
+    annotationLoading.value = false
+  }
+}
+
+const generateAppreciation = async () => {
+  if (!userStore.isLoggedIn) {
+    loginPromptVisible.value = true
+    return
+  }
+
+  activePanel.value = 'appreciation'
+  showEnlargedContent.value = true
+
+  const poemTitle = selectedExternalPoem.value?.title || ''
+  const poemAuthor = selectedExternalPoem.value?.author || ''
+  const poemContent = poemSentences.value.join('\n')
+
+  const cached = await getCachedContent(poemTitle, poemAuthor, 'appreciation')
+  if (cached) {
+    appreciationContent.value = cached
+    return
+  }
+
+  appreciationLoading.value = true
+  appreciationContent.value = ''
+
+  try {
+    await ensureAiConfig()
+    const prompt = `【系统设定】你是一个文化渊博的大学者，精通古今中外诗歌知识。请提供这首诗的历代名人点评和历史评价。
+
+当前诗词：《${poemTitle}》${poemAuthor ? ' - ' + poemAuthor : ''}
+诗词内容：
+${poemContent}
+
+回答要求：
+1. 列举历代名家对此诗的点评和评价（如钟嵘、严羽、王国维等诗论家的评语）
+2. 引用真实的古籍文献中的评价原文
+3. 说明此诗在文学史上的地位和影响
+4. 如果是名篇，引用经典评论（如《诗品》《沧浪诗话》《人间词话》等）
+5. 不要使用markdown格式，直接输出纯文本，不要用**加粗等符号
+
+【用户问题】请提供这首诗的历代名人点评和历史评价`
+
+    const { chat } = await import('@/api/modules/ai')
+    const res = await chat({ message: prompt })
+    appreciationContent.value = res.data.reply || '抱歉，暂时无法生成鉴赏'
+    await saveCachedContent(poemTitle, poemAuthor, 'appreciation', appreciationContent.value, 'ai')
+  } catch {
+    appreciationContent.value = 'AI服务暂时不可用，请稍后重试'
+  } finally {
+    appreciationLoading.value = false
+  }
+}
+
+const generateBackground = async () => {
+  if (!userStore.isLoggedIn) {
+    loginPromptVisible.value = true
+    return
+  }
+
+  const poemTitle = selectedExternalPoem.value?.title || ''
+  const poemAuthor = selectedExternalPoem.value?.author || ''
+  const poemDynasty = selectedExternalPoem.value?.dynasty || ''
+
+  const cached = await getCachedContent(poemTitle, poemAuthor, 'background')
+  if (cached) {
+    backgroundContent.value = cached
+    return
+  }
+
+  backgroundLoading.value = true
+  backgroundContent.value = ''
+
+  try {
+    await ensureAiConfig()
+    const prompt = `【系统设定】你是一个文化渊博的大学者，精通古今中外诗歌知识。请介绍这首诗的创作背景。
+
+当前诗词：《${poemTitle}》${poemAuthor ? ' - ' + poemAuthor : ''}${poemDynasty ? ' 【' + poemDynasty + '】' : ''}
+
+回答要求：
+1. 介绍诗人的生平和时代背景
+2. 说明这首诗的创作缘由和历史背景
+3. 解释诗歌与诗人经历的关系
+4. 语言简洁易懂，适合普通读者阅读
+5. 不要使用markdown格式，直接输出纯文本
+
+【用户问题】请介绍这首诗的创作背景`
+
+    const { chat } = await import('@/api/modules/ai')
+    const res = await chat({ message: prompt })
+    backgroundContent.value = res.data.reply || '抱歉，暂时无法生成创作背景'
+    await saveCachedContent(poemTitle, poemAuthor, 'background', backgroundContent.value, 'ai')
+  } catch {
+    backgroundContent.value = 'AI服务暂时不可用，请稍后重试'
+  } finally {
+    backgroundLoading.value = false
+  }
+}
+
+const explainLine = async (idx: number) => {
+  if (!userStore.isLoggedIn) {
+    loginPromptVisible.value = true
+    return
+  }
+
+  if (explainedLineIdxs.value.has(idx)) {
+    explainedLineIdxs.value.delete(idx)
+    explainedLineIdxs.value = new Set(explainedLineIdxs.value)
+    return
+  }
+
+  explainedLineIdxs.value.add(idx)
+  explainedLineIdxs.value = new Set(explainedLineIdxs.value)
+
+  if (lineExplanations.value.has(idx) || lineExplaining.value.has(idx)) return
+
+  const sentence = poemSentences.value[idx]
+  const poemTitle = selectedExternalPoem.value?.title || ''
+  const poemAuthor = selectedExternalPoem.value?.author || ''
+
+  lineExplaining.value.add(idx)
+  lineExplaining.value = new Set(lineExplaining.value)
+
+  try {
+    if (!aiConfig.value) {
+      const res = await getAiModuleConfig('poetry_chat')
+      aiConfig.value = res.data
+    }
+
+    const prompt = `【系统设定】你是一个文化渊博的大学者，精通古今中外诗歌知识。请用简洁易懂的语言解释这句诗的含义、意象和情感。
+
+当前诗词：《${poemTitle}》${poemAuthor ? ' - ' + poemAuthor : ''}
+需要解释的诗句：${sentence}
+
+回答要求：
+1. 语言简洁精炼，不超过150字
+2. 解释诗句的字面意思和深层含义
+3. 分析其中的意象和修辞手法
+4. 说明表达的情感或思想
+5. 直接输出纯文本，不要使用任何markdown符号（如**、##、- 列表等）
+
+【用户问题】请解释这句诗`
+
+    const { chat } = await import('@/api/modules/ai')
+    const res = await chat({ message: prompt })
+    lineExplanations.value.set(idx, res.data.reply || '抱歉，暂时无法解析')
+    lineExplanations.value = new Map(lineExplanations.value)
+  } catch {
+    lineExplanations.value.set(idx, 'AI服务暂时不可用，请稍后重试')
+    lineExplanations.value = new Map(lineExplanations.value)
+  } finally {
+    lineExplaining.value.delete(idx)
+    lineExplaining.value = new Set(lineExplaining.value)
+  }
+}
+
+const closeLineExplanation = (idx: number) => {
+  explainedLineIdxs.value.delete(idx)
+  explainedLineIdxs.value = new Set(explainedLineIdxs.value)
+}
+
+const formatContent = (content: string): string[] => {
+  if (!content) return []
+  return content
+    .split(/\n+/)
+    .map(p => p.trim())
+    .filter(p => p.length > 0)
+}
+
+const copyContent = async (content: string) => {
+  try {
+    await navigator.clipboard.writeText(content)
+    ElMessage.success('已复制到剪贴板')
+  } catch {
+    ElMessage.error('复制失败')
+  }
+}
+
+const getCacheKey = (poemTitle: string, poetName: string, contentType: string) => {
+  return `${poemTitle}_${poetName}_${contentType}`
+}
+
+const getCachedContent = async (poemTitle: string, poetName: string, contentType: string): Promise<string> => {
+  const key = getCacheKey(poemTitle, poetName, contentType)
+  if (contentCache.value.has(key)) {
+    return contentCache.value.get(key)!
+  }
+  try {
+    const res = await getPoemCachedContent(poemTitle, poetName, contentType)
+    if (res.data?.content) {
+      contentCache.value.set(key, res.data.content)
+      return res.data.content
+    }
+  } catch {}
+  return ''
+}
+
+const saveCachedContent = async (poemTitle: string, poetName: string, contentType: string, content: string, source: string) => {
+  const key = getCacheKey(poemTitle, poetName, contentType)
+  contentCache.value.set(key, content)
+  try {
+    await savePoemCachedContent({ poemTitle, poetName, contentType, content, source })
+  } catch (e) {
+    console.error('保存缓存失败:', e)
+  }
+}
+
+const toggleAuthorInfo = async () => {
+  authorInfoExpanded.value = !authorInfoExpanded.value
+  if (authorInfoExpanded.value && !authorInfoContent.value) {
+    await loadAuthorInfo()
+  }
+}
+
+const loadAuthorInfo = async () => {
+  const poemTitle = selectedExternalPoem.value?.title || ''
+  const poemAuthor = selectedExternalPoem.value?.author || ''
+  if (!poemAuthor) return
+
+  authorInfoLoading.value = true
+  try {
+    const cached = await getCachedContent(poemTitle, poemAuthor, 'author_info')
+    if (cached) {
+      authorInfoContent.value = cached
+      return
+    }
+
+    await ensureAiConfig()
+    const prompt = `【系统设定】你是一个文化渊博的大学者，精通古今中外诗歌知识。请介绍这位诗人的生平和文学成就。
+
+诗人姓名：${poemAuthor}
+${selectedExternalPoem.value?.dynasty ? '朝代：' + selectedExternalPoem.value.dynasty : ''}
+
+回答要求：
+1. 介绍诗人的生平经历
+2. 说明诗人的文学风格和代表作品
+3. 语言简洁易懂，适合普通读者阅读
+4. 不要使用markdown格式，直接输出纯文本
+
+【用户问题】请介绍这位诗人`
+
+    const { chat } = await import('@/api/modules/ai')
+    const res = await chat({ message: prompt })
+    authorInfoContent.value = res.data.reply || '抱歉，暂时无法生成诗人介绍'
+    await saveCachedContent(poemTitle, poemAuthor, 'author_info', authorInfoContent.value, 'ai')
+  } catch {
+    authorInfoContent.value = 'AI服务暂时不可用，请稍后重试'
+  } finally {
+    authorInfoLoading.value = false
+  }
+}
+
+const toggleKnowledgePanel = async (panel: string) => {
+  const index = activeKnowledgePanels.value.indexOf(panel)
+  if (index > -1) {
+    activeKnowledgePanels.value.splice(index, 1)
+  } else {
+    activeKnowledgePanels.value.push(panel)
+    await loadKnowledgeContent(panel)
+  }
+}
+
+const loadKnowledgeContent = async (panel: string) => {
+  const poemTitle = selectedExternalPoem.value?.title || ''
+  const poemAuthor = selectedExternalPoem.value?.author || ''
+  const poemDynasty = selectedExternalPoem.value?.dynasty || ''
+
+  const panelData = backgroundKnowledge.value[panel as keyof typeof backgroundKnowledge.value]
+  if (panelData.loaded) return
+
+  panelData.loading = true
+  try {
+    const contentType = `knowledge_${panel}`
+    const cached = await getCachedContent(poemTitle, poemAuthor, contentType)
+    if (cached) {
+      panelData.content = cached
+      panelData.loaded = true
+      return
+    }
+
+    await ensureAiConfig()
+    let prompt = ''
+    if (panel === 'dynastyPoetry') {
+      prompt = `【系统设定】你是一个文化渊博的大学者，精通古今中外诗歌知识。请介绍${poemDynasty}朝代的诗歌特点。
+
+回答要求：
+1. 介绍该朝代诗歌的主要特点和风格
+2. 列举代表诗人和作品
+3. 语言简洁易懂
+4. 不要使用markdown格式，直接输出纯文本
+
+【用户问题】请介绍${poemDynasty}朝代的诗歌特点`
+    } else if (panel === 'literarySchool') {
+      prompt = `【系统设定】你是一个文化渊博的大学者，精通古今中外诗歌知识。请介绍与《${poemTitle}》相关的文学流派。
+
+当前诗词：《${poemTitle}》${poemAuthor ? ' - ' + poemAuthor : ''}
+
+回答要求：
+1. 分析这首诗属于哪个文学流派
+2. 介绍该流派的特点和代表人物
+3. 语言简洁易懂
+4. 不要使用markdown格式，直接输出纯文本
+
+【用户问题】请介绍与这首诗相关的文学流派`
+    } else if (panel === 'historicalContext') {
+      prompt = `【系统设定】你是一个文化渊博的大学者，精通古今中外诗歌知识。请介绍《${poemTitle}》的历史文化背景。
+
+当前诗词：《${poemTitle}》${poemAuthor ? ' - ' + poemAuthor : ''}${poemDynasty ? ' 【' + poemDynasty + '】' : ''}
+
+回答要求：
+1. 介绍这首诗创作时的历史背景
+2. 说明当时的社会文化环境
+3. 语言简洁易懂
+4. 不要使用markdown格式，直接输出纯文本
+
+【用户问题】请介绍这首诗的历史文化背景`
+    }
+
+    const { chat } = await import('@/api/modules/ai')
+    const res = await chat({ message: prompt })
+    panelData.content = res.data.reply || '抱歉，暂时无法生成内容'
+    panelData.loaded = true
+    await saveCachedContent(poemTitle, poemAuthor, contentType, panelData.content, 'ai')
+  } catch {
+    panelData.content = 'AI服务暂时不可用，请稍后重试'
+  } finally {
+    panelData.loading = false
+  }
+}
+
+const buildAiPrompt = (userMessage: string, isFirst: boolean = false) => {
+  const poemTitle = selectedExternalPoem.value?.title || '该诗词'
+  const poemAuthor = selectedExternalPoem.value?.author || ''
+  const poemContent = poemSentences.value.join('')
+
+  const poemContext = `\n\n当前诗词：《${poemTitle}》${poemAuthor ? ' - ' + poemAuthor : ''}\n诗词内容：${poemContent}`
+
+  let systemConstraint = ''
+  if (aiConfig.value?.promptTemplate) {
+    const maxLength = isFirst ? (aiConfig.value.firstResponseLength || 120) : (aiConfig.value.maxLength || 300)
+    const styleHint = isFirst
+      ? `这是首次提问，请用2-3句话简要概括即可，不超过${aiConfig.value.firstResponseLength || 120}字`
+      : `根据问题复杂度适当展开，但不超过${maxLength}字`
+
+    systemConstraint = aiConfig.value.promptTemplate
+      .replace(/\{poetName\}/g, poemAuthor)
+      .replace(/\{poemTitle\}/g, poemTitle)
+      .replace(/\{poemContent\}/g, poemContent)
+      .replace(/\{maxLength\}/g, String(maxLength))
+      .replace(/\{styleHint\}/g, styleHint)
+
+    if (!systemConstraint.includes(poemTitle)) {
+      systemConstraint += poemContext
+    }
+  } else {
+    const maxLength = isFirst ? 120 : 300
+    systemConstraint = `你是一个文化渊博的大学者，精通古今中外诗歌知识。正在为用户讲解一首古诗。
+当前诗词：《${poemTitle}》${poemAuthor ? ' - ' + poemAuthor : ''}
+诗词内容：${poemContent}
+
+回答要求：
+1. 语言简洁精炼，避免冗余
+2. 使用通俗易懂的中文
+3. 重点突出，条理清晰
+4. 不要使用markdown格式，直接输出纯文本
+${isFirst ? '5. 这是首次提问，请用2-3句话简要概括即可' : '5. 根据问题复杂度适当展开，但不超过' + maxLength + '字'}`
+  }
+
+  return `【系统设定】${systemConstraint}\n\n【用户问题】${userMessage}`
+}
+
+const sendAiChatMessage = async (message?: string, isFirst: boolean = false) => {
+  const msg = message || aiChatInput.value.trim()
+  if (!msg || aiChatLoading.value) return
+
+  if (!userStore.isLoggedIn) {
+    loginPromptVisible.value = true
+    return
+  }
+
+  if (!aiConfig.value) {
+    try {
+      const res = await getAiModuleConfig('poetry_chat')
+      aiConfig.value = res.data
+    } catch {
+      console.error('获取AI配置失败')
+    }
+  }
+
+  aiChatMessages.value.push({
+    role: 'user',
+    content: msg,
+    timestamp: Date.now()
+  })
+  aiChatInput.value = ''
+  aiChatLoading.value = true
+  scrollToAiChatBottom()
+
+  try {
+    const { chat } = await import('@/api/modules/ai')
+    const prompt = buildAiPrompt(msg, isFirst)
+    const res = await chat({ message: prompt })
+    aiChatMessages.value.push({
+      role: 'assistant',
+      content: res.data.reply || '抱歉，暂时无法回答',
+      timestamp: Date.now()
+    })
+  } catch {
+    aiChatMessages.value.push({
+      role: 'assistant',
+      content: 'AI服务暂时不可用，请稍后重试',
+      timestamp: Date.now()
+    })
+  } finally {
+    aiChatLoading.value = false
+    scrollToAiChatBottom()
+  }
+}
+
+const handleAiChatKeydown = (e: Event | KeyboardEvent) => {
+  if ((e as KeyboardEvent).key === 'Enter' && !(e as KeyboardEvent).shiftKey) {
+    e.preventDefault()
+    sendAiChatMessage()
+  }
+}
+
+const scrollToAiChatBottom = () => {
+  nextTick(() => {
+    if (aiChatContainerRef.value) {
+      aiChatContainerRef.value.scrollTop = aiChatContainerRef.value.scrollHeight
+    }
+  })
+}
+
+const toggleAiChat = () => {
+  aiChatVisible.value = !aiChatVisible.value
+  if (aiChatVisible.value && !aiChatInitialized) {
+    aiChatInitialized = true
+    nextTick(() => {
+      sendAiChatMessage('请简要介绍一下这首诗', true)
+    })
+  }
+}
+
+const hasContent = (fields: string[]): boolean => {
+  if (!externalPoemDetail.value) return false
+  return fields.some(f => {
+    const val = externalPoemDetail.value?.[f]
+    return val && typeof val === 'string' && val.trim().length > 0
+  })
+}
+
+const getContent = (fields: string[]): string => {
+  if (!externalPoemDetail.value) return ''
+  return fields
+    .map(f => externalPoemDetail.value?.[f])
+    .filter(v => v && typeof v === 'string' && v.trim().length > 0)
+    .join('\n\n')
+}
+
+const parsePoemContent = (content: string): string[] => {
+  if (!content) return []
+  const cleaned = content
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&emsp;/g, '　')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+
+  const lines = cleaned.split(/\n/).filter(line => line.trim())
+  const sentences: string[] = []
+  for (const line of lines) {
+    const parts = line.split(/(?<=[。！？；!?;])/).filter(s => s.trim())
+    if (parts.length === 0 && line.trim()) {
+      sentences.push(line.trim())
+    } else {
+      sentences.push(...parts.map(s => s.trim()).filter(Boolean))
+    }
+  }
+  return sentences
+}
+
+const poemSentences = computed(() => {
+  if (!externalPoemDetail.value?.content) return []
+  return parsePoemContent(externalPoemDetail.value.content)
+})
 
 const fetchFilters = async () => {
   try {
@@ -125,8 +897,8 @@ const fetchFilters = async () => {
   }
 }
 
-const handleTabChange = (tab: 'classical' | 'modern') => {
-  activeTab.value = tab
+const handleTabChange = (tab: string | number | boolean | undefined) => {
+  activeTab.value = tab as 'classical' | 'modern'
   currentPage.value = 1
   syncFiltersToUrl()
   fetchPoems()
@@ -175,6 +947,8 @@ const syncFiltersToUrl = () => {
     if (modernFilters.value.hasCertifiedPoet !== undefined) query.hasCertifiedPoet = String(modernFilters.value.hasCertifiedPoet)
     if (modernFilters.value.sortBy !== 'latest') query.sortBy = modernFilters.value.sortBy
   }
+  if (currentPage.value > 1) query.page = String(currentPage.value)
+  if (selectedExternalPoem.value) query.poemTitle = selectedExternalPoem.value.title
   router.replace({ query })
 }
 
@@ -187,6 +961,7 @@ const hasActiveFilters = computed(() => {
 
 const handlePageChange = (page: number) => {
   currentPage.value = page
+  syncFiltersToUrl()
   fetchPoems()
 }
 
@@ -256,6 +1031,12 @@ onMounted(() => {
   if (query.keyword) {
     filters.value.keyword = String(query.keyword)
   }
+  if (query.page) {
+    const page = Number(query.page)
+    if (!isNaN(page) && page > 0) {
+      currentPage.value = page
+    }
+  }
   if (query.sortBy) {
     const sortBy = String(query.sortBy) as 'latest' | 'popular' | 'likes'
     if (activeTab.value === 'classical') {
@@ -272,22 +1053,91 @@ onMounted(() => {
   }
   fetchFilters()
   fetchPoems()
+  initSearchData()
+
+  if (query.poemTitle) {
+    const poemTitle = String(query.poemTitle)
+    const cachedPoem = getCache<PoemSearchResult>(`external_poem_${poemTitle}`)
+    if (cachedPoem) {
+      openPoemDetail(cachedPoem)
+    }
+  }
 })
+
+const initSearchData = async () => {
+  try {
+    const [hot, history] = await Promise.all([
+      getHotSearches(8),
+      getSearchHistory(10)
+    ])
+    hotSearches.value = hot
+    searchHistoryList.value = history
+  } catch (error) {
+    console.error('初始化搜索数据失败:', error)
+  }
+}
+
+const handleSearchInput = async (value: string) => {
+  if (value.trim()) {
+    try {
+      searchSuggestions.value = await getSearchSuggestions(value.trim(), 10)
+    } catch {
+      searchSuggestions.value = []
+    }
+  } else {
+    searchSuggestions.value = []
+  }
+}
+
+const handleSearchFocus = () => {
+  showSearchPanel.value = true
+}
+
+const handleSearchBlur = () => {
+  setTimeout(() => {
+    showSearchPanel.value = false
+  }, 200)
+}
+
+const selectSuggestion = (suggestion: string) => {
+  filters.value.keyword = suggestion
+  showSearchPanel.value = false
+  handleFilterChange()
+}
+
+const selectHotSearch = (keyword: string) => {
+  filters.value.keyword = keyword
+  showSearchPanel.value = false
+  handleFilterChange()
+}
+
+const selectHistory = (keyword: string) => {
+  filters.value.keyword = keyword
+  showSearchPanel.value = false
+  handleFilterChange()
+}
+
+const handleClearHistory = async () => {
+  try {
+    await clearSearchHistory()
+    searchHistoryList.value = []
+    ElMessage.success('搜索历史已清除')
+  } catch {
+    ElMessage.error('清除失败')
+  }
+}
 </script>
 
 <template>
   <div class="poem-list-page">
-    <div class="page-decoration">
-      <div class="decoration-left">
-        <img src="/img/lb_shiwen (1).png" alt="" class="deco-img" />
-      </div>
-      <div class="decoration-right">
-        <img src="/img/lb_shiwen (2).png" alt="" class="deco-img" />
-      </div>
-    </div>
-
+    <canvas ref="particleCanvasRef" class="particle-bg"></canvas>
     <div class="container">
       <div class="page-nav">
+        <el-button text @click="router.back()">
+          <el-icon><ArrowLeft /></el-icon>
+          返回
+        </el-button>
+        <el-divider direction="vertical" />
         <el-button text @click="router.push('/')">
           <el-icon><HomeFilled /></el-icon>
           首页
@@ -296,18 +1146,12 @@ onMounted(() => {
         <span class="current-page">诗词鉴赏</span>
       </div>
 
-      <div class="page-header">
-        <div class="header-content">
-          <div class="header-left">
-            <h1 class="page-title">诗词鉴赏</h1>
-            <p class="page-subtitle">品读千年韵律，感悟诗词之美</p>
-            <div class="title-decoration">
-              <span class="deco-line"></span>
-              <span class="deco-icon">墨</span>
-              <span class="deco-line"></span>
-            </div>
-          </div>
-          <div class="header-right">
+      <div class="header-banner">
+        <canvas ref="bannerCanvasRef" class="banner-particles"></canvas>
+        <div class="page-header">
+          <h1 class="page-title">诗词鉴赏</h1>
+          <p class="page-subtitle">品读千年韵律，感悟诗词之美</p>
+          <div class="header-actions">
             <el-button @click="router.push('/poet')">
               <el-icon><User /></el-icon>
               诗人风采
@@ -322,14 +1166,13 @@ onMounted(() => {
             </el-button>
           </div>
         </div>
-      </div>
 
-      <div class="tab-section">
-        <el-tabs v-model="activeTab" @tab-change="handleTabChange">
-          <el-tab-pane label="古籍诗文" name="classical" />
-          <el-tab-pane label="现代创作" name="modern" />
-        </el-tabs>
-      </div>
+        <div class="poem-tabs">
+          <el-radio-group v-model="activeTab" @change="handleTabChange">
+            <el-radio-button value="classical">古籍诗文</el-radio-button>
+            <el-radio-button value="modern">现代创作</el-radio-button>
+          </el-radio-group>
+        </div>
 
       <div class="filter-section" v-if="activeTab === 'classical'">
         <el-card class="filter-card">
@@ -401,18 +1244,53 @@ onMounted(() => {
               </el-select>
             </div>
 
-            <div class="filter-item">
+            <div class="filter-item search-item">
               <label>搜索：</label>
-              <el-input
-                v-model="filters.keyword"
-                placeholder="搜索诗词..."
-                clearable
-                @keyup.enter="handleFilterChange"
-              >
-                <template #prefix>
-                  <el-icon><Search /></el-icon>
-                </template>
-              </el-input>
+              <div class="search-input-wrapper">
+                <el-input
+                  v-model="filters.keyword"
+                  placeholder="搜索诗词..."
+                  clearable
+                  @keyup.enter="handleFilterChange"
+                  @input="handleSearchInput"
+                  @focus="handleSearchFocus"
+                  @blur="handleSearchBlur"
+                >
+                  <template #prefix>
+                    <el-icon><Search /></el-icon>
+                  </template>
+                </el-input>
+                
+                <div v-if="showSearchPanel && (searchSuggestions.length > 0 || hotSearches.length > 0 || searchHistoryList.length > 0)" class="search-panel">
+                  <div v-if="searchSuggestions.length > 0" class="panel-section">
+                    <div class="panel-title">搜索建议</div>
+                    <div v-for="item in searchSuggestions" :key="item" class="panel-item" @mousedown.prevent="selectSuggestion(item)">
+                      <el-icon><Search /></el-icon>
+                      <span>{{ item }}</span>
+                    </div>
+                  </div>
+                  
+                  <div v-else-if="searchHistoryList.length > 0" class="panel-section">
+                    <div class="panel-title">
+                      <span>搜索历史</span>
+                      <el-button text size="small" @mousedown.prevent="handleClearHistory">清除</el-button>
+                    </div>
+                    <div v-for="item in searchHistoryList" :key="item" class="panel-item" @mousedown.prevent="selectHistory(item)">
+                      <el-icon><Clock /></el-icon>
+                      <span>{{ item }}</span>
+                    </div>
+                  </div>
+                  
+                  <div v-if="hotSearches.length > 0" class="panel-section">
+                    <div class="panel-title">热门搜索</div>
+                    <div class="hot-tags">
+                      <el-tag v-for="item in hotSearches" :key="item" class="hot-tag" @mousedown.prevent="selectHotSearch(item)">
+                        {{ item }}
+                      </el-tag>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <el-button type="primary" @click="handleFilterChange">
@@ -437,7 +1315,7 @@ onMounted(() => {
                 clearable
                 @change="handleFilterChange"
               >
-                <el-option label="全部作品" :value="undefined" />
+                <el-option label="全部作品" :value="''" />
                 <el-option label="原创作品" :value="true" />
                 <el-option label="非原创" :value="false" />
               </el-select>
@@ -451,7 +1329,7 @@ onMounted(() => {
                 clearable
                 @change="handleFilterChange"
               >
-                <el-option label="全部诗人" :value="undefined" />
+                <el-option label="全部诗人" :value="''" />
                 <el-option label="认证诗人" :value="true" />
               </el-select>
             </div>
@@ -477,13 +1355,16 @@ onMounted(() => {
           </div>
         </el-card>
       </div>
+      </div>
 
       <div class="result-stats" v-if="total > 0">
         <span>共找到 <strong>{{ total }}</strong> 首诗词</span>
+        <el-tag v-if="searchLevel === 'fuzzy'" type="warning" size="small" class="search-level-tag">模糊匹配</el-tag>
+        <el-tag v-else-if="searchLevel === 'pinyin'" type="info" size="small" class="search-level-tag">拼音匹配</el-tag>
       </div>
 
-      <div class="poem-grid" v-loading="loading">
-        <el-empty v-if="!loading && poems.length === 0" description="暂无诗词" />
+      <div class="poem-grid" v-loading="loading" v-if="loading || poems.length > 0 || (!externalSearching && externalPoemResults.length === 0)">
+        <el-empty v-if="!loading && !externalSearching && poems.length === 0 && externalPoemResults.length === 0" description="暂无诗词" />
 
         <div
           v-for="poem in poems"
@@ -529,9 +1410,9 @@ onMounted(() => {
                   <el-icon><ChatDotRound /></el-icon>
                   {{ poem.likeCount }}
                 </span>
-                <span class="meta-item rating-meta" v-if="poem.averageScore">
+                <span class="meta-item rating-meta" v-if="poem.avgScore">
                   <el-icon><Trophy /></el-icon>
-                  {{ poem.averageScore.toFixed(1) }}
+                  {{ poem.avgScore.toFixed(1) }}
                 </span>
               </div>
               <div class="poem-actions">
@@ -570,52 +1451,504 @@ onMounted(() => {
           @size-change="handleSizeChange"
         />
       </div>
+
+      <div class="external-results-section" v-if="externalSearching || externalPoemResults.length > 0">
+        <div class="section-header">
+          <div class="section-title-area">
+            <el-button v-if="poemHistory.length > 0" text class="back-btn" @click="goBackInHistory">
+              <el-icon><ArrowLeft /></el-icon>
+              返回上一篇
+            </el-button>
+            <h1 class="section-title">寻章摘句</h1>
+            <p class="section-subtitle">品读千年韵律，感悟诗词之美</p>
+          </div>
+          <div class="poem-history-bar" v-if="poemHistory.length > 0">
+            <span class="history-label">浏览历史：</span>
+            <div class="history-items">
+              <span
+                v-for="(item, idx) in poemHistory.slice(-5)"
+                :key="idx"
+                :class="['history-item', { 'is-current': selectedExternalPoem?.title === item.title }]"
+                @click="openPoemDetail(item)"
+              >
+                {{ item.title }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="externalSearching" class="external-loading">
+          <el-icon class="is-loading"><Loading /></el-icon>
+          正在搜索古诗词库...
+        </div>
+
+        <div v-else class="external-content-layout">
+          <div class="external-poem-selector">
+            <div
+              v-for="(poem, idx) in externalPoemResults"
+              :key="'ext-' + idx"
+              :class="['poem-select-item', { 'is-active': selectedExternalPoem?.title === poem.title }]"
+              @click="openPoemDetail(poem)"
+            >
+              <span class="poem-select-title">{{ poem.title }}</span>
+              <span class="poem-select-author" v-if="poem.author">{{ poem.author }}</span>
+            </div>
+          </div>
+
+          <div class="external-main-content">
+            <div class="poem-detail-layout" v-if="selectedExternalPoem" v-loading="externalDetailLoading">
+              <template v-if="externalPoemDetail">
+                <div class="poem-left-panel">
+                <div class="poem-header-section">
+                  <div class="poem-header-info">
+                    <h2 class="poem-main-title">{{ selectedExternalPoem.title }}</h2>
+                    <div class="poem-meta">
+                      <span
+                        v-if="selectedExternalPoem.author"
+                        class="author-link"
+                        @click="toggleAuthorInfo"
+                      >
+                        {{ selectedExternalPoem.author }}
+                        <el-icon class="expand-icon" :class="{ 'is-expanded': authorInfoExpanded }">
+                          <ArrowDown />
+                        </el-icon>
+                      </span>
+                      <span v-if="selectedExternalPoem.dynasty">【{{ selectedExternalPoem.dynasty }}】</span>
+                    </div>
+                    <Transition name="expand">
+                      <div v-if="authorInfoExpanded" class="author-info-expand">
+                        <div v-if="authorInfoLoading" class="author-info-loading">
+                          <el-icon class="is-loading"><Loading /></el-icon>
+                          正在加载诗人介绍...
+                        </div>
+                        <div v-else class="author-info-content">{{ authorInfoContent }}</div>
+                      </div>
+                    </Transition>
+                  </div>
+
+                  <div class="action-toolbar">
+                    <el-button
+                      @click="generateAnnotation"
+                      :loading="annotationLoading"
+                      :class="['toolbar-btn', { 'is-active': activePanel === 'annotation' }]"
+                    >
+                      <el-icon><EditPen /></el-icon>
+                      <span>译文注释</span>
+                    </el-button>
+                    <el-button
+                      @click="generateAppreciation"
+                      :loading="appreciationLoading"
+                      :class="['toolbar-btn', { 'is-active': activePanel === 'appreciation' }]"
+                    >
+                      <el-icon><Star /></el-icon>
+                      <span>名人点评</span>
+                    </el-button>
+                    <el-button
+                      @click="generateBackground"
+                      :loading="backgroundLoading"
+                      :class="['toolbar-btn', { 'is-active': activePanel === 'background' }]"
+                    >
+                      <el-icon><Document /></el-icon>
+                      <span>创作背景</span>
+                    </el-button>
+                  </div>
+
+                  <Transition name="panel-expand-left">
+                    <div class="poem-flyout-panel" v-if="activePanel">
+                      <div class="flyout-connector"></div>
+                      <div class="flyout-inner">
+                        <div class="flyout-header">
+                          <h3 v-if="activePanel === 'annotation'">译文注释</h3>
+                          <h3 v-else-if="activePanel === 'appreciation'">名人点评</h3>
+                          <h3 v-else-if="activePanel === 'background'">创作背景</h3>
+                          <el-button text @click="activePanel = null">
+                            <el-icon><Close /></el-icon>
+                          </el-button>
+                        </div>
+                        <div class="flyout-content">
+                          <div v-if="activePanel === 'annotation'">
+                            <div v-if="annotationLoading" class="panel-loading">
+                              <div class="search-loading-anim">
+                                <el-icon><Search /></el-icon>
+                                <span class="search-dot"></span>
+                                <span class="search-dot"></span>
+                                <span class="search-dot"></span>
+                              </div>
+                              <span>搜索中</span>
+                            </div>
+                            <div v-else-if="annotationContent">
+                              <el-button text size="small" @click="copyContent(annotationContent)" class="copy-btn copy-btn-top">
+                                <el-icon><CopyDocument /></el-icon> 复制
+                              </el-button>
+                              <div v-for="(para, idx) in formatContent(annotationContent)" :key="idx" class="content-paragraph">
+                                <p>{{ para }}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div v-else-if="activePanel === 'appreciation'">
+                            <div v-if="appreciationLoading" class="panel-loading">
+                              <div class="search-loading-anim">
+                                <el-icon><Search /></el-icon>
+                                <span class="search-dot"></span>
+                                <span class="search-dot"></span>
+                                <span class="search-dot"></span>
+                              </div>
+                              <span>搜索中</span>
+                            </div>
+                            <div v-else-if="appreciationContent">
+                              <el-button text size="small" @click="copyContent(appreciationContent)" class="copy-btn copy-btn-top">
+                                <el-icon><CopyDocument /></el-icon> 复制
+                              </el-button>
+                              <div v-for="(para, idx) in formatContent(appreciationContent)" :key="idx" class="content-paragraph">
+                                <p>{{ para }}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div v-else-if="activePanel === 'background'">
+                            <div v-if="backgroundLoading" class="panel-loading">
+                              <div class="search-loading-anim">
+                                <el-icon><Search /></el-icon>
+                                <span class="search-dot"></span>
+                                <span class="search-dot"></span>
+                                <span class="search-dot"></span>
+                              </div>
+                              <span>搜索中</span>
+                            </div>
+                            <div v-else-if="backgroundContent">
+                              <el-button text size="small" @click="copyContent(backgroundContent)" class="copy-btn copy-btn-top">
+                                <el-icon><CopyDocument /></el-icon> 复制
+                              </el-button>
+                              <p style="white-space: pre-line;">{{ backgroundContent }}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Transition>
+                </div>
+
+                <div class="poem-body-layout">
+                  <div class="poem-content-section">
+                    <Transition name="enlarged-content">
+                      <div v-if="showEnlargedContent && activePanel" class="enlarged-content-panel">
+                        <div class="enlarged-header">
+                          <h3 v-if="activePanel === 'annotation'">译文注释</h3>
+                          <h3 v-else-if="activePanel === 'appreciation'">名人点评</h3>
+                          <h3 v-else-if="activePanel === 'background'">创作背景</h3>
+                          <el-button text @click="showEnlargedContent = false">
+                            <el-icon><Close /></el-icon>
+                          </el-button>
+                        </div>
+                        <div class="enlarged-body">
+                          <div v-if="activePanel === 'annotation'">
+                            <div v-if="annotationLoading" class="enlarged-loading">
+                              <el-icon class="is-loading"><Loading /></el-icon>
+                              正在生成译文注释...
+                            </div>
+                            <div v-else-if="annotationContent" class="enlarged-text">
+                              <div v-for="(para, idx) in formatContent(annotationContent)" :key="idx" class="enlarged-paragraph">
+                                {{ para }}
+                              </div>
+                            </div>
+                          </div>
+                          <div v-else-if="activePanel === 'appreciation'">
+                            <div v-if="appreciationLoading" class="enlarged-loading">
+                              <el-icon class="is-loading"><Loading /></el-icon>
+                              正在生成名人点评...
+                            </div>
+                            <div v-else-if="appreciationContent" class="enlarged-text">
+                              <div v-for="(para, idx) in formatContent(appreciationContent)" :key="idx" class="enlarged-paragraph">
+                                {{ para }}
+                              </div>
+                            </div>
+                          </div>
+                          <div v-else-if="activePanel === 'background'">
+                            <div v-if="backgroundLoading" class="enlarged-loading">
+                              <el-icon class="is-loading"><Loading /></el-icon>
+                              正在生成创作背景...
+                            </div>
+                            <div v-else-if="backgroundContent" class="enlarged-text">
+                              {{ backgroundContent }}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </Transition>
+                    <div class="poem-verses-panel">
+                      <template v-for="(sentence, idx) in poemSentences" :key="idx">
+                        <div
+                          :class="['verse-line-item', { 'is-explained': explainedLineIdxs.has(idx) }]"
+                          @mouseenter="hoveredLineIdx = idx"
+                          @mouseleave="hoveredLineIdx = null"
+                          @click="explainLine(idx)"
+                        >
+                          <span class="verse-number">{{ idx + 1 }}</span>
+                          <span class="verse-text">{{ sentence }}</span>
+                          <el-icon class="verse-explain-icon" v-show="hoveredLineIdx === idx">
+                            <MagicStick />
+                          </el-icon>
+                        </div>
+                        <Transition name="expand-line">
+                          <div class="ai-line-explain" v-if="explainedLineIdxs.has(idx)">
+                            <div class="ai-explain-header">
+                              <el-icon><MagicStick /></el-icon>
+                              <span>AI解析</span>
+                              <el-icon class="ai-explain-close" @click.stop="closeLineExplanation(idx)">
+                                <Close />
+                              </el-icon>
+                            </div>
+                            <div v-if="lineExplaining.has(idx)" class="ai-explain-loading">
+                              <div class="search-loading-anim">
+                                <el-icon><Search /></el-icon>
+                                <span class="search-dot"></span>
+                                <span class="search-dot"></span>
+                                <span class="search-dot"></span>
+                              </div>
+                              <span>搜索中</span>
+                            </div>
+                            <div v-else class="ai-explain-content">{{ lineExplanations.get(idx) }}</div>
+                          </div>
+                        </Transition>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+                </div>
+
+                <div class="poem-right-panel">
+                  <div class="background-knowledge-card">
+                    <h4 class="info-card-title">背景知识</h4>
+                    <div class="knowledge-panels">
+                      <div class="knowledge-panel">
+                        <div class="knowledge-panel-header" @click="toggleKnowledgePanel('dynastyPoetry')">
+                          <span>朝代诗歌特点</span>
+                          <el-icon :class="{ 'is-expanded': activeKnowledgePanels.includes('dynastyPoetry') }">
+                            <ArrowRight />
+                          </el-icon>
+                        </div>
+                        <Transition name="slide-left">
+                          <div v-if="activeKnowledgePanels.includes('dynastyPoetry')" class="knowledge-panel-content">
+                            <div v-if="backgroundKnowledge.dynastyPoetry.loading" class="knowledge-loading">
+                              <el-icon class="is-loading"><Loading /></el-icon>
+                              正在加载...
+                            </div>
+                            <div v-else class="knowledge-text">{{ backgroundKnowledge.dynastyPoetry.content }}</div>
+                          </div>
+                        </Transition>
+                      </div>
+
+                      <div class="knowledge-panel">
+                        <div class="knowledge-panel-header" @click="toggleKnowledgePanel('literarySchool')">
+                          <span>相关文学流派</span>
+                          <el-icon :class="{ 'is-expanded': activeKnowledgePanels.includes('literarySchool') }">
+                            <ArrowRight />
+                          </el-icon>
+                        </div>
+                        <Transition name="slide-left">
+                          <div v-if="activeKnowledgePanels.includes('literarySchool')" class="knowledge-panel-content">
+                            <div v-if="backgroundKnowledge.literarySchool.loading" class="knowledge-loading">
+                              <el-icon class="is-loading"><Loading /></el-icon>
+                              正在加载...
+                            </div>
+                            <div v-else class="knowledge-text">{{ backgroundKnowledge.literarySchool.content }}</div>
+                          </div>
+                        </Transition>
+                      </div>
+
+                      <div class="knowledge-panel">
+                        <div class="knowledge-panel-header" @click="toggleKnowledgePanel('historicalContext')">
+                          <span>历史文化背景</span>
+                          <el-icon :class="{ 'is-expanded': activeKnowledgePanels.includes('historicalContext') }">
+                            <ArrowRight />
+                          </el-icon>
+                        </div>
+                        <Transition name="slide-left">
+                          <div v-if="activeKnowledgePanels.includes('historicalContext')" class="knowledge-panel-content">
+                            <div v-if="backgroundKnowledge.historicalContext.loading" class="knowledge-loading">
+                              <el-icon class="is-loading"><Loading /></el-icon>
+                              正在加载...
+                            </div>
+                            <div v-else class="knowledge-text">{{ backgroundKnowledge.historicalContext.content }}</div>
+                          </div>
+                        </Transition>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="info-card annotation-card" v-if="annotationContent">
+                    <div class="info-card-header">
+                      <div class="info-card-icon">
+                        <el-icon><EditPen /></el-icon>
+                      </div>
+                      <h4 class="info-card-title">译文注释</h4>
+                      <el-button text size="small" @click="copyContent(annotationContent)" class="copy-btn">
+                        <el-icon><CopyDocument /></el-icon>
+                      </el-button>
+                    </div>
+                    <div class="info-card-content">
+                      <div v-for="(para, idx) in formatContent(annotationContent)" :key="idx" class="content-paragraph">
+                        <p>{{ para }}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="info-card appreciation-card" v-if="appreciationContent">
+                    <div class="info-card-header">
+                      <div class="info-card-icon appreciation-icon">
+                        <el-icon><Star /></el-icon>
+                      </div>
+                      <h4 class="info-card-title">名人点评</h4>
+                      <el-button text size="small" @click="copyContent(appreciationContent)" class="copy-btn">
+                        <el-icon><CopyDocument /></el-icon>
+                      </el-button>
+                    </div>
+                    <div class="info-card-content">
+                      <div v-for="(para, idx) in formatContent(appreciationContent)" :key="idx" class="content-paragraph">
+                        <p>{{ para }}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="info-card" v-if="backgroundContent">
+                    <h4 class="info-card-title">创作背景</h4>
+                    <div class="info-card-content">
+                      <p style="white-space: pre-line;">{{ backgroundContent }}</p>
+                    </div>
+                  </div>
+
+                  <div class="info-card" v-if="hasContent(['jj', 'yj', 'xzsf', 'dj', 'jx'])">
+                    <h4 class="info-card-title">深度解读</h4>
+                    <div class="info-card-content">
+                      <p style="white-space: pre-line;">{{ getContent(['jj', 'yj', 'xzsf', 'dj', 'jx']) }}</p>
+                    </div>
+                  </div>
+
+                  <div class="info-card" v-if="hasContent(['pj'])">
+                    <h4 class="info-card-title">评价</h4>
+                    <div class="info-card-content">
+                      <p style="white-space: pre-line;">{{ getContent(['pj']) }}</p>
+                    </div>
+                  </div>
+
+                  <div class="ai-chat-card">
+                    <div class="ai-chat-header" @click="toggleAiChat">
+                      <div class="ai-chat-header-left">
+                        <el-icon><MagicStick /></el-icon>
+                        <span>AI诗词助手</span>
+                      </div>
+                      <el-icon>
+                        <ArrowUp v-if="aiChatVisible" />
+                        <ArrowDown v-else />
+                      </el-icon>
+                    </div>
+
+                    <Transition name="ai-chat-slide">
+                      <div v-if="aiChatVisible" class="ai-chat-body">
+                        <div class="ai-chat-messages" ref="aiChatContainerRef">
+                          <div
+                            v-for="(msg, index) in aiChatMessages"
+                            :key="index"
+                            :class="['ai-message', msg.role]"
+                          >
+                            <div class="ai-message-avatar" v-if="msg.role === 'assistant'">AI</div>
+                            <div class="ai-message-content">{{ msg.content }}</div>
+                            <div class="ai-message-avatar" v-if="msg.role === 'user'">我</div>
+                          </div>
+                          <div v-if="aiChatLoading" class="ai-message assistant">
+                            <div class="ai-message-avatar">AI</div>
+                            <div class="ai-message-content ai-loading">
+                              <span class="loading-dot"></span>
+                              <span class="loading-dot"></span>
+                              <span class="loading-dot"></span>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="ai-chat-input">
+                          <el-input
+                            v-model="aiChatInput"
+                            type="textarea"
+                            :rows="2"
+                            :autosize="{ minRows: 1, maxRows: 3 }"
+                            placeholder="输入问题，按Enter发送..."
+                            @keydown="handleAiChatKeydown"
+                            :disabled="aiChatLoading"
+                            resize="none"
+                          />
+                          <el-button
+                            class="ai-send-btn"
+                            @click="sendAiChatMessage()"
+                            :loading="aiChatLoading"
+                            :disabled="!aiChatInput.trim()"
+                          >
+                            <el-icon><Promotion /></el-icon>
+                          </el-button>
+                        </div>
+                      </div>
+                    </Transition>
+                  </div>
+
+                  <div class="resource-card">
+                    <h4 class="resource-card-title">相关资源</h4>
+                    <div class="resource-list">
+                      <a
+                        v-for="res in resources"
+                        :key="res.name"
+                        :href="res.url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="resource-item"
+                      >
+                        <el-icon><Link /></el-icon>
+                        <span>{{ res.name }}</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </template>
+
+              <el-empty v-else-if="!externalDetailLoading" description="暂未收录该诗词的详细赏析" />
+            </div>
+
+            <div class="poem-detail-layout placeholder" v-else>
+              <div class="placeholder-content">
+                <el-icon class="placeholder-icon"><Document /></el-icon>
+                <p class="placeholder-text">点击上方诗词查看详细赏析</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <LoginPrompt
+        v-model:visible="loginPromptVisible"
+        message="使用AI诗词助手需要先登录"
+      />
     </div>
   </div>
 </template>
 
 <style scoped lang="scss">
+@use 'sass:color';
+
 .poem-list-page {
   padding: $spacing-xl 0;
   position: relative;
   min-height: 100vh;
-  overflow-x: hidden;
 }
 
-.page-decoration {
+.particle-bg {
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
+  width: 100%;
+  height: 100%;
   z-index: 0;
+  pointer-events: none;
 }
 
-.decoration-left {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  opacity: 0.15;
-
-  .deco-img {
-    width: 200px;
-    height: auto;
-  }
-}
-
-.decoration-right {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  opacity: 0.15;
-
-  .deco-img {
-    width: 200px;
-    height: auto;
-  }
+.container {
+  position: relative;
+  z-index: 1;
 }
 
 .page-nav {
@@ -623,8 +1956,6 @@ onMounted(() => {
   align-items: center;
   gap: $spacing-sm;
   margin-bottom: $spacing-lg;
-  position: relative;
-  z-index: 1;
 
   .el-button {
     color: $text-color-secondary;
@@ -640,99 +1971,94 @@ onMounted(() => {
   }
 }
 
-.page-header {
-  margin-bottom: $spacing-xl;
+.header-banner {
   position: relative;
-  z-index: 1;
+  overflow: hidden;
+  border-radius: 12px;
+  margin-bottom: $spacing-xl;
+
+  .banner-particles {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #5a3e2b 0%, #6b4c36 50%, #5a3e2b 100%);
+    z-index: 0;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('/img/dt_3.jpg') no-repeat center / cover;
+    opacity: 0.15;
+    z-index: 1;
+  }
+
+  > * {
+    position: relative;
+    z-index: 2;
+  }
 }
 
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: linear-gradient(135deg, rgba($primary-color, 0.03), rgba($accent-color, 0.03));
-  border-radius: $border-radius-lg;
-  padding: $spacing-xl;
-  border: 1px solid rgba($primary-color, 0.1);
+.page-header {
+  text-align: center;
+  padding: 40px 20px 30px;
 }
 
-.header-left {
+.header-actions {
+  margin-top: $spacing-md;
   display: flex;
-  flex-direction: column;
-  gap: $spacing-sm;
-  align-items: center;
-}
-
-.header-right {
-  display: flex;
+  justify-content: center;
   gap: $spacing-sm;
 }
 
 .page-title {
+  text-align: center;
   font-size: $font-size-title;
-  color: $primary-color;
+  color: #f8f0e6;
   font-family: $font-family-title;
-  margin: 0;
+  margin-bottom: $spacing-xs;
 }
 
 .page-subtitle {
-  font-size: $font-size-base;
-  color: $text-color-secondary;
+  font-size: $font-size-sm;
+  color: #d9c7b2;
   font-family: $font-family-base;
   margin: 0;
 }
 
-.title-decoration {
-  display: flex;
-  align-items: center;
-  gap: $spacing-md;
-  margin-top: $spacing-xs;
-}
-
-.deco-line {
-  width: 40px;
-  height: 1px;
-  background: linear-gradient(90deg, $primary-color, transparent);
-}
-
-.deco-icon {
-  font-size: $font-size-xs;
-  color: $primary-color;
-  font-family: $font-family-title;
-  opacity: 0.6;
-}
-
-.tab-section {
+.poem-tabs {
+  text-align: center;
   margin-bottom: $spacing-lg;
-
-  :deep(.el-tabs__header) {
-    margin-bottom: 0;
-  }
-
-  :deep(.el-tabs__item) {
-    font-size: $font-size-lg;
-    font-family: $font-family-title;
-    color: $text-color-secondary;
-
-    &.is-active {
-      color: $primary-color;
-      font-weight: 600;
-    }
-  }
-
-  :deep(.el-tabs__active-bar) {
-    background-color: $primary-color;
-  }
 }
 
 .filter-section {
   margin-bottom: $spacing-xl;
-  position: relative;
-  z-index: 1;
+  background: url('/img/dt_5.jpg') no-repeat center / cover;
+  border-radius: 8px;
 }
 
 .filter-card {
   border-radius: $border-radius-md;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .filter-row {
@@ -765,16 +2091,129 @@ onMounted(() => {
   }
 }
 
+.search-item {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+  
+  label {
+    font-size: $font-size-base;
+    color: $text-color;
+    white-space: nowrap;
+  }
+  
+  .el-input {
+    width: 100%;
+  }
+  
+  :deep(.el-input__inner) {
+    font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: 0.5px;
+    line-height: 1.5;
+    
+    &::placeholder {
+      color: $text-color-light;
+      font-size: $font-size-base;
+    }
+  }
+}
+
+.search-input-wrapper {
+  position: relative;
+  width: 100%;
+  
+  .el-input {
+    width: 100%;
+  }
+}
+
+.search-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: $background-color-light;
+  border: 1px solid $border-color;
+  border-radius: $border-radius-sm;
+  box-shadow: $box-shadow;
+  margin-top: $spacing-xs;
+  max-height: 400px;
+  overflow-y: auto;
+  @include scrollbar;
+}
+
+.panel-section {
+  padding: $spacing-sm 0;
+  
+  &:not(:last-child) {
+    border-bottom: 1px solid $border-color-light;
+  }
+}
+
+.panel-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: $spacing-xs $spacing-md $spacing-sm;
+  font-size: $font-size-xs;
+  color: $text-color-light;
+}
+
+.panel-item {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: $spacing-sm $spacing-md;
+  cursor: pointer;
+  font-size: $font-size-base;
+  color: $text-color-secondary;
+  transition: all $transition-fast;
+  
+  &:hover {
+    background: rgba($primary-color, 0.04);
+    color: $primary-color;
+  }
+  
+  .el-icon {
+    font-size: $font-size-base;
+    color: $text-color-light;
+  }
+}
+
+.hot-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+  padding: $spacing-xs $spacing-md $spacing-sm;
+}
+
+.hot-tag {
+  cursor: pointer;
+  transition: all $transition-fast;
+  
+  &:hover {
+    color: $primary-color;
+    border-color: $primary-color;
+    background: rgba($primary-color, 0.04);
+  }
+}
+
 .result-stats {
   margin-bottom: $spacing-md;
   font-size: $font-size-sm;
   color: $text-color-secondary;
-  position: relative;
-  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 
   strong {
     color: $primary-color;
     font-weight: 600;
+  }
+  
+  .search-level-tag {
+    margin-left: 4px;
   }
 }
 
@@ -783,8 +2222,6 @@ onMounted(() => {
   grid-template-columns: repeat(2, 1fr);
   gap: $spacing-lg;
   min-height: 400px;
-  position: relative;
-  z-index: 1;
   max-height: calc(100vh - 300px);
   overflow-y: auto;
   padding-right: $spacing-sm;
@@ -811,7 +2248,7 @@ onMounted(() => {
   transition: all $transition-base;
 
   &:hover {
-    border-left-color: darken($primary-color, 10%);
+    border-left-color: color.adjust($primary-color, $lightness: -10%);
     transform: translateY(-2px);
   }
 
@@ -821,7 +2258,7 @@ onMounted(() => {
     border-top: 3px solid $primary-color;
 
     &:hover {
-      border-top-color: darken($primary-color, 10%);
+      border-top-color: color.adjust($primary-color, $lightness: -10%);
     }
   }
 }
@@ -849,9 +2286,27 @@ onMounted(() => {
 
 .featured-badge {
   position: absolute;
-  top: $spacing-xs;
-  left: $spacing-xs;
+  top: 4px;
+  left: 4px;
   background: linear-gradient(135deg, #FFD700, #FFA500);
+  color: white;
+  padding: 1px 4px;
+  border-radius: $border-radius-sm;
+  font-size: 9px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-weight: bold;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.original-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: linear-gradient(135deg, #67C23A, #85ce61);
   color: white;
   padding: 2px 6px;
   border-radius: $border-radius-sm;
@@ -861,24 +2316,8 @@ onMounted(() => {
   gap: 2px;
   font-weight: bold;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  z-index: 2;
-}
-
-.original-badge {
-  position: absolute;
-  top: $spacing-xs;
-  right: $spacing-xs;
-  background: linear-gradient(135deg, #67C23A, #85ce61);
-  color: white;
-  padding: 2px $spacing-xs;
-  border-radius: $border-radius-sm;
-  font-size: 10px;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  font-weight: bold;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   z-index: 1;
+  pointer-events: none;
 }
 
 .poem-card:hover .poem-image img {
@@ -1022,7 +2461,7 @@ onMounted(() => {
     color: $warning-color;
 
     &:hover {
-      color: darken($warning-color, 10%);
+      color: color.adjust($warning-color, $lightness: -10%);
     }
   }
 }
@@ -1032,7 +2471,7 @@ onMounted(() => {
     color: $danger-color;
 
     &:hover {
-      color: darken($danger-color, 10%);
+      color: color.adjust($danger-color, $lightness: -10%);
     }
   }
 }
@@ -1041,8 +2480,6 @@ onMounted(() => {
   margin-top: $spacing-xl;
   display: flex;
   justify-content: center;
-  position: relative;
-  z-index: 1;
 }
 
 .card-corner {
@@ -1054,4 +2491,1166 @@ onMounted(() => {
   background: linear-gradient(135deg, transparent 50%, rgba($primary-color, 0.05) 50%);
   pointer-events: none;
 }
+
+.external-results-section {
+  margin-top: $spacing-xl;
+  padding: $spacing-xl;
+  background: linear-gradient(135deg, #f5efe6 0%, #e8ddd0 40%, #f0e6d8 70%, #f5efe6 100%);
+  border-radius: $border-radius-md;
+  box-shadow: $box-shadow;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: $spacing-lg;
+  flex-wrap: wrap;
+  gap: $spacing-md;
+}
+
+.section-title-area {
+  text-align: center;
+  flex: 1;
+}
+
+.back-btn {
+  color: $text-color-secondary;
+  margin-bottom: $spacing-sm;
+
+  &:hover {
+    color: $primary-color;
+  }
+}
+
+.section-title {
+  font-size: 36px;
+  font-family: $font-family-title;
+  color: $primary-color;
+  margin: 0 0 $spacing-xs;
+  letter-spacing: 4px;
+}
+
+.section-subtitle {
+  font-size: $font-size-base;
+  color: $text-color-light;
+  margin: 0;
+  letter-spacing: 2px;
+}
+
+.poem-history-bar {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  font-size: $font-size-sm;
+  color: $text-color-secondary;
+}
+
+.history-label {
+  white-space: nowrap;
+}
+
+.history-items {
+  display: flex;
+  gap: $spacing-xs;
+}
+
+.history-item {
+  padding: $spacing-xs $spacing-sm;
+  background: rgba($primary-color, 0.06);
+  border-radius: $border-radius-sm;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    background: rgba($primary-color, 0.12);
+  }
+
+  &.is-current {
+    background: $primary-color;
+    color: #fff;
+  }
+}
+
+.external-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-sm;
+  padding: $spacing-xxl 0;
+  color: $text-color-secondary;
+  font-size: $font-size-base;
+}
+
+.external-content-layout {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+}
+
+.external-poem-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+  padding-bottom: $spacing-lg;
+  border-bottom: 1px solid $border-color-light;
+}
+
+.poem-select-item {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+  padding: $spacing-sm $spacing-md;
+  background: rgba($primary-color, 0.04);
+  border-radius: $border-radius-sm;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    background: rgba($primary-color, 0.08);
+  }
+
+  &.is-active {
+    background: $primary-color;
+    color: #fff;
+
+    .poem-select-title,
+    .poem-select-author {
+      color: #fff;
+    }
+  }
+}
+
+.poem-select-title {
+  font-size: $font-size-sm;
+  font-weight: 500;
+  color: $text-color;
+}
+
+.poem-select-author {
+  font-size: $font-size-xs;
+  color: $text-color-light;
+}
+
+.external-main-content {
+  min-width: 0;
+}
+
+.poem-detail-layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: $spacing-xl;
+  min-height: 400px;
+  align-items: start;
+
+  &.placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+.poem-left-panel {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: $background-color-light;
+  border-radius: $border-radius-md;
+  border: 1px solid $border-color-light;
+  padding: $spacing-xl;
+}
+
+.poem-header-info {
+  text-align: center;
+  margin-bottom: $spacing-xl;
+  padding-bottom: $spacing-lg;
+  border-bottom: 1px solid $border-color-light;
+}
+
+.poem-main-title {
+  font-size: 28px;
+  font-family: $font-family-title;
+  color: $primary-color;
+  margin: 0 0 $spacing-sm;
+}
+
+.poem-meta {
+  font-size: $font-size-base;
+  color: $text-color-secondary;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.author-link {
+  color: $primary-color;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-xs;
+  border-bottom: 1px dashed $primary-color;
+  transition: all $transition-fast;
+
+  &:hover {
+    color: color.adjust($primary-color, $lightness: -10%);
+    border-bottom-color: color.adjust($primary-color, $lightness: -10%);
+  }
+
+  .expand-icon {
+    transition: transform $transition-fast;
+
+    &.is-expanded {
+      transform: rotate(180deg);
+    }
+  }
+}
+
+.author-info-expand {
+  margin-top: $spacing-md;
+  padding: $spacing-md;
+  background: rgba($primary-color, 0.05);
+  border-radius: $border-radius-sm;
+  border-left: 3px solid $primary-color;
+}
+
+.author-info-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-sm;
+  color: $text-color-light;
+  font-size: $font-size-sm;
+}
+
+.author-info-content {
+  font-size: $font-size-sm;
+  color: $text-color-secondary;
+  line-height: 1.8;
+}
+
+.expand-enter-active,
+.expand-leave-active {
+  transition: all $transition-base;
+  overflow: hidden;
+}
+
+.expand-enter-from,
+.expand-leave-to {
+  opacity: 0;
+  max-height: 0;
+  margin-top: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.expand-enter-to,
+.expand-leave-from {
+  opacity: 1;
+  max-height: 500px;
+}
+
+.slide-left-enter-active,
+.slide-left-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.slide-left-enter-from,
+.slide-left-leave-to {
+  opacity: 0;
+  transform: translateX(-30px);
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.slide-left-enter-to,
+.slide-left-leave-from {
+  opacity: 1;
+  transform: translateX(0);
+  max-height: 500px;
+}
+
+.action-toolbar {
+  display: flex;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-lg;
+  padding: $spacing-md 0;
+  border-top: 1px solid $border-color-light;
+  border-bottom: 1px solid $border-color-light;
+}
+
+.toolbar-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-xs;
+  background: transparent;
+  border: 1px solid $border-color;
+  color: $text-color-secondary;
+  transition: all $transition-fast;
+
+  &:hover:not(:disabled) {
+    background: rgba($primary-color, 0.06);
+    border-color: $primary-color;
+    color: $primary-color;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .el-icon {
+    font-size: 16px;
+  }
+}
+
+.poem-header-section {
+  margin-bottom: $spacing-lg;
+  text-align: center;
+  position: relative;
+  z-index: 10;
+}
+
+.poem-body-layout {
+  display: flex;
+  gap: $spacing-lg;
+  justify-content: center;
+}
+
+.poem-content-section {
+  text-align: center;
+  max-width: 700px;
+  margin: 0 auto;
+  flex: 0 1 700px;
+}
+
+.poem-flyout-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: calc(100% + 20px);
+  z-index: 20;
+  margin-top: $spacing-sm;
+}
+
+.flyout-connector {
+  position: absolute;
+  top: 0;
+  right: 40px;
+  width: 12px;
+  height: 12px;
+  background: $background-color-light;
+  border: 1px solid $border-color-light;
+  border-bottom: none;
+  border-right: none;
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.flyout-inner {
+  background: $background-color-light;
+  border-radius: $border-radius-md;
+  border: 1px solid $border-color-light;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+.flyout-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-md $spacing-lg;
+  border-bottom: 1px solid $border-color-light;
+  background: linear-gradient(135deg, rgba($primary-color, 0.04), rgba($primary-color, 0.01));
+
+  h3 {
+    font-size: $font-size-lg;
+    font-weight: 600;
+    color: $text-color;
+    margin: 0;
+  }
+}
+
+.flyout-content {
+  padding: $spacing-lg;
+  max-height: 400px;
+  overflow-y: auto;
+  @include scrollbar;
+}
+
+.panel-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-md;
+  padding: $spacing-xxl;
+  color: $text-color-secondary;
+}
+
+.search-loading-anim {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+
+  .el-icon {
+    font-size: 18px;
+    color: $primary-color;
+    animation: searchPulse 1.5s ease-in-out infinite;
+  }
+}
+
+.search-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: $primary-color;
+  animation: searchDotBounce 1.4s ease-in-out infinite;
+
+  &:nth-child(2) { animation-delay: 0.2s; }
+  &:nth-child(3) { animation-delay: 0.4s; }
+}
+
+@keyframes searchPulse {
+  0%, 100% { opacity: 0.5; transform: scale(0.95); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+@keyframes searchDotBounce {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.7); }
+  40% { opacity: 1; transform: scale(1.2); }
+}
+
+.toolbar-btn {
+  &.is-active {
+    background: $primary-color;
+    color: #fff;
+    border-color: $primary-color;
+  }
+}
+
+.panel-expand-left-enter-active {
+  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.panel-expand-left-leave-active {
+  transition: all 0.25s cubic-bezier(0.55, 0, 1, 0.45);
+}
+
+.panel-expand-left-enter-from,
+.panel-expand-left-leave-to {
+  opacity: 0;
+  transform: translateX(30px) scale(0.97);
+}
+
+.panel-expand-left-enter-to,
+.panel-expand-left-leave-from {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+}
+
+.poem-verses-panel {
+  margin-bottom: $spacing-xl;
+  display: inline-block;
+  text-align: left;
+  max-width: 100%;
+}
+
+.verse-line-item {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  padding: $spacing-md $spacing-lg;
+  border-radius: $border-radius-sm;
+  cursor: pointer;
+  transition: all $transition-fast;
+  position: relative;
+
+  &:hover {
+    background: rgba($primary-color, 0.06);
+  }
+
+  &.is-explained {
+    background: rgba($primary-color, 0.1);
+    border-left: 3px solid $primary-color;
+  }
+}
+
+.verse-number {
+  font-size: $font-size-xs;
+  color: $text-color-light;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.verse-text {
+  font-size: 20px;
+  font-family: $font-family-title;
+  color: $text-color;
+  line-height: 2;
+  letter-spacing: 2px;
+  flex: 1;
+}
+
+.verse-explain-icon {
+  color: $primary-color;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.ai-line-explain {
+  background: linear-gradient(135deg, rgba(#667eea, 0.05), rgba(#764ba2, 0.05));
+  border-radius: $border-radius-md;
+  padding: $spacing-lg;
+  border-left: 3px solid #667eea;
+}
+
+.ai-explain-header {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-md;
+  font-size: $font-size-sm;
+  font-weight: 600;
+  color: #667eea;
+}
+
+.ai-explain-close {
+  margin-left: auto;
+  cursor: pointer;
+  font-size: 14px;
+  color: $text-color-light;
+  transition: color $transition-fast;
+
+  &:hover {
+    color: $danger-color;
+  }
+}
+
+.ai-explain-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-sm;
+  padding: $spacing-md 0;
+  color: $text-color-light;
+  font-size: $font-size-sm;
+}
+
+.ai-explain-content {
+  font-size: $font-size-base;
+  color: $text-color;
+  line-height: 1.8;
+  white-space: pre-line;
+}
+
+.expand-line-enter-active,
+.expand-line-leave-active {
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.expand-line-enter-from,
+.expand-line-leave-to {
+  opacity: 0;
+  max-height: 0;
+  margin-top: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.expand-line-enter-to,
+.expand-line-leave-from {
+  opacity: 1;
+  max-height: 300px;
+}
+
+.enlarged-content-panel {
+  background: linear-gradient(135deg, #f8f4ee 0%, #f0e8d8 100%);
+  border-radius: $border-radius-md;
+  border: 2px solid $primary-color;
+  margin-bottom: $spacing-xl;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba($primary-color, 0.15);
+}
+
+.enlarged-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-md $spacing-lg;
+  background: linear-gradient(135deg, $primary-color, color.adjust($primary-color, $lightness: -10%));
+  color: #fff;
+
+  h3 {
+    font-size: $font-size-lg;
+    font-weight: 600;
+    margin: 0;
+    font-family: $font-family-title;
+  }
+
+  .el-button {
+    color: #fff;
+    &:hover {
+      opacity: 0.8;
+    }
+  }
+}
+
+.enlarged-body {
+  padding: $spacing-lg;
+  max-height: 400px;
+  overflow-y: auto;
+  @include scrollbar;
+}
+
+.enlarged-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-sm;
+  padding: $spacing-xxl;
+  color: $text-color-secondary;
+}
+
+.enlarged-text {
+  font-size: 18px;
+  line-height: 2;
+  color: $text-color;
+  font-family: $font-family-title;
+  letter-spacing: 1px;
+}
+
+.enlarged-paragraph {
+  margin-bottom: $spacing-md;
+  text-indent: 2em;
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.enlarged-content-enter-active {
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.enlarged-content-leave-active {
+  transition: all 0.3s cubic-bezier(0.55, 0, 1, 0.45);
+}
+
+.enlarged-content-enter-from,
+.enlarged-content-leave-to {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.97);
+  max-height: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.enlarged-content-enter-to,
+.enlarged-content-leave-from {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  max-height: 500px;
+}
+
+.copy-btn-top {
+  margin-bottom: $spacing-md;
+  color: $text-color-secondary;
+
+  &:hover {
+    color: $primary-color;
+  }
+}
+
+.action-buttons-card {
+  background: $background-color-light;
+  border-radius: $border-radius-md;
+  border: 1px solid $border-color-light;
+  padding: $spacing-lg;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+
+  .action-btn {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+.poem-right-panel {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+  overflow-y: auto;
+  padding-right: $spacing-sm;
+  grid-column: 2;
+  grid-row: 1 / 3;
+  @include scrollbar;
+}
+
+.info-card {
+  background: $background-color-light;
+  border-radius: $border-radius-md;
+  border: 1px solid $border-color-light;
+  padding: $spacing-lg;
+  transition: all $transition-fast;
+
+  &:hover {
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  }
+}
+
+.info-card-header {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-md;
+  padding-bottom: $spacing-sm;
+  border-bottom: 1px solid $border-color-light;
+}
+
+.info-card-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #e8d5b7 0%, #d4af87 100%);
+  color: #5a3e2b;
+  font-size: 16px;
+
+  &.appreciation-icon {
+    background: linear-gradient(135deg, #f0e4d7 0%, #e8d5b7 100%);
+    color: #8b6914;
+  }
+}
+
+.info-card-title {
+  font-size: $font-size-base;
+  font-weight: 600;
+  color: $text-color;
+  margin: 0;
+  flex: 1;
+}
+
+.copy-btn {
+  color: $text-color-secondary;
+  &:hover {
+    color: $primary-color;
+  }
+}
+
+.info-card-content {
+  font-size: $font-size-sm;
+  color: $text-color-secondary;
+  line-height: 1.8;
+
+  p {
+    margin: 0;
+  }
+}
+
+.content-paragraph {
+  margin-bottom: $spacing-sm;
+  padding-left: $spacing-sm;
+  border-left: 2px solid transparent;
+  transition: all $transition-fast;
+
+  &:hover {
+    border-left-color: $primary-color;
+    background: rgba($primary-color, 0.02);
+  }
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  p {
+    text-indent: 2em;
+  }
+}
+
+.annotation-card {
+  border-left: 3px solid #d4af87;
+}
+
+.appreciation-card {
+  border-left: 3px solid #e8d5b7;
+}
+
+.background-knowledge-card {
+  background: $background-color-light;
+  border-radius: $border-radius-md;
+  border: 1px solid $border-color-light;
+  padding: $spacing-lg;
+}
+
+.knowledge-panels {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.knowledge-panel {
+  border: 1px solid $border-color-light;
+  border-radius: $border-radius-sm;
+  overflow: hidden;
+  position: relative;
+  min-height: 42px;
+}
+
+.knowledge-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-md;
+  background: rgba($primary-color, 0.03);
+  cursor: pointer;
+  transition: all $transition-fast;
+  font-size: $font-size-sm;
+  font-weight: 500;
+  color: $text-color;
+
+  &:hover {
+    background: rgba($primary-color, 0.06);
+  }
+
+  .el-icon {
+    transition: transform $transition-fast;
+
+    &.is-expanded {
+      transform: rotate(90deg);
+    }
+  }
+}
+
+.knowledge-panel-content {
+  padding: $spacing-md;
+  background: $background-color-light;
+  transform-origin: left center;
+}
+
+.knowledge-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-sm;
+  color: $text-color-light;
+  font-size: $font-size-sm;
+  padding: $spacing-md 0;
+}
+
+.knowledge-text {
+  font-size: $font-size-sm;
+  color: $text-color-secondary;
+  line-height: 1.8;
+}
+
+.info-empty {
+  font-size: $font-size-sm;
+  color: $text-color-light;
+  margin: 0;
+  font-style: italic;
+}
+
+.ai-chat-card {
+  background: $background-color-light;
+  border-radius: $border-radius-md;
+  border: 1px solid $border-color-light;
+}
+
+.ai-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-md $spacing-lg;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    opacity: 0.9;
+  }
+}
+
+.ai-chat-header-left {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  color: #fff;
+  font-weight: 600;
+}
+
+.ai-chat-slide-enter-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  max-height: 500px;
+  overflow: hidden;
+}
+
+.ai-chat-slide-leave-active {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.ai-chat-slide-enter-from,
+.ai-chat-slide-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+
+.ai-chat-body {
+  border-top: 1px solid $border-color-light;
+}
+
+.ai-chat-messages {
+  height: 250px;
+  overflow-y: auto;
+  padding: $spacing-md;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+  @include scrollbar;
+}
+
+.ai-message {
+  display: flex;
+  gap: $spacing-sm;
+  max-width: 90%;
+
+  &.user {
+    align-self: flex-end;
+    flex-direction: row;
+
+    .ai-message-content {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      border-radius: $border-radius-md $border-radius-md $border-radius-sm $border-radius-md;
+    }
+  }
+
+  &.assistant {
+    align-self: flex-start;
+
+    .ai-message-content {
+      background: #f4f5f7;
+      color: $text-color;
+      border-radius: $border-radius-md $border-radius-md $border-radius-md $border-radius-sm;
+    }
+  }
+}
+
+.ai-message-avatar {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: $font-size-xs;
+  font-weight: 600;
+  margin-top: 2px;
+
+  .assistant & {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+  }
+
+  .user & {
+    background: $primary-color;
+    color: #fff;
+  }
+}
+
+.ai-message-content {
+  padding: $spacing-sm $spacing-md;
+  font-size: $font-size-sm;
+  line-height: 1.7;
+  word-break: break-word;
+  white-space: pre-line;
+}
+
+.ai-loading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: $spacing-sm $spacing-lg;
+}
+
+.loading-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: $text-color-light;
+  animation: dotPulse 1.2s ease-in-out infinite;
+
+  &:nth-child(2) { animation-delay: 0.2s; }
+  &:nth-child(3) { animation-delay: 0.4s; }
+}
+
+@keyframes dotPulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
+.ai-chat-input {
+  display: flex;
+  align-items: flex-end;
+  gap: $spacing-sm;
+  padding: $spacing-sm $spacing-md;
+  border-top: 1px solid $border-color-light;
+  background: rgba($primary-color, 0.01);
+
+  :deep(.el-textarea__inner) {
+    border-radius: $border-radius-md;
+    font-size: $font-size-sm;
+    padding: $spacing-sm $spacing-md;
+    box-shadow: none;
+    border-color: $border-color-light;
+
+    &:focus {
+      border-color: $primary-color;
+    }
+  }
+}
+
+.ai-send-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: $border-radius-md;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.resource-card {
+  background: $background-color-light;
+  border-radius: $border-radius-md;
+  border: 1px solid $border-color-light;
+  padding: $spacing-lg;
+}
+
+.resource-card-title {
+  font-size: $font-size-sm;
+  font-weight: 600;
+  color: $text-color-secondary;
+  margin: 0 0 $spacing-md;
+}
+
+.resource-list {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+}
+
+.resource-item {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: $spacing-sm;
+  border-radius: $border-radius-sm;
+  text-decoration: none;
+  font-size: $font-size-sm;
+  color: $text-color;
+  transition: all $transition-fast;
+
+  &:hover {
+    background: rgba($primary-color, 0.04);
+    color: $primary-color;
+  }
+}
+
+.placeholder-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 300px;
+  color: $text-color-light;
+}
+
+.placeholder-icon {
+  font-size: 48px;
+  margin-bottom: $spacing-md;
+  opacity: 0.5;
+}
+
+.placeholder-text {
+  font-size: $font-size-base;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .poem-detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .poem-left-panel {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .poem-right-panel {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .external-poem-selector {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  .action-toolbar {
+    flex-direction: column;
+  }
+
+  .toolbar-btn {
+    width: 100%;
+  }
+
+  .knowledge-panels {
+    width: 100%;
+  }
+
+  .background-knowledge-card {
+    width: 100%;
+  }
+
+
+  .poem-body-layout {
+    flex-direction: column;
+  }
+
+  .poem-flyout-panel {
+    width: calc(100% + $spacing-lg);
+    right: -#{$spacing-sm};
+  }
+}
+
 </style>

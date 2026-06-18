@@ -34,6 +34,12 @@ const goToAuthorSearch = () => {
   }
 }
 
+const goToContentSearch = () => {
+  if (dailyPoetry.value?.origin?.title) {
+    router.push({ path: '/poem', query: { keyword: dailyPoetry.value.origin.title } })
+  }
+}
+
 onMounted(() => {
   fetchDailyPoetry()
 })
@@ -54,7 +60,7 @@ onMounted(() => {
       <button @click="fetchDailyPoetry" class="retry-btn">重新加载</button>
     </div>
     <div v-else-if="dailyPoetry" class="daily-poetry-content">
-      <div class="poetry-text">
+      <div class="poetry-text" @click="goToContentSearch" title="点击查看整首诗">
         <p class="poetry-line">{{ dailyPoetry.content }}</p>
       </div>
       <div class="poetry-info">
@@ -166,6 +172,14 @@ onMounted(() => {
   padding: 20px;
   background: rgba(255, 255, 255, 0.4);
   border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.poetry-text:hover {
+  background: rgba(255, 255, 255, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 69, 19, 0.15);
 }
 
 .poetry-line {

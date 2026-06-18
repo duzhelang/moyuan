@@ -4,9 +4,18 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import AuthHeader from '@/components/common/AuthHeader.vue'
+import { useParticles } from '@/composables/useParticles'
 
 const router = useRouter()
 const userStore = useUserStore()
+
+const particleCanvasRef = ref<HTMLCanvasElement | null>(null)
+useParticles(particleCanvasRef, {
+  count: 50,
+  colors: ['#d4af87', '#f0e4d7', '#c9a06c'],
+  opacityRange: [0.2, 0.4],
+  sizeRange: [1.5, 3]
+})
 
 const loading = ref(false)
 
@@ -76,6 +85,7 @@ const handleSubmit = async () => {
 
 <template>
   <div class="dl_container">
+    <canvas ref="particleCanvasRef" class="particle-bg"></canvas>
     <AuthHeader />
 
     <div class="body">
@@ -219,6 +229,16 @@ const handleSubmit = async () => {
   font-family: cursive;
   overflow-x: hidden;
   overflow-y: auto;
+}
+
+.particle-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
 }
 
 .dl_container::-webkit-scrollbar {

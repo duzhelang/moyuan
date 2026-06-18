@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, onActivated, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { getForumPostList, getComments, createComment, likeComment } from '@/api/modules/forum'
 import { likePoem, favoritePoem } from '@/api/modules/poem'
 import { writePoemFromImage, analyzePoem, matchCouplet } from '@/api/modules/ai'
@@ -24,6 +24,7 @@ import HomeNavBar from '@/components/business/HomeNavBar.vue'
 const NAV_ANIMATION_KEY = 'home_nav_animation_config'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
 const hotPosts = ref<ForumPost[]>([])
@@ -703,6 +704,29 @@ onUnmounted(() => {
     clockTimer.value = null
   }
   window.removeEventListener('scroll', handleScroll)
+})
+
+const handleTabParam = () => {
+  const tabParam = route.query.tab as string
+  if (tabParam && ['poem', 'analyze', 'explore'].includes(tabParam)) {
+    activeAiTab.value = tabParam as 'poem' | 'analyze' | 'explore'
+    setTimeout(() => {
+      const aiSection = document.querySelector('.ai-container')
+      if (aiSection) {
+        aiSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }, 300)
+  }
+}
+
+watch(() => route.query.tab, (newTab) => {
+  if (newTab) {
+    handleTabParam()
+  }
+}, { immediate: true })
+
+onActivated(() => {
+  handleTabParam()
 })
 </script>
 

@@ -739,7 +739,7 @@ onMounted(() => {
                     </el-tag>
                     <span class="history-id">ID: {{ item.targetId }}</span>
                   </div>
-                  <span class="history-time">{{ item.createdAt }}</span>
+                  <span class="history-time">{{ item.createTime }}</span>
                 </div>
               </div>
               <el-empty v-else description="暂无浏览记录" />

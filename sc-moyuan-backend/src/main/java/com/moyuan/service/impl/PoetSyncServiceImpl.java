@@ -40,7 +40,8 @@ public class PoetSyncServiceImpl implements PoetSyncService {
             String url = String.format("%s?id=%s&key=%s&name=%s&page=1", API_URL, apihzId, apihzKey, poetName);
             log.info("调用接口盒子API: {}", url);
 
-            Map response = restTemplate.getForObject(url, Map.class);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> response = restTemplate.getForObject(url, Map.class);
             if (response == null || !Integer.valueOf(200).equals(response.get("code"))) {
                 String msg = response != null ? (String) response.get("msg") : "请求失败";
                 result.put("success", false);
@@ -48,6 +49,7 @@ public class PoetSyncServiceImpl implements PoetSyncService {
                 return result;
             }
 
+            @SuppressWarnings("unchecked")
             List<Map<String, Object>> dataList = (List<Map<String, Object>>) response.get("data");
             if (dataList == null || dataList.isEmpty()) {
                 result.put("success", false);

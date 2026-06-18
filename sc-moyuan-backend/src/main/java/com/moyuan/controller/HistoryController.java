@@ -20,12 +20,11 @@ import java.util.Map;
 public class HistoryController {
 
     private final UserHistoryService userHistoryService;
-    private final SecurityUtil securityUtil;
 
     @Operation(summary = "添加浏览历史")
     @PostMapping
     public R<Void> addHistory(@RequestParam Long targetId, @RequestParam Integer targetType) {
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         userHistoryService.addHistory(userId, targetId, targetType);
         return R.success();
     }
@@ -36,7 +35,7 @@ public class HistoryController {
             @RequestParam(required = false) Integer targetType,
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "20") int pageSize) {
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         IPage<UserHistory> page = userHistoryService.getHistory(userId, targetType, pageNum, pageSize);
         Map<String, Object> result = new HashMap<>();
         result.put("list", page.getRecords());
@@ -49,7 +48,7 @@ public class HistoryController {
     @Operation(summary = "清空浏览历史")
     @DeleteMapping
     public R<Void> clearHistory(@RequestParam(required = false) Integer targetType) {
-        Long userId = securityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         userHistoryService.clearHistory(userId, targetType);
         return R.success();
     }

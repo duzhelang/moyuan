@@ -1,3 +1,5 @@
+@use 'sass:color';
+
 @font-face {
   font-family: 'YingBiXingShu';
   src: url('/fonts/yingbixingshu.ttf') format('truetype');
@@ -32,7 +34,7 @@ a {
   transition: color $transition-fast;
   
   &:hover {
-    color: darken($primary-color, 10%);
+    color: color.adjust($primary-color, $lightness: -10%);
   }
 }
 
