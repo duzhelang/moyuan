@@ -93,41 +93,40 @@ const fillAdminUsername = () => {
         <img src="/img/fy_tubiao (10).png" class="dl_zhuang_s5"/>
       </div>
 
-      <div class="dl_zhuti">
-        <div class="zhong">
-          <div class="dlzt_tx_div">
-            <img src="/img/00.jpg"/>
-            <input type="text" placeholder="输入用户名" v-model="form.username">
+      <div class="login-card">
+        <div class="card-content">
+          <div class="user-panel">
+            <img src="/img/00.jpg" class="avatar" alt="用户头像">
             <div class="register-link">
-              <a class="fuzhu" href="javascript:void(0)" @click="goToRegister">还没有账号?注册</a>
+              <a class="register-text" href="javascript:void(0)" @click="goToRegister">还没有账号？立即注册</a>
             </div>
           </div>
 
-          <div class="zhong_shuxian"></div>
-          <div class="dlzt_wz_div">
-            <h1>登&nbsp;&nbsp;&nbsp;&nbsp;录</h1>
-            <form @submit.prevent="handleLogin">
-              <div class="a1">
-                <label for="username" class="">用户名:</label>
-                <input type="text" id="username" class="dl_shurukuang" placeholder="请输入注册手机号" v-model="form.username">
+          <div class="divider"></div>
+          <div class="login-form-panel">
+            <h1 class="login-title">登&nbsp;&nbsp;&nbsp;&nbsp;录</h1>
+            <form @submit.prevent="handleLogin" class="login-form">
+              <div class="form-group">
+                <label for="username" class="form-label">用户名:</label>
+                <input type="text" id="username" class="form-input" placeholder="请输入注册手机号" v-model="form.username">
               </div>
-              <div class="a2">
-                <label for="password">密&nbsp;&nbsp;码:</label>
+              <div class="form-group">
+                <label for="password" class="form-label">密&nbsp;&nbsp;码:</label>
                 <div class="password-wrapper">
-                  <input :type="showPassword ? 'text' : 'password'" id="password" class="dl_shurukuang" placeholder="请输入密码" required v-model="form.password">
+                  <input :type="showPassword ? 'text' : 'password'" id="password" class="form-input" placeholder="请输入密码" required v-model="form.password">
                   <span class="toggle-password" @click="togglePassword">
                     {{ showPassword ? '🙈' : '👁' }}
                   </span>
                 </div>
               </div>
-              <div class="remember-row">
+              <div class="remember-group">
                 <label class="remember-label">
                   <input type="checkbox" v-model="rememberMe" class="remember-checkbox">
                   <span class="remember-text">记住密码</span>
                 </label>
               </div>
-              <div class="a3">
-                <button class="dl_anjian" type="submit" :disabled="loading">
+              <div class="submit-group">
+                <button class="login-button" type="submit" :disabled="loading">
                   {{ loading ? '登录中...' : '登录' }}
                 </button>
               </div>
@@ -262,7 +261,7 @@ const fillAdminUsername = () => {
   height: 300px;
 }
 
-.dl_zhuti {
+.login-card {
   margin: 20px 10px;
   text-align: center;
   display: flex;
@@ -272,20 +271,7 @@ const fillAdminUsername = () => {
   z-index: 50;
 }
 
-.zhong img {
-  width: 430px;
-  height: 280px;
-}
-
-.zhong h1 {
-  font-size: 50px;
-  font-weight: 600;
-  margin: 10px auto;
-  display: flex;
-  justify-content: center;
-}
-
-.zhong {
+.card-content {
   backdrop-filter: blur(1.5px);
   box-shadow: 0 4px 8px rgba(0,0,0,0.2);
   width: 600px;
@@ -297,68 +283,58 @@ const fillAdminUsername = () => {
   background-position: 0px 0px;
   display: flex;
   align-items: center;
+  overflow: hidden;
 }
 
-.zhong .dlzt_tx_div {
+.user-panel {
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   width: 35%;
   height: 100%;
+  box-sizing: border-box;
+  padding: 20px;
+  gap: 20px;
 }
 
-.zhong .dlzt_tx_div > img {
+.user-panel .avatar {
   display: block;
   border-radius: 50%;
-  margin-bottom: 15px;
-  width: 80px;
-  height: 80px;
-  position: relative;
-  z-index: 50;
-}
-
-.zhong .dlzt_tx_div > input {
-  display: block;
-  border: 1px solid #ccc;
-  border-radius: 35px 0 35px 0;
-  padding: 2px 30px;
-  width: 75px;
-  height: 30px;
-  color: #ffffff;
-  background-color: rgba(255, 255, 255, 0.5);
-  font-size: 20px;
-  font-family: cursive;
-  outline: none;
+  width: 90px;
+  height: 90px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }
 
 .register-link {
-  font-size: 20px;
+  font-size: 14px;
   text-align: center;
-  margin-top: 15px;
-  position: relative;
 }
 
-.register-link .fuzhu {
-  background-color: rgba(204, 204, 204, 0.7);
-  line-height: 0px;
-  text-shadow: 0 0 10px white;
+.register-link .register-text {
   color: #55aaff;
   cursor: pointer;
+  text-decoration: none;
+  transition: color 0.2s;
 }
 
-.register-link .fuzhu:hover {
+.register-link .register-text:hover {
+  color: #007BFF;
+  text-decoration: underline;
+}
+
+.register-link .register-text:hover {
   text-decoration: none;
   color: #007BFF;
 }
 
-.zhong_shuxian {
+.divider {
   width: 1px;
   height: 70%;
   background-color: #e0e0e0;
 }
 
-.zhong .dlzt_wz_div {
+.login-form-panel {
   width: 60%;
   display: flex;
   flex-direction: column;
@@ -366,7 +342,7 @@ const fillAdminUsername = () => {
   height: 100%;
 }
 
-.zhong .dlzt_wz_div h1 {
+.login-title {
   text-shadow: 8px 2px 3px rgba(254, 254, 254, 0.4);
   color: #333;
   font-size: 50px;
@@ -376,7 +352,7 @@ const fillAdminUsername = () => {
   justify-content: center;
 }
 
-.dl_shurukuang {
+.form-input {
   width: 250px;
   height: 33px;
   border-radius: 10px;
@@ -396,7 +372,7 @@ const fillAdminUsername = () => {
   align-items: center;
 }
 
-.password-wrapper .dl_shurukuang {
+.password-wrapper .form-input {
   padding-right: 35px;
 }
 
@@ -408,14 +384,14 @@ const fillAdminUsername = () => {
   user-select: none;
 }
 
-.a1, .a2, .a3 {
+.form-group {
   height: 50px;
   font-size: 20px;
   display: flex;
   align-items: center;
 }
 
-.a1 label, .a2 label {
+.form-group .form-label {
   width: 70px;
   text-align: right;
   margin-right: 10px;
@@ -423,7 +399,7 @@ const fillAdminUsername = () => {
   font-family: cursive;
 }
 
-.remember-row {
+.remember-group {
   height: 30px;
   padding-left: 80px;
   display: flex;
@@ -451,11 +427,11 @@ const fillAdminUsername = () => {
   user-select: none;
 }
 
-.a3 {
+.submit-group {
   padding-left: 80px;
 }
 
-.dl_anjian {
+.login-button {
   display: flex;
   width: 200px;
   height: 43px;
@@ -471,11 +447,11 @@ const fillAdminUsername = () => {
   font-family: cursive;
 }
 
-.dl_anjian:hover {
+.login-button:hover {
   background-color: #0056b3;
 }
 
-.dl_anjian:disabled {
+.login-button:disabled {
   opacity: 0.7;
   cursor: not-allowed;
 }

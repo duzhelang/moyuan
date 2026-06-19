@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -169,9 +170,18 @@ public class RecommendationServiceImpl implements RecommendationService {
     @Override
     public List<Map<String, Object>> getExternalPoems(String keyword, int limit) {
         List<Map<String, Object>> results = new ArrayList<>();
+        if (!externalApiEnabled) {
+            return results;
+        }
         try {
-            String url = String.format("%s?id=%s&key=%s&words=%s&page=1",
-                    APIHZ_POETRY_URL, apihzId, apihzKey, keyword);
+            String url = UriComponentsBuilder
+                    .fromHttpUrl(APIHZ_POETRY_URL)
+                    .queryParam("id", apihzId)
+                    .queryParam("key", apihzKey)
+                    .queryParam("words", keyword)
+                    .queryParam("page", 1)
+                    .build()
+                    .toUriString();
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restTemplate.getForObject(url, Map.class);
 
@@ -194,11 +204,61 @@ public class RecommendationServiceImpl implements RecommendationService {
                         count++;
                     }
                 }
+            } else {
+                log.warn("外部诗词API返回异常响应: keyword={}, response={}", keyword, response);
             }
         } catch (Exception e) {
-            log.error("调用外部诗词API失败: {}", e.getMessage());
+            log.error("调用外部诗词API失败: keyword={}, error={}", keyword, e.getMessage(), e);
         }
         return results;
+    }
+
+    @Override
+    public Map<String, Object> getExternalPoemDetail(String keyword) {
+        if (!externalApiEnabled) {
+            return null;
+        }
+        try {
+            String url = UriComponentsBuilder
+                    .fromHttpUrl(APIHZ_POETRY_URL)
+                    .queryParam("id", apihzId)
+                    .queryParam("key", apihzKey)
+                    .queryParam("words", keyword)
+                    .queryParam("page", 1)
+                    .build()
+                    .toUriString();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> response = restTemplate.getForObject(url, Map.class);
+
+            if (response != null && Integer.valueOf(200).equals(response.get("code"))) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+                if (data != null && !data.isEmpty()) {
+                    Map<String, Object> item = data.get(0);
+                    Map<String, Object> detail = new HashMap<>(item);
+                    detail.put("content", stripHtml((String) detail.get("content")));
+                    detail.put("ywjzsy", stripHtml((String) detail.get("ywjzsy")));
+                    detail.put("ywjzse", stripHtml((String) detail.get("ywjzse")));
+                    detail.put("czbj", stripHtml((String) detail.get("czbj")));
+                    detail.put("jsy", stripHtml((String) detail.get("jsy")));
+                    detail.put("jse", stripHtml((String) detail.get("jse")));
+                    detail.put("sxy", stripHtml((String) detail.get("sxy")));
+                    detail.put("sxe", stripHtml((String) detail.get("sxe")));
+                    detail.put("jj", stripHtml((String) detail.get("jj")));
+                    detail.put("yj", stripHtml((String) detail.get("yj")));
+                    detail.put("xzsf", stripHtml((String) detail.get("xzsf")));
+                    detail.put("dj", stripHtml((String) detail.get("dj")));
+                    detail.put("pj", stripHtml((String) detail.get("pj")));
+                    detail.put("jx", stripHtml((String) detail.get("jx")));
+                    return detail;
+                }
+            } else {
+                log.warn("外部诗词详情API返回异常响应: keyword={}, response={}", keyword, response);
+            }
+        } catch (Exception e) {
+            log.error("调用外部诗词详情API失败: keyword={}, error={}", keyword, e.getMessage(), e);
+        }
+        return null;
     }
 
     private String stripHtml(String html) {

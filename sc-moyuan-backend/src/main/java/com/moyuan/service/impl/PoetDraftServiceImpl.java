@@ -76,6 +76,15 @@ public class PoetDraftServiceImpl implements PoetDraftService {
         return poetDraftMapper.selectById(id);
     }
 
+    @Override
+    public long countByStatus(Integer status) {
+        LambdaQueryWrapper<PoetDraft> wrapper = new LambdaQueryWrapper<>();
+        if (status != null) {
+            wrapper.eq(PoetDraft::getStatus, status);
+        }
+        return poetDraftMapper.selectCount(wrapper);
+    }
+
     private void publishDraft(PoetDraft draft) {
         Poet poet = poetMapper.selectById(draft.getPoetId());
         if (poet == null) return;

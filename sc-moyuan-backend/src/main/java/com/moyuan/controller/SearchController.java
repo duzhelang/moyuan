@@ -106,6 +106,13 @@ public class SearchController {
         return R.success(results);
     }
 
+    @Operation(summary = "从外部API获取诗词详情")
+    @GetMapping("/poems/external/detail")
+    public R<Map<String, Object>> getExternalPoemDetail(@RequestParam String keyword) {
+        Map<String, Object> detail = recommendationService.getExternalPoemDetail(keyword);
+        return R.success(detail);
+    }
+
     @Operation(summary = "智能搜索（支持渐进式匹配）")
     @GetMapping("/smart")
     public R<Map<String, Object>> smartSearch(

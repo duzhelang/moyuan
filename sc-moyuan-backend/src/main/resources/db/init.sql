@@ -156,6 +156,8 @@ CREATE TABLE IF NOT EXISTS `forum_post` (
   `is_top` TINYINT NOT NULL DEFAULT 0 COMMENT '是否置顶',
   `is_featured` TINYINT NOT NULL DEFAULT 0 COMMENT '是否精选',
   `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-草稿，1-已发布，2-已关闭',
+  `audit_reason` VARCHAR(500) DEFAULT NULL COMMENT '审核原因',
+  `audit_time` DATETIME DEFAULT NULL COMMENT '审核时间',
   `last_comment_time` DATETIME DEFAULT NULL COMMENT '最后评论时间',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -181,6 +183,8 @@ CREATE TABLE IF NOT EXISTS `comment` (
   `reply_to_user_id` BIGINT DEFAULT NULL COMMENT '回复目标用户ID',
   `like_count` INT NOT NULL DEFAULT 0 COMMENT '点赞次数',
   `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-隐藏，1-正常',
+  `audit_reason` VARCHAR(500) DEFAULT NULL COMMENT '审核原因',
+  `audit_time` DATETIME DEFAULT NULL COMMENT '审核时间',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
@@ -1114,3 +1118,26 @@ INSERT IGNORE INTO `static_page` (`page_key`, `title`, `content`) VALUES
 ('terms', '使用条款', '[{"title":"服务说明","content":"古诗词汇是一个提供古典诗词内容浏览、学习和交流服务的在线平台。用户通过注册账号可以享受更多个性化服务。"},{"title":"用户注册","content":"1. 用户应提供真实、准确的注册信息\n2. 用户应妥善保管账号密码，因个人原因导致的账号安全问题由用户自行负责\n3. 每个用户只能注册一个账号"},{"title":"用户行为规范","content":"1. 用户应遵守国家法律法规，不得利用平台从事违法违规活动\n2. 用户应尊重其他用户，不得发布侮辱、诽谤、色情等不良信息\n3. 用户应尊重知识产权，不得侵犯他人著作权"},{"title":"知识产权","content":"1. 平台上的诗词内容版权归原作者或授权方所有\n2. 用户发布的内容应为原创或已获得授权\n3. 未经授权，不得将平台内容用于商业用途"},{"title":"免责声明","content":"1. 平台不对用户发布的内容承担法律责任\n2. 因不可抗力导致的服务中断，平台不承担责任\n3. 平台有权对违规内容进行删除或处理"},{"title":"条款修改","content":"平台有权根据需要修改使用条款，修改后的条款将在平台上公布。继续使用平台即视为同意修改后的条款。"}]'),
 ('privacy', '隐私政策', '[{"title":"信息收集","content":"我们可能收集以下信息：\n1. 注册信息：用户名、邮箱、手机号等\n2. 使用数据：浏览记录、搜索历史、收藏内容等\n3. 设备信息：设备型号、操作系统、浏览器类型等"},{"title":"信息使用","content":"我们使用收集的信息用于：\n1. 提供和维护服务\n2. 个性化用户体验\n3. 改进平台功能\n4. 发送服务通知\n5. 防范安全风险"},{"title":"信息保护","content":"我们采取以下措施保护您的信息：\n1. 数据加密存储和传输\n2. 访问权限控制\n3. 定期安全审计\n4. 员工保密培训"},{"title":"信息共享","content":"未经您的同意，我们不会向第三方共享您的个人信息，但以下情况除外：\n1. 法律法规要求\n2. 保护平台或用户的合法权益\n3. 经您明确同意"},{"title":"Cookie使用","content":"我们使用Cookie来提升用户体验，您可以通过浏览器设置管理Cookie。"},{"title":"隐私政策更新","content":"我们可能会不时更新隐私政策，更新后的政策将在平台上公布。"},{"title":"联系我们","content":"如对隐私政策有任何疑问，请通过平台联系我们。"}]'),
 ('contact', '联系我们', '[{"title":"联系方式","content":"• 客服邮箱：support@gushihui.com\n• 商务合作：business@gushihui.com\n• 意见反馈：feedback@gushihui.com"},{"title":"工作时间","content":"周一至周五：9:00 - 18:00\n法定节假日除外"},{"title":"常见问题","content":"1. 账号问题：如忘记密码、账号异常等\n2. 内容问题：如诗词纠错、诗人信息补充等\n3. 功能建议：如新功能需求、界面优化等\n4. 合作洽谈：如内容授权、广告合作等"},{"title":"反馈渠道","content":"1. 邮件反馈：发送邮件至上述邮箱\n2. 在线反馈：通过平台\"意见反馈\"功能提交\n3. 社交媒体：关注我们的官方微博、微信公众号"},{"title":"地址","content":"[公司地址信息]"}]');
+
+-- ============================================================
+-- 24. AI生成内容审核表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `ai_generated_content` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `target_type` VARCHAR(20) NOT NULL COMMENT '目标类型：poem-诗词，poet-诗人',
+  `target_id` BIGINT NOT NULL COMMENT '目标ID（诗词ID或诗人ID）',
+  `target_name` VARCHAR(200) DEFAULT NULL COMMENT '目标名称（诗词标题或诗人姓名）',
+  `field_name` VARCHAR(50) NOT NULL COMMENT '字段名：translation/appreciation/background/biography/life_story/influence/evaluation/anecdotes',
+  `content` TEXT NOT NULL COMMENT 'AI生成的内容',
+  `ai_model` VARCHAR(50) DEFAULT NULL COMMENT '使用的AI模型',
+  `status` TINYINT NOT NULL DEFAULT 0 COMMENT '审核状态：0-待审核，1-已通过，2-已拒绝',
+  `reviewer_id` BIGINT DEFAULT NULL COMMENT '审核者ID',
+  `review_comment` VARCHAR(500) DEFAULT NULL COMMENT '审核备注',
+  `review_time` DATETIME DEFAULT NULL COMMENT '审核时间',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_agc_target` (`target_type`, `target_id`),
+  KEY `idx_agc_status` (`status`),
+  KEY `idx_agc_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI生成内容审核表';

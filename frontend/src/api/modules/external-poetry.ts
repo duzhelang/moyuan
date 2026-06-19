@@ -209,11 +209,7 @@ export async function getExternalPoems(
   }
 }
 
-// ========== 接口盒子 API (apihz.cn) ==========
-
-const APIHZ_BASE = 'https://cn.apihz.cn/api/zici'
-const APIHZ_ID = '10017619'
-const APIHZ_KEY = '87736ae7fe3a325574c57ef1f45962a4'
+// ========== 接口盒子 API (apihz.cn) - 通过后端代理 ==========
 
 export interface ApihzPoetryItem {
   name: string
@@ -237,43 +233,15 @@ export interface ApihzPoetryItem {
   jx: string | null
 }
 
-export interface ApihzResponse {
-  code: number
-  msg: string
-  page: number
-  data: ApihzPoetryItem[]
-}
-
-function stripHtml(html: string | null): string | null {
-  if (!html) return null
-  return html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim() || null
-}
-
 export async function searchApihzPoems(
   keyword: string,
   limit: number = 10
 ): Promise<PoemSearchResult[]> {
   try {
-    const response = await axios.get<ApihzResponse>(`${APIHZ_BASE}/poetry.php`, {
-      params: {
-        id: APIHZ_ID,
-        key: APIHZ_KEY,
-        words: keyword,
-        page: 1
-      }
+    const response = await request.get('/search/poems/external', {
+      params: { keyword, limit }
     })
-    if (response.data.code === 200 && response.data.data?.length > 0) {
-      return response.data.data.slice(0, limit).map(item => ({
-        title: item.name,
-        content: stripHtml(item.content) || item.content,
-        author: item.author,
-        dynasty: item.dynasty,
-        source: 'external' as const,
-        recommendScore: 0.5,
-        recommendReason: '古诗词库推荐'
-      }))
-    }
-    return []
+    return response.data || []
   } catch (error) {
     console.error('外部诗词搜索失败:', error)
     return []
@@ -281,39 +249,13 @@ export async function searchApihzPoems(
 }
 
 export async function getApihzPoetryDetail(
-  keyword: string,
-  page: number = 1
+  keyword: string
 ): Promise<ApihzPoetryItem | null> {
   try {
-    const response = await axios.get<ApihzResponse>(`${APIHZ_BASE}/poetry.php`, {
-      params: {
-        id: APIHZ_ID,
-        key: APIHZ_KEY,
-        words: keyword,
-        page
-      }
+    const response = await request.get('/search/poems/external/detail', {
+      params: { keyword }
     })
-    if (response.data.code === 200 && response.data.data?.length > 0) {
-      const item = response.data.data[0]
-      return {
-        ...item,
-        content: stripHtml(item.content) || item.content,
-        ywjzsy: stripHtml(item.ywjzsy),
-        ywjzse: stripHtml(item.ywjzse),
-        czbj: stripHtml(item.czbj),
-        jsy: stripHtml(item.jsy),
-        jse: stripHtml(item.jse),
-        sxy: stripHtml(item.sxy),
-        sxe: stripHtml(item.sxe),
-        jj: stripHtml(item.jj),
-        yj: stripHtml(item.yj),
-        xzsf: stripHtml(item.xzsf),
-        dj: stripHtml(item.dj),
-        pj: stripHtml(item.pj),
-        jx: stripHtml(item.jx),
-      }
-    }
-    return null
+    return response.data || null
   } catch (error) {
     console.error('获取接口盒子诗词详情失败:', error)
     return null

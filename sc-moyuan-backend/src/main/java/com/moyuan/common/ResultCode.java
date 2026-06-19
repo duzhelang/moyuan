@@ -19,6 +19,7 @@ public enum ResultCode {
     PASSWORD_ERROR("1004", "密码错误"),
     ACCOUNT_DISABLED("1005", "账号已被禁用"),
     POST_NOT_FOUND("2001", "帖子不存在"),
+    COMMENT_NOT_FOUND("2002", "评论不存在"),
     ARTICLE_NOT_FOUND("2101", "文章不存在"),
     POEM_NOT_FOUND("3001", "诗词不存在"),
     POET_NOT_FOUND("3002", "诗人不存在"),

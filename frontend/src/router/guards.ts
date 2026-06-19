@@ -47,7 +47,7 @@ export function setupRouterGuards(router: Router) {
       }
     }
 
-    if ((to.name === 'Login' || to.name === 'Register') && userStore.isLoggedIn) {
+    if ((to.name === 'Login' || to.name === 'Register') && userStore.isLoggedIn && userStore.userInfo) {
       next({ name: 'Home' })
       return
     }

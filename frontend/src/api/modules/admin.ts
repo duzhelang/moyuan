@@ -180,3 +180,43 @@ export function reviewPoetSuggestion(id: number, status: string, reviewComment?:
     params: { status, reviewComment }
   })
 }
+
+export function getAdminAiContents(params: { page?: number; size?: number; status?: number | null }) {
+  return request.get<{ records: any[]; total: number }>('/admin/ai-contents', { params })
+}
+
+export function approveAiContent(id: number, reviewComment?: string) {
+  return request.put<void>(`/admin/ai-contents/${id}/approve`, { reviewComment })
+}
+
+export function rejectAiContent(id: number, reviewComment?: string) {
+  return request.put<void>(`/admin/ai-contents/${id}/reject`, { reviewComment })
+}
+
+export function auditPoem(id: number, status: number, reason?: string) {
+  return request.put<void>(`/admin/poems/${id}/audit`, { status, reason })
+}
+
+export function getAdminPoetProfiles(params: { page?: number; size?: number; status?: number | null }) {
+  return request.get<{ records: any[]; total: number }>('/admin/poet-profiles', { params })
+}
+
+export function verifyPoetProfile(id: number, status: number, reason?: string) {
+  return request.put<void>(`/admin/poet-profiles/${id}/verify`, { status, reason })
+}
+
+export function getAdminComments(params: { page?: number; size?: number; status?: number | null }) {
+  return request.get<{ records: any[]; total: number }>('/admin/comments', { params })
+}
+
+export function auditComment(id: number, status: number, reason?: string) {
+  return request.put<void>(`/admin/comments/${id}/audit`, { status, reason })
+}
+
+export function deleteAdminComment(id: number) {
+  return request.delete<void>(`/admin/comments/${id}`)
+}
+
+export function getAuditStats() {
+  return request.get<Record<string, number>>('/admin/audit/stats')
+}

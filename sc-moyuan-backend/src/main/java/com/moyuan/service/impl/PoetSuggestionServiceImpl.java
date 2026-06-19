@@ -54,4 +54,13 @@ public class PoetSuggestionServiceImpl implements PoetSuggestionService {
         suggestion.setUpdateTime(LocalDateTime.now());
         poetSuggestionMapper.updateById(suggestion);
     }
+
+    @Override
+    public long countByStatus(String status) {
+        LambdaQueryWrapper<PoetSuggestion> wrapper = new LambdaQueryWrapper<>();
+        if (status != null && !status.isEmpty()) {
+            wrapper.eq(PoetSuggestion::getStatus, status);
+        }
+        return poetSuggestionMapper.selectCount(wrapper);
+    }
 }

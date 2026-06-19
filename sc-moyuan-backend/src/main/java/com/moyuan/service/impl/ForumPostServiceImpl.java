@@ -173,4 +173,17 @@ public class ForumPostServiceImpl extends ServiceImpl<ForumPostMapper, ForumPost
         fillUserInfo(page.getRecords());
         return page;
     }
+
+    @Override
+    @Transactional
+    public void auditForumPost(Long postId, Integer status, String reason) {
+        ForumPost post = forumPostMapper.selectById(postId);
+        if (post == null) {
+            throw new BusinessException(ResultCode.POST_NOT_FOUND);
+        }
+        post.setStatus(status);
+        post.setAuditReason(reason);
+        post.setAuditTime(java.time.LocalDateTime.now());
+        forumPostMapper.updateById(post);
+    }
 }

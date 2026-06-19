@@ -109,11 +109,16 @@ export function useParticles(canvasRef: Ref<HTMLCanvasElement | null>, options: 
     const canvas = canvasRef.value
     if (!canvas) return
 
-    const container = canvas.parentElement
-    if (!container) return
-
-    canvas.width = container.offsetWidth
-    canvas.height = container.offsetHeight
+    const style = window.getComputedStyle(canvas)
+    if (style.position === 'fixed') {
+      canvas.width = window.innerWidth
+      canvas.height = window.innerHeight
+    } else {
+      const container = canvas.parentElement
+      if (!container) return
+      canvas.width = container.offsetWidth
+      canvas.height = container.offsetHeight
+    }
 
     particles = createParticles(canvas)
     startAnimation(canvas)
@@ -123,17 +128,22 @@ export function useParticles(canvasRef: Ref<HTMLCanvasElement | null>, options: 
     const canvas = canvasRef.value
     if (!canvas) return
 
-    const container = canvas.parentElement
-    if (!container) return
-
-    canvas.width = container.offsetWidth
-    canvas.height = container.offsetHeight
+    const style = window.getComputedStyle(canvas)
+    if (style.position === 'fixed') {
+      canvas.width = window.innerWidth
+      canvas.height = window.innerHeight
+    } else {
+      const container = canvas.parentElement
+      if (!container) return
+      canvas.width = container.offsetWidth
+      canvas.height = container.offsetHeight
+    }
   }
 
   onMounted(() => {
     setTimeout(() => {
       initCanvas()
-    }, 100)
+    }, 300)
     window.addEventListener('resize', handleResize)
   })
 

@@ -49,6 +49,12 @@ const poets = ref<Poet[]>([])
 
 const activeTab = ref<'classical' | 'modern'>('classical')
 
+const poemImages = [
+  '/img/lt_jx (2).jpg',
+  '/img/lt_jx (3).jpg',
+  '/img/lt_jx (4).jpg'
+]
+
 const filters = ref({
   dynastyId: undefined as number | undefined,
   categoryId: undefined as number | undefined,
@@ -1367,13 +1373,13 @@ const handleClearHistory = async () => {
         <el-empty v-if="!loading && !externalSearching && poems.length === 0 && externalPoemResults.length === 0" description="暂无诗词" />
 
         <div
-          v-for="poem in poems"
+          v-for="(poem, index) in poems"
           :key="poem.id"
           class="poem-card"
           @click="goToDetail(poem.id)"
         >
           <div class="poem-image">
-            <img src="/images/h6.jpg" :alt="poem.title" />
+            <img :src="poemImages[index % poemImages.length]" :alt="poem.title" />
             <div class="featured-badge" v-if="poem.isFeatured">
               <el-icon><Star /></el-icon>
               精选

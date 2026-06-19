@@ -131,4 +131,46 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
                     .setSql("like_count = like_count - 1"));
         }
     }
+
+    @Override
+    public IPage<Comment> getCommentList(int pageNum, int pageSize, Integer status) {
+        LambdaQueryWrapper<Comment> wrapper = new LambdaQueryWrapper<>();
+        if (status != null) {
+            wrapper.eq(Comment::getStatus, status);
+        }
+        wrapper.orderByDesc(Comment::getCreateTime);
+        IPage<Comment> page = commentMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
+        fillUserInfo(page.getRecords());
+        return page;
+    }
+
+    @Override
+    @Transactional
+    public void auditComment(Long commentId, Integer status, String reason) {
+        Comment comment = commentMapper.selectById(commentId);
+        if (comment == null) {
+            throw new BusinessException(ResultCode.COMMENT_NOT_FOUND);
+        }
+        comment.setStatus(status);
+        comment.setAuditReason(reason);
+        comment.setAuditTime(LocalDateTime.now());
+        commentMapper.updateById(comment);
+    }
+
+    @Override
+    @Transactional
+    public void deleteCommentByAdmin(Long commentId) {
+        Comment comment = commentMapper.selectById(commentId);
+        if (comment == null) {
+            throw new BusinessException(ResultCode.COMMENT_NOT_FOUND);
+        }
+        commentMapper.deleteById(commentId);
+
+        if (comment.getTargetType() == 2) {
+            forumPostMapper.update(null, new LambdaUpdateWrapper<ForumPost>()
+                    .eq(ForumPost::getId, comment.getTargetId())
+                    .gt(ForumPost::getCommentCount, 0)
+                    .setSql("comment_count = comment_count - 1"));
+        }
+    }
 }

@@ -12,4 +12,6 @@ public interface PoetDraftService {
     void reviewDraft(Long id, Integer status, String reviewComment, Long reviewerId);
 
     PoetDraft getDraftById(Long id);
+
+    long countByStatus(Integer status);
 }

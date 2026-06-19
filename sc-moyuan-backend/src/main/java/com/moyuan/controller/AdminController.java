@@ -8,6 +8,7 @@ import com.moyuan.dto.StatsTrendDTO;
 import com.moyuan.entity.*;
 import com.moyuan.mapper.StatsMapper;
 import com.moyuan.service.*;
+import com.moyuan.util.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +42,11 @@ public class AdminController {
     private final VisitLogService visitLogService;
     private final PoetSyncService poetSyncService;
     private final PoetProfileService poetProfileService;
+    private final AiGeneratedContentService aiGeneratedContentService;
     private final StatsMapper statsMapper;
+    private final CommentService commentService;
+    private final PoetDraftService poetDraftService;
+    private final PoetSuggestionService poetSuggestionService;
 
     // ========== 统计数据 ==========
 
@@ -506,6 +511,18 @@ public class AdminController {
         return R.success();
     }
 
+    @Operation(summary = "审核帖子")
+    @PutMapping("/forum-posts/{id}/audit")
+    public R<Void> auditForumPost(@PathVariable Long id, @RequestBody Map<String, Object> params) {
+        Integer status = (Integer) params.get("status");
+        String reason = (String) params.get("reason");
+        if (status == null) {
+            return R.error("审核状态不能为空");
+        }
+        forumPostService.auditForumPost(id, status, reason);
+        return R.success();
+    }
+
     @Operation(summary = "删除帖子")
     @DeleteMapping("/forum-posts/{id}")
     public R<Void> deleteForumPost(@PathVariable Long id) {
@@ -593,6 +610,74 @@ public class AdminController {
         return R.success(result);
     }
 
+    // ========== 审核统计 ==========
+
+    @Operation(summary = "获取审核统计数据")
+    @GetMapping("/audit/stats")
+    public R<Map<String, Long>> getAuditStats() {
+        Map<String, Long> stats = new HashMap<>();
+
+        // 诗词待审核数量（auditStatus = 0）
+        long poemCount = poemService.count(
+                new LambdaQueryWrapper<Poem>().eq(Poem::getAuditStatus, 0));
+        stats.put("poems", poemCount);
+
+        // 评论待审核数量（status = 0）
+        long commentCount = commentService.count(
+                new LambdaQueryWrapper<Comment>().eq(Comment::getStatus, 0));
+        stats.put("comments", commentCount);
+
+        // 诗人认证待审核数量（verifiedStatus = 0）
+        long poetProfileCount = poetProfileService.count(
+                new LambdaQueryWrapper<PoetProfile>().eq(PoetProfile::getVerifiedStatus, 0));
+        stats.put("poetProfiles", poetProfileCount);
+
+        // AI内容待审核数量（status = 0）
+        long aiContentCount = aiGeneratedContentService.count(
+                new LambdaQueryWrapper<AiGeneratedContent>().eq(AiGeneratedContent::getStatus, 0));
+        stats.put("aiContents", aiContentCount);
+
+        // 诗人草稿待审核数量（status = 0）
+        long poetDraftCount = poetDraftService.countByStatus(0);
+        stats.put("poetDrafts", poetDraftCount);
+
+        // 诗人修正意见待审核数量（status = pending）
+        long poetSuggestionCount = poetSuggestionService.countByStatus("pending");
+        stats.put("poetSuggestions", poetSuggestionCount);
+
+        return R.success(stats);
+    }
+
+    // ========== 评论管理 ==========
+
+    @Operation(summary = "获取评论列表")
+    @GetMapping("/comments")
+    public R<?> listComments(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) Integer status) {
+        return R.success(commentService.getCommentList(page, size, status));
+    }
+
+    @Operation(summary = "审核评论")
+    @PutMapping("/comments/{id}/audit")
+    public R<Void> auditComment(@PathVariable Long id, @RequestBody Map<String, Object> params) {
+        Integer status = (Integer) params.get("status");
+        String reason = (String) params.get("reason");
+        if (status == null) {
+            return R.error("审核状态不能为空");
+        }
+        commentService.auditComment(id, status, reason);
+        return R.success();
+    }
+
+    @Operation(summary = "删除评论")
+    @DeleteMapping("/comments/{id}")
+    public R<Void> deleteComment(@PathVariable Long id) {
+        commentService.deleteCommentByAdmin(id);
+        return R.success();
+    }
+
     // ========== 内容审核 ==========
 
     @Operation(summary = "审核诗词")
@@ -656,5 +741,34 @@ public class AdminController {
         }
         wrapper.orderByDesc(OperationLog::getCreateTime);
         return R.success(operationLogService.page(new Page<>(page, size), wrapper));
+    }
+
+    // ========== AI内容审核 ==========
+
+    @Operation(summary = "获取AI生成内容列表")
+    @GetMapping("/ai-contents")
+    public R<?> listAiContents(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) Integer status) {
+        return R.success(aiGeneratedContentService.listByStatus(status, page, size));
+    }
+
+    @Operation(summary = "审核通过AI生成内容")
+    @PutMapping("/ai-contents/{id}/approve")
+    public R<Void> approveAiContent(@PathVariable Long id, @RequestBody Map<String, String> params) {
+        Long reviewerId = SecurityUtil.getCurrentUserId();
+        String reviewComment = params.get("reviewComment");
+        aiGeneratedContentService.approve(id, reviewerId, reviewComment);
+        return R.success();
+    }
+
+    @Operation(summary = "审核拒绝AI生成内容")
+    @PutMapping("/ai-contents/{id}/reject")
+    public R<Void> rejectAiContent(@PathVariable Long id, @RequestBody Map<String, String> params) {
+        Long reviewerId = SecurityUtil.getCurrentUserId();
+        String reviewComment = params.get("reviewComment");
+        aiGeneratedContentService.reject(id, reviewerId, reviewComment);
+        return R.success();
     }
 }

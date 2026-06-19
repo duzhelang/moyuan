@@ -45,7 +45,17 @@ const adminMenus = [
     label: '审核管理',
     icon: 'Checked',
     children: [
-      { path: '/admin/poet-suggestions', name: 'AdminPoetSuggestions', icon: 'Checked', label: '诗人内容审核' }
+      { path: '/admin/poem-audit', name: 'PoemAudit', icon: 'Reading', label: '诗词审核' },
+      { path: '/admin/poet-profiles', name: 'PoetProfiles', icon: 'User', label: '诗人认证审核' },
+      { path: '/admin/poet-suggestions', name: 'AdminPoetSuggestions', icon: 'Checked', label: '诗人内容审核' },
+      { path: '/admin/ai-contents', name: 'AdminAiContents', icon: 'MagicStick', label: 'AI内容审核' }
+    ]
+  },
+  {
+    label: '评论管理',
+    icon: 'ChatDotSquare',
+    children: [
+      { path: '/admin/comments', name: 'Comments', icon: 'ChatLineSquare', label: '评论管理' }
     ]
   },
   {

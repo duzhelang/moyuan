@@ -10,4 +10,6 @@ public interface PoetSuggestionService {
     IPage<PoetSuggestion> getSuggestionList(int pageNum, int pageSize, String status);
 
     void reviewSuggestion(Long id, String status, String reviewComment, Long reviewerId);
+
+    long countByStatus(String status);
 }

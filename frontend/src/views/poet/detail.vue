@@ -5,18 +5,35 @@ import { ElMessage } from 'element-plus'
 import type { Poet, Poem } from '@/types/model'
 import { getPoetById, getPoetList } from '@/api/modules/poet'
 import { getPoemsByPoet } from '@/api/modules/poem'
-import { getAiModuleConfig, type AiModuleConfig } from '@/api/modules/ai'
+import { getAiModuleConfig, type AiModuleConfig, fillAiContent, getFillStatus, previewAiContent, submitForReview } from '@/api/modules/ai'
 import { savePoetDraft } from '@/api/modules/poet-draft'
+import { getExternalPoems, type PoemSearchResult } from '@/api/modules/external-poetry'
+import { importExternalPoem } from '@/api/modules/poem'
 import PoetryDetailDialog from '@/components/business/PoetryDetailDialog.vue'
 import LoginPrompt from '@/components/common/LoginPrompt.vue'
 import { useUserStore } from '@/stores/user'
+import { useParticles } from '@/composables/useParticles'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
+const particleCanvasRef = ref<HTMLCanvasElement | null>(null)
+useParticles(particleCanvasRef, {
+  count: 80,
+  colors: ['#d4af87', '#f0e4d7', '#c9a06c', '#8b7355'],
+  opacityRange: [0.3, 0.6],
+  sizeRange: [2, 4]
+})
+
 const isAdmin = computed(() => userStore.userInfo?.role === 'admin')
 const loginPromptVisible = ref(false)
+
+const fillStatusMap = ref<Record<string, any>>({})
+const fillingField = ref('')
+const previewField = ref('')
+const previewContent = ref('')
+const submittingReview = ref(false)
 
 const loading = ref(false)
 const poet = ref<Poet | null>(null)
@@ -24,6 +41,8 @@ const poems = ref<Poem[]>([])
 const poemTotal = ref(0)
 const poemPage = ref(1)
 const poemSize = ref(10)
+const externalPoems = ref<PoemSearchResult[]>([])
+const externalPoemsLoading = ref(false)
 
 const poetId = computed(() => Number(route.params.id))
 
@@ -72,8 +91,10 @@ const relatedCollapsed = ref(true)
 const featuresCollapsed = ref(true)
 const aiFeatures = ref('')
 const aiFeaturesLoading = ref(false)
+const featuresDetailVisible = ref(false)
 const poetNameFontSize = ref(38)
 const relatedExpanded = ref(false)
+const floatBtnsBottom = ref(80)
 
 const chatDraggable = ref(false)
 const chatPos = ref({ x: 0, y: 0 })
@@ -89,6 +110,11 @@ const chatMessages = ref<ChatMessage[]>([])
 const chatInput = ref('')
 const chatLoading = ref(false)
 const chatContainerRef = ref<HTMLElement | null>(null)
+const enlargedMessageIndex = ref<number | null>(null)
+
+const toggleMessageEnlarge = (index: number) => {
+  enlargedMessageIndex.value = enlargedMessageIndex.value === index ? null : index
+}
 const aiConfig = ref<AiModuleConfig | null>(null)
 
 const openPoetryDetail = (poem: Poem) => {
@@ -105,6 +131,114 @@ const sectionContentMap: Record<string, { title: string; field: keyof Poet }> = 
   'section-anecdotes': { title: '轶事典故', field: 'anecdotes' },
 }
 
+const sectionFieldNameMap: Record<string, string> = {
+  'section-intro': 'biography',
+  'section-life': 'life_story',
+  'section-influence': 'influence',
+  'section-evaluation': 'evaluation',
+  'section-anecdotes': 'anecdotes',
+}
+
+const loadFillStatus = async () => {
+  if (!poet.value?.id) return
+  try {
+    const res = await getFillStatus('poet', poet.value.id)
+    if (res && Array.isArray(res)) {
+      const map: Record<string, any> = {}
+      let latestPending: any = null
+      res.forEach((item: any) => {
+        if (item.status === 0) {
+          map[item.fieldName] = item
+          if (!latestPending || new Date(item.createTime) > new Date(latestPending.createTime)) {
+            latestPending = item
+          }
+        }
+      })
+      fillStatusMap.value = map
+      
+      if (latestPending) {
+        previewField.value = latestPending.fieldName
+        previewContent.value = sanitizeAiContent(latestPending.content)
+        submittedFields.value.add(latestPending.fieldName)
+      }
+    }
+  } catch (e) {
+    // 静默失败
+  }
+}
+
+const sanitizeAiContent = (content: string): string => {
+  if (!content) return ''
+  return content
+    .replace(/\\/g, '')
+    .replace(/\*\*/g, '')
+    .replace(/\*/g, '')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^\s*[-*+]\s/gm, '')
+    .replace(/^\s*\d+\.\s/gm, '')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+    .trim()
+}
+
+const handleAiFill = async (fieldName: string) => {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录')
+    return
+  }
+  if (!poet.value?.id) return
+  fillingField.value = fieldName
+  try {
+    const res = await previewAiContent({ targetType: 'poet', targetId: poet.value.id, fieldName })
+    const cleanedContent = sanitizeAiContent(res.data.content)
+    previewField.value = fieldName
+    previewContent.value = cleanedContent
+    
+    await submitForReview({
+      targetType: 'poet',
+      targetId: poet.value.id,
+      fieldName,
+      content: cleanedContent
+    })
+    submittedFields.value.add(fieldName)
+    await loadFillStatus()
+    ElMessage.success('AI内容已生成并保存，等待管理员审核')
+  } catch (e: any) {
+    ElMessage.error(e.message || 'AI生成失败')
+  } finally {
+    fillingField.value = ''
+  }
+}
+
+const submittedFields = ref<Set<string>>(new Set())
+
+const handleSubmitReview = async () => {
+  if (!poet.value?.id || !previewField.value || !previewContent.value) return
+  submittingReview.value = true
+  try {
+    await submitForReview({
+      targetType: 'poet',
+      targetId: poet.value.id,
+      fieldName: previewField.value,
+      content: previewContent.value
+    })
+    ElMessage.success('已提交审核，内容将显示为AI参考，待管理员审核后正式生效')
+    submittedFields.value.add(previewField.value)
+    await loadFillStatus()
+  } catch (e: any) {
+    ElMessage.error(e.message || '提交失败')
+  } finally {
+    submittingReview.value = false
+  }
+}
+
+const handleCancelPreview = () => {
+  previewField.value = ''
+  previewContent.value = ''
+}
+
 const getSectionContent = (sectionId: string): string => {
   const config = sectionContentMap[sectionId]
   if (!config || !poet.value) return ''
@@ -117,6 +251,56 @@ const getSectionContent = (sectionId: string): string => {
     .join('\n')
 }
 
+const formatSectionContent = (content: string): string => {
+  if (!content) return ''
+  let text = content
+    .replace(/&emsp;&emsp;/g, '\n')
+    .replace(/&emsp;/g, '\n')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+  
+  const lines = text.split('\n')
+  const result: string[] = []
+  
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim()
+    if (!trimmed) {
+      result.push('')
+      continue
+    }
+    
+    if (/^[\u4e00-\u9fa5]{4}$/.test(trimmed)) {
+      result.push(`<div class="section-subtitle">${trimmed}</div>`)
+      continue
+    }
+    
+    const match = trimmed.match(/^(.*?[。！？])([\u4e00-\u9fa5]{4})\s*$/)
+    if (match && match[1] && match[2]) {
+      const prevText = match[1].trim()
+      const subtitle = match[2]
+      if (prevText) {
+        result.push(`<p>\u3000\u3000${prevText}</p>`)
+      }
+      result.push(`<div class="section-subtitle">${subtitle}</div>`)
+      continue
+    }
+    
+    const startMatch = trimmed.match(/^([\u4e00-\u9fa5]{4})[：:，,、\s\u3000]/)
+    if (startMatch) {
+      result.push(`<div class="section-subtitle">${startMatch[1]}</div>`)
+      const rest = trimmed.substring(4).replace(/^[\s\u3000]+/, '').trim()
+      if (rest) {
+        result.push(`<p>\u3000\u3000${rest}</p>`)
+      }
+      continue
+    }
+    
+    result.push(`<p>\u3000\u3000${trimmed}</p>`)
+  }
+  
+  return result.join('\n')
+}
+
 const formatContent = (content: string): string => {
   return content
     .replace(/&emsp;&emsp;/g, '\n')
@@ -124,6 +308,45 @@ const formatContent = (content: string): string => {
     .split('\n')
     .map(line => line.trim() ? '\u3000\u3000' + line.trim() : '')
     .join('\n')
+}
+
+const formatFeaturesContent = (content: string): string => {
+  if (!content) return ''
+  let text = content
+    .replace(/&emsp;&emsp;/g, '\n')
+    .replace(/&emsp;/g, '\n')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+  
+  const lines = text.split('\n')
+  const formattedLines: string[] = []
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+    if (!line) {
+      if (formattedLines.length > 0 && formattedLines[formattedLines.length - 1] !== '') {
+        formattedLines.push('')
+      }
+      continue
+    }
+    
+    const fourCharTitleMatch = line.match(/^([\u4e00-\u9fa5]{4})[：:，,]/)
+    if (fourCharTitleMatch) {
+      if (formattedLines.length > 0 && formattedLines[formattedLines.length - 1] !== '') {
+        formattedLines.push('')
+      }
+      formattedLines.push(line)
+      formattedLines.push('')
+    } else {
+      formattedLines.push('\u3000\u3000' + line)
+    }
+  }
+  
+  while (formattedLines.length > 0 && formattedLines[formattedLines.length - 1] === '') {
+    formattedLines.pop()
+  }
+  
+  return formattedLines.join('\n')
 }
 
 const hasSectionContent = (sectionId: string): boolean => {
@@ -139,13 +362,18 @@ const handleScroll = () => {
       break
     }
   }
-
-  const pageHeight = document.documentElement.scrollHeight
-  const viewportHeight = window.innerHeight
-  const currentScroll = window.scrollY
-  const footer = document.querySelector('.app-footer') || document.querySelector('footer')
-  const footerHeight = footer ? (footer as HTMLElement).offsetHeight : 80
-  isNearBottom.value = currentScroll + viewportHeight >= pageHeight - footerHeight - 10
+  
+  const footer = document.querySelector('.dibu') as HTMLElement
+  if (footer) {
+    const footerRect = footer.getBoundingClientRect()
+    const windowHeight = window.innerHeight
+    if (footerRect.top < windowHeight) {
+      const overlap = windowHeight - footerRect.top + 20
+      floatBtnsBottom.value = Math.max(20, overlap)
+    } else {
+      floatBtnsBottom.value = 80
+    }
+  }
 }
 
 const scrollToSection = (sectionId: string) => {
@@ -192,8 +420,62 @@ const fetchPoems = async () => {
     })
     poems.value = res.data.list
     poemTotal.value = res.data.total
+    if (res.data.total < 5 && poet.value?.name) {
+      fetchExternalPoems()
+    }
   } catch (error) {
     console.error('获取诗人作品失败:', error)
+  }
+}
+
+const fetchExternalPoems = async () => {
+  if (!poet.value?.name) return
+  externalPoemsLoading.value = true
+  try {
+    const needCount = 10 - (poemTotal.value || 0)
+    if (needCount <= 0) return
+    
+    const results = await getExternalPoems(poet.value.name, needCount)
+    
+    if (results.length > 0) {
+      for (const poem of results) {
+        try {
+          await importExternalPoem({
+            title: poem.title,
+            content: poem.content || '',
+            author: poem.author || poet.value.name,
+            dynasty: poem.dynasty || poet.value.dynastyName || ''
+          })
+        } catch (e) {
+          console.error('导入诗词失败:', poem.title, e)
+        }
+      }
+    }
+    
+    const res = await getPoemsByPoet(poetId.value, {
+      pageNum: 1,
+      pageSize: 10
+    })
+    poems.value = res.data.list
+    poemTotal.value = res.data.total
+  } catch (error) {
+    console.error('获取外部诗词失败:', error)
+  } finally {
+    externalPoemsLoading.value = false
+  }
+}
+
+const openExternalPoemDetail = async (poem: PoemSearchResult) => {
+  try {
+    const res = await importExternalPoem({
+      title: poem.title,
+      content: poem.content,
+      author: poem.author,
+      dynasty: poem.dynasty
+    })
+    router.push(`/poem/${res.data.id}`)
+  } catch (error) {
+    ElMessage.error('导入诗词失败，请稍后重试')
   }
 }
 
@@ -533,6 +815,7 @@ const sendChatMessage = async (message?: string, isFirst: boolean = false) => {
   } finally {
     chatLoading.value = false
     scrollToChatBottom()
+    saveChatCache()
   }
 }
 
@@ -579,11 +862,69 @@ const adjustPoetNameFontSize = () => {
   })
 }
 
+const CHAT_CACHE_KEY = 'poet_chat_cache'
+const CHAT_CACHE_DURATION = 60 * 60 * 1000
+
+const getChatCacheKey = () => {
+  return `${CHAT_CACHE_KEY}_${poetId.value}`
+}
+
+const loadChatCache = () => {
+  try {
+    const cacheKey = getChatCacheKey()
+    const cached = localStorage.getItem(cacheKey)
+    if (!cached) return false
+    
+    const data = JSON.parse(cached)
+    const now = Date.now()
+    
+    if (now - data.timestamp > CHAT_CACHE_DURATION) {
+      localStorage.removeItem(cacheKey)
+      return false
+    }
+    
+    if (data.messages && data.messages.length > 0) {
+      chatMessages.value = data.messages
+      return true
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
+const saveChatCache = () => {
+  try {
+    const cacheKey = getChatCacheKey()
+    const data = {
+      messages: chatMessages.value,
+      timestamp: Date.now()
+    }
+    localStorage.setItem(cacheKey, JSON.stringify(data))
+  } catch (error) {
+    console.error('保存聊天缓存失败:', error)
+  }
+}
+
+const chatStarted = ref(false)
+
 const initAiChat = () => {
   if (!userStore.isLoggedIn) return
-  if (poet.value && chatMessages.value.length === 0) {
-    sendChatMessage(`${poet.value.name}是谁`, true)
+  if (chatMessages.value.length === 0) {
+    const hasCache = loadChatCache()
+    if (hasCache) {
+      chatStarted.value = true
+    }
   }
+}
+
+const startAiChat = () => {
+  if (!userStore.isLoggedIn) {
+    loginPromptVisible.value = true
+    return
+  }
+  chatStarted.value = true
+  sendChatMessage(`${poet.value?.name}是谁`, true)
 }
 
 const handleGenerateAiFeatures = () => {
@@ -646,6 +987,24 @@ const handleChatKeydown = (e: Event | KeyboardEvent) => {
 }
 
 const startChatDrag = (e: MouseEvent) => {
+  if (!chatDraggable.value) {
+    chatDraggable.value = true
+    nextTick(() => {
+      const panel = document.querySelector('.panel-ai-chat') as HTMLElement
+      if (panel) {
+        const rect = panel.getBoundingClientRect()
+        chatPos.value = { x: rect.left, y: rect.top }
+      }
+      chatDragging.value = true
+      chatDragOffset.value = {
+        x: e.clientX - chatPos.value.x,
+        y: e.clientY - chatPos.value.y
+      }
+      document.addEventListener('mousemove', onChatDrag)
+      document.addEventListener('mouseup', stopChatDrag)
+    })
+    return
+  }
   chatDragging.value = true
   chatDragOffset.value = {
     x: e.clientX - chatPos.value.x,
@@ -659,7 +1018,7 @@ const onChatDrag = (e: MouseEvent) => {
   if (!chatDragging.value) return
   const newX = e.clientX - chatDragOffset.value.x
   const newY = e.clientY - chatDragOffset.value.y
-  const maxX = window.innerWidth - 340
+  const maxX = window.innerWidth - 400
   const maxY = window.innerHeight - 100
   chatPos.value = {
     x: Math.max(0, Math.min(newX, maxX)),
@@ -682,8 +1041,10 @@ watch(() => route.params.id, (newId) => {
   }
 })
 
-onMounted(() => {
-  fetchPoet()
+onMounted(async () => {
+  changeFontSize(fontSizeLevel.value)
+  await fetchPoet()
+  loadFillStatus()
   fetchPoems()
   checkFavoriteStatus()
   window.addEventListener('scroll', handleScroll, { passive: true })
@@ -704,7 +1065,8 @@ onUnmounted(() => {
 
 <template>
   <div class="poet-detail-page" v-loading="loading">
-    <aside class="poet-sidebar" :class="{ collapsed: sidebarCollapsed, 'sidebar-bottom': isNearBottom }">
+    <canvas ref="particleCanvasRef" class="particle-bg"></canvas>
+    <aside class="poet-sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-header">
         <el-tooltip :content="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'" placement="right">
           <el-icon class="collapse-btn" @click="sidebarCollapsed = !sidebarCollapsed; adjustPoetNameFontSize()">
@@ -791,7 +1153,7 @@ onUnmounted(() => {
         </div>
 
         <div class="poet-brief" v-if="poet.biography">
-          <p class="brief-text">{{ formatContent(poet.biography) }}</p>
+          <p class="brief-text" :style="{ fontSize: fontSizeMap[fontSizeLevel] }">{{ formatContent(poet.biography) }}</p>
         </div>
 
         <div
@@ -817,18 +1179,7 @@ onUnmounted(() => {
                   {{ isReading && currentReadingId === section.id ? '停止朗读' : '朗读' }}
                 </el-button>
               </el-tooltip>
-              <el-tooltip v-if="isAdmin" content="编辑此段内容" placement="top">
-                <el-button
-                  size="small"
-                  type="info"
-                  text
-                  @click="openEdit(section.id)"
-                >
-                  <el-icon><Edit /></el-icon>
-                  编辑
-                </el-button>
-              </el-tooltip>
-              <el-tooltip v-else content="提交修正意见" placement="top">
+              <el-tooltip content="提交修正意见" placement="top">
                 <el-button
                   size="small"
                   type="warning"
@@ -843,8 +1194,40 @@ onUnmounted(() => {
           </div>
           <div class="section-divider"></div>
           <div class="section-body">
-            <p v-if="hasSectionContent(section.id)" class="section-text">{{ getSectionContent(section.id) }}</p>
-            <el-empty v-else description="暂未收录" :image-size="60" />
+            <div v-if="submittedFields.has(sectionFieldNameMap[section.id]) && previewContent" class="ai-submitted">
+              <div class="ai-hint">
+                <el-icon><InfoFilled /></el-icon>
+                <span>以下为AI生成内容，正在等待后台管理员审核</span>
+              </div>
+              <p class="preview-text">{{ previewContent }}</p>
+            </div>
+            <div v-else-if="previewField === sectionFieldNameMap[section.id] && previewContent" class="ai-preview">
+              <p class="preview-text">{{ previewContent }}</p>
+              <div class="preview-actions">
+                <el-button type="success" size="small" :loading="submittingReview" @click="handleSubmitReview()">
+                  <el-icon><Check /></el-icon>
+                  提交审核
+                </el-button>
+                <el-button type="info" size="small" @click="handleCancelPreview()">
+                  <el-icon><Close /></el-icon>
+                  取消
+                </el-button>
+              </div>
+            </div>
+            <div v-else-if="hasSectionContent(section.id)" class="section-text" v-html="formatSectionContent(getSectionContent(section.id))"></div>
+            <div v-else>
+              <el-empty description="暂未收录" :image-size="60" />
+              <div class="ai-fill-actions">
+                <el-button v-if="fillStatusMap[sectionFieldNameMap[section.id]]" type="success" size="small" plain disabled>
+                  <el-icon><Clock /></el-icon>
+                  已提交待审核
+                </el-button>
+                <el-button v-else type="warning" size="small" plain :loading="fillingField === sectionFieldNameMap[section.id]" @click="handleAiFill(sectionFieldNameMap[section.id])">
+                  <el-icon><MagicStick /></el-icon>
+                  AI填充
+                </el-button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -870,49 +1253,56 @@ onUnmounted(() => {
           </div>
           <div class="section-divider"></div>
           <div class="section-body">
-            <el-empty v-if="poems.length === 0" description="暂无作品" :image-size="60" />
-            <div v-else class="poems-list">
-              <div
-                v-for="poem in poems"
-                :key="poem.id"
-                class="poem-item"
-                @click="openPoetryDetail(poem)"
-              >
-                <h3 class="poem-title">{{ poem.title }}</h3>
-                <p class="poem-content">{{ formatContent(poem.content) }}</p>
-                <div class="poem-footer">
-                  <div class="poem-source">
-                    <span v-if="poem.dynastyName">{{ poem.dynastyName }}</span>
-                    <span v-if="poem.poetName"> · {{ poem.poetName }}</span>
-                  </div>
-                  <div class="poem-stats">
-                    <span class="stat-item">
-                      <el-icon><View /></el-icon>
-                      {{ poem.viewCount }}
-                    </span>
-                    <span class="stat-item">
-                      <el-icon><Star /></el-icon>
-                      {{ poem.likeCount }}
-                    </span>
-                  </div>
+            <template v-if="poems.length > 0">
+              <div class="poems-list">
+                <div
+                  v-for="poem in poems"
+                  :key="poem.id"
+                  class="poem-item"
+                  @click="openPoetryDetail(poem)"
+                >
+                  <span class="poem-link-title">{{ poem.title }}</span>
                 </div>
               </div>
-            </div>
-            <div class="poem-pagination" v-if="poemTotal > poemSize">
-              <el-pagination
-                v-model:current-page="poemPage"
-                :page-size="poemSize"
-                :total="poemTotal"
-                layout="prev, pager, next"
-                @current-change="handlePageChange"
-              />
-            </div>
+              <div class="poem-pagination" v-if="poemTotal > poemSize">
+                <el-pagination
+                  v-model:current-page="poemPage"
+                  :page-size="poemSize"
+                  :total="poemTotal"
+                  layout="prev, pager, next"
+                  @current-change="handlePageChange"
+                />
+              </div>
+            </template>
+            <template v-else-if="externalPoemsLoading">
+              <div class="external-loading">
+                <el-icon class="loading-icon"><Loading /></el-icon>
+                <span>正在从古诗词库检索作品...</span>
+              </div>
+            </template>
+            <template v-else-if="externalPoems.length > 0">
+              <div class="external-poems-header">
+                <el-icon><Connection /></el-icon>
+                <span>以下作品来自古诗词库</span>
+              </div>
+              <div class="external-poems-links">
+                <a
+                  v-for="(poem, index) in externalPoems"
+                  :key="index"
+                  class="external-poem-link"
+                  @click.prevent="openExternalPoemDetail(poem)"
+                >
+                  {{ poem.title }}
+                </a>
+              </div>
+            </template>
+            <el-empty v-else description="暂无作品" :image-size="60" />
           </div>
         </div>
       </div>
     </main>
 
-    <div class="right-floating-panels" :class="{ 'panels-bottom': isNearBottom }">
+    <div class="right-floating-panels">
       <div class="floating-panel panel-actions">
         <div class="header-actions">
           <el-icon :class="{ 'action-active': isFavorited }" @click="toggleFavorite" :title="isFavorited ? '取消收藏' : '收藏诗人'">
@@ -973,10 +1363,16 @@ onUnmounted(() => {
         </div>
         <div class="panel-body" v-show="!featuresCollapsed" v-loading="aiFeaturesLoading">
           <div v-if="poet?.influence" class="poem-features">
-            <p>{{ formatContent(poet.influence) }}</p>
+            <p class="features-preview">{{ formatContent(poet.influence).substring(0, 120) }}{{ poet.influence.length > 120 ? '...' : '' }}</p>
+            <div class="features-detail-btn" v-if="poet.influence.length > 120">
+              <el-button text type="primary" size="small" @click="featuresDetailVisible = true">
+                展开详情
+                <el-icon><ArrowDown /></el-icon>
+              </el-button>
+            </div>
           </div>
           <div v-else-if="aiFeatures" class="poem-features">
-            <p>{{ aiFeatures }}</p>
+            <p class="features-preview">{{ aiFeatures }}</p>
           </div>
           <div v-else-if="!aiFeaturesLoading" class="poem-features-generate">
             <el-tooltip content="使用AI分析诗人创作风格特点" placement="top">
@@ -1006,35 +1402,51 @@ onUnmounted(() => {
           </el-tooltip>
         </div>
         <div class="ai-chat-messages" ref="chatContainerRef">
-          <div
-            v-for="(msg, index) in chatMessages"
-            :key="index"
-            :class="['chat-message', msg.role]"
-          >
-            <div class="message-avatar">
-              <el-avatar :size="28" v-if="msg.role === 'user'">我</el-avatar>
-              <el-avatar :size="28" v-else class="ai-avatar">AI</el-avatar>
-            </div>
-            <div class="message-body">
-              <div class="message-content">{{ msg.content }}</div>
-              <div v-if="msg.role === 'assistant'" class="message-actions">
-                <el-icon
-                  :class="{ 'speaking': currentReadingId === `chat-${index}` }"
-                  @click="readChatMessage(msg.content, `chat-${index}`)"
-                  title="朗读"
-                >
-                  <VideoPause v-if="currentReadingId === `chat-${index}`" /><Headset v-else />
-                </el-icon>
+          <template v-if="chatStarted || chatMessages.length > 0">
+            <div
+              v-for="(msg, index) in chatMessages"
+              :key="index"
+              :class="['chat-message', msg.role]"
+            >
+              <div class="message-avatar">
+                <el-avatar :size="28" v-if="msg.role === 'user'">我</el-avatar>
+                <el-avatar :size="28" v-else class="ai-avatar">AI</el-avatar>
+              </div>
+              <div class="message-body">
+                <div 
+                  class="message-content" 
+                  :class="{ 'enlarged': enlargedMessageIndex === index }"
+                  @click="toggleMessageEnlarge(index)"
+                >{{ msg.content }}</div>
+                <div v-if="msg.role === 'assistant'" class="message-actions">
+                  <el-icon
+                    :class="{ 'speaking': currentReadingId === `chat-${index}` }"
+                    @click="readChatMessage(msg.content, `chat-${index}`)"
+                    title="朗读"
+                  >
+                    <VideoPause v-if="currentReadingId === `chat-${index}`" /><Headset v-else />
+                  </el-icon>
+                </div>
               </div>
             </div>
-          </div>
-          <div v-if="chatLoading" class="chat-message assistant">
-            <div class="message-avatar">
-              <el-avatar :size="28" class="ai-avatar">AI</el-avatar>
+            <div v-if="chatLoading" class="chat-message assistant">
+              <div class="message-avatar">
+                <el-avatar :size="28" class="ai-avatar">AI</el-avatar>
+              </div>
+              <div class="message-body">
+                <div class="message-content loading">思考中...</div>
+              </div>
             </div>
-            <div class="message-body">
-              <div class="message-content loading">思考中...</div>
+          </template>
+          <div v-else class="chat-welcome">
+            <div class="welcome-icon">
+              <el-icon><MagicStick /></el-icon>
             </div>
+            <p class="welcome-text">与AI助手对话，了解{{ poet?.name || '诗人' }}的故事</p>
+            <el-button type="primary" @click="startAiChat" :loading="chatLoading">
+              <el-icon><Promotion /></el-icon>
+              开始对话
+            </el-button>
           </div>
         </div>
         <div class="ai-chat-input">
@@ -1052,15 +1464,6 @@ onUnmounted(() => {
             </el-button>
           </el-tooltip>
         </div>
-      </div>
-    </div>
-
-    <div class="side-float-btns">
-      <div class="side-float-btn" @click="toggleMusic" :title="isMusicPlaying ? '暂停音乐' : '播放音乐'">
-        <el-icon><Headset /></el-icon>
-      </div>
-      <div class="side-float-btn" @click="scrollToTop" title="返回顶部">
-        <el-icon><Top /></el-icon>
       </div>
     </div>
 
@@ -1099,6 +1502,29 @@ onUnmounted(() => {
       :title="selectedPoemTitle"
       :author="selectedPoemAuthor"
     />
+
+    <el-dialog
+      v-model="featuresDetailVisible"
+      :title="poet?.name + ' - 诗词特点详情'"
+      width="680px"
+      :close-on-click-modal="true"
+      class="features-detail-dialog"
+    >
+      <div class="features-detail-content" v-if="poet?.influence">
+        <div 
+          v-for="(paragraph, index) in formatFeaturesContent(poet.influence).split('\n')" 
+          :key="index"
+          class="features-paragraph"
+        >
+          <template v-if="paragraph && /^[\u4e00-\u9fa5]{4}[：:，,]/.test(paragraph.trim())">
+            <h4 class="features-subtitle">{{ paragraph.match(/^([\u4e00-\u9fa5]{4})/)?.[1] || '' }}{{ paragraph.substring(4) }}</h4>
+          </template>
+          <template v-else-if="paragraph">
+            <p>{{ paragraph }}</p>
+          </template>
+        </div>
+      </div>
+    </el-dialog>
 
     <el-dialog
       v-model="suggestionDialogVisible"
@@ -1142,6 +1568,15 @@ onUnmounted(() => {
       message="AI对话功能需要登录后才能使用"
     />
   </div>
+
+  <div class="side-float-btns" :style="{ bottom: floatBtnsBottom + 'px' }">
+    <div class="side-float-btn" @click="toggleMusic" :title="isMusicPlaying ? '暂停音乐' : '播放音乐'">
+      <el-icon><Headset /></el-icon>
+    </div>
+    <div class="side-float-btn" @click="scrollToTop" title="返回顶部">
+      <el-icon><Top /></el-icon>
+    </div>
+  </div>
 </template>
 
 <style scoped lang="scss">
@@ -1151,17 +1586,29 @@ onUnmounted(() => {
   display: flex;
   min-height: calc(100vh - 60px);
   position: relative;
+  padding-top: 55px;
+}
+
+.particle-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
 }
 
 .poet-sidebar {
-  position: fixed;
-  left: 0;
+  position: sticky;
   top: 55px;
   height: calc(100vh - 55px);
   overflow-y: auto;
   width: 180px;
+  flex-shrink: 0;
+  align-self: flex-start;
   border-right: 1px solid $border-color;
-  z-index: 100;
+  z-index: 99;
   display: flex;
   flex-direction: column;
   transition: width $transition-base;
@@ -1169,11 +1616,11 @@ onUnmounted(() => {
 
   &::before {
     content: '';
-    position: fixed;
+    position: absolute;
     left: 0;
-    top: 55px;
-    width: 180px;
-    height: calc(100vh - 55px);
+    top: 0;
+    width: 100%;
+    height: 100%;
     background: url('/img/dts_1.jpg') no-repeat -60px 0 / cover;
     z-index: -1;
     pointer-events: none;
@@ -1185,14 +1632,6 @@ onUnmounted(() => {
 
   @include responsive(md) {
     display: none;
-  }
-
-  &.sidebar-bottom {
-    position: absolute;
-    top: auto;
-    bottom: 0;
-    height: auto;
-    max-height: calc(100vh - 55px);
   }
 }
 
@@ -1286,21 +1725,12 @@ onUnmounted(() => {
 
 .poet-main {
   flex: 1;
-  margin-left: 180px;
-  margin-right: 300px;
+  min-width: 0;
   padding: $spacing-xl;
-  transition: margin-left $transition-base;
-
-  &.sidebar-collapsed {
-    margin-left: 48px;
-  }
-
-  @include responsive(lg) {
-    margin-right: 0;
-  }
+  position: relative;
+  z-index: 1;
 
   @include responsive(md) {
-    margin-left: 0 !important;
     padding: $spacing-md;
   }
 }
@@ -1310,7 +1740,11 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: $spacing-lg;
-  padding-top: 60px;
+  padding-top: 10px;
+
+  .poet-header-right {
+    margin-right: -30px;
+  }
 }
 
 .back-button {
@@ -1321,7 +1755,9 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: $spacing-sm;
-  background: $background-color-light;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid $border-color;
   border-radius: 20px;
   padding: 4px 12px;
@@ -1369,7 +1805,9 @@ onUnmounted(() => {
 
 .poet-hero {
   position: relative;
-  background: $background-color-light;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-radius: $border-radius-md;
   box-shadow: $box-shadow;
   overflow: hidden;
@@ -1485,7 +1923,9 @@ onUnmounted(() => {
 }
 
 .poet-brief {
-  background: $background-color-light;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-radius: $border-radius-md;
   box-shadow: $box-shadow;
   padding: $spacing-lg;
@@ -1502,7 +1942,9 @@ onUnmounted(() => {
 }
 
 .content-section {
-  background: $background-color-light;
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   border-radius: $border-radius-md;
   box-shadow: $box-shadow;
   padding: $spacing-lg;
@@ -1516,7 +1958,7 @@ onUnmounted(() => {
 }
 
 .section-title {
-  font-size: $font-size-xl;
+  font-size: $font-size-xxl;
   color: $text-color;
   font-family: $font-family-title;
   display: flex;
@@ -1539,62 +1981,134 @@ onUnmounted(() => {
   min-height: 80px;
 }
 
+.ai-fill-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.ai-preview {
+  background: linear-gradient(135deg, rgba($primary-color, 0.03), rgba($primary-color, 0.01));
+  border: 1px solid rgba($primary-color, 0.15);
+  border-radius: $border-radius-md;
+  padding: $spacing-lg;
+  
+  .preview-text {
+    margin: 0 0 $spacing-md 0;
+    line-height: $line-height-loose;
+    white-space: pre-line;
+    color: $text-color;
+    font-family: $font-family-base;
+    font-size: var(--poet-content-font-size, $font-size-base);
+    text-indent: 2em;
+  }
+  
+  .preview-actions {
+    display: flex;
+    gap: $spacing-sm;
+    justify-content: flex-end;
+    padding-top: $spacing-md;
+    border-top: 1px dashed $border-color;
+  }
+}
+
+.ai-submitted {
+  background: linear-gradient(135deg, rgba($warning-color, 0.05), rgba($warning-color, 0.02));
+  border: 1px dashed rgba($warning-color, 0.3);
+  border-radius: $border-radius-md;
+  padding: $spacing-lg;
+  
+  .ai-hint {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    margin-bottom: $spacing-md;
+    padding: $spacing-sm $spacing-md;
+    background: rgba($warning-color, 0.1);
+    border-radius: $border-radius-sm;
+    color: $warning-color;
+    font-size: $font-size-sm;
+    font-family: $font-family-input;
+    
+    .el-icon {
+      font-size: 16px;
+    }
+  }
+  
+  .preview-text {
+    margin: 0;
+    line-height: $line-height-loose;
+    white-space: pre-line;
+    color: $text-color-secondary;
+    font-family: $font-family-base;
+    font-size: var(--poet-content-font-size, $font-size-base);
+    text-indent: 2em;
+  }
+}
+
 .section-text {
   font-size: var(--poet-content-font-size, $font-size-base);
   color: $text-color;
   line-height: $line-height-loose;
-  white-space: pre-line;
-}
 
-.poems-list {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-lg;
-}
+  :deep(p) {
+    margin: 0 0 12px 0;
+    text-indent: 2em;
+  }
 
-.poem-item {
-  padding: $spacing-lg;
-  border: 1px solid $border-color-light;
-  border-radius: $border-radius-md;
-  cursor: pointer;
-  transition: all $transition-base;
+  :deep(.section-subtitle) {
+    font-size: calc(var(--poet-content-font-size, #{$font-size-base}) + 2px);
+    font-weight: 700;
+    color: $primary-color;
+    margin: 20px 0 8px 0;
+    padding-left: 12px;
+    border-left: 3px solid $primary-color;
+    letter-spacing: 2px;
+    text-indent: 0;
 
-  &:hover {
-    border-color: $primary-color;
-    box-shadow: $box-shadow-md;
+    &:first-child {
+      margin-top: 0;
+    }
   }
 }
 
-.poem-title {
-  font-size: $font-size-xl;
+.poems-list {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: $spacing-sm;
+}
+
+.poem-item {
+  padding: $spacing-sm;
+  text-align: center;
+  cursor: pointer;
+  transition: all $transition-fast;
+  border-radius: $border-radius-sm;
+
+  &:hover {
+    background: rgba($primary-color, 0.05);
+
+    .poem-link-title {
+      color: $primary-color;
+    }
+  }
+}
+
+.poem-link-title {
+  font-size: $font-size-base;
   color: $text-color;
   font-family: $font-family-title;
-  margin-bottom: $spacing-sm;
-}
-
-.poem-content {
-  font-size: $font-size-base;
-  color: $text-color-secondary;
-  line-height: $line-height-loose;
-  white-space: pre-line;
-  @include text-clamp(3);
-  margin-bottom: $spacing-md;
-}
-
-.poem-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.poem-source {
-  font-size: $font-size-sm;
-  color: $text-color-light;
-}
-
-.poem-stats {
-  display: flex;
-  gap: $spacing-md;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 6px 12px;
+  border: 1px solid $border-color-light;
+  border-radius: $border-radius-sm;
+  
+  &:hover {
+    border-color: $primary-color;
+  }
 }
 
 .stat-item {
@@ -1611,30 +2125,81 @@ onUnmounted(() => {
   justify-content: center;
 }
 
+.external-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-xl 0;
+  gap: $spacing-md;
+  color: $text-color-secondary;
+
+  .loading-icon {
+    font-size: 24px;
+    animation: spin 1s linear infinite;
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.external-poems-header {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: $spacing-md;
+  margin-bottom: $spacing-md;
+  background: rgba($primary-color, 0.05);
+  border-radius: $border-radius-sm;
+  font-size: $font-size-sm;
+  color: $text-color-secondary;
+
+  .el-icon {
+    color: $primary-color;
+  }
+}
+
+.external-poems-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+  padding: $spacing-sm 0;
+}
+
+.external-poem-link {
+  color: $primary-color;
+  cursor: pointer;
+  font-size: $font-size-base;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $border-radius-sm;
+  transition: all $transition-fast;
+  text-decoration: none;
+
+  &:hover {
+    background: rgba($primary-color, 0.1);
+    text-decoration: underline;
+  }
+}
+
 .right-floating-panels {
-  position: fixed;
-  right: 40px;
+  position: sticky;
   top: 55px;
-  bottom: 100px;
-  width: 340px;
-  z-index: 100;
+  width: 400px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  z-index: 99;
   display: flex;
   flex-direction: column;
   gap: $spacing-md;
-  overflow-y: auto;
-  padding: $spacing-xs 0;
+  overflow: hidden;
+  padding: $spacing-xs $spacing-md;
+  max-height: calc(100vh - 55px);
   @include scrollbar;
 
   @include responsive(lg) {
     display: none;
-  }
-
-  &.panels-bottom {
-    position: absolute;
-    top: auto;
-    bottom: 0;
-    height: auto;
-    max-height: calc(100vh - 55px);
   }
 }
 
@@ -1648,7 +2213,9 @@ onUnmounted(() => {
   }
 
   &.panel-actions {
-    background: $background-color-light;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border: 1px solid $border-color;
     padding: $spacing-md;
 
@@ -1701,22 +2268,29 @@ onUnmounted(() => {
   }
 
   &.panel-related {
-    background: $background-color-light;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border: 1px solid $border-color;
   }
 
   &.panel-features {
-    background: $background-color-light;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border: 1px solid $border-color;
   }
 
   &.panel-ai-chat {
-    background: $background-color-light;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border: 1px solid $border-color;
     flex: 1;
     display: flex;
     flex-direction: column;
-    min-height: 400px;
+    min-height: 420px;
+    max-height: calc(100vh - 55px - 240px);
 
     .panel-header {
       background: linear-gradient(135deg, rgba(#667eea, 0.08) 0%, rgba(#764ba2, 0.08) 100%);
@@ -1832,8 +2406,7 @@ onUnmounted(() => {
 
 .side-float-btns {
   position: fixed;
-  right: 400px;
-  bottom: 40px;
+  right: 393px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1847,7 +2420,9 @@ onUnmounted(() => {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: $background-color-light;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border: 1px solid $border-color;
     display: flex;
     align-items: center;
@@ -1891,9 +2466,58 @@ onUnmounted(() => {
 .panel-ai-chat .ai-chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: $spacing-md;
-  min-height: 200px;
+  padding: $spacing-sm $spacing-md;
+  min-height: 150px;
   @include scrollbar;
+}
+
+.chat-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 200px;
+  gap: $spacing-md;
+  text-align: center;
+
+  .welcome-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(#667eea, 0.15) 0%, rgba(#764ba2, 0.15) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    .el-icon {
+      font-size: 28px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+  }
+
+  .welcome-text {
+    font-size: $font-size-sm;
+    color: $text-color-secondary;
+    margin: 0;
+    line-height: 1.6;
+  }
+
+  .el-button {
+    border-radius: 20px;
+    padding: 10px 24px;
+    font-weight: 500;
+    background: linear-gradient(135deg, $primary-color 0%, color.adjust($primary-color, $lightness: -10%) 100%);
+    border: none;
+    box-shadow: 0 2px 8px rgba($primary-color, 0.3);
+
+    &:hover {
+      box-shadow: 0 4px 12px rgba($primary-color, 0.4);
+    }
+  }
 }
 
 .chat-message {
@@ -1955,10 +2579,21 @@ onUnmounted(() => {
   line-height: 1.6;
   padding: 10px 14px;
   word-break: break-word;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &.enlarged {
+    font-size: 16px;
+    line-height: 1.8;
+    background: rgba($primary-color, 0.05);
+    border-radius: 12px;
+    padding: 14px 18px;
+  }
 
   &.loading {
     color: $text-color-secondary;
     font-style: italic;
+    cursor: default;
   }
 }
 
@@ -2045,7 +2680,9 @@ onUnmounted(() => {
   width: 560px;
   max-width: 90vw;
   max-height: 80vh;
-  background: $background-color-light;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-radius: $border-radius-lg;
   box-shadow: $box-shadow-xl;
   display: flex;
@@ -2103,6 +2740,24 @@ onUnmounted(() => {
   opacity: 0;
 }
 
+:deep(.features-detail-dialog) {
+  .el-dialog__header {
+    border-bottom: 1px solid $border-color;
+    padding: $spacing-md $spacing-lg;
+    margin: 0;
+    
+    .el-dialog__title {
+      font-family: $font-family-title;
+      font-size: $font-size-xl;
+      color: $primary-color;
+    }
+  }
+  
+  .el-dialog__body {
+    padding: 0;
+  }
+}
+
 .suggestion-form {
   .suggestion-tip {
     font-size: $font-size-sm;
@@ -2128,7 +2783,7 @@ onUnmounted(() => {
   cursor: pointer;
   transition: all $transition-fast;
   border: 1px solid $border-color-light;
-  background: $background-color-light;
+  background: rgba(255, 255, 255, 0.7);
   text-align: center;
 
   &:hover {
@@ -2167,6 +2822,59 @@ onUnmounted(() => {
   margin-top: $spacing-sm;
   padding-top: $spacing-sm;
   border-top: 1px solid $border-color-light;
+}
+
+.features-preview {
+  font-size: $font-size-sm;
+  color: $text-color;
+  line-height: 1.7;
+  margin: 0;
+  text-align: justify;
+  white-space: pre-line;
+}
+
+.features-detail-btn {
+  display: flex;
+  justify-content: center;
+  margin-top: $spacing-sm;
+  padding-top: $spacing-sm;
+  border-top: 1px solid $border-color-light;
+}
+
+.features-detail-content {
+  padding: $spacing-md;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.features-paragraph {
+  margin-bottom: $spacing-md;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+  
+  p {
+    font-size: $font-size-base;
+    color: $text-color;
+    line-height: 1.8;
+    margin: 0 0 $spacing-md 0;
+    text-align: justify;
+  }
+  
+  .features-subtitle {
+    font-size: $font-size-lg;
+    font-weight: 600;
+    color: $primary-color;
+    margin: $spacing-lg 0 $spacing-sm 0;
+    padding-bottom: $spacing-xs;
+    border-bottom: 2px solid rgba($primary-color, 0.2);
+    display: inline-block;
+    
+    &:first-child {
+      margin-top: 0;
+    }
+  }
 }
 
 .panel-ai-chat {

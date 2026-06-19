@@ -87,3 +87,7 @@ export function requestAiRating(poemId: number) {
 export function getAiRating(poemId: number) {
   return request.get<PoemRating>(`/poems/${poemId}/ratings/ai`)
 }
+
+export function importExternalPoem(data: { title: string; content?: string; author?: string; dynasty?: string }) {
+  return request.post<{ id: number; imported: boolean }>('/poems/import-external', data)
+}

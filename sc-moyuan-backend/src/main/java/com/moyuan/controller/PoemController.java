@@ -4,14 +4,19 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.moyuan.common.R;
 import com.moyuan.common.ResultCode;
+import com.moyuan.entity.Dynasty;
 import com.moyuan.entity.Poem;
+import com.moyuan.entity.Poet;
 import com.moyuan.exception.BusinessException;
+import com.moyuan.service.DynastyService;
 import com.moyuan.service.PoemService;
+import com.moyuan.service.PoetService;
 import com.moyuan.service.UserService;
 import com.moyuan.util.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.CacheManager;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -26,6 +31,9 @@ public class PoemController {
 
     private final PoemService poemService;
     private final UserService userService;
+    private final PoetService poetService;
+    private final DynastyService dynastyService;
+    private final CacheManager cacheManager;
 
     @Operation(summary = "获取诗词列表")
     @GetMapping
@@ -96,6 +104,80 @@ public class PoemController {
         poem.setIsFeatured(0);
         poemService.save(poem);
         return R.success(poem);
+    }
+
+    @Operation(summary = "导入外部诗词（按标题+诗人查重，已有返回ID，没有则导入）")
+    @PostMapping("/import-external")
+    public R<Map<String, Object>> importExternalPoem(@RequestBody Map<String, String> params) {
+        String title = params.get("title");
+        String content = params.get("content");
+        String author = params.get("author");
+        String dynasty = params.get("dynasty");
+
+        if (title == null || title.trim().isEmpty()) {
+            throw new BusinessException(ResultCode.PARAM_ERROR);
+        }
+
+        Long poetId = null;
+        if (author != null && !author.trim().isEmpty()) {
+            LambdaQueryWrapper<Poet> poetWrapper = new LambdaQueryWrapper<>();
+            poetWrapper.eq(Poet::getName, author.trim()).last("LIMIT 1");
+            Poet poet = poetService.getOne(poetWrapper);
+            if (poet != null) {
+                poetId = poet.getId();
+            }
+        }
+
+        LambdaQueryWrapper<Poem> existWrapper = new LambdaQueryWrapper<>();
+        existWrapper.eq(Poem::getTitle, title.trim());
+        if (poetId != null) {
+            existWrapper.eq(Poem::getPoetId, poetId);
+        } else {
+            existWrapper.isNull(Poem::getPoetId);
+        }
+        existWrapper.last("LIMIT 1");
+        Poem existPoem = poemService.getOne(existWrapper);
+
+        if (existPoem != null) {
+            Map<String, Object> result = new HashMap<>();
+            result.put("id", existPoem.getId());
+            result.put("imported", false);
+            return R.success(result);
+        }
+
+        Poem newPoem = new Poem();
+        newPoem.setTitle(title.trim());
+        newPoem.setContent(content != null ? content.trim() : "");
+        newPoem.setPoetId(poetId);
+        newPoem.setSource("external");
+
+        if (dynasty != null && !dynasty.trim().isEmpty()) {
+            LambdaQueryWrapper<Dynasty> dynastyWrapper = new LambdaQueryWrapper<>();
+            dynastyWrapper.eq(Dynasty::getName, dynasty.trim()).last("LIMIT 1");
+            Dynasty dynastyEntity = dynastyService.getOne(dynastyWrapper);
+            if (dynastyEntity != null) {
+                newPoem.setDynastyId(dynastyEntity.getId());
+            }
+        }
+
+        newPoem.setViewCount(0);
+        newPoem.setLikeCount(0);
+        newPoem.setFavoriteCount(0);
+        newPoem.setStatus(1);
+        newPoem.setIsFeatured(0);
+        newPoem.setIsOriginal(0);
+        newPoem.setPoemType("ancient");
+        newPoem.setAuditStatus(1);
+        poemService.save(newPoem);
+
+        if (cacheManager.getCache("poems") != null) {
+            cacheManager.getCache("poems").clear();
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("id", newPoem.getId());
+        result.put("imported", true);
+        return R.success(result);
     }
 
     @Operation(summary = "获取诗词详情")

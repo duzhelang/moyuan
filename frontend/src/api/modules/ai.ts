@@ -82,3 +82,19 @@ export interface AiModuleConfig {
 export function getAiModuleConfig(moduleCode: string) {
   return request.get<AiModuleConfig>(`/ai/config/${moduleCode}`)
 }
+
+export function fillAiContent(data: { targetType: string; targetId: number; fieldName: string }) {
+  return request.post<any>('/ai/fill-content', data)
+}
+
+export function previewAiContent(data: { targetType: string; targetId: number; fieldName: string }) {
+  return request.post<{ content: string }>('/ai/preview', data)
+}
+
+export function submitForReview(data: { targetType: string; targetId: number; fieldName: string; content: string }) {
+  return request.post<any>('/ai/submit-review', data)
+}
+
+export function getFillStatus(targetType: string, targetId: number) {
+  return request.get<any[]>(`/ai/fill-status/${targetType}/${targetId}`)
+}

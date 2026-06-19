@@ -109,7 +109,7 @@ const openExternalLink = (url: string) => {
   color: #f0e4d7;
   font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
   padding: 0;
-  margin-top: 30px;
+  margin-top: 0px;
   overflow: hidden;
   position: relative;
   z-index: 10;

@@ -8,7 +8,7 @@ import type { Comment, PoemRatingsData } from '@/types/model'
 import { likePoem, favoritePoem, getPoemRatings, ratePoem, requestAiRating } from '@/api/modules/poem'
 import { getComments, createComment, likeComment } from '@/api/modules/forum'
 import { addHistory } from '@/api/modules/history'
-import { getAiModuleConfig, type AiModuleConfig } from '@/api/modules/ai'
+import { getAiModuleConfig, type AiModuleConfig, fillAiContent, getFillStatus, previewAiContent, submitForReview } from '@/api/modules/ai'
 import LoginPrompt from '@/components/common/LoginPrompt.vue'
 
 const route = useRoute()
@@ -36,6 +36,12 @@ const requestingAi = ref(false)
 const aiPollTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 const loginPromptVisible = ref(false)
+
+const fillStatusMap = ref<Record<string, any>>({})
+const fillingField = ref('')
+const previewField = ref('')
+const previewContent = ref('')
+const submittingReview = ref(false)
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -90,6 +96,67 @@ const fetchRatings = async () => {
   } catch (error) {
     ElMessage.error('获取评分失败')
   }
+}
+
+const loadFillStatus = async () => {
+  if (!poem.value?.id) return
+  try {
+    const res = await getFillStatus('poem', poem.value.id)
+    if (res && Array.isArray(res)) {
+      const map: Record<string, any> = {}
+      res.forEach((item: any) => {
+        if (item.status === 0) map[item.fieldName] = item
+      })
+      fillStatusMap.value = map
+    }
+  } catch (e) {
+    // 静默失败
+  }
+}
+
+const handleAiFill = async (fieldName: string) => {
+  if (!userStore.isLoggedIn) {
+    loginPromptVisible.value = true
+    return
+  }
+  if (!poem.value?.id) return
+  fillingField.value = fieldName
+  try {
+    const res = await previewAiContent({ targetType: 'poem', targetId: poem.value.id, fieldName })
+    previewField.value = fieldName
+    previewContent.value = res.data.content
+  } catch (e: any) {
+    ElMessage.error(e.message || 'AI生成失败')
+  } finally {
+    fillingField.value = ''
+  }
+}
+
+const submittedFields = ref<Set<string>>(new Set())
+
+const handleSubmitReview = async () => {
+  if (!poem.value?.id || !previewField.value || !previewContent.value) return
+  submittingReview.value = true
+  try {
+    await submitForReview({
+      targetType: 'poem',
+      targetId: poem.value.id,
+      fieldName: previewField.value,
+      content: previewContent.value
+    })
+    ElMessage.success('已提交审核，内容将显示为AI参考，待管理员审核后正式生效')
+    submittedFields.value.add(previewField.value)
+    await loadFillStatus()
+  } catch (e: any) {
+    ElMessage.error(e.message || '提交失败')
+  } finally {
+    submittingReview.value = false
+  }
+}
+
+const handleCancelPreview = () => {
+  previewField.value = ''
+  previewContent.value = ''
 }
 
 const handleLike = async () => {
@@ -355,8 +422,9 @@ const toggleAiChat = () => {
   }
 }
 
-onMounted(() => {
-  fetchPoem()
+onMounted(async () => {
+  await fetchPoem()
+  loadFillStatus()
   fetchComments()
   fetchRatings()
 })
@@ -414,7 +482,7 @@ onMounted(() => {
           </div>
           
           <div class="poem-source" v-if="poem.source">
-            <p>出处：{{ poem.source }}</p>
+            <p>出处：{{ poem.source === 'external' ? '古诗词库' : poem.source }}</p>
           </div>
         </div>
         
@@ -466,15 +534,45 @@ onMounted(() => {
               <h3>创作背景</h3>
             </div>
             <div class="info-card-body">
-              <div v-if="poem.background" class="info-content">
+              <div v-if="submittedFields.has('background') && previewContent" class="ai-submitted">
+                <div class="ai-hint">
+                  <el-icon><InfoFilled /></el-icon>
+                  <span>以下为AI生成内容，正在等待后台管理员审核</span>
+                </div>
+                <p class="preview-text">{{ previewContent }}</p>
+              </div>
+              <div v-else-if="previewField === 'background' && previewContent" class="ai-preview">
+                <p class="preview-text">{{ previewContent }}</p>
+                <div class="preview-actions">
+                  <el-button type="success" size="small" :loading="submittingReview" @click="handleSubmitReview()">
+                    <el-icon><Check /></el-icon>
+                    提交审核
+                  </el-button>
+                  <el-button type="info" size="small" @click="handleCancelPreview()">
+                    <el-icon><Close /></el-icon>
+                    取消
+                  </el-button>
+                </div>
+              </div>
+              <div v-else-if="poem.background" class="info-content">
                 <p>{{ poem.background }}</p>
               </div>
               <div v-else class="info-empty">
                 <p>暂无创作背景信息</p>
-                <el-button type="primary" size="small" plain @click="sendAiChatMessage('请介绍一下这首诗的创作背景')">
-                  <el-icon><MagicStick /></el-icon>
-                  请求AI分析
-                </el-button>
+                <div class="ai-fill-actions">
+                  <el-button type="primary" size="small" plain @click="sendAiChatMessage('请介绍一下这首诗的创作背景')">
+                    <el-icon><MagicStick /></el-icon>
+                    请求AI分析
+                  </el-button>
+                  <el-button v-if="fillStatusMap['background']" type="success" size="small" plain disabled>
+                    <el-icon><Clock /></el-icon>
+                    已提交待审核
+                  </el-button>
+                  <el-button v-else type="warning" size="small" plain :loading="fillingField === 'background'" @click="handleAiFill('background')">
+                    <el-icon><MagicStick /></el-icon>
+                    AI填充
+                  </el-button>
+                </div>
               </div>
             </div>
           </div>
@@ -485,7 +583,27 @@ onMounted(() => {
               <h3>作品赏析</h3>
             </div>
             <div class="info-card-body">
-              <div v-if="poem.appreciation" class="info-content">
+              <div v-if="submittedFields.has('appreciation') && previewContent" class="ai-submitted">
+                <div class="ai-hint">
+                  <el-icon><InfoFilled /></el-icon>
+                  <span>以下为AI生成内容，正在等待后台管理员审核</span>
+                </div>
+                <p class="preview-text">{{ previewContent }}</p>
+              </div>
+              <div v-else-if="previewField === 'appreciation' && previewContent" class="ai-preview">
+                <p class="preview-text">{{ previewContent }}</p>
+                <div class="preview-actions">
+                  <el-button type="success" size="small" :loading="submittingReview" @click="handleSubmitReview()">
+                    <el-icon><Check /></el-icon>
+                    提交审核
+                  </el-button>
+                  <el-button type="info" size="small" @click="handleCancelPreview()">
+                    <el-icon><Close /></el-icon>
+                    取消
+                  </el-button>
+                </div>
+              </div>
+              <div v-else-if="poem.appreciation" class="info-content">
                 <p>{{ poem.appreciation }}</p>
               </div>
               <div v-else-if="poem.translation" class="info-content">
@@ -493,10 +611,20 @@ onMounted(() => {
               </div>
               <div v-else class="info-empty">
                 <p>暂无赏析内容</p>
-                <el-button type="primary" size="small" plain @click="sendAiChatMessage('请对这首诗进行翻译赏析')">
-                  <el-icon><MagicStick /></el-icon>
-                  请求AI翻译赏析
-                </el-button>
+                <div class="ai-fill-actions">
+                  <el-button type="primary" size="small" plain @click="sendAiChatMessage('请对这首诗进行翻译赏析')">
+                    <el-icon><MagicStick /></el-icon>
+                    请求AI翻译赏析
+                  </el-button>
+                  <el-button v-if="fillStatusMap['appreciation']" type="success" size="small" plain disabled>
+                    <el-icon><Clock /></el-icon>
+                    已提交待审核
+                  </el-button>
+                  <el-button v-else type="warning" size="small" plain :loading="fillingField === 'appreciation'" @click="handleAiFill('appreciation')">
+                    <el-icon><MagicStick /></el-icon>
+                    AI填充
+                  </el-button>
+                </div>
               </div>
             </div>
           </div>
@@ -1055,6 +1183,71 @@ onMounted(() => {
     font-size: $font-size-sm;
     color: $text-color-light;
     margin: 0;
+  }
+}
+
+.ai-fill-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-preview {
+  background: linear-gradient(135deg, rgba($primary-color, 0.03), rgba($primary-color, 0.01));
+  border: 1px solid rgba($primary-color, 0.15);
+  border-radius: $border-radius-md;
+  padding: $spacing-lg;
+  
+  .preview-text {
+    margin: 0 0 $spacing-md 0;
+    line-height: $line-height-loose;
+    white-space: pre-line;
+    color: $text-color;
+    font-family: $font-family-base;
+    font-size: $font-size-base;
+    text-indent: 2em;
+  }
+  
+  .preview-actions {
+    display: flex;
+    gap: $spacing-sm;
+    justify-content: flex-end;
+    padding-top: $spacing-md;
+    border-top: 1px dashed $border-color;
+  }
+}
+
+.ai-submitted {
+  background: linear-gradient(135deg, rgba($warning-color, 0.05), rgba($warning-color, 0.02));
+  border: 1px dashed rgba($warning-color, 0.3);
+  border-radius: $border-radius-md;
+  padding: $spacing-lg;
+  
+  .ai-hint {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    margin-bottom: $spacing-md;
+    padding: $spacing-sm $spacing-md;
+    background: rgba($warning-color, 0.1);
+    border-radius: $border-radius-sm;
+    color: $warning-color;
+    font-size: $font-size-sm;
+    font-family: $font-family-input;
+    
+    .el-icon {
+      font-size: 16px;
+    }
+  }
+  
+  .preview-text {
+    margin: 0;
+    line-height: $line-height-loose;
+    white-space: pre-line;
+    color: $text-color-secondary;
+    font-family: $font-family-base;
+    font-size: $font-size-base;
+    text-indent: 2em;
   }
 }
 

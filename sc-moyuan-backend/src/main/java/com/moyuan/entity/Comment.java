@@ -21,6 +21,8 @@ public class Comment {
     private Long replyToUserId;
     private Integer likeCount;
     private Integer status;
+    private String auditReason;
+    private LocalDateTime auditTime;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
     @TableField(fill = FieldFill.INSERT_UPDATE)

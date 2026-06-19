@@ -186,6 +186,30 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '诗人内容审核', requiresAuth: true, requiresAdmin: true }
       },
       {
+        path: 'ai-contents',
+        name: 'AdminAiContents',
+        component: () => import('@/views/admin/ai-contents.vue'),
+        meta: { title: 'AI内容审核', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'poem-audit',
+        name: 'PoemAudit',
+        component: () => import('@/views/admin/poem-audit.vue'),
+        meta: { title: '诗词审核', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'poet-profiles',
+        name: 'PoetProfiles',
+        component: () => import('@/views/admin/poet-profiles.vue'),
+        meta: { title: '诗人认证审核', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'comments',
+        name: 'Comments',
+        component: () => import('@/views/admin/comments.vue'),
+        meta: { title: '评论管理', requiresAuth: true, requiresAdmin: true }
+      },
+      {
         path: 'ai-models',
         name: 'AdminAiModels',
         component: () => import('@/views/admin/ai-models.vue'),

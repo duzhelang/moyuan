@@ -23,6 +23,8 @@ public class ForumPost {
     private Integer isTop;
     private Integer isFeatured;
     private Integer status;
+    private String auditReason;
+    private LocalDateTime auditTime;
     private LocalDateTime lastCommentTime;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
