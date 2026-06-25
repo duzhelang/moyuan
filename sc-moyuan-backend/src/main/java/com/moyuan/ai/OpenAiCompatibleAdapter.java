@@ -56,6 +56,9 @@ public class OpenAiCompatibleAdapter implements AiModelAdapter {
             throw new BusinessException(ResultCode.ERROR, model.getDisplayName() + "不支持视觉模型");
         }
 
+        log.info("开始调用视觉模型: {}, provider: {}, apiUrl: {}", visionModelId, model.getProvider(), model.getApiUrl());
+        log.info("图片base64长度: {}", base64Image != null ? base64Image.length() : 0);
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(model.getApiKey());
@@ -72,30 +75,35 @@ public class OpenAiCompatibleAdapter implements AiModelAdapter {
         if (systemPrompt != null && !systemPrompt.isEmpty()) {
             messages.add(Map.of("role", "system", "content", systemPrompt));
         }
-        messages.add(Map.of("role", "user", "content", List.of(textContent, imageContent)));
+        messages.add(Map.of("role", "user", "content", List.of(imageContent, textContent)));
 
         Map<String, Object> body = new HashMap<>();
         body.put("model", visionModelId);
         body.put("messages", messages);
         body.put("max_tokens", model.getMaxTokens() != null ? model.getMaxTokens() : 1024);
 
+        log.info("视觉模型请求体: model={}, messages数量={}", visionModelId, messages.size());
+
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
         try {
             ResponseEntity<Map<String, Object>> response = restTemplate.postForEntity(model.getApiUrl(), request, (Class<Map<String, Object>>) (Class<?>) Map.class);
+            log.info("视觉模型响应状态: {}", response.getStatusCode());
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                log.info("视觉模型响应成功");
                 return extractContent(response.getBody());
             }
+            log.error("视觉模型响应失败: status={}, body={}", response.getStatusCode(), response.getBody());
             throw new BusinessException(ResultCode.ERROR, model.getDisplayName() + "视觉模型调用失败");
         } catch (Exception e) {
-            log.error("{}视觉模型调用失败", model.getDisplayName(), e);
+            log.error("{}视觉模型调用失败, apiUrl={}, model={}", model.getDisplayName(), model.getApiUrl(), visionModelId, e);
             throw new BusinessException(ResultCode.ERROR, model.getDisplayName() + "视觉模型调用失败: " + e.getMessage());
         }
     }
 
     @Override
     public boolean supports(String provider) {
-        return "zhipu".equals(provider) || "deepseek".equals(provider) || "kimi".equals(provider);
+        return "zhipu".equals(provider) || "deepseek".equals(provider) || "kimi".equals(provider) || "mimo".equals(provider);
     }
 
     private List<Map<String, String>> buildMessages(String systemPrompt, String userMessage) {

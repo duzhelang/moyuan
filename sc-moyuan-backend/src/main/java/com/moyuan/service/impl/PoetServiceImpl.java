@@ -10,10 +10,13 @@ import com.moyuan.entity.Poet;
 import com.moyuan.exception.BusinessException;
 import com.moyuan.mapper.DynastyMapper;
 import com.moyuan.mapper.PoetMapper;
+import com.moyuan.service.DynastyService;
 import com.moyuan.service.PoetService;
+import com.moyuan.util.PoetDataExtractor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -22,8 +25,6 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -32,7 +33,9 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
 
     private final PoetMapper poetMapper;
     private final DynastyMapper dynastyMapper;
+    private final DynastyService dynastyService;
     private final RestTemplate restTemplate;
+    private final CacheManager cacheManager;
 
     @Value("${apihz.id}")
     private String apihzId;
@@ -43,11 +46,15 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
     private static final String API_URL = "https://cn.apihz.cn/api/zici/poet.php";
 
     @Override
-    @Cacheable(value = "poets", key = "'list:' + #dynastyId + ':' + #keyword + ':' + #pageNum + ':' + #pageSize + ':' + #poetType")
-    public IPage<Poet> getPoetList(int pageNum, int pageSize, Long dynastyId, String keyword, String poetType) {
+    @Cacheable(value = "poets", key = "'list:' + #dynastyId + ':' + #categoryId + ':' + #keyword + ':' + #pageNum + ':' + #pageSize + ':' + #poetType")
+    public IPage<Poet> getPoetList(int pageNum, int pageSize, Long dynastyId, Long categoryId, String keyword, String poetType) {
         LambdaQueryWrapper<Poet> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Poet::getStatus, 1);
         if (dynastyId != null) wrapper.eq(Poet::getDynastyId, dynastyId);
+        if (categoryId != null) {
+            wrapper.inSql(Poet::getId,
+                "SELECT DISTINCT poet_id FROM poem WHERE category_id = " + categoryId + " AND status = 1 AND deleted = 0");
+        }
         if (StringUtils.hasText(keyword)) {
             wrapper.like(Poet::getName, keyword);
         }
@@ -85,6 +92,10 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
         // 懒加载：如果诗人信息不完整，从API获取
         if (isPoetInfoIncomplete(poet)) {
             fetchAndSavePoetData(poet);
+            // 手动清除缓存，确保下次获取最新数据
+            if (cacheManager.getCache("poets") != null) {
+                cacheManager.getCache("poets").evict("detail:" + id);
+            }
         }
         return poet;
     }
@@ -97,7 +108,6 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
                 || !StringUtils.hasText(poet.getAvatar());
     }
 
-    @CacheEvict(value = "poets", key = "'detail:' + #poet.id")
     private void fetchAndSavePoetData(Poet poet) {
         try {
             String url = String.format("%s?id=%s&key=%s&name=%s&page=1", API_URL, apihzId, apihzKey, poet.getName());
@@ -118,6 +128,12 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
             }
 
             Map<String, Object> poetData = dataList.get(0);
+            String returnedName = (String) poetData.get("name");
+            if (returnedName != null && !returnedName.contains(poet.getName()) && !poet.getName().contains(returnedName)) {
+                log.warn("API返回的诗人名字不匹配: 期望={}, 实际={}", poet.getName(), returnedName);
+                return;
+            }
+
             boolean needUpdate = false;
 
             if (!StringUtils.hasText(poet.getAvatar()) && poetData.containsKey("image") && poetData.get("image") != null) {
@@ -131,26 +147,46 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
             }
 
             if (!StringUtils.hasText(poet.getBiography()) && poetData.containsKey("content") && poetData.get("content") != null) {
-                String content = stripHtml((String) poetData.get("content"));
-                poet.setBiography(content);
-                extractYears(content, poet);
-                extractBirthplace(content, poet);
-                needUpdate = true;
+                String content = PoetDataExtractor.stripHtml((String) poetData.get("content"));
+                if (content.length() >= 10) {
+                    poet.setBiography(content);
+                    PoetDataExtractor.extractYears(content, poet);
+                    PoetDataExtractor.extractBirthplace(content, poet);
+                    needUpdate = true;
+                }
+            }
+            
+            // 如果没有朝代信息，根据生卒年确定朝代
+            if (poet.getDynastyId() == null && (poet.getBirthYear() != null || poet.getDeathYear() != null)) {
+                Dynasty dynasty = dynastyService.determineDynastyByYears(poet.getBirthYear(), poet.getDeathYear());
+                if (dynasty != null) {
+                    poet.setDynastyId(dynasty.getId());
+                    needUpdate = true;
+                }
             }
 
             if (!StringUtils.hasText(poet.getLifeStory()) && poetData.containsKey("rwsp") && poetData.get("rwsp") != null) {
-                poet.setLifeStory(stripHtml((String) poetData.get("rwsp")));
-                needUpdate = true;
+                String lifeStory = PoetDataExtractor.stripHtml((String) poetData.get("rwsp"));
+                if (lifeStory.length() >= 20) {
+                    poet.setLifeStory(lifeStory);
+                    needUpdate = true;
+                }
             }
 
             if (!StringUtils.hasText(poet.getInfluence()) && poetData.containsKey("zycj") && poetData.get("zycj") != null) {
-                poet.setInfluence(stripHtml((String) poetData.get("zycj")));
-                needUpdate = true;
+                String influence = PoetDataExtractor.stripHtml((String) poetData.get("zycj"));
+                if (influence.length() >= 10) {
+                    poet.setInfluence(influence);
+                    needUpdate = true;
+                }
             }
 
             if (!StringUtils.hasText(poet.getAnecdotes()) && poetData.containsKey("ysdg") && poetData.get("ysdg") != null) {
-                poet.setAnecdotes(stripHtml((String) poetData.get("ysdg")));
-                needUpdate = true;
+                String anecdotes = PoetDataExtractor.stripHtml((String) poetData.get("ysdg"));
+                if (anecdotes.length() >= 10) {
+                    poet.setAnecdotes(anecdotes);
+                    needUpdate = true;
+                }
             }
 
             if (needUpdate) {
@@ -162,39 +198,11 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
         }
     }
 
-    private String stripHtml(String html) {
-        if (html == null) return null;
-        return html.replaceAll("<[^>]+>", "").replaceAll("\\s+", " ").trim();
-    }
-
-    private void extractYears(String content, Poet poet) {
-        // 匹配多种格式：701年－762年、约984年—约1053年、前340年-前278年
-        Pattern pattern = Pattern.compile("(?:约|大约)?\\s*(?:前)?(\\d{3,4})\\s*年\\s*[－—\\-~～至]\\s*(?:约|大约)?\\s*(?:前)?(\\d{3,4})\\s*年");
-        Matcher matcher = pattern.matcher(content);
-        if (matcher.find()) {
-            poet.setBirthYear(Integer.parseInt(matcher.group(1)));
-            poet.setDeathYear(Integer.parseInt(matcher.group(2)));
-        } else {
-            // 尝试匹配只有出生年的情况：生于701年
-            Pattern birthPattern = Pattern.compile("(?:生于|出生于|出生)\\s*(?:约|大约)?\\s*(?:前)?(\\d{3,4})\\s*年");
-            Matcher birthMatcher = birthPattern.matcher(content);
-            if (birthMatcher.find()) {
-                poet.setBirthYear(Integer.parseInt(birthMatcher.group(1)));
-            }
-            // 尝试匹配只有去世年的情况：卒于762年、去世于762年
-            Pattern deathPattern = Pattern.compile("(?:卒于|去世于|卒|逝世于)\\s*(?:约|大约)?\\s*(?:前)?(\\d{3,4})\\s*年");
-            Matcher deathMatcher = deathPattern.matcher(content);
-            if (deathMatcher.find()) {
-                poet.setDeathYear(Integer.parseInt(deathMatcher.group(1)));
-            }
-        }
-    }
-
-    private void extractBirthplace(String content, Poet poet) {
-        Pattern pattern = Pattern.compile("(?:生于|出生于|出生地[：:])\\s*(.{2,10}?)(?:[，,。]|\\s|$)");
-        Matcher matcher = pattern.matcher(content);
-        if (matcher.find()) {
-            poet.setBirthplace(matcher.group(1).trim());
+    @Override
+    public void clearAllCache() {
+        if (cacheManager.getCache("poets") != null) {
+            cacheManager.getCache("poets").clear();
+            log.info("诗人缓存已清除");
         }
     }
 }

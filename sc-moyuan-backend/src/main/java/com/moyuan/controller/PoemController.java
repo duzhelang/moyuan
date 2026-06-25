@@ -16,13 +16,18 @@ import com.moyuan.util.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Tag(name = "诗词接口")
 @RestController
 @RequestMapping("/api/poems")
@@ -34,6 +39,13 @@ public class PoemController {
     private final PoetService poetService;
     private final DynastyService dynastyService;
     private final CacheManager cacheManager;
+    private final RestTemplate restTemplate;
+
+    @Value("${apihz.id}")
+    private String apihzId;
+
+    @Value("${apihz.key}")
+    private String apihzKey;
 
     @Operation(summary = "获取诗词列表")
     @GetMapping
@@ -119,12 +131,32 @@ public class PoemController {
         }
 
         Long poetId = null;
+        Long dynastyId = null;
+
+        if (dynasty != null && !dynasty.trim().isEmpty()) {
+            LambdaQueryWrapper<Dynasty> dynastyWrapper = new LambdaQueryWrapper<>();
+            dynastyWrapper.eq(Dynasty::getName, dynasty.trim()).last("LIMIT 1");
+            Dynasty dynastyEntity = dynastyService.getOne(dynastyWrapper);
+            if (dynastyEntity != null) {
+                dynastyId = dynastyEntity.getId();
+            }
+        }
+
         if (author != null && !author.trim().isEmpty()) {
             LambdaQueryWrapper<Poet> poetWrapper = new LambdaQueryWrapper<>();
             poetWrapper.eq(Poet::getName, author.trim()).last("LIMIT 1");
             Poet poet = poetService.getOne(poetWrapper);
             if (poet != null) {
                 poetId = poet.getId();
+            } else {
+                Poet newPoet = new Poet();
+                newPoet.setName(author.trim());
+                newPoet.setDynastyId(dynastyId);
+                newPoet.setPoetType("ancient");
+                newPoet.setStatus(1);
+                poetService.save(newPoet);
+                poetId = newPoet.getId();
+                poetService.clearAllCache();
             }
         }
 
@@ -139,6 +171,14 @@ public class PoemController {
         Poem existPoem = poemService.getOne(existWrapper);
 
         if (existPoem != null) {
+            if (existPoem.getPoetId() == null && poetId != null) {
+                existPoem.setPoetId(poetId);
+                poemService.updateById(existPoem);
+            }
+            if (existPoem.getDynastyId() == null && dynastyId != null) {
+                existPoem.setDynastyId(dynastyId);
+                poemService.updateById(existPoem);
+            }
             Map<String, Object> result = new HashMap<>();
             result.put("id", existPoem.getId());
             result.put("imported", false);
@@ -149,16 +189,8 @@ public class PoemController {
         newPoem.setTitle(title.trim());
         newPoem.setContent(content != null ? content.trim() : "");
         newPoem.setPoetId(poetId);
+        newPoem.setDynastyId(dynastyId);
         newPoem.setSource("external");
-
-        if (dynasty != null && !dynasty.trim().isEmpty()) {
-            LambdaQueryWrapper<Dynasty> dynastyWrapper = new LambdaQueryWrapper<>();
-            dynastyWrapper.eq(Dynasty::getName, dynasty.trim()).last("LIMIT 1");
-            Dynasty dynastyEntity = dynastyService.getOne(dynastyWrapper);
-            if (dynastyEntity != null) {
-                newPoem.setDynastyId(dynastyEntity.getId());
-            }
-        }
 
         newPoem.setViewCount(0);
         newPoem.setLikeCount(0);
@@ -177,6 +209,91 @@ public class PoemController {
         Map<String, Object> result = new HashMap<>();
         result.put("id", newPoem.getId());
         result.put("imported", true);
+        return R.success(result);
+    }
+
+    @Operation(summary = "更新缺失诗人信息的外部诗词")
+    @PostMapping("/fix-external-poems")
+    public R<Map<String, Object>> fixExternalPoems() {
+        LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Poem::getSource, "external")
+                .isNull(Poem::getPoetId)
+                .last("LIMIT 100");
+        List<Poem> poems = poemService.list(wrapper);
+
+        int fixedCount = 0;
+        for (Poem poem : poems) {
+            if (poem.getTitle() == null) continue;
+
+            try {
+                String keyword = poem.getTitle();
+                String url = UriComponentsBuilder
+                        .fromHttpUrl("https://cn.apihz.cn/api/zici/poetry.php")
+                        .queryParam("id", apihzId)
+                        .queryParam("key", apihzKey)
+                        .queryParam("words", keyword)
+                        .queryParam("page", 1)
+                        .build()
+                        .toUriString();
+
+                @SuppressWarnings("unchecked")
+                Map<String, Object> response = restTemplate.getForObject(url, Map.class);
+
+                if (response != null && Integer.valueOf(200).equals(response.get("code"))) {
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+                    if (data != null && !data.isEmpty()) {
+                        Map<String, Object> item = data.get(0);
+                        String author = (String) item.get("author");
+                        String dynasty = (String) item.get("dynasty");
+
+                        Long dynastyId = null;
+                        if (dynasty != null && !dynasty.trim().isEmpty()) {
+                            LambdaQueryWrapper<Dynasty> dynastyWrapper = new LambdaQueryWrapper<>();
+                            dynastyWrapper.eq(Dynasty::getName, dynasty.trim()).last("LIMIT 1");
+                            Dynasty dynastyEntity = dynastyService.getOne(dynastyWrapper);
+                            if (dynastyEntity != null) {
+                                dynastyId = dynastyEntity.getId();
+                                poem.setDynastyId(dynastyId);
+                            }
+                        }
+
+                        if (author != null && !author.trim().isEmpty()) {
+                            LambdaQueryWrapper<Poet> poetWrapper = new LambdaQueryWrapper<>();
+                            poetWrapper.eq(Poet::getName, author.trim()).last("LIMIT 1");
+                            Poet poet = poetService.getOne(poetWrapper);
+                            if (poet == null) {
+                                poet = new Poet();
+                                poet.setName(author.trim());
+                                poet.setPoetType("ancient");
+                                poet.setStatus(1);
+                                if (dynastyId != null) {
+                                    poet.setDynastyId(dynastyId);
+                                }
+                                poetService.save(poet);
+                            }
+                            poem.setPoetId(poet.getId());
+                        }
+
+                        poemService.updateById(poem);
+                        fixedCount++;
+                    }
+                }
+            } catch (Exception e) {
+                log.error("修复诗词失败: id={}, title={}, error={}", poem.getId(), poem.getTitle(), e.getMessage());
+            }
+        }
+
+        if (fixedCount > 0) {
+            poetService.clearAllCache();
+            if (cacheManager.getCache("poems") != null) {
+                cacheManager.getCache("poems").clear();
+            }
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("total", poems.size());
+        result.put("fixed", fixedCount);
         return R.success(result);
     }
 

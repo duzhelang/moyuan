@@ -5,7 +5,9 @@ import com.moyuan.entity.Dynasty;
 import com.moyuan.entity.Poet;
 import com.moyuan.mapper.DynastyMapper;
 import com.moyuan.mapper.PoetMapper;
+import com.moyuan.service.DynastyService;
 import com.moyuan.service.PoetSyncService;
+import com.moyuan.util.PoetDataExtractor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,8 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -23,6 +23,7 @@ public class PoetSyncServiceImpl implements PoetSyncService {
 
     private final PoetMapper poetMapper;
     private final DynastyMapper dynastyMapper;
+    private final DynastyService dynastyService;
     private final RestTemplate restTemplate;
 
     @Value("${apihz.id}")
@@ -38,7 +39,7 @@ public class PoetSyncServiceImpl implements PoetSyncService {
         Map<String, Object> result = new HashMap<>();
         try {
             String url = String.format("%s?id=%s&key=%s&name=%s&page=1", API_URL, apihzId, apihzKey, poetName);
-            log.info("调用接口盒子API: {}", url);
+            log.info("调用接口盒子API同步诗人数据: poetName={}", poetName);
 
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restTemplate.getForObject(url, Map.class);
@@ -87,22 +88,30 @@ public class PoetSyncServiceImpl implements PoetSyncService {
             }
 
             if (poetData.containsKey("content") && poetData.get("content") != null) {
-                String content = stripHtml((String) poetData.get("content"));
+                String content = PoetDataExtractor.stripHtml((String) poetData.get("content"));
                 poet.setBiography(content);
-                extractYears(content, poet);
-                extractBirthplace(content, poet);
+                PoetDataExtractor.extractYears(content, poet);
+                PoetDataExtractor.extractBirthplace(content, poet);
+            }
+            
+            // 如果没有从API获取到朝代，根据生卒年确定朝代
+            if (poet.getDynastyId() == null && (poet.getBirthYear() != null || poet.getDeathYear() != null)) {
+                Dynasty dynasty = dynastyService.determineDynastyByYears(poet.getBirthYear(), poet.getDeathYear());
+                if (dynasty != null) {
+                    poet.setDynastyId(dynasty.getId());
+                }
             }
 
             if (poetData.containsKey("rwsp") && poetData.get("rwsp") != null) {
-                poet.setLifeStory(stripHtml((String) poetData.get("rwsp")));
+                poet.setLifeStory(PoetDataExtractor.stripHtml((String) poetData.get("rwsp")));
             }
 
             if (poetData.containsKey("zycj") && poetData.get("zycj") != null) {
-                poet.setInfluence(stripHtml((String) poetData.get("zycj")));
+                poet.setInfluence(PoetDataExtractor.stripHtml((String) poetData.get("zycj")));
             }
 
             if (poetData.containsKey("ysdg") && poetData.get("ysdg") != null) {
-                poet.setAnecdotes(stripHtml((String) poetData.get("ysdg")));
+                poet.setAnecdotes(PoetDataExtractor.stripHtml((String) poetData.get("ysdg")));
             }
 
             if (poet.getId() == null) {
@@ -158,25 +167,4 @@ public class PoetSyncServiceImpl implements PoetSyncService {
         return result;
     }
 
-    private String stripHtml(String html) {
-        if (html == null) return null;
-        return html.replaceAll("<[^>]+>", "").replaceAll("\\s+", " ").trim();
-    }
-
-    private void extractYears(String content, Poet poet) {
-        Pattern pattern = Pattern.compile("(\\d{3,4})\\s*[年－-]\\s*(\\d{3,4})\\s*年");
-        Matcher matcher = pattern.matcher(content);
-        if (matcher.find()) {
-            poet.setBirthYear(Integer.parseInt(matcher.group(1)));
-            poet.setDeathYear(Integer.parseInt(matcher.group(2)));
-        }
-    }
-
-    private void extractBirthplace(String content, Poet poet) {
-        Pattern pattern = Pattern.compile("(?:生于|出生于|出生地[：:])\\s*(.{2,10}?)(?:[，,。]|\\s|$)");
-        Matcher matcher = pattern.matcher(content);
-        if (matcher.find()) {
-            poet.setBirthplace(matcher.group(1).trim());
-        }
-    }
 }

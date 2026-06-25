@@ -13,4 +13,5 @@ public interface PoemService extends IService<Poem> {
     IPage<Poem> getFavorites(Long userId, int pageNum, int pageSize);
     void createPoemWithAudit(Poem poem);
     void auditPoem(Long poemId, Integer status, String reason);
+    void clearAllCache();
 }

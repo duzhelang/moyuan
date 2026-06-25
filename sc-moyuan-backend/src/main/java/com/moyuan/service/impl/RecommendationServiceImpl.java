@@ -174,38 +174,46 @@ public class RecommendationServiceImpl implements RecommendationService {
             return results;
         }
         try {
-            String url = UriComponentsBuilder
-                    .fromHttpUrl(APIHZ_POETRY_URL)
-                    .queryParam("id", apihzId)
-                    .queryParam("key", apihzKey)
-                    .queryParam("words", keyword)
-                    .queryParam("page", 1)
-                    .build()
-                    .toUriString();
-            @SuppressWarnings("unchecked")
-            Map<String, Object> response = restTemplate.getForObject(url, Map.class);
-
-            if (response != null && Integer.valueOf(200).equals(response.get("code"))) {
+            int page = 1;
+            int maxPages = 5;
+            while (results.size() < limit && page <= maxPages) {
+                String url = UriComponentsBuilder
+                        .fromHttpUrl(APIHZ_POETRY_URL)
+                        .queryParam("id", apihzId)
+                        .queryParam("key", apihzKey)
+                        .queryParam("words", keyword)
+                        .queryParam("page", page)
+                        .build()
+                        .toUriString();
                 @SuppressWarnings("unchecked")
-                List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
-                if (data != null) {
-                    int count = 0;
-                    for (Map<String, Object> item : data) {
-                        if (count >= limit) break;
-                        Map<String, Object> poem = new HashMap<>();
-                        poem.put("title", item.get("name"));
-                        poem.put("content", stripHtml((String) item.get("content")));
-                        poem.put("author", item.get("author"));
-                        poem.put("dynasty", item.get("dynasty"));
-                        poem.put("source", "external");
-                        poem.put("recommendScore", 0.5);
-                        poem.put("recommendReason", "古诗词库推荐");
-                        results.add(poem);
-                        count++;
+                Map<String, Object> response = restTemplate.getForObject(url, Map.class);
+
+                if (response != null && Integer.valueOf(200).equals(response.get("code"))) {
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+                    if (data == null || data.isEmpty()) {
+                        break;
                     }
+                    for (Map<String, Object> item : data) {
+                        if (results.size() >= limit) break;
+                        String author = (String) item.get("author");
+                        if (author != null && author.contains(keyword)) {
+                            Map<String, Object> poem = new HashMap<>();
+                            poem.put("title", item.get("name"));
+                            poem.put("content", stripHtml((String) item.get("content")));
+                            poem.put("author", author);
+                            poem.put("dynasty", item.get("dynasty"));
+                            poem.put("source", "external");
+                            poem.put("recommendScore", 0.5);
+                            poem.put("recommendReason", "古诗词库推荐");
+                            results.add(poem);
+                        }
+                    }
+                } else {
+                    log.warn("外部诗词API返回异常响应: keyword={}, page={}, response={}", keyword, page, response);
+                    break;
                 }
-            } else {
-                log.warn("外部诗词API返回异常响应: keyword={}, response={}", keyword, response);
+                page++;
             }
         } catch (Exception e) {
             log.error("调用外部诗词API失败: keyword={}, error={}", keyword, e.getMessage(), e);

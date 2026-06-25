@@ -495,7 +495,7 @@ onUnmounted(() => {
 .poem-create-page {
   padding: 75px 0 $spacing-xl;
   min-height: 60vh;
-  background-color: $bg-color-page;
+  background-color: $background-color-page;
 }
 
 .page-container {
@@ -545,7 +545,7 @@ onUnmounted(() => {
 .create-card {
   flex: 1;
   border-radius: $border-radius-md;
-  box-shadow: $box-shadow-light;
+  box-shadow: $box-shadow;
 }
 
 .side-panel {
@@ -595,7 +595,7 @@ onUnmounted(() => {
 .original-form-item {
   margin-bottom: $spacing-lg;
   padding: $spacing-md;
-  background-color: rgba($bg-color-secondary, 0.5);
+  background-color: rgba($background-color, 0.5);
   border-radius: $border-radius-sm;
 }
 
@@ -634,7 +634,7 @@ onUnmounted(() => {
 .form-actions {
   margin-top: $spacing-xl;
   padding-top: $spacing-lg;
-  border-top: 1px solid $border-color-lighter;
+  border-top: 1px solid $border-color-light;
   
   .el-form-item__content {
     display: flex;

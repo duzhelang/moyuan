@@ -220,3 +220,31 @@ export function deleteAdminComment(id: number) {
 export function getAuditStats() {
   return request.get<Record<string, number>>('/admin/audit/stats')
 }
+
+export function getAdminRepairs(params: { page?: number; size?: number; status?: number | null; category?: string; priority?: number | null; keyword?: string }) {
+  return request.get<{ records: any[]; total: number }>('/admin/repairs', { params })
+}
+
+export function getAdminRepairDetail(id: number) {
+  return request.get<any>(`/admin/repairs/${id}`)
+}
+
+export function updateRepairStatus(id: number, data: { status: number; resolveContent?: string }) {
+  return request.put<void>(`/admin/repairs/${id}/status`, data)
+}
+
+export function assignRepairOrder(id: number, assigneeId: number) {
+  return request.put<void>(`/admin/repairs/${id}/assign`, { assigneeId })
+}
+
+export function addRepairInternalComment(id: number, data: { content: string; images?: string }) {
+  return request.post<any>(`/admin/repairs/${id}/comments`, data)
+}
+
+export function getAdminRepairComments(id: number) {
+  return request.get<any[]>(`/admin/repairs/${id}/comments`)
+}
+
+export function getRepairStats() {
+  return request.get<Record<string, number>>('/admin/repairs/stats')
+}

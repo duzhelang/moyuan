@@ -189,6 +189,7 @@ export interface PoemRating {
   dimension?: string
   comment?: string
   aiModel?: string
+  aiSummary?: string
   aiAnalysis?: string
   createTime: string
 }

@@ -7,11 +7,14 @@ import com.moyuan.common.R;
 import com.moyuan.dto.StatsTrendDTO;
 import com.moyuan.entity.*;
 import com.moyuan.mapper.StatsMapper;
+import com.moyuan.dto.request.RepairCommentCreateRequest;
 import com.moyuan.service.*;
 import com.moyuan.util.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +26,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+@Slf4j
 @Tag(name = "后台管理接口")
 @RestController
 @RequestMapping("/api/admin")
@@ -47,65 +51,76 @@ public class AdminController {
     private final CommentService commentService;
     private final PoetDraftService poetDraftService;
     private final PoetSuggestionService poetSuggestionService;
+    private final RepairOrderService repairOrderService;
 
     // ========== 统计数据 ==========
 
     @Operation(summary = "获取统计数据")
     @GetMapping("/stats")
     public R<Map<String, Object>> getStats() {
-        long userCount = userService.count();
-        long poemCount = poemService.count();
-        long categoryCount = categoryService.count();
-        long dynastyCount = dynastyService.count();
-        long poetCount = poetService.count();
-        long postCount = forumPostService.count();
+        try {
+            long userCount = userService.count();
+            long poemCount = poemService.count();
+            long categoryCount = categoryService.count();
+            long dynastyCount = dynastyService.count();
+            long poetCount = poetService.count();
+            long postCount = forumPostService.count();
 
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("userCount", userCount);
-        stats.put("poemCount", poemCount);
-        stats.put("categoryCount", categoryCount);
-        stats.put("dynastyCount", dynastyCount);
-        stats.put("poetCount", poetCount);
-        stats.put("postCount", postCount);
-        return R.success(stats);
+            Map<String, Object> stats = new HashMap<>();
+            stats.put("userCount", userCount);
+            stats.put("poemCount", poemCount);
+            stats.put("categoryCount", categoryCount);
+            stats.put("dynastyCount", dynastyCount);
+            stats.put("poetCount", poetCount);
+            stats.put("postCount", postCount);
+            return R.success(stats);
+        } catch (Exception e) {
+            log.error("获取统计数据失败", e);
+            return R.error("获取统计数据失败");
+        }
     }
 
     @Operation(summary = "获取统计趋势")
     @GetMapping("/stats/trend")
     public R<Map<String, Object>> getStatsTrend() {
-        int days = 7;
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd");
+        try {
+            int days = 7;
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd");
 
-        List<String> dates = IntStream.rangeClosed(0, days - 1)
-                .mapToObj(i -> LocalDate.now().minusDays(days - 1 - i).format(formatter))
-                .toList();
+            List<String> dates = IntStream.rangeClosed(0, days - 1)
+                    .mapToObj(i -> LocalDate.now().minusDays(days - 1 - i).format(formatter))
+                    .toList();
 
-        List<StatsTrendDTO> trendData = statsMapper.selectStatsTrend(days);
+            List<StatsTrendDTO> trendData = statsMapper.selectStatsTrend(days);
 
-        Map<String, Map<String, Long>> grouped = trendData.stream()
-                .collect(Collectors.groupingBy(
-                        StatsTrendDTO::getType,
-                        Collectors.toMap(
-                                StatsTrendDTO::getDate,
-                                StatsTrendDTO::getCount,
-                                Long::sum)));
+            Map<String, Map<String, Long>> grouped = trendData.stream()
+                    .collect(Collectors.groupingBy(
+                            StatsTrendDTO::getType,
+                            Collectors.toMap(
+                                    StatsTrendDTO::getDate,
+                                    StatsTrendDTO::getCount,
+                                    Long::sum)));
 
-        List<Long> poemCounts = dates.stream()
-                .map(d -> grouped.getOrDefault("poem", Map.of()).getOrDefault(d, 0L))
-                .toList();
-        List<Long> postCounts = dates.stream()
-                .map(d -> grouped.getOrDefault("post", Map.of()).getOrDefault(d, 0L))
-                .toList();
-        List<Long> userCounts = dates.stream()
-                .map(d -> grouped.getOrDefault("user", Map.of()).getOrDefault(d, 0L))
-                .toList();
+            List<Long> poemCounts = dates.stream()
+                    .map(d -> grouped.getOrDefault("poem", Map.of()).getOrDefault(d, 0L))
+                    .toList();
+            List<Long> postCounts = dates.stream()
+                    .map(d -> grouped.getOrDefault("post", Map.of()).getOrDefault(d, 0L))
+                    .toList();
+            List<Long> userCounts = dates.stream()
+                    .map(d -> grouped.getOrDefault("user", Map.of()).getOrDefault(d, 0L))
+                    .toList();
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("dates", dates);
-        result.put("poems", poemCounts);
-        result.put("posts", postCounts);
-        result.put("users", userCounts);
-        return R.success(result);
+            Map<String, Object> result = new HashMap<>();
+            result.put("dates", dates);
+            result.put("poems", poemCounts);
+            result.put("posts", postCounts);
+            result.put("users", userCounts);
+            return R.success(result);
+        } catch (Exception e) {
+            log.error("获取统计趋势失败", e);
+            return R.error("获取统计趋势失败");
+        }
     }
 
     // ========== 用户管理 ==========
@@ -610,6 +625,31 @@ public class AdminController {
         return R.success(result);
     }
 
+    @Operation(summary = "清除诗人缓存")
+    @PostMapping("/cache/clear-poets")
+    public R<String> clearPoetCache() {
+        try {
+            poetService.clearAllCache();
+            return R.success("诗人缓存已清除");
+        } catch (Exception e) {
+            log.error("清除诗人缓存失败", e);
+            return R.error("清除缓存失败");
+        }
+    }
+
+    @Operation(summary = "清除所有缓存")
+    @PostMapping("/cache/clear-all")
+    public R<String> clearAllCache() {
+        try {
+            poetService.clearAllCache();
+            poemService.clearAllCache();
+            return R.success("所有缓存已清除");
+        } catch (Exception e) {
+            log.error("清除所有缓存失败", e);
+            return R.error("清除缓存失败");
+        }
+    }
+
     // ========== 审核统计 ==========
 
     @Operation(summary = "获取审核统计数据")
@@ -770,5 +810,74 @@ public class AdminController {
         String reviewComment = params.get("reviewComment");
         aiGeneratedContentService.reject(id, reviewerId, reviewComment);
         return R.success();
+    }
+
+    // ========== 报修管理 ==========
+
+    @Operation(summary = "获取报修列表")
+    @GetMapping("/repairs")
+    public R<Map<String, Object>> listRepairs(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) Integer priority,
+            @RequestParam(required = false) String keyword) {
+        IPage<RepairOrder> result = repairOrderService.adminGetOrders(page, size, status, category, priority, keyword);
+        Map<String, Object> map = new HashMap<>();
+        map.put("list", result.getRecords());
+        map.put("total", result.getTotal());
+        map.put("pageNum", result.getCurrent());
+        map.put("pageSize", result.getSize());
+        return R.success(map);
+    }
+
+    @Operation(summary = "获取报修详情")
+    @GetMapping("/repairs/{id}")
+    public R<RepairOrder> getRepairDetail(@PathVariable Long id) {
+        return R.success(repairOrderService.adminGetOrderDetail(id));
+    }
+
+    @Operation(summary = "更新报修状态")
+    @PutMapping("/repairs/{id}/status")
+    public R<Void> updateRepairStatus(@PathVariable Long id, @RequestBody Map<String, Object> params) {
+        Integer status = (Integer) params.get("status");
+        String resolveContent = (String) params.get("resolveContent");
+        if (status == null) {
+            return R.error("状态不能为空");
+        }
+        repairOrderService.updateStatus(id, status, resolveContent, null);
+        return R.success();
+    }
+
+    @Operation(summary = "分配处理人")
+    @PutMapping("/repairs/{id}/assign")
+    public R<Void> assignRepair(@PathVariable Long id, @RequestBody Map<String, Long> params) {
+        Long assigneeId = params.get("assigneeId");
+        if (assigneeId == null) {
+            return R.error("处理人不能为空");
+        }
+        repairOrderService.assignOrder(id, assigneeId);
+        return R.success();
+    }
+
+    @Operation(summary = "添加内部备注")
+    @PostMapping("/repairs/{id}/comments")
+    public R<RepairComment> addRepairComment(@PathVariable Long id, @Valid @RequestBody RepairCommentCreateRequest request) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        request.setIsInternal(1);
+        return R.success(repairOrderService.addComment(id, userId, request));
+    }
+
+    @Operation(summary = "获取报修评论列表（含内部备注）")
+    @GetMapping("/repairs/{id}/comments")
+    public R<List<RepairComment>> getRepairComments(@PathVariable Long id) {
+        return R.success(repairOrderService.getComments(id, true));
+    }
+
+    @Operation(summary = "获取报修统计数据")
+    @GetMapping("/repairs/stats")
+    public R<Map<String, Object>> getRepairStats() {
+        return R.success(repairOrderService.getStats());
     }
 }

@@ -8,7 +8,7 @@ const isDev = import.meta.env.DEV
 
 const service: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  timeout: 15000,
+  timeout: 120000,
   headers: {
     'Content-Type': 'application/json; charset=utf-8'
   },

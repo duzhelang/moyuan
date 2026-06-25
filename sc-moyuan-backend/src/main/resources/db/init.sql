@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS `poet` (
   `name` VARCHAR(50) NOT NULL COMMENT '诗人姓名',
   `courtesy_name` VARCHAR(50) DEFAULT NULL COMMENT '字',
   `pseudonym` VARCHAR(50) DEFAULT NULL COMMENT '号',
-  `dynasty_id` BIGINT NOT NULL COMMENT '朝代ID',
+  `dynasty_id` BIGINT DEFAULT NULL COMMENT '朝代ID',
   `birth_year` INT DEFAULT NULL COMMENT '出生年份',
   `death_year` INT DEFAULT NULL COMMENT '去世年份',
   `birthplace` VARCHAR(100) DEFAULT NULL COMMENT '出生地',
@@ -442,12 +442,13 @@ INSERT IGNORE INTO `category` (`id`, `name`, `parent_id`, `description`, `sort_o
 -- ============================================================
 -- 初始数据：诗人
 -- ============================================================
-INSERT IGNORE INTO `poet` (`name`, `dynasty_id`, `biography`, `poet_type`, `status`) VALUES
-('常平逼王', 13, '现代诗人，作品多表现个人情感与生活感悟', 'modern', 1),
-('陆游', 8, '（1125年—1210年），字务观，号放翁，越州山阴（今浙江绍兴）人。南宋文学家、史学家、爱国诗人。一生笔耕不辍，诗词文俱有很高成就，其诗语言平易晓畅、章法整饬谨严，兼具李白的雄奇奔放与杜甫的沉郁悲凉，尤以饱含爱国热情对后世影响深远。', 'ancient', 1),
-('唐婉', 8, '（约1128年—约1156年），字蕙仙，越州山阴（今浙江绍兴）人。南宋才女，陆游的前妻。自幼聪慧，才华横溢，擅长诗词。与陆游的爱情悲剧令人扼腕，其《钗头凤·世情薄》传诵千古。', 'ancient', 1),
-('李煜', 7, '（937年—978年），初名从嘉，字重光，号钟隐、莲峰居士，彭城（今江苏徐州）人。南唐末代君主，世称南唐后主。精书法、工绘画、通音律，诗文均有一定造诣，尤以词的成就最高。其词作在晚唐五代词中别树一帜，对后世词坛影响深远。', 'ancient', 1),
-('森垚', 13, '现代诗人，作品风格独特，善于运用古典意象表达现代情感。', 'modern', 1);
+INSERT IGNORE INTO `poet` (`name`, `dynasty_id`, `biography`, `life_story`, `influence`, `evaluation`, `anecdotes`, `courtesy_name`, `pseudonym`, `birth_year`, `death_year`, `birthplace`, `poet_type`, `status`) VALUES
+('常平逼王', 13, '现代诗人，作品多表现个人情感与生活感悟', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'modern', 1),
+('陆游', 8, '（1125年—1210年），字务观，号放翁，越州山阴（今浙江绍兴）人。南宋文学家、史学家、爱国诗人。一生笔耕不辍，诗词文俱有很高成就，其诗语言平易晓畅、章法整饬谨严，兼具李白的雄奇奔放与杜甫的沉郁悲凉，尤以饱含爱国热情对后世影响深远。', '陆游出生于北宋末年，成长在民族危亡之际。他自幼聪慧好学，十二岁便能作诗文。青年时期，陆游积极投身抗金事业，曾参与张浚的北伐计划。然而，由于南宋朝廷的软弱妥协，他的政治理想屡屡受挫。陆游一生仕途坎坷，多次被贬谪，但他始终不改爱国初心。晚年退居山阴，仍心系国事，临终前写下"王师北定中原日，家祭无忘告乃翁"的千古名句。', '陆游是中国文学史上创作最丰富的诗人之一，现存诗作九千三百余首，堪称古今第一。他的诗歌涵盖爱国、抒情、写景、咏物等多种题材，对后世影响深远。其爱国诗篇激励了无数仁人志士，成为中国爱国主义文学的重要组成部分。陆游的词作同样成就斐然，与辛弃疾并称"辛陆"，是南宋豪放词派的代表人物。', '陆游一生笔耕不辍，诗词文俱有很高成就。其诗语言平易晓畅、章法整饬谨严，兼具李白的雄奇奔放与杜甫的沉郁悲凉，尤以饱含爱国热情对后世影响深远。梁启超曾赞其诗"集中十九从军乐，亘古男儿一放翁"。', '陆游与唐婉的爱情悲剧广为流传。二人本是表兄妹，婚后感情甚笃，但陆母认为陆游沉溺于儿女情长，强迫二人离异。多年后二人在沈园偶遇，陆游题写《钗头凤·红酥手》于园壁，唐婉见后悲痛不已，和词《钗头凤·世情薄》。陆游晚年仍对唐婉念念不忘，曾多次作诗怀念。', '务观', '放翁', 1125, 1210, '越州山阴（今浙江绍兴）', 'ancient', 1),
+('杜牧', 6, '（803年—852年），字牧之，号樊川居士，京兆万年（今陕西西安）人。唐代杰出的诗人、散文家。因晚年居长安南樊川别墅，故后世称"杜樊川"。杜牧为性情刚直，不拘小节，不屑逢迎。自负经略之才，诗文均有盛名。文以《阿房宫赋》为最著，诗作明丽隽永，绝句诗尤受人称赞，世称"小杜"。与李商隐齐名，合称"小李杜"。', '杜牧出身名门望族，祖父杜佑是唐朝宰相、史学家。杜牧自幼聪慧好学，博览群书，尤喜论政谈兵。太和二年（828年），杜牧进士及第，授弘文馆校书郎。后历任淮南节度使掌书记、监察御史、黄州刺史、池州刺史、睦州刺史等职。杜牧为人刚直有奇节，不为龌龊小谨，敢论列大事，指陈病利尤切至。然而生逢晚唐，牛李党争激烈，杜牧虽有济世之才，却未能充分施展抱负。晚年渐趋消极，纵情声色，放浪形骸。大中六年（852年），杜牧病逝，年仅五十岁。', '杜牧在文学上的成就是多方面的。他的诗歌创作成就最高，尤擅七言绝句和七言律诗。其诗风格俊朗，情致豪迈，与李商隐并称"小李杜"，以别于李白、杜甫"大杜"之称。杜牧的咏史诗最为出色，善于借古讽今，寓意深远。其赋作《阿房宫赋》是中国文学史上的名篇，开宋代文赋之先河。杜牧的诗歌对后世影响深远，宋人姜夔有"小杜才高气逸"之评。', '杜牧的诗歌以风格俊朗、情致豪迈著称。其咏史诗善于选取典型事件，借古讽今，议论精辟。写景抒情诗清新自然，意境深远。杜牧善于用典，却不露痕迹，语言精练，音韵和谐。清人沈德潜评价其诗"雄姿英发"，"拗峭"中有"风华"。杜牧与李商隐齐名，但二人风格迥异：李商隐深沉绵邈，杜牧俊朗明快。', '杜牧与张好好：杜牧在江西观察使沈传师幕府任职时，结识歌女张好好，二人情投意合。后张好好被沈传师之弟纳为妾，杜牧怅然若失。数年后杜牧在洛阳重逢张好好，此时她已沦为当垆卖酒女，杜牧感慨万千，作《张好好诗》相赠。此诗成为杜牧书法名作，现存故宫博物院。', '牧之', '樊川居士', 803, 852, '京兆万年（今陕西西安）', 'ancient', 1),
+('唐婉', 8, '（约1128年—约1156年），字蕙仙，越州山阴（今浙江绍兴）人。南宋才女，陆游的前妻。自幼聪慧，才华横溢，擅长诗词。与陆游的爱情悲剧令人扼腕，其《钗头凤·世情薄》传诵千古。', NULL, NULL, NULL, NULL, '蕙仙', NULL, 1128, 1156, '越州山阴（今浙江绍兴）', 'ancient', 1),
+('李煜', 7, '（937年—978年），初名从嘉，字重光，号钟隐、莲峰居士，彭城（今江苏徐州）人。南唐末代君主，世称南唐后主。精书法、工绘画、通音律，诗文均有一定造诣，尤以词的成就最高。其词作在晚唐五代词中别树一帜，对后世词坛影响深远。', NULL, NULL, NULL, NULL, '重光', '钟隐、莲峰居士', 937, 978, '彭城（今江苏徐州）', 'ancient', 1),
+('森垚', 13, '现代诗人，作品风格独特，善于运用古典意象表达现代情感。', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'modern', 1);
 
 -- ============================================================
 -- 初始数据：诗词
@@ -528,8 +529,8 @@ CREATE TABLE IF NOT EXISTS `ai_model` (
 -- ============================================================
 INSERT IGNORE INTO `ai_model` (`name`, `display_name`, `provider`, `model_type`, `api_url`, `api_key`, `model_id`, `vision_model_id`, `max_tokens`, `is_enabled`, `is_default`, `sort_order`) VALUES
 -- 智谱AI
-('zhipu', '智谱AI', 'zhipu', 'both', 'https://open.bigmodel.cn/api/paas/v4/chat/completions', 'your-zhipu-api-key', 'glm-4', 'glm-4.6v-flash', 1024, 0, 0, 1),
-('zhipu-flash', '智谱GLM-4.7-Flash', 'zhipu', 'text', 'https://open.bigmodel.cn/api/paas/v4/chat/completions', 'your-zhipu-api-key', 'glm-4.7-flash', NULL, 1024, 0, 0, 2),
+('zhipu', '智谱AI', 'zhipu', 'both', 'https://open.bigmodel.cn/api/paas/v4/chat/completions', '1a0d9529e8b64c88bffb00cdfba77b44.3ZkEwG4Kvsanf6Qb', 'glm-4', 'glm-4.6v-flash', 1024, 1, 1, 1),
+('zhipu-flash', '智谱GLM-4.7-Flash', 'zhipu', 'text', 'https://open.bigmodel.cn/api/paas/v4/chat/completions', '1a0d9529e8b64c88bffb00cdfba77b44.3ZkEwG4Kvsanf6Qb', 'glm-4.7-flash', NULL, 1024, 1, 0, 2),
 -- DeepSeek
 ('deepseek', 'DeepSeek', 'deepseek', 'text', 'https://api.deepseek.com/v1/chat/completions', 'your-deepseek-api-key', 'deepseek-chat', NULL, 1024, 0, 0, 3),
 ('deepseek-v3', 'DeepSeek-V3', 'deepseek', 'text', 'https://api.deepseek.com/v1/chat/completions', 'your-deepseek-api-key', 'deepseek-v3', NULL, 1024, 0, 0, 4),
@@ -820,7 +821,8 @@ CREATE TABLE IF NOT EXISTS `poem_rating` (
   `dimension` VARCHAR(50) DEFAULT NULL COMMENT '评分维度（格律,意境,用词,情感,创新）',
   `comment` TEXT DEFAULT NULL COMMENT '评分说明',
   `ai_model` VARCHAR(50) DEFAULT NULL COMMENT 'AI模型名称（AI评分时使用）',
-  `ai_analysis` TEXT DEFAULT NULL COMMENT 'AI分析内容',
+  `ai_summary` TEXT DEFAULT NULL COMMENT 'AI评价概要',
+  `ai_analysis` TEXT DEFAULT NULL COMMENT 'AI分析详情',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),

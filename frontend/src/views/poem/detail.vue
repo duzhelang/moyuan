@@ -5,7 +5,7 @@ import { usePoemStore } from '@/stores/poem'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import type { Comment, PoemRatingsData } from '@/types/model'
-import { likePoem, favoritePoem, getPoemRatings, ratePoem, requestAiRating } from '@/api/modules/poem'
+import { likePoem, favoritePoem, getPoemRatings, ratePoem, requestAiRating, regenerateAiRating } from '@/api/modules/poem'
 import { getComments, createComment, likeComment } from '@/api/modules/forum'
 import { addHistory } from '@/api/modules/history'
 import { getAiModuleConfig, type AiModuleConfig, fillAiContent, getFillStatus, previewAiContent, submitForReview } from '@/api/modules/ai'
@@ -33,6 +33,8 @@ const userScore = ref(0)
 const userComment = ref('')
 const submittingRating = ref(false)
 const requestingAi = ref(false)
+const regeneratingAi = ref(false)
+const aiExpanded = ref(false)
 const aiPollTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 const loginPromptVisible = ref(false)
@@ -122,7 +124,7 @@ const handleAiFill = async (fieldName: string) => {
   if (!poem.value?.id) return
   fillingField.value = fieldName
   try {
-    const res = await previewAiContent({ targetType: 'poem', targetId: poem.value.id, fieldName })
+    const res = await previewAiContent({ targetType: 'poem', targetId: poem.value.id, fieldName, moduleCode: 'chat' })
     previewField.value = fieldName
     previewContent.value = res.data.content
   } catch (e: any) {
@@ -157,6 +159,14 @@ const handleSubmitReview = async () => {
 const handleCancelPreview = () => {
   previewField.value = ''
   previewContent.value = ''
+}
+
+const handleContribute = () => {
+  if (!userStore.isLoggedIn) {
+    loginPromptVisible.value = true
+    return
+  }
+  ElMessage.info('内容补充功能正在开发中，敬请期待')
 }
 
 const handleLike = async () => {
@@ -230,7 +240,7 @@ const pollAiRating = () => {
         aiPollTimer.value = null
       }
       if (attempts >= maxAttempts && !ratingsData.value?.aiRating) {
-        ElMessage.warning('AI评分处理中，请稍后刷新查看')
+        ElMessage.warning('AI评价处理中，请稍后刷新查看')
       }
     }
   }, 1500)
@@ -251,13 +261,34 @@ const handleRequestAiRating = async () => {
   requestingAi.value = true
   try {
     await requestAiRating(poemId.value)
-    ElMessage.success('AI评分请求已提交')
+    ElMessage.success('AI评价请求已提交')
     pollAiRating()
   } catch (error) {
-    ElMessage.error('AI评分请求失败')
+    ElMessage.error('AI评价请求失败')
   } finally {
     requestingAi.value = false
   }
+}
+
+const handleRegenerateAiRating = async () => {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录')
+    return
+  }
+  regeneratingAi.value = true
+  try {
+    await regenerateAiRating(poemId.value)
+    ElMessage.success('AI重新评价请求已提交')
+    pollAiRating()
+  } catch (error) {
+    ElMessage.error('AI重新评价请求失败')
+  } finally {
+    regeneratingAi.value = false
+  }
+}
+
+const toggleAiExpanded = () => {
+  aiExpanded.value = !aiExpanded.value
 }
 
 const handleSubmitComment = async () => {
@@ -389,7 +420,7 @@ const sendAiChatMessage = async (message?: string, isFirst: boolean = false) => 
   try {
     const { chat } = await import('@/api/modules/ai')
     const prompt = buildAiPrompt(msg, isFirst)
-    const res = await chat({ message: prompt })
+    const res = await chat({ message: prompt, moduleCode: 'chat' })
     aiChatMessages.value.push({
       role: 'assistant',
       content: res.data.reply || '抱歉，暂时无法回答',
@@ -523,7 +554,11 @@ onMounted(async () => {
                 </router-link>
               </div>
               <div v-else class="info-empty">
-                <p>暂无诗人信息</p>
+                <p class="empty-hint">笔耕不辍，诗人简介待整理</p>
+                <el-button type="primary" plain size="small" class="contribute-btn" @click="handleContribute">
+                  <el-icon><Edit /></el-icon>
+                  我来补充
+                </el-button>
               </div>
             </div>
           </div>
@@ -558,7 +593,7 @@ onMounted(async () => {
                 <p>{{ poem.background }}</p>
               </div>
               <div v-else class="info-empty">
-                <p>暂无创作背景信息</p>
+                <p class="empty-hint">创作背景尚待考证，欢迎补充</p>
                 <div class="ai-fill-actions">
                   <el-button type="primary" size="small" plain @click="sendAiChatMessage('请介绍一下这首诗的创作背景')">
                     <el-icon><MagicStick /></el-icon>
@@ -571,6 +606,10 @@ onMounted(async () => {
                   <el-button v-else type="warning" size="small" plain :loading="fillingField === 'background'" @click="handleAiFill('background')">
                     <el-icon><MagicStick /></el-icon>
                     AI填充
+                  </el-button>
+                  <el-button type="info" size="small" plain class="contribute-btn" @click="handleContribute">
+                    <el-icon><Edit /></el-icon>
+                    我来补充
                   </el-button>
                 </div>
               </div>
@@ -610,7 +649,7 @@ onMounted(async () => {
                 <p>{{ poem.translation }}</p>
               </div>
               <div v-else class="info-empty">
-                <p>暂无赏析内容</p>
+                <p class="empty-hint">赏析内容待整理，期待您的见解</p>
                 <div class="ai-fill-actions">
                   <el-button type="primary" size="small" plain @click="sendAiChatMessage('请对这首诗进行翻译赏析')">
                     <el-icon><MagicStick /></el-icon>
@@ -623,6 +662,10 @@ onMounted(async () => {
                   <el-button v-else type="warning" size="small" plain :loading="fillingField === 'appreciation'" @click="handleAiFill('appreciation')">
                     <el-icon><MagicStick /></el-icon>
                     AI填充
+                  </el-button>
+                  <el-button type="info" size="small" plain class="contribute-btn" @click="handleContribute">
+                    <el-icon><Edit /></el-icon>
+                    我来补充
                   </el-button>
                 </div>
               </div>
@@ -661,13 +704,21 @@ onMounted(async () => {
         <h2 class="section-title">评分区域</h2>
 
         <div class="rating-overview">
-          <div class="rating-score">
-            <span class="score-value">{{ (ratingsData.averageScore || 0).toFixed(1) }}</span>
-            <span class="score-label">综合评分</span>
-          </div>
-          <div class="rating-count">
-            <span>{{ ratingsData.ratingCount }} 人评分</span>
-          </div>
+          <template v-if="ratingsData.ratingCount > 0">
+            <div class="rating-score">
+              <span class="score-value">{{ (ratingsData.averageScore || 0).toFixed(1) }}</span>
+              <span class="score-label">综合评分</span>
+            </div>
+            <div class="rating-count">
+              <span>{{ ratingsData.ratingCount }} 人评分</span>
+            </div>
+          </template>
+          <template v-else>
+            <div class="rating-empty">
+              <span class="empty-text">暂无评分</span>
+              <span class="empty-hint">期待您的评价</span>
+            </div>
+          </template>
         </div>
 
         <div class="ai-rating-card" v-if="ratingsData.aiRating">
@@ -676,7 +727,7 @@ onMounted(async () => {
               <div class="ai-rating-header">
                 <span class="ai-label">
                   <el-icon><Cpu /></el-icon>
-                  AI 评分
+                  AI 评价
                 </span>
                 <span class="ai-model">{{ ratingsData.aiRating.aiModel || '未知模型' }}</span>
               </div>
@@ -685,9 +736,33 @@ onMounted(async () => {
               <div class="ai-score">
                 <span class="score-value">{{ (ratingsData.aiRating.score || 0).toFixed(1) }}</span>
               </div>
-              <div class="ai-analysis" v-if="ratingsData.aiRating.aiAnalysis">
-                <p>{{ ratingsData.aiRating.aiAnalysis }}</p>
+              <div class="ai-analysis">
+                <div v-if="!aiExpanded && ratingsData.aiRating.aiSummary" class="ai-summary">
+                  <p>{{ ratingsData.aiRating.aiSummary }}</p>
+                  <el-button type="primary" link @click="toggleAiExpanded">
+                    查看详情
+                    <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                  </el-button>
+                </div>
+                <div v-else-if="ratingsData.aiRating.aiAnalysis" class="ai-detail">
+                  <p v-for="(para, idx) in ratingsData.aiRating.aiAnalysis.split('\n').filter(p => p.trim())" :key="idx">{{ para }}</p>
+                  <el-button type="primary" link @click="toggleAiExpanded" v-if="ratingsData.aiRating.aiSummary">
+                    收起详情
+                    <el-icon class="el-icon--right"><ArrowUp /></el-icon>
+                  </el-button>
+                </div>
               </div>
+            </div>
+            <div class="ai-rating-actions">
+              <el-button
+                type="warning"
+                size="small"
+                :loading="regeneratingAi"
+                @click="handleRegenerateAiRating"
+              >
+                <el-icon><Refresh /></el-icon>
+                重新生成
+              </el-button>
             </div>
           </el-card>
         </div>
@@ -699,7 +774,7 @@ onMounted(async () => {
             @click="handleRequestAiRating"
           >
             <el-icon><Cpu /></el-icon>
-            请求 AI 评分
+            请求 AI 评价
           </el-button>
         </div>
 
@@ -901,6 +976,7 @@ onMounted(async () => {
   min-height: 60vh;
   position: relative;
   overflow-x: hidden;
+  background-color: $background-color-page;
 }
 
 .page-decoration {
@@ -942,6 +1018,8 @@ onMounted(async () => {
 .container {
   position: relative;
   z-index: 1;
+  max-width: 900px;
+  margin: 0 auto;
 }
 
 .poem-header {
@@ -956,6 +1034,8 @@ onMounted(async () => {
   margin-bottom: $spacing-xl;
   border-radius: $border-radius-md;
   padding: $spacing-xl;
+  background: $background-color-paper;
+  box-shadow: 0 2px 12px rgba($primary-color, 0.08);
 }
 
 .poem-title-section {
@@ -974,13 +1054,13 @@ onMounted(async () => {
   .deco-line {
     width: 60px;
     height: 1px;
-    background: linear-gradient(to right, transparent, $primary-color, transparent);
+    background: linear-gradient(to right, transparent, $accent-color-vermilion, transparent);
   }
 
   .deco-dot {
     width: 6px;
     height: 6px;
-    background: $primary-color;
+    background: $accent-color-vermilion;
     border-radius: 50%;
   }
 }
@@ -996,7 +1076,7 @@ onMounted(async () => {
 .title-underline {
   width: 80px;
   height: 2px;
-  background: linear-gradient(to right, transparent, $primary-color, transparent);
+  background: linear-gradient(to right, transparent, $accent-color-vermilion, transparent);
   margin: $spacing-md auto $spacing-lg;
 }
 
@@ -1035,12 +1115,13 @@ onMounted(async () => {
   margin-bottom: $spacing-lg;
   
   .poem-sentence {
-    font-size: $font-size-xl;
-    line-height: 2.2;
-    letter-spacing: 2px;
-    color: $text-color;
+    font-size: $font-size-xxl;
+    line-height: 2.4;
+    letter-spacing: 3px;
+    color: $text-color-ink;
     font-family: $font-family-title;
     margin-bottom: $spacing-xs;
+    text-indent: 0;
   }
 }
 
@@ -1061,9 +1142,24 @@ onMounted(async () => {
 .poem-actions {
   display: flex;
   align-items: center;
-  gap: $spacing-md;
-  padding-top: $spacing-xl;
-  border-top: 1px solid $border-color;
+  justify-content: center;
+  gap: $spacing-lg;
+  padding: $spacing-lg $spacing-xl;
+  margin-top: $spacing-xl;
+  border-top: 1px solid $border-color-bronze;
+  border-bottom: 1px solid $border-color-bronze;
+  background: rgba($border-color-bronze, 0.08);
+  border-radius: $border-radius-sm;
+
+  .el-button {
+    font-family: $font-family-title;
+    letter-spacing: 1px;
+  }
+
+  .view-count {
+    font-family: $font-family-title;
+    color: $text-color-secondary;
+  }
 }
 
 .poem-info-section {
@@ -1082,14 +1178,15 @@ onMounted(async () => {
 }
 
 .info-card {
-  background: $background-color-light;
+  background: $background-color-paper;
   border-radius: $border-radius-md;
-  box-shadow: $box-shadow;
+  box-shadow: 0 2px 8px rgba($primary-color, 0.06);
   overflow: hidden;
   transition: all $transition-fast;
+  border: 1px solid rgba($border-color-bronze, 0.3);
 
   &:hover {
-    box-shadow: $box-shadow-md;
+    box-shadow: 0 4px 12px rgba($primary-color, 0.1);
     transform: translateY(-2px);
   }
 }
@@ -1099,8 +1196,8 @@ onMounted(async () => {
   align-items: center;
   gap: $spacing-sm;
   padding: $spacing-md $spacing-lg;
-  background: linear-gradient(135deg, rgba($primary-color, 0.05), rgba($primary-color, 0.02));
-  border-bottom: 1px solid $border-color-light;
+  background: linear-gradient(135deg, rgba($primary-color, 0.04), rgba($primary-color, 0.01));
+  border-bottom: 1px solid rgba($border-color-bronze, 0.3);
 
   .el-icon {
     color: $primary-color;
@@ -1110,9 +1207,10 @@ onMounted(async () => {
   h3 {
     font-size: $font-size-base;
     font-weight: 600;
-    color: $text-color;
+    color: $text-color-ink;
     margin: 0;
     font-family: $font-family-title;
+    letter-spacing: 2px;
   }
 }
 
@@ -1177,12 +1275,30 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   gap: $spacing-md;
-  padding: $spacing-md 0;
+  padding: $spacing-lg 0;
 
   p {
     font-size: $font-size-sm;
     color: $text-color-light;
     margin: 0;
+  }
+
+  .empty-hint {
+    font-family: $font-family-title;
+    font-size: $font-size-base;
+    color: $text-color-light;
+    letter-spacing: 1px;
+    font-style: italic;
+  }
+
+  .contribute-btn {
+    margin-top: $spacing-xs;
+    border-color: $border-color-bronze;
+    color: $primary-color;
+
+    &:hover {
+      background: rgba($primary-color, 0.05);
+    }
   }
 }
 
@@ -1329,29 +1445,7 @@ onMounted(async () => {
     width: 100%;
   }
 
-  :deep(.el-textarea__inner) {
-    font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
-    color: #333;
-    letter-spacing: 0.5px;
-    line-height: 1.6;
-    resize: vertical;
-    min-height: 80px;
-    padding: 12px;
-    background-color: #fff;
-    border: 1px solid $border-color;
-    border-radius: $border-radius-sm;
-    transition: border-color 0.2s, box-shadow 0.2s;
-
-    &::placeholder {
-      color: #999;
-    }
-
-    &:focus {
-      border-color: $primary-color;
-      box-shadow: 0 0 0 2px rgba($primary-color, 0.15);
-      outline: none;
-    }
-  }
+  @include el-comment-input;
 }
 
 .submit-button {
@@ -1426,9 +1520,10 @@ onMounted(async () => {
 .rating-section {
   margin-top: $spacing-xl;
   padding: $spacing-xl;
-  background: $background-color-light;
+  background: $background-color-paper;
   border-radius: $border-radius-md;
-  box-shadow: $box-shadow;
+  box-shadow: 0 2px 8px rgba($primary-color, 0.06);
+  border: 1px solid rgba($border-color-bronze, 0.3);
 }
 
 .rating-overview {
@@ -1463,6 +1558,26 @@ onMounted(async () => {
 .rating-count {
   font-size: $font-size-base;
   color: $text-color-secondary;
+}
+
+.rating-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $spacing-xs;
+  width: 100%;
+
+  .empty-text {
+    font-family: $font-family-title;
+    font-size: $font-size-lg;
+    color: $text-color-light;
+    letter-spacing: 2px;
+  }
+
+  .empty-hint {
+    font-size: $font-size-sm;
+    color: $text-color-light;
+  }
 }
 
 .ai-rating-card {
@@ -1509,8 +1624,28 @@ onMounted(async () => {
       font-size: $font-size-base;
       color: $text-color;
       line-height: $line-height-loose;
-      margin: 0;
+      margin: 0 0 $spacing-md;
+      text-indent: 2em;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
     }
+
+    .ai-summary,
+    .ai-detail {
+      .el-button {
+        margin-top: $spacing-sm;
+      }
+    }
+  }
+
+  .ai-rating-actions {
+    margin-top: $spacing-md;
+    padding-top: $spacing-md;
+    border-top: 1px solid $border-color-light;
+    display: flex;
+    justify-content: flex-end;
   }
 }
 
@@ -1551,28 +1686,10 @@ onMounted(async () => {
   }
 
   .comment-input {
+    @include el-comment-input;
+
     :deep(.el-textarea__inner) {
-      font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
-      color: #333;
-      letter-spacing: 0.5px;
-      line-height: 1.6;
-      resize: vertical;
       min-height: 60px;
-      padding: 12px;
-      background-color: #fff;
-      border: 1px solid $border-color;
-      border-radius: $border-radius-sm;
-      transition: border-color 0.2s, box-shadow 0.2s;
-
-      &::placeholder {
-        color: #999;
-      }
-
-      &:focus {
-        border-color: $primary-color;
-        box-shadow: 0 0 0 2px rgba($primary-color, 0.15);
-        outline: none;
-      }
     }
   }
 }
@@ -1781,25 +1898,11 @@ onMounted(async () => {
   .el-textarea {
     flex: 1;
 
+    @include el-comment-input;
+
     :deep(.el-textarea__inner) {
-      border-radius: 20px;
-      padding: 10px 16px;
-      resize: none;
-      border-color: $border-color;
-      font-size: $font-size-sm;
-      line-height: 1.5;
-      transition: all $transition-fast;
-      background: white;
-
-      &::placeholder {
-        font-size: $font-size-sm;
-        color: $text-color-light;
-      }
-
-      &:focus {
-        border-color: $primary-color;
-        box-shadow: 0 0 0 3px rgba($primary-color, 0.15);
-      }
+      border-radius: $comment-input-radius;
+      padding: $comment-input-padding;
     }
   }
 

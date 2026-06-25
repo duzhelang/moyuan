@@ -43,19 +43,35 @@ public class AiServiceImpl implements AiService {
 
     @Override
     public String chat(String message, String model) {
+        return chat(message, model, null);
+    }
+
+    @Override
+    public String chat(String message, String model, String moduleCode) {
+        if (moduleCode != null && !moduleCode.isEmpty()) {
+            return aiModelRegistry.chatByModule(message, moduleCode, CHAT_SYSTEM_PROMPT);
+        }
         return aiModelRegistry.chat(message, model, CHAT_SYSTEM_PROMPT);
     }
 
     @Override
     public String writePoemFromImage(MultipartFile image, String model) {
-        return writePoemFromImage(image, model, null);
+        return writePoemFromImage(image, model, null, null);
     }
 
     @Override
     public String writePoemFromImage(MultipartFile image, String model, String visionModel) {
+        return writePoemFromImage(image, model, visionModel, null);
+    }
+
+    @Override
+    public String writePoemFromImage(MultipartFile image, String model, String visionModel, String moduleCode) {
         try {
             String base64Image = Base64.getEncoder().encodeToString(image.getBytes());
             String prompt = "请根据这张图片创作一首古诗词。要求：1. 诗词要符合古诗词的格律和韵律；2. 内容要与图片意境相符；3. 请直接给出诗词内容，不需要额外解释。";
+            if (moduleCode != null && !moduleCode.isEmpty()) {
+                return aiModelRegistry.visionByModule(prompt, base64Image, moduleCode, visionModel, VISION_SYSTEM_PROMPT);
+            }
             return aiModelRegistry.vision(prompt, base64Image, model, visionModel, VISION_SYSTEM_PROMPT);
         } catch (IOException e) {
             log.error("图片处理失败", e);
@@ -65,6 +81,11 @@ public class AiServiceImpl implements AiService {
 
     @Override
     public String analyzePoem(String poem, String model) {
+        return analyzePoem(poem, model, null);
+    }
+
+    @Override
+    public String analyzePoem(String poem, String model, String moduleCode) {
         String prompt = "请对以下古诗词进行详细分析，包括：\n" +
                 "1. 诗词的意境和主题\n" +
                 "2. 使用的修辞手法\n" +
@@ -72,14 +93,25 @@ public class AiServiceImpl implements AiService {
                 "4. 作者的情感表达\n" +
                 "5. 诗词的历史背景（如果可能）\n\n" +
                 "诗词内容：\n" + poem;
+        if (moduleCode != null && !moduleCode.isEmpty()) {
+            return aiModelRegistry.chatByModule(prompt, moduleCode, ANALYZE_SYSTEM_PROMPT);
+        }
         return aiModelRegistry.chat(prompt, model, ANALYZE_SYSTEM_PROMPT);
     }
 
     @Override
     public String matchCouplet(String upperCouplet, String model) {
+        return matchCouplet(upperCouplet, model, null);
+    }
+
+    @Override
+    public String matchCouplet(String upperCouplet, String model, String moduleCode) {
         String prompt = "请为以下上联对出下联：\n\n" +
                 "上联：" + upperCouplet + "\n\n" +
                 "请给出下联，并简要说明对仗思路。";
+        if (moduleCode != null && !moduleCode.isEmpty()) {
+            return aiModelRegistry.chatByModule(prompt, moduleCode, COUPLET_SYSTEM_PROMPT);
+        }
         return aiModelRegistry.chat(prompt, model, COUPLET_SYSTEM_PROMPT);
     }
 }

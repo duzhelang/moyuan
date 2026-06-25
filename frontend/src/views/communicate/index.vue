@@ -1099,26 +1099,7 @@ onActivated(() => {
 }
 
 .comment-input {
-  flex: 1;
-  height: 36px;
-  padding: 0 14px;
-  background: rgba(12, 22, 45, 0.7);
-  border: 1px solid rgba(100, 140, 200, 0.15);
-  border-radius: 18px;
-  color: rgba(220, 230, 245, 0.92);
-  font-size: 13px;
-  outline: none;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
-  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-
-  &::placeholder {
-    color: rgba(160, 175, 200, 0.45);
-  }
-
-  &:focus {
-    border-color: rgba(100, 160, 240, 0.4);
-    box-shadow: 0 0 12px rgba(80, 140, 220, 0.08);
-  }
+  @include comment-input-dark;
 }
 
 .comment-submit-btn {

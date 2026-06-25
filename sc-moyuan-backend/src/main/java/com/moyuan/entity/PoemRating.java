@@ -17,6 +17,7 @@ public class PoemRating {
     private String dimension;
     private String comment;
     private String aiModel;
+    private String aiSummary;
     private String aiAnalysis;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

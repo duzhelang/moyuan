@@ -1,7 +1,7 @@
 import request from '@/utils/request'
 import type { Poet } from '@/types/model'
 
-export function getPoetList(params?: { pageNum?: number; pageSize?: number; dynastyId?: number; keyword?: string; poetType?: string }) {
+export function getPoetList(params?: { pageNum?: number; pageSize?: number; dynastyId?: number; categoryId?: number; keyword?: string; poetType?: string }) {
   return request.get<{ list: Poet[]; total: number; pageNum: number; pageSize: number }>('/poets', { params })
 }
 

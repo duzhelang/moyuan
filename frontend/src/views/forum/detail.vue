@@ -362,10 +362,9 @@ onMounted(() => {
   border-radius: $border-radius-lg;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 
+  @include el-comment-input;
+  
   :deep(.el-textarea__inner) {
-    font-family: $font-family-input;
-    letter-spacing: 0.5px;
-    line-height: 1.6;
     border-radius: $border-radius-md;
     padding: $spacing-md;
   }

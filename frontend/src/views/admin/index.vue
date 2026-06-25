@@ -31,7 +31,8 @@ const adminMenus = [
     label: '社区管理',
     icon: 'ChatLineSquare',
     children: [
-      { path: '/admin/forum-posts', name: 'AdminForumPosts', icon: 'ChatLineSquare', label: '帖子管理' }
+      { path: '/admin/forum-posts', name: 'AdminForumPosts', icon: 'ChatLineSquare', label: '帖子管理' },
+      { path: '/admin/repairs', name: 'AdminRepairs', icon: 'Tickets', label: '报修管理' }
     ]
   },
   {

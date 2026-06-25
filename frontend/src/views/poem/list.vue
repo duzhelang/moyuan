@@ -13,6 +13,7 @@ import { getPoetList } from '@/api/modules/poet'
 import { getCache, setCache } from '@/utils/storage'
 import { searchApihzPoems, getApihzPoetryDetail } from '@/api/modules/external-poetry'
 import type { PoemSearchResult } from '@/api/modules/external-poetry'
+import { searchPoetryByTitle, searchPoetryByAuthor, getRandomPoetry, type PoetryDbPoem } from '@/api/modules/external-poetry'
 import { getAiModuleConfig, type AiModuleConfig } from '@/api/modules/ai'
 import { smartSearch, getSearchSuggestions, getHotSearches, getSearchHistory, clearSearchHistory } from '@/api/modules/search'
 import type { SmartSearchResult } from '@/api/modules/search'
@@ -47,7 +48,7 @@ const dynasties = ref<Dynasty[]>([])
 const categories = ref<Category[]>([])
 const poets = ref<Poet[]>([])
 
-const activeTab = ref<'classical' | 'modern'>('classical')
+const activeTab = ref<'classical' | 'modern' | 'foreign'>('classical')
 
 const poemImages = [
   '/img/lt_jx (2).jpg',
@@ -69,6 +70,23 @@ const modernFilters = ref({
   sortBy: 'latest' as 'latest' | 'popular' | 'likes'
 })
 
+interface ForeignPoem {
+  id: string
+  title: string
+  content: string
+  author: string
+  linecount: string
+  source: 'foreign'
+}
+
+const foreignFilters = ref({
+  keyword: '',
+  author: ''
+})
+const foreignPoemList = ref<ForeignPoem[]>([])
+const foreignTotal = ref(0)
+const foreignLoading = ref(false)
+
 const currentPage = ref(1)
 const pageSize = ref(preferencesStore.userPreferences.pageSize || 10)
 
@@ -76,13 +94,19 @@ const poems = computed(() => {
   if (activeTab.value === 'classical') {
     return poemStore.poemList
   }
-  return modernPoemList.value
+  if (activeTab.value === 'modern') {
+    return modernPoemList.value
+  }
+  return foreignPoemList.value
 })
 const total = computed(() => {
   if (activeTab.value === 'classical') {
     return poemStore.total
   }
-  return modernTotal.value
+  if (activeTab.value === 'modern') {
+    return modernTotal.value
+  }
+  return foreignTotal.value
 })
 
 const modernPoemList = ref<Poem[]>([])
@@ -125,6 +149,7 @@ const backgroundKnowledge = ref({
   historicalContext: { content: '', loading: false, loaded: false }
 })
 const activeKnowledgePanels = ref<string[]>([])
+const expandedKnowledgePanels = ref<string[]>([])
 
 const contentCache = ref<Map<string, string>>(new Map())
 
@@ -256,7 +281,7 @@ const fetchPoems = async () => {
           }
         }
       }
-    } else {
+    } else if (activeTab.value === 'modern') {
       const res = await getModernPoems({
         pageNum: currentPage.value,
         pageSize: pageSize.value,
@@ -266,11 +291,40 @@ const fetchPoems = async () => {
       })
       modernPoemList.value = res.data.list
       modernTotal.value = res.data.total
+    } else if (activeTab.value === 'foreign') {
+      await fetchForeignPoems()
     }
   } catch (error) {
     ElMessage.error('获取诗词列表失败')
   } finally {
     loading.value = false
+  }
+}
+
+const fetchForeignPoems = async () => {
+  foreignLoading.value = true
+  try {
+    let results: PoetryDbPoem[] = []
+    if (foreignFilters.value.keyword) {
+      results = await searchPoetryByTitle(foreignFilters.value.keyword)
+    } else if (foreignFilters.value.author) {
+      results = await searchPoetryByAuthor(foreignFilters.value.author)
+    } else {
+      results = await getRandomPoetry(20)
+    }
+    foreignPoemList.value = results.map((poem: PoetryDbPoem, index: number) => ({
+      id: `foreign_${index}`,
+      title: poem.title,
+      content: poem.lines?.join('\n') || '',
+      author: poem.author,
+      linecount: poem.linecount,
+      source: 'foreign' as const
+    }))
+    foreignTotal.value = foreignPoemList.value.length
+  } catch (error) {
+    ElMessage.error('获取外文诗词失败')
+  } finally {
+    foreignLoading.value = false
   }
 }
 
@@ -375,7 +429,7 @@ ${poemContent}
 【用户问题】请为这首诗提供译文注释`
 
     const { chat } = await import('@/api/modules/ai')
-    const res = await chat({ message: prompt })
+    const res = await chat({ message: prompt, moduleCode: 'poetry_chat' })
     annotationContent.value = res.data.reply || '抱歉，暂时无法生成注释'
     await saveCachedContent(poemTitle, poemAuthor, 'annotation', annotationContent.value, 'ai')
   } catch {
@@ -425,7 +479,7 @@ ${poemContent}
 【用户问题】请提供这首诗的历代名人点评和历史评价`
 
     const { chat } = await import('@/api/modules/ai')
-    const res = await chat({ message: prompt })
+    const res = await chat({ message: prompt, moduleCode: 'poetry_chat' })
     appreciationContent.value = res.data.reply || '抱歉，暂时无法生成鉴赏'
     await saveCachedContent(poemTitle, poemAuthor, 'appreciation', appreciationContent.value, 'ai')
   } catch {
@@ -470,7 +524,7 @@ const generateBackground = async () => {
 【用户问题】请介绍这首诗的创作背景`
 
     const { chat } = await import('@/api/modules/ai')
-    const res = await chat({ message: prompt })
+    const res = await chat({ message: prompt, moduleCode: 'poetry_chat' })
     backgroundContent.value = res.data.reply || '抱歉，暂时无法生成创作背景'
     await saveCachedContent(poemTitle, poemAuthor, 'background', backgroundContent.value, 'ai')
   } catch {
@@ -525,7 +579,7 @@ const explainLine = async (idx: number) => {
 【用户问题】请解释这句诗`
 
     const { chat } = await import('@/api/modules/ai')
-    const res = await chat({ message: prompt })
+    const res = await chat({ message: prompt, moduleCode: 'poetry_chat' })
     lineExplanations.value.set(idx, res.data.reply || '抱歉，暂时无法解析')
     lineExplanations.value = new Map(lineExplanations.value)
   } catch {
@@ -623,7 +677,7 @@ ${selectedExternalPoem.value?.dynasty ? '朝代：' + selectedExternalPoem.value
 【用户问题】请介绍这位诗人`
 
     const { chat } = await import('@/api/modules/ai')
-    const res = await chat({ message: prompt })
+    const res = await chat({ message: prompt, moduleCode: 'poetry_chat' })
     authorInfoContent.value = res.data.reply || '抱歉，暂时无法生成诗人介绍'
     await saveCachedContent(poemTitle, poemAuthor, 'author_info', authorInfoContent.value, 'ai')
   } catch {
@@ -700,7 +754,7 @@ const loadKnowledgeContent = async (panel: string) => {
     }
 
     const { chat } = await import('@/api/modules/ai')
-    const res = await chat({ message: prompt })
+    const res = await chat({ message: prompt, moduleCode: 'poetry_chat' })
     panelData.content = res.data.reply || '抱歉，暂时无法生成内容'
     panelData.loaded = true
     await saveCachedContent(poemTitle, poemAuthor, contentType, panelData.content, 'ai')
@@ -708,6 +762,25 @@ const loadKnowledgeContent = async (panel: string) => {
     panelData.content = 'AI服务暂时不可用，请稍后重试'
   } finally {
     panelData.loading = false
+  }
+}
+
+const getKnowledgeSummary = (content: string, maxLength: number = 100) => {
+  if (!content) return ''
+  if (content.length <= maxLength) return content
+  return content.substring(0, maxLength) + '...'
+}
+
+const isKnowledgeExpanded = (panel: string) => {
+  return expandedKnowledgePanels.value.includes(panel)
+}
+
+const toggleKnowledgeExpand = (panel: string) => {
+  const index = expandedKnowledgePanels.value.indexOf(panel)
+  if (index > -1) {
+    expandedKnowledgePanels.value.splice(index, 1)
+  } else {
+    expandedKnowledgePanels.value.push(panel)
   }
 }
 
@@ -782,7 +855,7 @@ const sendAiChatMessage = async (message?: string, isFirst: boolean = false) => 
   try {
     const { chat } = await import('@/api/modules/ai')
     const prompt = buildAiPrompt(msg, isFirst)
-    const res = await chat({ message: prompt })
+    const res = await chat({ message: prompt, moduleCode: 'poetry_chat' })
     aiChatMessages.value.push({
       role: 'assistant',
       content: res.data.reply || '抱歉，暂时无法回答',
@@ -904,7 +977,7 @@ const fetchFilters = async () => {
 }
 
 const handleTabChange = (tab: string | number | boolean | undefined) => {
-  activeTab.value = tab as 'classical' | 'modern'
+  activeTab.value = tab as 'classical' | 'modern' | 'foreign'
   currentPage.value = 1
   syncFiltersToUrl()
   fetchPoems()
@@ -925,11 +998,16 @@ const clearFilters = () => {
       keyword: '',
       sortBy: 'latest'
     }
-  } else {
+  } else if (activeTab.value === 'modern') {
     modernFilters.value = {
       isOriginal: undefined,
       hasCertifiedPoet: undefined,
       sortBy: 'latest'
+    }
+  } else {
+    foreignFilters.value = {
+      keyword: '',
+      author: ''
     }
   }
   currentPage.value = 1
@@ -941,6 +1019,8 @@ const syncFiltersToUrl = () => {
   const query: Record<string, string> = {}
   if (activeTab.value === 'modern') {
     query.tab = 'modern'
+  } else if (activeTab.value === 'foreign') {
+    query.tab = 'foreign'
   }
   if (activeTab.value === 'classical') {
     if (filters.value.dynastyId) query.dynastyId = String(filters.value.dynastyId)
@@ -948,10 +1028,13 @@ const syncFiltersToUrl = () => {
     if (filters.value.poetId) query.poetId = String(filters.value.poetId)
     if (filters.value.keyword) query.keyword = filters.value.keyword
     if (filters.value.sortBy !== 'latest') query.sortBy = filters.value.sortBy
-  } else {
+  } else if (activeTab.value === 'modern') {
     if (modernFilters.value.isOriginal !== undefined) query.isOriginal = String(modernFilters.value.isOriginal)
     if (modernFilters.value.hasCertifiedPoet !== undefined) query.hasCertifiedPoet = String(modernFilters.value.hasCertifiedPoet)
     if (modernFilters.value.sortBy !== 'latest') query.sortBy = modernFilters.value.sortBy
+  } else {
+    if (foreignFilters.value.keyword) query.keyword = foreignFilters.value.keyword
+    if (foreignFilters.value.author) query.author = foreignFilters.value.author
   }
   if (currentPage.value > 1) query.page = String(currentPage.value)
   if (selectedExternalPoem.value) query.poemTitle = selectedExternalPoem.value.title
@@ -962,7 +1045,10 @@ const hasActiveFilters = computed(() => {
   if (activeTab.value === 'classical') {
     return filters.value.dynastyId || filters.value.categoryId || filters.value.poetId || filters.value.keyword || filters.value.sortBy !== 'latest'
   }
-  return modernFilters.value.isOriginal !== undefined || modernFilters.value.hasCertifiedPoet !== undefined || modernFilters.value.sortBy !== 'latest'
+  if (activeTab.value === 'modern') {
+    return modernFilters.value.isOriginal !== undefined || modernFilters.value.hasCertifiedPoet !== undefined || modernFilters.value.sortBy !== 'latest'
+  }
+  return foreignFilters.value.keyword || foreignFilters.value.author
 })
 
 const handlePageChange = (page: number) => {
@@ -978,8 +1064,28 @@ const handleSizeChange = (size: number) => {
   fetchPoems()
 }
 
-const goToDetail = (id: number) => {
-  router.push(`/poem/${id}`)
+const goToDetail = (id: number | string) => {
+  if (typeof id === 'string' && id.startsWith('foreign_')) {
+    // 外文诗词，打开详情面板
+    const poem = foreignPoemList.value.find(p => p.id === id)
+    if (poem) {
+      openForeignPoemDetail(poem)
+    }
+  } else {
+    router.push(`/poem/${id}`)
+  }
+}
+
+const openForeignPoemDetail = (poem: any) => {
+  selectedExternalPoem.value = {
+    title: poem.title,
+    content: poem.content,
+    author: poem.author,
+    source: 'external'
+  }
+  externalDetailLoading.value = false
+  externalActiveTab.value = 'translation'
+  showEnlargedContent.value = true
 }
 
 const handleLike = async (poem: any, event: Event) => {
@@ -1024,6 +1130,8 @@ onMounted(() => {
   const query = route.query
   if (query.tab === 'modern') {
     activeTab.value = 'modern'
+  } else if (query.tab === 'foreign') {
+    activeTab.value = 'foreign'
   }
   if (query.dynastyId) {
     filters.value.dynastyId = Number(query.dynastyId)
@@ -1035,7 +1143,14 @@ onMounted(() => {
     filters.value.poetId = Number(query.poetId)
   }
   if (query.keyword) {
-    filters.value.keyword = String(query.keyword)
+    if (activeTab.value === 'foreign') {
+      foreignFilters.value.keyword = String(query.keyword)
+    } else {
+      filters.value.keyword = String(query.keyword)
+    }
+  }
+  if (query.author) {
+    foreignFilters.value.author = String(query.author)
   }
   if (query.page) {
     const page = Number(query.page)
@@ -1177,8 +1292,10 @@ const handleClearHistory = async () => {
           <el-radio-group v-model="activeTab" @change="handleTabChange">
             <el-radio-button value="classical">古籍诗文</el-radio-button>
             <el-radio-button value="modern">现代创作</el-radio-button>
+            <el-radio-button value="foreign">外文诗词</el-radio-button>
           </el-radio-group>
         </div>
+      </div>
 
       <div class="filter-section" v-if="activeTab === 'classical'">
         <el-card class="filter-card">
@@ -1310,7 +1427,7 @@ const handleClearHistory = async () => {
         </el-card>
       </div>
 
-      <div class="filter-section" v-else>
+      <div class="filter-section" v-else-if="activeTab === 'modern'">
         <el-card class="filter-card">
           <div class="filter-row">
             <div class="filter-item">
@@ -1361,16 +1478,62 @@ const handleClearHistory = async () => {
           </div>
         </el-card>
       </div>
+
+      <div class="filter-section" v-else-if="activeTab === 'foreign'">
+        <el-card class="filter-card">
+          <div class="filter-row">
+            <div class="filter-item search-item">
+              <label>标题搜索：</label>
+              <el-input
+                v-model="foreignFilters.keyword"
+                placeholder="搜索英文诗词标题..."
+                clearable
+                @keyup.enter="handleFilterChange"
+              >
+                <template #prefix>
+                  <el-icon><Search /></el-icon>
+                </template>
+              </el-input>
+            </div>
+
+            <div class="filter-item search-item">
+              <label>作者搜索：</label>
+              <el-input
+                v-model="foreignFilters.author"
+                placeholder="搜索作者..."
+                clearable
+                @keyup.enter="handleFilterChange"
+              >
+                <template #prefix>
+                  <el-icon><Search /></el-icon>
+                </template>
+              </el-input>
+            </div>
+
+            <el-button type="primary" @click="handleFilterChange">
+              搜索
+            </el-button>
+
+            <el-button @click="fetchForeignPoems">
+              随机获取
+            </el-button>
+
+            <el-button v-if="hasActiveFilters" @click="clearFilters">
+              清除筛选
+            </el-button>
+          </div>
+        </el-card>
       </div>
 
       <div class="result-stats" v-if="total > 0">
-        <span>共找到 <strong>{{ total }}</strong> 首诗词</span>
+        <span v-if="activeTab === 'foreign'">共找到 <strong>{{ total }}</strong> 首外文诗词</span>
+        <span v-else>共找到 <strong>{{ total }}</strong> 首诗词</span>
         <el-tag v-if="searchLevel === 'fuzzy'" type="warning" size="small" class="search-level-tag">模糊匹配</el-tag>
         <el-tag v-else-if="searchLevel === 'pinyin'" type="info" size="small" class="search-level-tag">拼音匹配</el-tag>
       </div>
 
-      <div class="poem-grid" v-loading="loading" v-if="loading || poems.length > 0 || (!externalSearching && externalPoemResults.length === 0)">
-        <el-empty v-if="!loading && !externalSearching && poems.length === 0 && externalPoemResults.length === 0" description="暂无诗词" />
+      <div class="poem-grid" v-loading="loading || foreignLoading" v-if="loading || foreignLoading || poems.length > 0 || (!externalSearching && externalPoemResults.length === 0)">
+        <el-empty v-if="!loading && !foreignLoading && !externalSearching && poems.length === 0 && externalPoemResults.length === 0" description="暂无诗词" />
 
         <div
           v-for="(poem, index) in poems"
@@ -1388,6 +1551,10 @@ const handleClearHistory = async () => {
               <el-icon><EditPen /></el-icon>
               原创
             </div>
+            <div class="foreign-badge" v-if="poem.source === 'foreign'">
+              <el-icon><Reading /></el-icon>
+              外文
+            </div>
           </div>
           <div class="poem-info">
             <div class="poem-header">
@@ -1400,6 +1567,7 @@ const handleClearHistory = async () => {
             </div>
             <p class="poem-author">
               <span v-if="poem.poetName">{{ poem.poetName }}</span>
+              <span v-else-if="poem.author">{{ poem.author }}</span>
             </p>
             <div class="poem-verses">
               <p v-for="(line, index) in getFormattedVerses(poem.content)" :key="index" class="verse-line">
@@ -1738,7 +1906,23 @@ const handleClearHistory = async () => {
                               <el-icon class="is-loading"><Loading /></el-icon>
                               正在加载...
                             </div>
-                            <div v-else class="knowledge-text">{{ backgroundKnowledge.dynastyPoetry.content }}</div>
+                            <div v-else class="knowledge-text">
+                              <div v-if="isKnowledgeExpanded('dynastyPoetry')">
+                                {{ backgroundKnowledge.dynastyPoetry.content }}
+                              </div>
+                              <div v-else>
+                                {{ getKnowledgeSummary(backgroundKnowledge.dynastyPoetry.content) }}
+                              </div>
+                              <el-button 
+                                v-if="backgroundKnowledge.dynastyPoetry.content && backgroundKnowledge.dynastyPoetry.content.length > 100"
+                                text 
+                                size="small" 
+                                class="knowledge-expand-btn"
+                                @click.stop="toggleKnowledgeExpand('dynastyPoetry')"
+                              >
+                                {{ isKnowledgeExpanded('dynastyPoetry') ? '收起' : '更多' }}
+                              </el-button>
+                            </div>
                           </div>
                         </Transition>
                       </div>
@@ -1756,7 +1940,23 @@ const handleClearHistory = async () => {
                               <el-icon class="is-loading"><Loading /></el-icon>
                               正在加载...
                             </div>
-                            <div v-else class="knowledge-text">{{ backgroundKnowledge.literarySchool.content }}</div>
+                            <div v-else class="knowledge-text">
+                              <div v-if="isKnowledgeExpanded('literarySchool')">
+                                {{ backgroundKnowledge.literarySchool.content }}
+                              </div>
+                              <div v-else>
+                                {{ getKnowledgeSummary(backgroundKnowledge.literarySchool.content) }}
+                              </div>
+                              <el-button 
+                                v-if="backgroundKnowledge.literarySchool.content && backgroundKnowledge.literarySchool.content.length > 100"
+                                text 
+                                size="small" 
+                                class="knowledge-expand-btn"
+                                @click.stop="toggleKnowledgeExpand('literarySchool')"
+                              >
+                                {{ isKnowledgeExpanded('literarySchool') ? '收起' : '更多' }}
+                              </el-button>
+                            </div>
                           </div>
                         </Transition>
                       </div>
@@ -1774,7 +1974,23 @@ const handleClearHistory = async () => {
                               <el-icon class="is-loading"><Loading /></el-icon>
                               正在加载...
                             </div>
-                            <div v-else class="knowledge-text">{{ backgroundKnowledge.historicalContext.content }}</div>
+                            <div v-else class="knowledge-text">
+                              <div v-if="isKnowledgeExpanded('historicalContext')">
+                                {{ backgroundKnowledge.historicalContext.content }}
+                              </div>
+                              <div v-else>
+                                {{ getKnowledgeSummary(backgroundKnowledge.historicalContext.content) }}
+                              </div>
+                              <el-button 
+                                v-if="backgroundKnowledge.historicalContext.content && backgroundKnowledge.historicalContext.content.length > 100"
+                                text 
+                                size="small" 
+                                class="knowledge-expand-btn"
+                                @click.stop="toggleKnowledgeExpand('historicalContext')"
+                              >
+                                {{ isKnowledgeExpanded('historicalContext') ? '收起' : '更多' }}
+                              </el-button>
+                            </div>
                           </div>
                         </Transition>
                       </div>
@@ -2313,6 +2529,24 @@ const handleClearHistory = async () => {
   top: 8px;
   right: 8px;
   background: linear-gradient(135deg, #67C23A, #85ce61);
+  color: white;
+  padding: 2px 6px;
+  border-radius: $border-radius-sm;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.foreign-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: linear-gradient(135deg, #409EFF, #66b1ff);
   color: white;
   padding: 2px 6px;
   border-radius: $border-radius-sm;
@@ -3361,6 +3595,17 @@ const handleClearHistory = async () => {
   line-height: 1.8;
 }
 
+.knowledge-expand-btn {
+  display: block;
+  margin-top: $spacing-sm;
+  color: $primary-color;
+  font-size: $font-size-sm;
+  padding: 0;
+  &:hover {
+    color: color.adjust($primary-color, $lightness: -10%);
+  }
+}
+
 .info-empty {
   font-size: $font-size-sm;
   color: $text-color-light;
@@ -3516,15 +3761,14 @@ const handleClearHistory = async () => {
   border-top: 1px solid $border-color-light;
   background: rgba($primary-color, 0.01);
 
-  :deep(.el-textarea__inner) {
-    border-radius: $border-radius-md;
-    font-size: $font-size-sm;
-    padding: $spacing-sm $spacing-md;
-    box-shadow: none;
-    border-color: $border-color-light;
+  .el-textarea {
+    flex: 1;
 
-    &:focus {
-      border-color: $primary-color;
+    @include el-comment-input;
+
+    :deep(.el-textarea__inner) {
+      border-radius: $comment-input-radius;
+      padding: $comment-input-padding;
     }
   }
 }

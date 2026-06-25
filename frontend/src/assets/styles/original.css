@@ -2461,8 +2461,8 @@ body {
 
 .register-link {
   position: absolute;
-  bottom: -5px;
-  right: 40px;
+  bottom: 20px;
+
 }
 
 .forgot-password .fuzhu:hover,

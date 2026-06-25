@@ -2,6 +2,7 @@
 $primary-color: #8B4513;
 $secondary-color: #D2691E;
 $accent-color: #CD853F;
+$accent-color-vermilion: #c53a3a;
 $danger-color: #F56C6C;
 $success-color: #67C23A;
 $warning-color: #E6A23C;
@@ -10,15 +11,19 @@ $warning-color: #E6A23C;
 $text-color: #333333;
 $text-color-secondary: #666666;
 $text-color-light: #999999;
+$text-color-ink: #4a4a4a;
 
 // 背景色
 $background-color: #F5F5F5;
 $background-color-light: #FFFFFF;
 $background-color-dark: #2C2C2C;
+$background-color-page: #faf8f5;
+$background-color-paper: #fffcf7;
 
 // 边框
 $border-color: #E8E8E8;
 $border-color-light: #F0F0F0;
+$border-color-bronze: #d4c5a9;
 $border-radius-sm: 4px;
 $border-radius-md: 8px;
 $border-radius-lg: 12px;
@@ -60,6 +65,23 @@ $box-shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.18);
 $transition-fast: 0.2s ease;
 $transition-base: 0.3s ease;
 $transition-slow: 0.5s ease;
+
+// 评论输入框（浅色主题）
+$comment-input-bg: #fff;
+$comment-input-border: #dee2e6;
+$comment-input-border-focus: #868e96;
+$comment-input-color: #212529;
+$comment-input-placeholder: #adb5bd;
+$comment-input-font-size: 13px;
+$comment-input-radius: 16px;
+$comment-input-padding: 8px 12px;
+
+// 评论输入框（深色主题）
+$comment-input-dark-bg: rgba(12, 22, 45, 0.7);
+$comment-input-dark-border: rgba(100, 140, 200, 0.15);
+$comment-input-dark-border-focus: rgba(100, 160, 240, 0.4);
+$comment-input-dark-color: rgba(220, 230, 245, 0.92);
+$comment-input-dark-placeholder: rgba(160, 175, 200, 0.45);
 
 // 断点
 $breakpoint-sm: 576px;

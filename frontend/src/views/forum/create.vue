@@ -373,10 +373,11 @@ onUnmounted(() => {
   width: 100%;
 }
 
-:deep(.el-input__inner),
-:deep(.el-textarea__inner) {
-  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+:deep(.el-input__inner) {
+  font-family: $font-family-input;
   letter-spacing: 0.5px;
   line-height: 1.5;
 }
+
+@include el-comment-input;
 </style>

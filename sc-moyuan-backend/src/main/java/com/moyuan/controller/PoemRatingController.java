@@ -40,15 +40,22 @@ public class PoemRatingController {
     }
 
     @PostMapping("/ai")
-    @Operation(summary = "请求AI评分")
+    @Operation(summary = "请求AI评价")
     public R<Void> requestAiRating(@PathVariable Long poemId) {
         poemRatingService.requestAiRating(poemId);
         return R.success();
     }
 
     @GetMapping("/ai")
-    @Operation(summary = "获取AI评分")
+    @Operation(summary = "获取AI评价")
     public R<PoemRating> getAiRating(@PathVariable Long poemId) {
         return R.success(poemRatingService.getAiRating(poemId));
+    }
+
+    @PostMapping("/ai/regenerate")
+    @Operation(summary = "重新生成AI评价")
+    public R<Void> regenerateAiRating(@PathVariable Long poemId) {
+        poemRatingService.requestAiRating(poemId);
+        return R.success();
     }
 }

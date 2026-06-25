@@ -20,14 +20,18 @@ import com.moyuan.mapper.UserFavoriteMapper;
 import com.moyuan.mapper.UserLikeMapper;
 import com.moyuan.service.PoemService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements PoemService {
@@ -37,6 +41,7 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
     private final DynastyMapper dynastyMapper;
     private final UserLikeMapper userLikeMapper;
     private final UserFavoriteMapper userFavoriteMapper;
+    private final CacheManager cacheManager;
 
     @Override
     @Cacheable(value = "poems", key = "'list:' + #dynastyId + ':' + #poetId + ':' + #categoryId + ':' + #keyword + ':' + #pageNum + ':' + #pageSize")
@@ -92,16 +97,14 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
     @Override
     @Transactional
     public void toggleLike(Long userId, Long poemId) {
-        try {
-            UserLike like = new UserLike();
-            like.setUserId(userId);
-            like.setTargetId(poemId);
-            like.setTargetType(TargetType.POEM.getCode());
-            userLikeMapper.insert(like);
-            poemMapper.update(null, new LambdaUpdateWrapper<Poem>()
-                    .eq(Poem::getId, poemId)
-                    .setSql("like_count = like_count + 1"));
-        } catch (DuplicateKeyException e) {
+        boolean exists = userLikeMapper.selectCount(
+                new LambdaQueryWrapper<UserLike>()
+                        .eq(UserLike::getUserId, userId)
+                        .eq(UserLike::getTargetId, poemId)
+                        .eq(UserLike::getTargetType, TargetType.POEM.getCode())) > 0;
+
+        if (exists) {
+            // 取消点赞
             userLikeMapper.delete(new LambdaQueryWrapper<UserLike>()
                     .eq(UserLike::getUserId, userId)
                     .eq(UserLike::getTargetId, poemId)
@@ -110,6 +113,16 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
                     .eq(Poem::getId, poemId)
                     .gt(Poem::getLikeCount, 0)
                     .setSql("like_count = like_count - 1"));
+        } else {
+            // 点赞
+            UserLike like = new UserLike();
+            like.setUserId(userId);
+            like.setTargetId(poemId);
+            like.setTargetType(TargetType.POEM.getCode());
+            userLikeMapper.insert(like);
+            poemMapper.update(null, new LambdaUpdateWrapper<Poem>()
+                    .eq(Poem::getId, poemId)
+                    .setSql("like_count = like_count + 1"));
         }
     }
 
@@ -139,18 +152,40 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
     }
 
     private void populatePoetAndDynasty(List<Poem> poems) {
+        if (poems == null || poems.isEmpty()) {
+            return;
+        }
+
+        // 收集所有需要查询的ID
+        Set<Long> poetIds = poems.stream()
+                .map(Poem::getPoetId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Set<Long> dynastyIds = poems.stream()
+                .map(Poem::getDynastyId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        // 批量查询诗人和朝代
+        Map<Long, String> poetNameMap = new HashMap<>();
+        Map<Long, String> dynastyNameMap = new HashMap<>();
+
+        if (!poetIds.isEmpty()) {
+            poetMapper.selectBatchIds(poetIds).forEach(
+                    poet -> poetNameMap.put(poet.getId(), poet.getName()));
+        }
+        if (!dynastyIds.isEmpty()) {
+            dynastyMapper.selectBatchIds(dynastyIds).forEach(
+                    dynasty -> dynastyNameMap.put(dynasty.getId(), dynasty.getName()));
+        }
+
+        // 填充数据
         for (Poem poem : poems) {
             if (poem.getPoetId() != null) {
-                Poet poet = poetMapper.selectById(poem.getPoetId());
-                if (poet != null) {
-                    poem.setPoetName(poet.getName());
-                }
+                poem.setPoetName(poetNameMap.get(poem.getPoetId()));
             }
             if (poem.getDynastyId() != null) {
-                Dynasty dynasty = dynastyMapper.selectById(poem.getDynastyId());
-                if (dynasty != null) {
-                    poem.setDynastyName(dynasty.getName());
-                }
+                poem.setDynastyName(dynastyNameMap.get(poem.getDynastyId()));
             }
         }
     }
@@ -177,5 +212,13 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
             poem.setStatus(1);
         }
         updateById(poem);
+    }
+
+    @Override
+    public void clearAllCache() {
+        if (cacheManager.getCache("poems") != null) {
+            cacheManager.getCache("poems").clear();
+            log.info("诗词缓存已清除");
+        }
     }
 }

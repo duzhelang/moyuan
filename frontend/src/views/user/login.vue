@@ -97,14 +97,13 @@ const fillAdminUsername = () => {
         <div class="card-content">
           <div class="user-panel">
             <img src="/img/00.jpg" class="avatar" alt="用户头像">
-            <div class="register-link">
-              <a class="register-text" href="javascript:void(0)" @click="goToRegister">还没有账号？立即注册</a>
-            </div>
           </div>
 
           <div class="divider"></div>
           <div class="login-form-panel">
-            <h1 class="login-title">登&nbsp;&nbsp;&nbsp;&nbsp;录</h1>
+            <h1 class="login-title">
+              <router-link to="/user/login" class="login-title-link">登&nbsp;&nbsp;&nbsp;&nbsp;录</router-link>
+            </h1>
             <form @submit.prevent="handleLogin" class="login-form">
               <div class="form-group">
                 <label for="username" class="form-label">用户名:</label>
@@ -131,15 +130,20 @@ const fillAdminUsername = () => {
                 </button>
               </div>
             </form>
-            <div v-if="userStore.lastAdminUsername" class="admin-quick-entry">
-              <el-tag 
-                type="warning" 
-                effect="plain" 
-                class="admin-tag"
-                @click="fillAdminUsername"
-              >
-                管理员快捷登录
-              </el-tag>
+            <div class="form-footer">
+              <div v-if="userStore.lastAdminUsername" class="admin-quick-entry">
+                <el-tag 
+                  type="warning" 
+                  effect="plain" 
+                  class="admin-tag"
+                  @click="fillAdminUsername"
+                >
+                  管理员快捷登录
+                </el-tag>
+              </div>
+              <div class="register-link">
+                <a class="register-text" href="javascript:void(0)" @click="goToRegister">还没有账号？立即注册</a>
+              </div>
             </div>
           </div>
         </div>
@@ -306,26 +310,15 @@ const fillAdminUsername = () => {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }
 
-.register-link {
-  font-size: 14px;
-  text-align: center;
-}
-
-.register-link .register-text {
-  color: #55aaff;
+.login-title-link {
+  color: inherit;
+  text-decoration: none;
   cursor: pointer;
-  text-decoration: none;
-  transition: color 0.2s;
+  transition: opacity 0.2s;
 }
 
-.register-link .register-text:hover {
-  color: #007BFF;
-  text-decoration: underline;
-}
-
-.register-link .register-text:hover {
-  text-decoration: none;
-  color: #007BFF;
+.login-title-link:hover {
+  opacity: 0.8;
 }
 
 .divider {
@@ -456,9 +449,15 @@ const fillAdminUsername = () => {
   cursor: not-allowed;
 }
 
-.admin-quick-entry {
+.form-footer {
   margin-top: 12px;
-  text-align: right;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.admin-quick-entry {
+  text-align: left;
 }
 
 .admin-tag {
@@ -470,6 +469,23 @@ const fillAdminUsername = () => {
 .admin-tag:hover {
   transform: scale(1.05);
   box-shadow: 0 2px 8px rgba(230, 162, 60, 0.3);
+}
+
+.register-link {
+  font-size: 13px;
+  text-align: right;
+}
+
+.register-link .register-text {
+  color: #55aaff;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.register-link .register-text:hover {
+  color: #007BFF;
+  text-decoration: underline;
 }
 
 .dlzc_ditu_div {

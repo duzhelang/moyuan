@@ -174,7 +174,7 @@ const sendAiChatMessage = async (message?: string, isFirst: boolean = false) => 
   try {
     const { chat } = await import('@/api/modules/ai')
     const prompt = buildAiPrompt(msg, isFirst)
-    const res = await chat({ message: prompt })
+    const res = await chat({ message: prompt, moduleCode: 'poetry_chat' })
     aiChatMessages.value.push({
       role: 'assistant',
       content: res.data.reply || '抱歉，暂时无法回答',
@@ -525,6 +525,9 @@ onUnmounted(() => {
   letter-spacing: 2px;
   margin: 0;
   font-family: $font-family-title;
+  overflow-wrap: break-word;
+  word-break: break-all;
+  max-width: 100%;
 }
 
 .detail-tabs {
@@ -768,15 +771,14 @@ onUnmounted(() => {
   border-top: 1px solid $border-color-light;
   background: rgba($primary-color, 0.01);
 
-  :deep(.el-textarea__inner) {
-    border-radius: $border-radius-md;
-    font-size: $font-size-sm;
-    padding: $spacing-sm $spacing-md;
-    box-shadow: none;
-    border-color: $border-color-light;
+  .el-textarea {
+    flex: 1;
 
-    &:focus {
-      border-color: $primary-color;
+    @include el-comment-input;
+
+    :deep(.el-textarea__inner) {
+      border-radius: $comment-input-radius;
+      padding: $comment-input-padding;
     }
   }
 }

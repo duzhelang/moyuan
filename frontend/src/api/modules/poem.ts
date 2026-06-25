@@ -88,6 +88,14 @@ export function getAiRating(poemId: number) {
   return request.get<PoemRating>(`/poems/${poemId}/ratings/ai`)
 }
 
+export function regenerateAiRating(poemId: number) {
+  return request.post<void>(`/poems/${poemId}/ratings/ai/regenerate`)
+}
+
 export function importExternalPoem(data: { title: string; content?: string; author?: string; dynasty?: string }) {
   return request.post<{ id: number; imported: boolean }>('/poems/import-external', data)
+}
+
+export function fixExternalPoems() {
+  return request.post<{ total: number; fixed: number }>('/poems/fix-external-poems')
 }

@@ -3,6 +3,7 @@ import request from '@/utils/request'
 export interface ChatRequest {
   message: string
   model?: string
+  moduleCode?: string
 }
 
 export interface ChatResponse {
@@ -20,6 +21,7 @@ export interface WritePoemResponse {
 export interface AnalyzeRequest {
   poem: string
   model?: string
+  moduleCode?: string
 }
 
 export interface AnalyzeResponse {
@@ -32,12 +34,15 @@ export function chat(data: ChatRequest) {
   return request.post<ChatResponse>('/ai/chat', data)
 }
 
-export function writePoemFromImage(image: File, model: string = 'zhipu', visionModel?: string) {
+export function writePoemFromImage(image: File, model: string = 'zhipu', visionModel?: string, moduleCode?: string) {
   const formData = new FormData()
   formData.append('image', image)
   formData.append('model', model)
   if (visionModel) {
     formData.append('visionModel', visionModel)
+  }
+  if (moduleCode) {
+    formData.append('moduleCode', moduleCode)
   }
   return request.post<WritePoemResponse>('/ai/write-poem', formData, {
     headers: {
@@ -53,6 +58,7 @@ export function analyzePoem(data: AnalyzeRequest) {
 export interface CoupletRequest {
   upperCouplet: string
   model?: string
+  moduleCode?: string
 }
 
 export interface CoupletResponse {
@@ -83,11 +89,11 @@ export function getAiModuleConfig(moduleCode: string) {
   return request.get<AiModuleConfig>(`/ai/config/${moduleCode}`)
 }
 
-export function fillAiContent(data: { targetType: string; targetId: number; fieldName: string }) {
+export function fillAiContent(data: { targetType: string; targetId: number; fieldName: string; moduleCode?: string }) {
   return request.post<any>('/ai/fill-content', data)
 }
 
-export function previewAiContent(data: { targetType: string; targetId: number; fieldName: string }) {
+export function previewAiContent(data: { targetType: string; targetId: number; fieldName: string; moduleCode?: string }) {
   return request.post<{ content: string }>('/ai/preview', data)
 }
 

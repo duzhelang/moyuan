@@ -43,7 +43,7 @@ public class AiGeneratedContentServiceImpl extends ServiceImpl<AiGeneratedConten
     private static final Set<String> POET_FIELDS = Set.of("biography", "life_story", "influence", "evaluation", "anecdotes");
 
     @Override
-    public String generatePreview(String targetType, Long targetId, String fieldName) {
+    public String generatePreview(String targetType, Long targetId, String fieldName, String moduleCode) {
         validateField(targetType, fieldName);
 
         String prompt;
@@ -83,11 +83,13 @@ public class AiGeneratedContentServiceImpl extends ServiceImpl<AiGeneratedConten
                 }
             }
             systemPrompt = "你是中国古典文学研究专家，擅长准确、全面地介绍古代诗人。请严格按照要求生成内容，直接输出内容本身，不要包含任何前缀说明。";
-            prompt = buildPoetPrompt(fieldName, poet.getName(), dynastyName);
+            prompt = buildPoetPrompt(fieldName, poet.getName(), dynastyName, moduleCode);
         }
 
-        log.info("调用AI生成预览: targetType={}, targetId={}, fieldName={}", targetType, targetId, fieldName);
-        return aiModelRegistry.chat(prompt, null, systemPrompt);
+        log.info("调用AI生成预览: targetType={}, targetId={}, fieldName={}, moduleCode={}", targetType, targetId, fieldName, moduleCode);
+        var model = aiModelRegistry.getModelForModule(moduleCode);
+        var adapter = aiModelRegistry.getAdapter(model.getProvider());
+        return adapter.chat(prompt, model, systemPrompt);
     }
 
     @Override
@@ -134,11 +136,9 @@ public class AiGeneratedContentServiceImpl extends ServiceImpl<AiGeneratedConten
 
     @Override
     @Transactional
-    public AiGeneratedContent generateContent(String targetType, Long targetId, String fieldName) {
-        // 1. 校验 targetType + fieldName 组合的合法性
+    public AiGeneratedContent generateContent(String targetType, Long targetId, String fieldName, String moduleCode) {
         validateField(targetType, fieldName);
 
-        // 2. 检查该字段是否已有待审核记录（防止重复生成）
         LambdaQueryWrapper<AiGeneratedContent> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(AiGeneratedContent::getTargetType, targetType)
                .eq(AiGeneratedContent::getTargetId, targetId)
@@ -151,7 +151,6 @@ public class AiGeneratedContentServiceImpl extends ServiceImpl<AiGeneratedConten
             return existing;
         }
 
-        // 3. 根据 targetType 查询原表并构建 prompt
         String prompt;
         String systemPrompt;
         String targetName;
@@ -192,12 +191,13 @@ public class AiGeneratedContentServiceImpl extends ServiceImpl<AiGeneratedConten
                 }
             }
             systemPrompt = "你是中国古典文学研究专家，擅长准确、全面地介绍古代诗人。请严格按照要求生成内容，直接输出内容本身，不要包含任何前缀说明。";
-            prompt = buildPoetPrompt(fieldName, poet.getName(), dynastyName);
+            prompt = buildPoetPrompt(fieldName, poet.getName(), dynastyName, moduleCode);
         }
 
-        // 4. 调用 AI 生成内容
-        log.info("调用AI生成内容: targetType={}, targetId={}, fieldName={}", targetType, targetId, fieldName);
-        String aiContent = aiModelRegistry.chat(prompt, null, systemPrompt);
+        log.info("调用AI生成内容: targetType={}, targetId={}, fieldName={}, moduleCode={}", targetType, targetId, fieldName, moduleCode);
+        var model = aiModelRegistry.getModelForModule(moduleCode);
+        var adapter = aiModelRegistry.getAdapter(model.getProvider());
+        String aiContent = adapter.chat(prompt, model, systemPrompt);
 
         // 5. 保存到审核表
         AiGeneratedContent record = new AiGeneratedContent();
@@ -299,14 +299,22 @@ public class AiGeneratedContentServiceImpl extends ServiceImpl<AiGeneratedConten
         };
     }
 
-    private String buildPoetPrompt(String fieldName, String poetName, String dynastyName) {
+    private String buildPoetPrompt(String fieldName, String poetName, String dynastyName, String moduleCode) {
         String poetInfo = poetName + "（" + dynastyName + "）";
+        int maxLength = 500;
+        if (moduleCode != null) {
+            var config = aiModelRegistry.getModuleConfig(moduleCode);
+            if (config != null && config.getMaxLength() != null && config.getMaxLength() > 0) {
+                maxLength = config.getMaxLength();
+            }
+        }
+        String lengthHint = "，不超过" + maxLength + "字";
         return switch (fieldName) {
-            case "biography" -> "请为诗人" + poetInfo + "撰写一段简洁的生平简介，200字左右，突出主要成就和历史地位。";
-            case "life_story" -> "请详细介绍诗人" + poetInfo + "的生平经历，包括重要人生阶段、仕途经历、重要事件等。";
-            case "influence" -> "请分析诗人" + poetInfo + "的主要影响，包括对当时文坛和后世文学的影响。";
-            case "evaluation" -> "请整理历代文人和学者对诗人" + poetInfo + "的评价，包括正面评价和不同声音。";
-            case "anecdotes" -> "请讲述诗人" + poetInfo + "的几个著名轶事典故，展现其性格特点和人生智慧。";
+            case "biography" -> "请为诗人" + poetInfo + "撰写一段简洁的生平简介" + lengthHint + "，突出主要成就和历史地位。";
+            case "life_story" -> "请详细介绍诗人" + poetInfo + "的生平经历" + lengthHint + "，包括重要人生阶段、仕途经历、重要事件等。";
+            case "influence" -> "请分析诗人" + poetInfo + "的主要影响" + lengthHint + "，包括对当时文坛和后世文学的影响。";
+            case "evaluation" -> "请详细介绍历代文人和学者对诗人" + poetInfo + "的评价" + lengthHint + "，包括：1.同时代名人对其评价 2.后世文学批评家的经典评述 3.历代典籍中的相关记载 4.正反两方面的评价观点。要求引用具体文献出处，内容详实有据。";
+            case "anecdotes" -> "请讲述诗人" + poetInfo + "的几个著名轶事典故" + lengthHint + "，展现其性格特点和人生智慧。";
             default -> throw new BusinessException("无效的诗人字段: " + fieldName);
         };
     }

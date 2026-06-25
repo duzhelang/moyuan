@@ -26,8 +26,9 @@ public class AiController {
     public R<Map<String, String>> chat(@RequestBody Map<String, String> request) {
         String message = request.get("message");
         String model = request.getOrDefault("model", "zhipu");
+        String moduleCode = request.get("moduleCode");
 
-        String reply = aiService.chat(message, model);
+        String reply = aiService.chat(message, model, moduleCode);
 
         return R.success(Map.of(
                 "message", message,
@@ -41,9 +42,10 @@ public class AiController {
     public R<Map<String, String>> writePoemFromImage(
             @RequestParam("image") MultipartFile image,
             @RequestParam(value = "model", defaultValue = "zhipu") String model,
-            @RequestParam(value = "visionModel", required = false) String visionModel) {
+            @RequestParam(value = "visionModel", required = false) String visionModel,
+            @RequestParam(value = "moduleCode", required = false) String moduleCode) {
 
-        String poem = aiService.writePoemFromImage(image, model, visionModel);
+        String poem = aiService.writePoemFromImage(image, model, visionModel, moduleCode);
 
         return R.success(Map.of(
                 "poem", poem,
@@ -57,8 +59,9 @@ public class AiController {
     public R<Map<String, String>> analyzePoem(@RequestBody Map<String, String> request) {
         String poem = request.get("poem");
         String model = request.getOrDefault("model", "zhipu");
+        String moduleCode = request.get("moduleCode");
 
-        String analysis = aiService.analyzePoem(poem, model);
+        String analysis = aiService.analyzePoem(poem, model, moduleCode);
 
         return R.success(Map.of(
                 "poem", poem,
@@ -72,8 +75,9 @@ public class AiController {
     public R<Map<String, String>> matchCouplet(@RequestBody Map<String, String> request) {
         String upperCouplet = request.get("upperCouplet");
         String model = request.getOrDefault("model", "zhipu");
+        String moduleCode = request.get("moduleCode");
 
-        String result = aiService.matchCouplet(upperCouplet, model);
+        String result = aiService.matchCouplet(upperCouplet, model, moduleCode);
 
         return R.success(Map.of(
                 "upperCouplet", upperCouplet,

@@ -78,15 +78,27 @@ public class PoemRatingServiceImpl extends ServiceImpl<PoemRatingMapper, PoemRat
 
         String analysis = aiService.analyzePoem(poem.getContent(), defaultAiModel);
         BigDecimal score = parseAiScore(analysis);
+        String summary = generateSummary(analysis);
+        String cleanedAnalysis = cleanSpecialSymbols(analysis);
 
-        PoemRating rating = new PoemRating();
-        rating.setPoemId(poemId);
-        rating.setUserId(null);
-        rating.setScore(score);
-        rating.setRatingType(2);
-        rating.setAiModel(defaultAiModel);
-        rating.setAiAnalysis(analysis);
-        save(rating);
+        PoemRating existing = getAiRating(poemId);
+        if (existing != null) {
+            existing.setScore(score);
+            existing.setAiModel(defaultAiModel);
+            existing.setAiSummary(summary);
+            existing.setAiAnalysis(cleanedAnalysis);
+            updateById(existing);
+        } else {
+            PoemRating rating = new PoemRating();
+            rating.setPoemId(poemId);
+            rating.setUserId(null);
+            rating.setScore(score);
+            rating.setRatingType(2);
+            rating.setAiModel(defaultAiModel);
+            rating.setAiSummary(summary);
+            rating.setAiAnalysis(cleanedAnalysis);
+            save(rating);
+        }
 
         updatePoemAverageScore(poemId);
     }
@@ -155,5 +167,28 @@ public class PoemRatingServiceImpl extends ServiceImpl<PoemRatingMapper, PoemRat
             log.warn("解析AI评分失败，使用默认评分", e);
         }
         return new BigDecimal("3.5");
+    }
+
+    private String generateSummary(String analysis) {
+        if (analysis == null || analysis.isEmpty()) {
+            return "";
+        }
+        String[] lines = analysis.split("[。！？]");
+        StringBuilder summary = new StringBuilder();
+        for (int i = 0; i < Math.min(2, lines.length); i++) {
+            if (!lines[i].trim().isEmpty()) {
+                summary.append(lines[i].trim()).append("。");
+            }
+        }
+        return summary.toString();
+    }
+
+    private String cleanSpecialSymbols(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replaceAll("[*#\\-_`~>]", "")
+                   .replaceAll("\\s+", " ")
+                   .trim();
     }
 }

@@ -6,11 +6,11 @@ import com.moyuan.entity.AiGeneratedContent;
 
 public interface AiGeneratedContentService extends IService<AiGeneratedContent> {
 
-    String generatePreview(String targetType, Long targetId, String fieldName);
+    String generatePreview(String targetType, Long targetId, String fieldName, String moduleCode);
 
     AiGeneratedContent submitForReview(String targetType, Long targetId, String fieldName, String content);
 
-    AiGeneratedContent generateContent(String targetType, Long targetId, String fieldName);
+    AiGeneratedContent generateContent(String targetType, Long targetId, String fieldName, String moduleCode);
 
     IPage<AiGeneratedContent> listByStatus(Integer status, int page, int size);
 

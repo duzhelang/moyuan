@@ -27,7 +27,10 @@ public enum ResultCode {
     ALREADY_LIKED("5001", "已点赞"),
     NOT_LIKED("5002", "未点赞"),
     ALREADY_FAVORITED("5003", "已收藏"),
-    NOT_FAVORITED("5004", "未收藏");
+    NOT_FAVORITED("5004", "未收藏"),
+    REPAIR_ORDER_NOT_FOUND("6001", "报修工单不存在"),
+    REPAIR_ORDER_CLOSED("6002", "工单已关闭"),
+    REPAIR_ORDER_NO_PERMISSION("6003", "无权操作此工单");
 
     private final String code;
     private final String message;

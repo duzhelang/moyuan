@@ -28,12 +28,13 @@ public class AiContentController {
         String targetType = (String) request.get("targetType");
         Long targetId = Long.valueOf(request.get("targetId").toString());
         String fieldName = (String) request.get("fieldName");
+        String moduleCode = (String) request.get("moduleCode");
 
         if (targetType == null || targetId == null || fieldName == null) {
             return R.error("参数不完整：targetType、targetId、fieldName 不能为空");
         }
 
-        String content = aiGeneratedContentService.generatePreview(targetType, targetId, fieldName);
+        String content = aiGeneratedContentService.generatePreview(targetType, targetId, fieldName, moduleCode);
         return R.success(Map.of("content", content));
     }
 
@@ -61,12 +62,13 @@ public class AiContentController {
         String targetType = (String) request.get("targetType");
         Long targetId = Long.valueOf(request.get("targetId").toString());
         String fieldName = (String) request.get("fieldName");
+        String moduleCode = (String) request.get("moduleCode");
 
         if (targetType == null || targetId == null || fieldName == null) {
             return R.error("参数不完整：targetType、targetId、fieldName 不能为空");
         }
 
-        AiGeneratedContent record = aiGeneratedContentService.generateContent(targetType, targetId, fieldName);
+        AiGeneratedContent record = aiGeneratedContentService.generateContent(targetType, targetId, fieldName, moduleCode);
         return R.success(record);
     }
 

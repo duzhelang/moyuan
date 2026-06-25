@@ -141,13 +141,17 @@ const fetchUserStats = async () => {
 
 const handleAvatarSuccess: UploadProps['onSuccess'] = async (response) => {
   try {
-    if (response.code === 200) {
+    console.log('头像上传响应:', response)
+    // 后端返回的 code 是字符串 "200"
+    if (response.code === '200' && response.data?.url) {
+      console.log('更新用户头像URL:', response.data.url)
       await userStore.updateUser({ avatar: response.data.url })
       ElMessage.success('头像更新成功')
     } else {
       ElMessage.error(response.message || '头像上传失败')
     }
   } catch (error) {
+    console.error('头像更新失败:', error)
     ElMessage.error('头像更新失败')
   } finally {
     avatarUploading.value = false
@@ -399,6 +403,10 @@ onMounted(() => {
             <el-icon><ChatLineSquare /></el-icon>
             <span>AI对话</span>
           </el-button>
+          <el-button @click="router.push('/repair')">
+            <el-icon><Tickets /></el-icon>
+            <span>报修</span>
+          </el-button>
         </div>
       </div>
       
@@ -482,6 +490,10 @@ onMounted(() => {
             <el-menu-item index="history">
               <el-icon><Clock /></el-icon>
               <span>浏览历史</span>
+            </el-menu-item>
+            <el-menu-item index="repair" @click="router.push('/repair')">
+              <el-icon><Tickets /></el-icon>
+              <span>报修中心</span>
             </el-menu-item>
             <el-menu-item index="settings">
               <el-icon><Setting /></el-icon>

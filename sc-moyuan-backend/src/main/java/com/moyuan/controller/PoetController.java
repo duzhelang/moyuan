@@ -33,9 +33,10 @@ public class PoetController {
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "10") int pageSize,
             @RequestParam(required = false) Long dynastyId,
+            @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String poetType) {
-        IPage<Poet> page = poetService.getPoetList(pageNum, pageSize, dynastyId, keyword, poetType);
+        IPage<Poet> page = poetService.getPoetList(pageNum, pageSize, dynastyId, categoryId, keyword, poetType);
         Map<String, Object> result = new HashMap<>();
         result.put("list", page.getRecords());
         result.put("total", page.getTotal());

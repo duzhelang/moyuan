@@ -144,6 +144,7 @@ public class AiModelConfigService {
         if (config.getEnableMarkdown() != null) existing.setEnableMarkdown(config.getEnableMarkdown());
         existing.setUpdateTime(null);
         aiModuleConfigMapper.updateById(existing);
+        aiModelRegistry.refreshCache();
         return existing;
     }
 

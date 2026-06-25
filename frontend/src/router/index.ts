@@ -86,6 +86,30 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '用户主页' }
       },
       {
+        path: 'repair',
+        name: 'RepairList',
+        component: () => import('@/views/repair/list.vue'),
+        meta: { title: '报修中心', requiresAuth: true }
+      },
+      {
+        path: 'repair/create',
+        name: 'RepairCreate',
+        component: () => import('@/views/repair/create.vue'),
+        meta: { title: '提交报修', requiresAuth: true }
+      },
+      {
+        path: 'repair/:id',
+        name: 'RepairDetail',
+        component: () => import('@/views/repair/detail.vue'),
+        meta: { title: '报修详情', requiresAuth: true }
+      },
+      {
+        path: 'contact',
+        name: 'Contact',
+        component: () => import('@/views/contact/index.vue'),
+        meta: { title: '联系我们' }
+      },
+      {
         path: 'static/:type',
         name: 'StaticPage',
         component: () => import('@/views/static/index.vue'),
@@ -220,6 +244,12 @@ const routes: RouteRecordRaw[] = [
         name: 'AdminHomeNavigation',
         component: () => import('@/views/admin/home-navigation.vue'),
         meta: { title: '首页导航管理', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'repairs',
+        name: 'AdminRepairs',
+        component: () => import('@/views/admin/repairs.vue'),
+        meta: { title: '报修管理', requiresAuth: true, requiresAdmin: true }
       },
       {
         path: 'static-pages',

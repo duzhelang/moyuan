@@ -122,6 +122,79 @@
   }
 }
 
+@mixin comment-input {
+  flex: 1;
+  padding: $comment-input-padding;
+  background: $comment-input-bg;
+  border: 1px solid $comment-input-border;
+  border-radius: $comment-input-radius;
+  font-size: $comment-input-font-size;
+  color: $comment-input-color;
+  font-family: $font-family-input;
+  letter-spacing: 0.5px;
+  outline: none;
+  transition: all 0.2s;
+  
+  &::placeholder {
+    color: $comment-input-placeholder;
+  }
+  
+  &:focus {
+    border-color: $comment-input-border-focus;
+    box-shadow: 0 0 0 2px rgba(134, 142, 150, 0.1);
+  }
+}
+
+@mixin comment-input-dark {
+  flex: 1;
+  height: 36px;
+  padding: 0 14px;
+  background: $comment-input-dark-bg;
+  border: 1px solid $comment-input-dark-border;
+  border-radius: $comment-input-radius;
+  font-size: $comment-input-font-size;
+  color: $comment-input-dark-color;
+  font-family: $font-family-input;
+  letter-spacing: 0.5px;
+  outline: none;
+  transition: all 0.3s ease;
+  
+  &::placeholder {
+    color: $comment-input-dark-placeholder;
+  }
+  
+  &:focus {
+    border-color: $comment-input-dark-border-focus;
+    box-shadow: 0 0 12px rgba(80, 140, 220, 0.08);
+  }
+}
+
+@mixin el-comment-input {
+  :deep(.el-textarea__inner) {
+    font-family: $font-family-input;
+    color: $comment-input-color;
+    letter-spacing: 0.5px;
+    line-height: 1.6;
+    resize: vertical;
+    min-height: 80px;
+    padding: 12px;
+    background-color: $comment-input-bg;
+    border: 1px solid $comment-input-border;
+    border-radius: $border-radius-sm;
+    transition: all 0.2s;
+    
+    &::placeholder {
+      color: $comment-input-placeholder;
+    }
+    
+    &:focus {
+      border-color: $comment-input-border-focus;
+      box-shadow: 0 0 0 2px rgba(134, 142, 150, 0.1);
+      outline: none;
+    }
+  }
+}
+
 @mixin responsive($breakpoint) {
   @if $breakpoint == sm {
     @media (max-width: $breakpoint-sm) { @content; }

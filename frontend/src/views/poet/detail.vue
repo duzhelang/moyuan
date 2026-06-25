@@ -8,7 +8,7 @@ import { getPoemsByPoet } from '@/api/modules/poem'
 import { getAiModuleConfig, type AiModuleConfig, fillAiContent, getFillStatus, previewAiContent, submitForReview } from '@/api/modules/ai'
 import { savePoetDraft } from '@/api/modules/poet-draft'
 import { getExternalPoems, type PoemSearchResult } from '@/api/modules/external-poetry'
-import { importExternalPoem } from '@/api/modules/poem'
+import { importExternalPoem, fixExternalPoems } from '@/api/modules/poem'
 import PoetryDetailDialog from '@/components/business/PoetryDetailDialog.vue'
 import LoginPrompt from '@/components/common/LoginPrompt.vue'
 import { useUserStore } from '@/stores/user'
@@ -43,6 +43,7 @@ const poemPage = ref(1)
 const poemSize = ref(10)
 const externalPoems = ref<PoemSearchResult[]>([])
 const externalPoemsLoading = ref(false)
+const fixingPoems = ref(false)
 
 const poetId = computed(() => Number(route.params.id))
 
@@ -145,21 +146,27 @@ const loadFillStatus = async () => {
     const res = await getFillStatus('poet', poet.value.id)
     if (res && Array.isArray(res)) {
       const map: Record<string, any> = {}
+      const allFields = new Set<string>()
       let latestPending: any = null
       res.forEach((item: any) => {
+        allFields.add(item.fieldName)
         if (item.status === 0) {
           map[item.fieldName] = item
           if (!latestPending || new Date(item.createTime) > new Date(latestPending.createTime)) {
             latestPending = item
           }
+        } else if (item.status === 1) {
+          map[item.fieldName] = { ...item, approved: true }
+        } else if (item.status === 2) {
+          map[item.fieldName] = { ...item, rejected: true }
         }
       })
       fillStatusMap.value = map
+      allFields.forEach(f => submittedFields.value.add(f))
       
-      if (latestPending) {
+      if (latestPending && !previewField.value) {
         previewField.value = latestPending.fieldName
         previewContent.value = sanitizeAiContent(latestPending.content)
-        submittedFields.value.add(latestPending.fieldName)
       }
     }
   } catch (e) {
@@ -191,11 +198,19 @@ const handleAiFill = async (fieldName: string) => {
   if (!poet.value?.id) return
   fillingField.value = fieldName
   try {
-    const res = await previewAiContent({ targetType: 'poet', targetId: poet.value.id, fieldName })
+    if (!aiConfig.value) {
+      await fetchAiConfig(false)
+    }
+    const res = await previewAiContent({
+      targetType: 'poet',
+      targetId: poet.value.id,
+      fieldName,
+      moduleCode: 'poet_chat'
+    })
     const cleanedContent = sanitizeAiContent(res.data.content)
     previewField.value = fieldName
     previewContent.value = cleanedContent
-    
+
     await submitForReview({
       targetType: 'poet',
       targetId: poet.value.id,
@@ -438,6 +453,7 @@ const fetchExternalPoems = async () => {
     const results = await getExternalPoems(poet.value.name, needCount)
     
     if (results.length > 0) {
+      externalPoems.value = results
       for (const poem of results) {
         try {
           await importExternalPoem({
@@ -450,14 +466,17 @@ const fetchExternalPoems = async () => {
           console.error('导入诗词失败:', poem.title, e)
         }
       }
+      
+      const res = await getPoemsByPoet(poetId.value, {
+        pageNum: 1,
+        pageSize: 10
+      })
+      poems.value = res.data.list
+      poemTotal.value = res.data.total
+      if (res.data.total > 0) {
+        externalPoems.value = []
+      }
     }
-    
-    const res = await getPoemsByPoet(poetId.value, {
-      pageNum: 1,
-      pageSize: 10
-    })
-    poems.value = res.data.list
-    poemTotal.value = res.data.total
   } catch (error) {
     console.error('获取外部诗词失败:', error)
   } finally {
@@ -486,6 +505,19 @@ const handlePageChange = (page: number) => {
     const el = document.getElementById('section-poems')
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   })
+}
+
+const handleFixExternalPoems = async () => {
+  fixingPoems.value = true
+  try {
+    const res = await fixExternalPoems()
+    ElMessage.success(`修复完成：共 ${res.data.total} 首，已修复 ${res.data.fixed} 首`)
+    fetchPoems()
+  } catch (error) {
+    ElMessage.error('修复失败，请稍后重试')
+  } finally {
+    fixingPoems.value = false
+  }
 }
 
 const readText = (sectionId: string) => {
@@ -800,7 +832,7 @@ const sendChatMessage = async (message?: string, isFirst: boolean = false) => {
   try {
     const { chat } = await import('@/api/modules/ai')
     const prompt = buildPrompt(msg, isFirst)
-    const res = await chat({ message: prompt })
+    const res = await chat({ message: prompt, moduleCode: 'poet_chat' })
     chatMessages.value.push({
       role: 'assistant',
       content: res.data.reply || '抱歉，暂时无法回答',
@@ -946,7 +978,7 @@ const generateAiFeatures = async () => {
 
 【用户问题】请概括${poet.value.name}的诗词特点`
     
-    const res = await chat({ message: prompt })
+    const res = await chat({ message: prompt, moduleCode: 'poet_chat' })
     const reply = res.data.reply || ''
     aiFeatures.value = reply.length > 100 ? reply.substring(0, 100) + '...' : reply
   } catch (error) {
@@ -1194,14 +1226,11 @@ onUnmounted(() => {
           </div>
           <div class="section-divider"></div>
           <div class="section-body">
-            <div v-if="submittedFields.has(sectionFieldNameMap[section.id]) && previewContent" class="ai-submitted">
+            <div v-if="previewField === sectionFieldNameMap[section.id] && previewContent" class="ai-preview">
               <div class="ai-hint">
                 <el-icon><InfoFilled /></el-icon>
-                <span>以下为AI生成内容，正在等待后台管理员审核</span>
+                <span>AI生成内容预览</span>
               </div>
-              <p class="preview-text">{{ previewContent }}</p>
-            </div>
-            <div v-else-if="previewField === sectionFieldNameMap[section.id] && previewContent" class="ai-preview">
               <p class="preview-text">{{ previewContent }}</p>
               <div class="preview-actions">
                 <el-button type="success" size="small" :loading="submittingReview" @click="handleSubmitReview()">
@@ -1214,15 +1243,56 @@ onUnmounted(() => {
                 </el-button>
               </div>
             </div>
+            <div v-else-if="submittedFields.has(sectionFieldNameMap[section.id]) && !hasSectionContent(section.id)" class="ai-submitted">
+              <div class="ai-hint">
+                <el-icon><InfoFilled /></el-icon>
+                <span>AI内容已提交，等待管理员审核</span>
+              </div>
+            </div>
             <div v-else-if="hasSectionContent(section.id)" class="section-text" v-html="formatSectionContent(getSectionContent(section.id))"></div>
             <div v-else>
               <el-empty description="暂未收录" :image-size="60" />
               <div class="ai-fill-actions">
-                <el-button v-if="fillStatusMap[sectionFieldNameMap[section.id]]" type="success" size="small" plain disabled>
-                  <el-icon><Clock /></el-icon>
-                  已提交待审核
-                </el-button>
-                <el-button v-else type="warning" size="small" plain :loading="fillingField === sectionFieldNameMap[section.id]" @click="handleAiFill(sectionFieldNameMap[section.id])">
+                <template v-if="fillStatusMap[sectionFieldNameMap[section.id]]">
+                  <el-button 
+                    v-if="fillStatusMap[sectionFieldNameMap[section.id]].approved" 
+                    type="success" 
+                    size="small" 
+                    plain 
+                    disabled
+                  >
+                    <el-icon><CircleCheck /></el-icon>
+                    已审核通过
+                  </el-button>
+                  <el-button 
+                    v-else-if="fillStatusMap[sectionFieldNameMap[section.id]].rejected" 
+                    type="danger" 
+                    size="small" 
+                    plain 
+                    disabled
+                  >
+                    <el-icon><CircleClose /></el-icon>
+                    审核未通过
+                  </el-button>
+                  <el-button 
+                    v-else 
+                    type="success" 
+                    size="small" 
+                    plain 
+                    disabled
+                  >
+                    <el-icon><Clock /></el-icon>
+                    已提交待审核
+                  </el-button>
+                </template>
+                <el-button 
+                  v-else 
+                  type="warning" 
+                  size="small" 
+                  plain 
+                  :loading="fillingField === sectionFieldNameMap[section.id]" 
+                  @click="handleAiFill(sectionFieldNameMap[section.id])"
+                >
                   <el-icon><MagicStick /></el-icon>
                   AI填充
                 </el-button>
@@ -1238,6 +1308,18 @@ onUnmounted(() => {
               诗词作品
             </h2>
             <div class="section-actions">
+              <el-tooltip content="修复外部诗词的诗人信息" placement="top">
+                <el-button
+                  size="small"
+                  type="warning"
+                  text
+                  :loading="fixingPoems"
+                  @click="handleFixExternalPoems"
+                >
+                  <el-icon><Refresh /></el-icon>
+                  修复诗词
+                </el-button>
+              </el-tooltip>
               <el-tooltip :content="isReading && currentReadingId === 'section-poems' ? '停止朗读' : '朗读全部诗词'" placement="top">
                 <el-button
                   size="small"
@@ -1988,10 +2070,41 @@ onUnmounted(() => {
 }
 
 .ai-preview {
-  background: linear-gradient(135deg, rgba($primary-color, 0.03), rgba($primary-color, 0.01));
-  border: 1px solid rgba($primary-color, 0.15);
+  background: linear-gradient(135deg, rgba($primary-color, 0.05), rgba($primary-color, 0.02));
+  border: 1px solid rgba($primary-color, 0.2);
   border-radius: $border-radius-md;
   padding: $spacing-lg;
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(to bottom, $primary-color, rgba($primary-color, 0.5));
+  }
+  
+  .ai-hint {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    margin-bottom: $spacing-md;
+    padding: $spacing-sm $spacing-md;
+    background: rgba($primary-color, 0.1);
+    border-radius: $border-radius-sm;
+    color: $primary-color;
+    font-size: $font-size-sm;
+    font-family: $font-family-input;
+    border: 1px solid rgba($primary-color, 0.2);
+    
+    .el-icon {
+      font-size: 16px;
+      animation: pulse 2s infinite;
+    }
+  }
   
   .preview-text {
     margin: 0 0 $spacing-md 0;
@@ -2008,15 +2121,27 @@ onUnmounted(() => {
     gap: $spacing-sm;
     justify-content: flex-end;
     padding-top: $spacing-md;
-    border-top: 1px dashed $border-color;
+    border-top: 1px dashed rgba($primary-color, 0.3);
   }
 }
 
 .ai-submitted {
-  background: linear-gradient(135deg, rgba($warning-color, 0.05), rgba($warning-color, 0.02));
-  border: 1px dashed rgba($warning-color, 0.3);
+  background: linear-gradient(135deg, rgba($warning-color, 0.06), rgba($warning-color, 0.02));
+  border: 1px solid rgba($warning-color, 0.25);
   border-radius: $border-radius-md;
   padding: $spacing-lg;
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(to bottom, $warning-color, rgba($warning-color, 0.5));
+  }
   
   .ai-hint {
     display: flex;
@@ -2029,9 +2154,11 @@ onUnmounted(() => {
     color: $warning-color;
     font-size: $font-size-sm;
     font-family: $font-family-input;
+    border: 1px solid rgba($warning-color, 0.2);
     
     .el-icon {
       font-size: 16px;
+      animation: pulse 2s infinite;
     }
   }
   
@@ -2043,6 +2170,15 @@ onUnmounted(() => {
     font-family: $font-family-base;
     font-size: var(--poet-content-font-size, $font-size-base);
     text-indent: 2em;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
   }
 }
 
@@ -2084,6 +2220,8 @@ onUnmounted(() => {
   cursor: pointer;
   transition: all $transition-fast;
   border-radius: $border-radius-sm;
+  overflow: hidden;
+  min-width: 0;
 
   &:hover {
     background: rgba($primary-color, 0.05);
@@ -2630,25 +2768,11 @@ onUnmounted(() => {
   .el-textarea {
     flex: 1;
 
+    @include el-comment-input;
+
     :deep(.el-textarea__inner) {
-      border-radius: 20px;
-      padding: 10px 16px;
-      resize: none;
-      border-color: $border-color;
-      font-size: $font-size-sm;
-      line-height: 1.5;
-      transition: all $transition-fast;
-      background: white;
-
-      &::placeholder {
-        font-size: $font-size-sm;
-        color: $text-color-light;
-      }
-
-      &:focus {
-        border-color: $primary-color;
-        box-shadow: 0 0 0 3px rgba($primary-color, 0.15);
-      }
+      border-radius: $comment-input-radius;
+      padding: $comment-input-padding;
     }
   }
 

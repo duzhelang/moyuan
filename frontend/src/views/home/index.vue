@@ -180,7 +180,7 @@ const handleCoupletMatch = async (upperCouplet?: string) => {
   coupletLoading.value = true
   coupletResult.value = ''
   try {
-    const res = await matchCouplet({ upperCouplet: input })
+    const res = await matchCouplet({ upperCouplet: input, moduleCode: 'couplet' })
     coupletResult.value = res.data.result
   } catch {
     coupletResult.value = '抱歉，AI服务暂时不可用，请稍后重试。'
@@ -568,9 +568,12 @@ const handleWritePoem = async () => {
   poemLoading.value = true
   poemResult.value = ''
   try {
-    const res = await writePoemFromImage(imageFile.value, aiModel.value, visionModel.value)
+    console.log('开始调用看图写诗, model:', aiModel.value, 'visionModel:', visionModel.value)
+    const res = await writePoemFromImage(imageFile.value, aiModel.value, visionModel.value, 'write_poem')
+    console.log('看图写诗响应:', res)
     poemResult.value = res.data.poem
-  } catch {
+  } catch (error) {
+    console.error('看图写诗失败:', error)
     poemResult.value = '抱歉，AI服务暂时不可用，请稍后重试。'
   } finally {
     poemLoading.value = false
@@ -585,7 +588,7 @@ const handleAnalyzePoem = async () => {
   analyzeLoading.value = true
   analyzeResult.value = ''
   try {
-    const res = await analyzePoem({ poem: analyzeInput.value, model: aiModel.value })
+    const res = await analyzePoem({ poem: analyzeInput.value, model: aiModel.value, moduleCode: 'analyze' })
     analyzeResult.value = res.data.analysis
   } catch {
     analyzeResult.value = '抱歉，AI服务暂时不可用，请稍后重试。'
@@ -3570,17 +3573,7 @@ html {
 }
 
 .poem_comment_input {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 6px;
-  font-size: 13px;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.poem_comment_input:focus {
-  border-color: #66afe9;
+  @include comment-input;
 }
 
 .poem_comment_submit_btn {
@@ -3839,24 +3832,7 @@ html {
 }
 
 .contemporary_comment_input {
-  flex: 1;
-  padding: 8px 12px;
-  background: #fff;
-  border: 1px solid #dee2e6;
-  border-radius: 16px;
-  font-size: 13px;
-  color: #212529;
-  outline: none;
-  transition: all 0.2s;
-}
-
-.contemporary_comment_input::placeholder {
-  color: #adb5bd;
-}
-
-.contemporary_comment_input:focus {
-  border-color: #868e96;
-  box-shadow: 0 0 0 2px rgba(134, 142, 150, 0.1);
+  @include comment-input;
 }
 
 .contemporary_comment_submit {

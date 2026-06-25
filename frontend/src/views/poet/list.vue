@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import type { Poet, Dynasty } from '@/types/model'
 import { getPoetList } from '@/api/modules/poet'
 import { getDynastyList } from '@/api/modules/dynasty'
+import { getCategoryList } from '@/api/modules/category'
+import type { Category } from '@/types/model'
 import { useParticles } from '@/composables/useParticles'
 
 const router = useRouter()
+const route = useRoute()
 
 const particleCanvasRef = ref<HTMLCanvasElement | null>(null)
 useParticles(particleCanvasRef, {
@@ -20,11 +23,13 @@ const loading = ref(false)
 const poets = ref<Poet[]>([])
 const total = ref(0)
 const dynasties = ref<Dynasty[]>([])
+const categories = ref<Category[]>([])
 
 const activeTab = ref('ancient')
 
 const filters = ref({
   dynastyId: undefined as number | undefined,
+  categoryId: undefined as number | undefined,
   keyword: ''
 })
 
@@ -38,6 +43,7 @@ const fetchPoets = async () => {
       pageNum: currentPage.value,
       pageSize: pageSize.value,
       dynastyId: filters.value.dynastyId,
+      categoryId: filters.value.categoryId,
       keyword: filters.value.keyword
     }
     if (activeTab.value === 'ancient') {
@@ -57,10 +63,14 @@ const fetchPoets = async () => {
 
 const fetchDynasties = async () => {
   try {
-    const res = await getDynastyList()
-    dynasties.value = res.data
+    const [dynastyRes, categoryRes] = await Promise.all([
+      getDynastyList(),
+      getCategoryList()
+    ])
+    dynasties.value = dynastyRes.data
+    categories.value = categoryRes.data
   } catch (error) {
-    console.error('获取朝代列表失败:', error)
+    console.error('获取筛选条件失败:', error)
   }
 }
 
@@ -68,17 +78,30 @@ const handleTabChange = (tab: string | number | boolean | undefined) => {
   activeTab.value = String(tab)
   currentPage.value = 1
   filters.value.dynastyId = undefined
+  filters.value.categoryId = undefined
   filters.value.keyword = ''
+  syncFiltersToUrl()
   fetchPoets()
+}
+
+const syncFiltersToUrl = () => {
+  const query: Record<string, string> = {}
+  if (filters.value.dynastyId) query.dynastyId = String(filters.value.dynastyId)
+  if (filters.value.categoryId) query.categoryId = String(filters.value.categoryId)
+  if (filters.value.keyword) query.keyword = filters.value.keyword
+  if (currentPage.value > 1) query.page = String(currentPage.value)
+  router.replace({ query })
 }
 
 const handleFilterChange = () => {
   currentPage.value = 1
+  syncFiltersToUrl()
   fetchPoets()
 }
 
 const handlePageChange = (page: number) => {
   currentPage.value = page
+  syncFiltersToUrl()
   fetchPoets()
 }
 
@@ -93,6 +116,22 @@ const goToDetail = (id: number) => {
 }
 
 onMounted(() => {
+  const query = route.query
+  if (query.dynastyId) {
+    filters.value.dynastyId = Number(query.dynastyId)
+  }
+  if (query.categoryId) {
+    filters.value.categoryId = Number(query.categoryId)
+  }
+  if (query.keyword) {
+    filters.value.keyword = String(query.keyword)
+  }
+  if (query.page) {
+    const page = Number(query.page)
+    if (!isNaN(page) && page > 0) {
+      currentPage.value = page
+    }
+  }
   fetchDynasties()
   fetchPoets()
 })
@@ -150,6 +189,23 @@ onMounted(() => {
                   :key="dynasty.id"
                   :label="dynasty.name"
                   :value="dynasty.id"
+                />
+              </el-select>
+            </div>
+
+            <div class="filter-item">
+              <label>流派：</label>
+              <el-select
+                v-model="filters.categoryId"
+                placeholder="全部流派"
+                clearable
+                @change="handleFilterChange"
+              >
+                <el-option
+                  v-for="category in categories"
+                  :key="category.id"
+                  :label="category.name"
+                  :value="category.id"
                 />
               </el-select>
             </div>

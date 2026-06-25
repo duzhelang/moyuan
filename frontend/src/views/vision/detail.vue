@@ -452,8 +452,6 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-
-      <el-back-top :right="40" :bottom="40" />
     </div>
     </main>
 

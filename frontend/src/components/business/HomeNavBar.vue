@@ -42,9 +42,9 @@ defineExpose({ searchInputRef })
           <span>诗词库</span>
           <ul>
             <li @click.stop="router.push('/poem')">全部诗词</li>
-            <li @click.stop="router.push('/poem')">古体诗词</li>
-            <li @click.stop="router.push('/poem')">现代诗歌</li>
-            <li @click.stop="router.push('/poem')">外国诗歌</li>
+            <li @click.stop="router.push({ path: '/poem', query: { tab: 'classical' } })">古体诗词</li>
+            <li @click.stop="router.push({ path: '/poem', query: { tab: 'modern' } })">现代诗歌</li>
+            <li @click.stop="router.push({ path: '/poem', query: { categoryId: 3 } })">外国诗歌</li>
           </ul>
         </li>
         <li @click="router.push('/poet')">

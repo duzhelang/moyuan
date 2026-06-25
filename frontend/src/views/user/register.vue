@@ -127,6 +127,7 @@ const handleSubmit = async () => {
                   <a href="javascript:void(0)" @click="goToLogin">已有账号?去登录</a>
                 </div>
               </caption>
+              <tbody>
               <tr>
                 <td align="right" width="200px">用户名：</td>
                 <td><input type="text" class="wb" placeholder="请输入用户名" v-model="form.username" required></td>
@@ -208,6 +209,7 @@ const handleSubmit = async () => {
                 <td align="right"><input type="button" value="重置" class="cz" @click="handleReset" /></td>
                 <td align="center"><input type="submit" value="注册" class="tj" :disabled="loading" /></td>
               </tr>
+              </tbody>
             </table>
           </form>
         </div>

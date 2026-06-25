@@ -94,6 +94,9 @@ const handleUserCommand = (command: string) => {
     case 'history':
       router.push('/user/profile?tab=history')
       break
+    case 'repair':
+      router.push('/repair')
+      break
     case 'createPoem':
       router.push('/poem/create')
       break
@@ -130,11 +133,8 @@ const handleUserCommand = (command: string) => {
             <img :src="asset('/img/微信二维.jpg')" alt="了解我们">
           </div>
         </div>
-        <div class="contact-item">
+        <div class="contact-item" @click="router.push('/contact')">
           <span class="contact-text">联系我们</span>
-          <div class="qr-popup">
-            <img :src="asset('/img/微信二维.jpg')" alt="联系我们">
-          </div>
         </div>
         <div class="divider"></div>
         <div class="user-actions">
@@ -169,6 +169,10 @@ const handleUserCommand = (command: string) => {
                   <el-dropdown-item command="history">
                     <el-icon><Clock /></el-icon>
                     浏览历史
+                  </el-dropdown-item>
+                  <el-dropdown-item command="repair">
+                    <el-icon><Tickets /></el-icon>
+                    报修中心
                   </el-dropdown-item>
                   <el-dropdown-item command="createPoem">
                     <el-icon><Edit /></el-icon>

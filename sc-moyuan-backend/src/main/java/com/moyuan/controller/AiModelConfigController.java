@@ -1,5 +1,6 @@
 package com.moyuan.controller;
 
+import com.moyuan.ai.AiModelRegistry;
 import com.moyuan.common.R;
 import com.moyuan.entity.AiModel;
 import com.moyuan.entity.AiModuleConfig;
@@ -21,6 +22,7 @@ import java.util.Map;
 public class AiModelConfigController {
 
     private final AiModelConfigService aiModelConfigService;
+    private final AiModelRegistry aiModelRegistry;
 
     @Operation(summary = "获取所有模型")
     @GetMapping
@@ -124,5 +126,12 @@ public class AiModelConfigController {
     public R<AiModuleConfig> updateModuleConfig(@PathVariable String moduleCode, @RequestBody AiModuleConfig config) {
         config.setModuleCode(moduleCode);
         return R.success(aiModelConfigService.updateModuleConfig(config));
+    }
+
+    @Operation(summary = "刷新AI模型缓存")
+    @PostMapping("/refresh-cache")
+    public R<String> refreshCache() {
+        aiModelRegistry.refreshCache();
+        return R.success("缓存已刷新");
     }
 }
