@@ -33,7 +33,11 @@ export default defineConfig({
     open: false,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:8085',
+        changeOrigin: true
+      },
+      '/uploads': {
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:8085',
         changeOrigin: true
       }
     }

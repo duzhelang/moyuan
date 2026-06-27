@@ -12,6 +12,7 @@ import com.moyuan.service.DynastyService;
 import com.moyuan.service.PoemService;
 import com.moyuan.service.PoetService;
 import com.moyuan.service.UserService;
+import com.moyuan.util.PoetDefaultAvatar;
 import com.moyuan.util.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -70,6 +71,7 @@ public class PoemController {
     public R<Poem> getRandomPoem() {
         LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Poem::getStatus, 1)
+                .eq(Poem::getPoemType, "classical")
                 .last("ORDER BY RAND() LIMIT 1");
         Poem poem = poemService.getOne(wrapper);
         if (poem == null) {
@@ -83,6 +85,7 @@ public class PoemController {
     public R<List<Poem>> getDailyPoems() {
         LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Poem::getStatus, 1)
+                .eq(Poem::getPoemType, "classical")
                 .orderByDesc(Poem::getViewCount)
                 .last("LIMIT 3");
         return R.success(poemService.list(wrapper));
@@ -270,6 +273,7 @@ public class PoemController {
                                 if (dynastyId != null) {
                                     poet.setDynastyId(dynastyId);
                                 }
+                                poet.setAvatar(PoetDefaultAvatar.getAvatar(poet));
                                 poetService.save(poet);
                             }
                             poem.setPoetId(poet.getId());

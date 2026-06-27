@@ -108,9 +108,8 @@ body{
  .erw img {
  	width: 100px;
  	height: 100px;
- 	float: left;
-	position: fixed;
-	border-radius: 20px;
+ 	border-radius: 20px;
+ 	object-fit: cover;
  }
  .top .txt1 .erw {
  	display: none;

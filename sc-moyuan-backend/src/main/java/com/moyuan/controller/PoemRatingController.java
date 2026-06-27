@@ -58,4 +58,14 @@ public class PoemRatingController {
         poemRatingService.requestAiRating(poemId);
         return R.success();
     }
+
+    @GetMapping("/me")
+    @Operation(summary = "获取当前用户评分")
+    public R<PoemRating> getCurrentUserRating(@PathVariable Long poemId) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        if (userId == null) {
+            return R.success(null);
+        }
+        return R.success(poemRatingService.getUserRating(poemId, userId));
+    }
 }

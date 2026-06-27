@@ -13,6 +13,10 @@ export const useUserStore = defineStore('user', () => {
   const avatar = computed(() => userInfo.value?.avatar || '')
   const lastAdminUsername = computed(() => localStorage.getItem('lastAdminUsername') || '')
 
+  if (token.value && !userInfo.value) {
+    fetchUserInfo()
+  }
+
   async function login(params: LoginRequest) {
     const response = await loginApi(params)
     token.value = response.data.token

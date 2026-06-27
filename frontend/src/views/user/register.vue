@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
@@ -110,11 +110,11 @@ const handleSubmit = async () => {
 
     <div class="body">
       <div class="dl_tubiao">
-        <img src="/img/lb_shiwen_ (1).png" class="dl_zhuang_s1_"/>
-        <img src="/img/YIJI_tuobiao (6).png" class="zc_zhuang_s2"/>
-        <img src="/img/fy_tubiao (5).png" class="dl_zhuang_s3"/>
-        <img src="/img/tuobiao (5).png" class="zc_zhuang_s4"/>
-        <img src="/img/fy_tubiao (10).png" class="dl_zhuang_s5"/>
+        <img src="/img/lb_shiwen_8.png" class="dl_zhuang_s1_"/>
+        <img src="/img/yiji_tuobiao_6.png" class="zc_zhuang_s2"/>
+        <img src="/img/fy_tubiao_5.png" class="dl_zhuang_s3"/>
+        <img src="/img/tuobiao_5.png" class="zc_zhuang_s4"/>
+        <img src="/img/fy_tubiao_10.png" class="dl_zhuang_s5"/>
       </div>
 
       <div class="zc_main">
@@ -287,7 +287,7 @@ const handleSubmit = async () => {
 
 .dl_container {
   height: 100vh;
-  background: url('/img/dt_0.0.jpg') no-repeat -155px 0 / cover;
+  background: url('/img/dt_0_0.jpg') no-repeat -155px 0 / cover;
   position: relative;
   font-family: cursive;
   overflow-x: hidden;

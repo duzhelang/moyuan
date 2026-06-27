@@ -92,6 +92,10 @@ export function regenerateAiRating(poemId: number) {
   return request.post<void>(`/poems/${poemId}/ratings/ai/regenerate`)
 }
 
+export function getCurrentUserRating(poemId: number) {
+  return request.get<PoemRating | null>(`/poems/${poemId}/ratings/me`)
+}
+
 export function importExternalPoem(data: { title: string; content?: string; author?: string; dynasty?: string }) {
   return request.post<{ id: number; imported: boolean }>('/poems/import-external', data)
 }

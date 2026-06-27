@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
-import { getMyRepairOrders } from '@/api/modules/repair'
+import { Plus, Back, User, ChatDotRound, SwitchButton, View, Delete } from '@element-plus/icons-vue'
+import { getMyRepairOrders, closeRepairOrder } from '@/api/modules/repair'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
@@ -46,6 +46,13 @@ const statusMap: Record<number, { text: string; type: string }> = {
   3: { text: '已关闭', type: 'danger' },
   4: { text: '已驳回', type: 'danger' }
 }
+
+const stats = computed(() => {
+  const pending = tableData.value.filter(item => item.status === 0).length
+  const processing = tableData.value.filter(item => item.status === 1).length
+  const resolved = tableData.value.filter(item => item.status === 2).length
+  return { pending, processing, resolved, total: tableData.value.length }
+})
 
 const fetchData = async () => {
   loading.value = true
@@ -100,6 +107,23 @@ const goBack = () => {
   router.go(-1)
 }
 
+const handleCloseOrder = async (id: number) => {
+  try {
+    await ElMessageBox.confirm('确定要关闭此工单吗？关闭后将无法继续操作。', '提示', { type: 'warning' })
+    await closeRepairOrder(id)
+    ElMessage.success('工单已关闭')
+    await fetchData()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('关闭工单失败', error)
+    }
+  }
+}
+
+const canClose = (status: number) => {
+  return status === 0 || status === 1
+}
+
 const handleLogout = async () => {
   try {
     await ElMessageBox.confirm('确定要退出登录吗？', '提示', { type: 'warning' })
@@ -139,6 +163,33 @@ onMounted(fetchData)
       </div>
     </div>
 
+    <el-row :gutter="16" class="stats-row">
+      <el-col :span="6">
+        <el-card class="stat-card" shadow="hover">
+          <div class="stat-value">{{ stats.total }}</div>
+          <div class="stat-label">总工单数</div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card class="stat-card stat-pending" shadow="hover">
+          <div class="stat-value">{{ stats.pending }}</div>
+          <div class="stat-label">待处理</div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card class="stat-card stat-processing" shadow="hover">
+          <div class="stat-value">{{ stats.processing }}</div>
+          <div class="stat-label">处理中</div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card class="stat-card stat-resolved" shadow="hover">
+          <div class="stat-value">{{ stats.resolved }}</div>
+          <div class="stat-label">已解决</div>
+        </el-card>
+      </el-col>
+    </el-row>
+
     <el-card class="filter-card">
       <el-row :gutter="16" align="middle">
         <el-col :span="6">
@@ -155,6 +206,9 @@ onMounted(fetchData)
               :value="item.value"
             />
           </el-select>
+        </el-col>
+        <el-col :span="18" class="filter-actions">
+          <el-button type="primary" :icon="Plus" @click="goToCreate">提交新报修</el-button>
         </el-col>
       </el-row>
     </el-card>
@@ -183,14 +237,31 @@ onMounted(fetchData)
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="创建时间" width="170" />
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" type="primary" link @click="goToDetail(row.id)">查看详情</el-button>
+            <el-button size="small" type="primary" link @click="goToDetail(row.id)">
+              <el-icon><View /></el-icon>
+              详情
+            </el-button>
+            <el-button
+              v-if="canClose(row.status)"
+              size="small"
+              type="danger"
+              link
+              @click="handleCloseOrder(row.id)"
+            >
+              <el-icon><Delete /></el-icon>
+              关闭
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
 
-      <div class="pagination-wrapper">
+      <el-empty v-if="!loading && tableData.length === 0" description="暂无报修记录">
+        <el-button type="primary" @click="goToCreate">提交报修</el-button>
+      </el-empty>
+
+      <div class="pagination-wrapper" v-if="total > 0">
         <el-pagination
           v-model:current-page="page"
           v-model:page-size="pageSize"
@@ -237,8 +308,53 @@ onMounted(fetchData)
   margin: 0;
 }
 
+.stats-row {
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  text-align: center;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #303133;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #909399;
+  margin-top: 8px;
+}
+
+.stat-pending .stat-value {
+  color: #e6a23c;
+}
+
+.stat-processing .stat-value {
+  color: #409eff;
+}
+
+.stat-resolved .stat-value {
+  color: #67c23a;
+}
+
 .filter-card {
   margin-bottom: 16px;
+}
+
+.filter-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .table-card {

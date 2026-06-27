@@ -1,14 +1,12 @@
+﻿/* ===== 旧版兼容样式 ===== */
+/* 已清理：body 背景、全局 font-size/font-family 覆盖 */
+/* 保留：基础重置、链接样式、布局规则 */
+
 /* ========== 全局重置 ========== */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-}
-
-body {
-  background: url('/img/dt_0.0.jpg') no-repeat -155px 0 / cover;
-  font-size: 25px;
-  font-family: cursive;
 }
 
 /* ========== body.css ========== */
@@ -36,11 +34,6 @@ input {
   margin: 0;
   padding: 0;
   border: 0;
-  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
-}
-
-body {
-  background: rgba(227, 196, 165, 0.75);
 }
 
 h1 {
@@ -68,8 +61,6 @@ body .body {
 /* ========== shouye.css ========== */
 body {
   margin: 0 auto;
-  font-family: cursive;
-  background: rgba(227, 196, 165, 0.5);
 }
 
 input:hover {
@@ -608,11 +599,7 @@ textarea::placeholder {
 }
 
 /* ========== sy_caidan.css ========== */
-body {
-  background: url('/img/dt_0.0.jpg') no-repeat -155px 0 / cover;
-  font-size: 25px;
-  font-family: cursive;
-}
+/* [已清理] body 背景/font-size(25px)/font-family(cursive) 全局覆盖已移除 */
 
 .sy_fljx {
   color: #333;
@@ -1255,7 +1242,7 @@ body {
   left: 0;
   right: 0;
   width: 100%;
-  background: url('/img/dt_0.0.jpg');
+  background: url('/img/dt_0_0.jpg');
   background-size: cover;
   background-repeat: no-repeat;
   background-position: 0px -320px;
@@ -1337,7 +1324,7 @@ body {
 }
 
 .sy_xdlchuang .login-container {
-  background: url('/img/dt_0.0.jpg') no-repeat -155px 0 / cover;
+  background: url('/img/dt_0_0.jpg') no-repeat -155px 0 / cover;
   width: 366px;
   padding: 15px 20px;
   box-sizing: border-box;
@@ -2751,13 +2738,7 @@ html {
   box-sizing: border-box;
 }
 
-body {
-  margin: 0 auto;
-  border-radius: 10px;
-  font-family: cursive;
-  background: rgba(227, 196, 165, 0.75);
-  font-size: 25px;
-}
+/* [已清理] body font-family/background/font-size 全局覆盖已移除 */
 
 a:hover {
   text-shadow: 0 0 10px white;

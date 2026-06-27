@@ -107,18 +107,26 @@ public class PoemRatingServiceImpl extends ServiceImpl<PoemRatingMapper, PoemRat
     public Map<String, Object> getPoemRatings(Long poemId) {
         Map<String, Object> result = new HashMap<>();
 
-        List<PoemRating> userRatings = list(new LambdaQueryWrapper<PoemRating>()
-                .eq(PoemRating::getPoemId, poemId)
-                .eq(PoemRating::getRatingType, 1)
-                .orderByDesc(PoemRating::getCreateTime));
+        try {
+            List<PoemRating> userRatings = list(new LambdaQueryWrapper<PoemRating>()
+                    .eq(PoemRating::getPoemId, poemId)
+                    .eq(PoemRating::getRatingType, 1)
+                    .orderByDesc(PoemRating::getCreateTime));
 
-        PoemRating aiRating = getAiRating(poemId);
-        BigDecimal avgScore = getAverageScore(poemId);
+            PoemRating aiRating = getAiRating(poemId);
+            BigDecimal avgScore = getAverageScore(poemId);
 
-        result.put("userRatings", userRatings);
-        result.put("aiRating", aiRating);
-        result.put("averageScore", avgScore);
-        result.put("ratingCount", userRatings.size());
+            result.put("userRatings", userRatings != null ? userRatings : java.util.Collections.emptyList());
+            result.put("aiRating", aiRating);
+            result.put("averageScore", avgScore != null ? avgScore : BigDecimal.ZERO);
+            result.put("ratingCount", userRatings != null ? userRatings.size() : 0);
+        } catch (Exception e) {
+            log.error("获取诗词评分失败, poemId={}", poemId, e);
+            result.put("userRatings", java.util.Collections.emptyList());
+            result.put("aiRating", null);
+            result.put("averageScore", BigDecimal.ZERO);
+            result.put("ratingCount", 0);
+        }
 
         return result;
     }
@@ -127,6 +135,14 @@ public class PoemRatingServiceImpl extends ServiceImpl<PoemRatingMapper, PoemRat
     public BigDecimal getAverageScore(Long poemId) {
         Poem poem = poemService.getById(poemId);
         return poem != null ? poem.getAvgScore() : null;
+    }
+
+    @Override
+    public PoemRating getUserRating(Long poemId, Long userId) {
+        return getOne(new LambdaQueryWrapper<PoemRating>()
+                .eq(PoemRating::getPoemId, poemId)
+                .eq(PoemRating::getUserId, userId)
+                .eq(PoemRating::getRatingType, 1));
     }
 
     private void updatePoemAverageScore(Long poemId) {
@@ -173,11 +189,15 @@ public class PoemRatingServiceImpl extends ServiceImpl<PoemRatingMapper, PoemRat
         if (analysis == null || analysis.isEmpty()) {
             return "";
         }
-        String[] lines = analysis.split("[。！？]");
+        String[] paragraphs = analysis.split("\\n\\n+");
         StringBuilder summary = new StringBuilder();
-        for (int i = 0; i < Math.min(2, lines.length); i++) {
-            if (!lines[i].trim().isEmpty()) {
-                summary.append(lines[i].trim()).append("。");
+        for (String para : paragraphs) {
+            String trimmed = para.trim();
+            if (!trimmed.isEmpty() && summary.length() < 200) {
+                if (summary.length() > 0) {
+                    summary.append("\n\n");
+                }
+                summary.append(trimmed);
             }
         }
         return summary.toString();
@@ -187,8 +207,14 @@ public class PoemRatingServiceImpl extends ServiceImpl<PoemRatingMapper, PoemRat
         if (text == null) {
             return "";
         }
-        return text.replaceAll("[*#\\-_`~>]", "")
-                   .replaceAll("\\s+", " ")
+        return text
+                   .replaceAll("\\*{1,2}([^*]+)\\*{1,2}", "$1")
+                   .replaceAll("`([^`]+)`", "$1")
+                   .replaceAll("(?m)^\\s*[-*+]\\s+", "")
+                   .replaceAll("(?m)^#{1,6}\\s+", "")
+                   .replaceAll("[~>]", "")
+                   .replaceAll("(?m)^\\s*[-=]{3,}\\s*$", "")
+                   .replaceAll("\\n{3,}", "\n\n")
                    .trim();
     }
 }

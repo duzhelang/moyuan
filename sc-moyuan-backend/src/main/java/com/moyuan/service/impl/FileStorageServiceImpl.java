@@ -40,7 +40,7 @@ public class FileStorageServiceImpl extends ServiceImpl<FileMetadataMapper, File
     @Value("${file.upload-dir:./uploads}")
     private String uploadDir;
 
-    @Value("${file.base-url:http://localhost:8080/uploads}")
+    @Value("${file.base-url:/uploads}")
     private String baseUrl;
 
     @Value("${file.allowed-extensions:.jpg,.jpeg,.png,.gif,.webp,.bmp}")

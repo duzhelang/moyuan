@@ -13,6 +13,7 @@ import com.moyuan.mapper.PoetMapper;
 import com.moyuan.service.DynastyService;
 import com.moyuan.service.PoetService;
 import com.moyuan.util.PoetDataExtractor;
+import com.moyuan.util.PoetDefaultAvatar;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -136,11 +137,6 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
 
             boolean needUpdate = false;
 
-            if (!StringUtils.hasText(poet.getAvatar()) && poetData.containsKey("image") && poetData.get("image") != null) {
-                poet.setAvatar((String) poetData.get("image"));
-                needUpdate = true;
-            }
-
             if (!StringUtils.hasText(poet.getPseudonym()) && poetData.containsKey("tag") && poetData.get("tag") != null) {
                 poet.setPseudonym((String) poetData.get("tag"));
                 needUpdate = true;
@@ -155,7 +151,7 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
                     needUpdate = true;
                 }
             }
-            
+
             // 如果没有朝代信息，根据生卒年确定朝代
             if (poet.getDynastyId() == null && (poet.getBirthYear() != null || poet.getDeathYear() != null)) {
                 Dynasty dynasty = dynastyService.determineDynastyByYears(poet.getBirthYear(), poet.getDeathYear());
@@ -163,6 +159,15 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
                     poet.setDynastyId(dynasty.getId());
                     needUpdate = true;
                 }
+            }
+
+            // 头像赋值（放在朝代之后，确保智能分配时有朝代信息）
+            if (!StringUtils.hasText(poet.getAvatar()) && poetData.containsKey("image") && poetData.get("image") != null) {
+                poet.setAvatar((String) poetData.get("image"));
+                needUpdate = true;
+            } else if (!StringUtils.hasText(poet.getAvatar())) {
+                poet.setAvatar(PoetDefaultAvatar.getAvatar(poet));
+                needUpdate = true;
             }
 
             if (!StringUtils.hasText(poet.getLifeStory()) && poetData.containsKey("rwsp") && poetData.get("rwsp") != null) {

@@ -1,13 +1,5 @@
 @use 'sass:color';
 
-@font-face {
-  font-family: 'YingBiXingShu';
-  src: url('/fonts/yingbixingshu.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
 * {
   margin: 0;
   padding: 0;
@@ -24,7 +16,7 @@ html {
 body {
   font-family: $font-family-base;
   color: $text-color;
-  background-color: $background-color;
+  background: rgba(227,196,165,0.75);
   min-height: 100vh;
 }
 
@@ -58,11 +50,17 @@ input, textarea, select {
   letter-spacing: 0.5px;
 }
 
+// 覆盖 Element Plus 组件库默认字体设置，统一项目输入框样式
 .el-input__inner,
 .el-textarea__inner {
   font-family: $font-family-input !important;
+  font-size: $font-size-base !important;
   letter-spacing: 0.5px;
   line-height: 1.5;
+
+  &::placeholder {
+    font-size: inherit;
+  }
 }
 
 .el-textarea {

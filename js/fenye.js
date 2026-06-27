@@ -1,4 +1,4 @@
-// scripts.js
+﻿// scripts.js
 // document.querySelectorAll('.sidebar a').forEach(anchor => {
 //     anchor.addEventListener('click', function(e) {
 //         e.preventDefault();
@@ -356,13 +356,13 @@ function initPlayButton(buttonId) {
 						        if (currentStatus === 'expand') {
 						            expandTextElement.dataset.status ='retract';
 						            expandTextElement.textContent = '展开';
-						            statusIcon.src = '../img/jianzu (2).png';
-						            laba.src = '../img/laba (2).png';
+						            statusIcon.src = '../img/jianzu_2.png';
+						            laba.src = '../img/laba_2.png';
 						        } else {
 						            expandTextElement.dataset.status = 'expand';
 						            expandTextElement.textContent = '收回';
-						            statusIcon.src = '../img/jianzu (1).png';
-						            laba.src = '../img/laba (1).png';
+						            statusIcon.src = '../img/jianzu_1.png';
+						            laba.src = '../img/laba_1.png';
 						        }
 						    };
 						
@@ -406,10 +406,10 @@ function initPlayButton(buttonId) {
 	// function toggleyinyue() {
 	//   var button = document.querySelector('.yinyueButton');
 	//   if (button.innerHTML.includes('展开')) {
-	//     button.innerHTML = '<p>展开<img class="jianzu" src="../img/jianzu (1).png"/></p>';
+	//     button.innerHTML = '<p>展开<img class="jianzu" src="../img/jianzu_1.png"/></p>';
 	//     // Add your code to lock the sidebar here
 	//   } else {
-	//     button.innerHTML = '<p>隐藏<img class="jianzu" src="../img/jianzu (2).png"/></p>';
+	//     button.innerHTML = '<p>隐藏<img class="jianzu" src="../img/jianzu_2.png"/></p>';
 	//     // Add your code to unlock the sidebar here
 	//   }
 	// }

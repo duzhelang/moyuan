@@ -231,9 +231,8 @@ body{
 			.top_gud .erw img{
 				width: 100px;
 				height: 100px;
-				float: left;
-				position: fixed;
 				border-radius: 20px;
+				object-fit: cover;
 			}
 			.top_gud .txt1 .erw{
 				display: none;/*隐藏*/

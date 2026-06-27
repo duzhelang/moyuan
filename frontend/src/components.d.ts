@@ -7,9 +7,12 @@ export {}
 
 declare module 'vue' {
   export interface GlobalComponents {
+    AncientPoemSelection: typeof import('./components/home/AncientPoemSelection.vue')['default']
     AppFooter: typeof import('./components/common/AppFooter.vue')['default']
     AppHeader: typeof import('./components/common/AppHeader.vue')['default']
     AuthHeader: typeof import('./components/common/AuthHeader.vue')['default']
+    BackToTop: typeof import('./components/common/BackToTop.vue')['default']
+    ContemporaryPoems: typeof import('./components/home/ContemporaryPoems.vue')['default']
     DailyPoetry: typeof import('./components/business/DailyPoetry.vue')['default']
     ElAside: typeof import('element-plus/es')['ElAside']
     ElAvatar: typeof import('element-plus/es')['ElAvatar']
@@ -61,6 +64,8 @@ declare module 'vue' {
     ElUpload: typeof import('element-plus/es')['ElUpload']
     ErrorMessage: typeof import('./components/common/ErrorMessage.vue')['default']
     ForumPost: typeof import('./components/business/ForumPost.vue')['default']
+    ForumPreview: typeof import('./components/home/ForumPreview.vue')['default']
+    HomeCarousel: typeof import('./components/home/HomeCarousel.vue')['default']
     HomeNavBar: typeof import('./components/business/HomeNavBar.vue')['default']
     HomeNavigation: typeof import('./components/business/HomeNavigation.vue')['default']
     ImageUpload: typeof import('./components/common/ImageUpload.vue')['default']

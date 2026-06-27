@@ -142,6 +142,11 @@ onMounted(() => {
     <canvas ref="particleCanvasRef" class="particle-bg"></canvas>
     <div class="container">
       <div class="page-nav">
+        <el-button text @click="router.back()">
+          <el-icon><ArrowLeft /></el-icon>
+          返回
+        </el-button>
+        <el-divider direction="vertical" />
         <el-button text @click="router.push('/')">
           <el-icon><HomeFilled /></el-icon>
           首页
@@ -163,6 +168,11 @@ onMounted(() => {
             诗词鉴赏
           </el-button>
         </div>
+      </div>
+
+      <div class="poet-banner-quote">
+        <p>"江山代有才人出，各领风骚数百年。"</p>
+        <span>—— 清 · 赵翼《论诗》</span>
       </div>
 
       <div class="poet-tabs">
@@ -320,8 +330,37 @@ onMounted(() => {
 }
 
 .page-header {
+  position: relative;
   text-align: center;
   margin-bottom: 0;
+  &::after {
+    content: '';
+    display: block;
+    width: 100px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, $primary-color, $accent-color, $primary-color, transparent);
+    margin: 24px auto 0;
+    border-radius: 2px;
+  }
+}
+
+.poet-banner-quote {
+  text-align: center;
+  padding: 16px 0;
+  margin-bottom: $spacing-lg;
+  p {
+    font-size: 17px;
+    color: $text-color-secondary;
+    font-style: italic;
+    letter-spacing: 3px;
+    line-height: 1.8;
+    margin: 0 0 6px;
+    font-family: $font-family-title;
+  }
+  span {
+    font-size: 13px;
+    color: $text-color-light;
+  }
 }
 
 .page-title {

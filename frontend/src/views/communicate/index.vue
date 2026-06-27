@@ -200,6 +200,11 @@ onActivated(() => {
 
     <div class="communicate-container">
       <div class="page-nav-bar">
+        <button class="nav-btn" @click="router.back()">
+          <el-icon><ArrowLeft /></el-icon>
+          返回
+        </button>
+        <span class="nav-sep">/</span>
         <button class="nav-btn" @click="router.push('/')">
           <el-icon><HomeFilled /></el-icon>
           首页
@@ -572,6 +577,17 @@ onActivated(() => {
   text-align: center;
   margin-bottom: 30px;
   animation: headerFadeIn 0.6s ease-out;
+  position: relative;
+
+  &::after {
+    content: '';
+    display: block;
+    width: 80px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #d4af87, transparent);
+    margin: 16px auto 0;
+    border-radius: 2px;
+  }
 }
 
 .page-title {

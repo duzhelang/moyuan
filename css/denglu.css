@@ -104,8 +104,7 @@
 							 .top_genglu .erw img{
 								width: 100px;
 								height: 100px;
-								float: left;
-								/position: fixed;
+								object-fit: cover;
 							}
 							.header .top_genglu .txt1 .erw{
 								display: none;/*隐藏*/
@@ -175,7 +174,7 @@
 				border-radius: 27px;
 				/* background-color: rgba(255, 255, 255, 0.4); */
 				background-color: rgba(227,196,165,0.7);
-				/* background: url('../img/lb_ (5).jpg'); */
+				/* background: url('../img/lb_5.jpg'); */
 				/*background-size: contain;/*保持比例，可能出现空白*/
 				background-size: cover;/*完全覆盖，改变比例*/
 				 background-repeat: no-repeat;

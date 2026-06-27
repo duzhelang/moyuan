@@ -67,7 +67,7 @@
       }
   
       function updateImage() {
-          document.getElementById("ad_scroll").src = "img/lb_ (" + now + ").jpg";
+          document.getElementById("ad_scroll").src = "img/lb_" + now + ".jpg";
           for (var i = 1; i <= max; i++) {
               document.getElementById("li" + i).style.color = now == i ? "rgb(249,255,0)" : "black";
           }

@@ -33,7 +33,10 @@ public class AiServiceImpl implements AiService {
     private static final String ANALYZE_SYSTEM_PROMPT =
             "你是「古今诗话」平台的诗词鉴赏专家，擅长对古典诗词进行深入细致的学术分析。" +
             "你的职责是：从意境、修辞、情感、历史背景等多个维度全面解读诗词作品。" +
-            "分析要求：结构清晰、引经据典、学术严谨但通俗易懂，帮助读者深入理解诗词之美。";
+            "分析要求：结构清晰、引经据典、学术严谨但通俗易懂，帮助读者深入理解诗词之美。" +
+            "重要：输出格式必须为纯文本，禁止使用任何Markdown标记符号（如#、*、-、`等）。" +
+            "每个分析维度作为独立段落，段落之间用空行分隔。段落开头用「一、」「二、」等中文序号标注。" +
+            "末尾单独一行给出评分，格式为「评分：X.X」（X.X为1.0到5.0之间的小数）。";
 
     private static final String COUPLET_SYSTEM_PROMPT =
             "你是「古今诗话」平台的对联大师，精通中国古典对联艺术。" +
@@ -86,12 +89,15 @@ public class AiServiceImpl implements AiService {
 
     @Override
     public String analyzePoem(String poem, String model, String moduleCode) {
-        String prompt = "请对以下古诗词进行详细分析，包括：\n" +
-                "1. 诗词的意境和主题\n" +
-                "2. 使用的修辞手法\n" +
-                "3. 关键词句的赏析\n" +
-                "4. 作者的情感表达\n" +
-                "5. 诗词的历史背景（如果可能）\n\n" +
+        String prompt = "请对以下古诗词进行详细分析。\n\n" +
+                "分析维度：\n" +
+                "一、意境与主题\n" +
+                "二、修辞手法\n" +
+                "三、关键词句赏析\n" +
+                "四、情感表达\n" +
+                "五、历史背景（如可考证）\n\n" +
+                "格式要求：每个维度独立成段，段落之间空一行。末尾另起一行给出评分（格式：评分：X.X）。\n" +
+                "禁止使用任何Markdown符号（#、*、-、`等），直接输出纯文本。\n\n" +
                 "诗词内容：\n" + poem;
         if (moduleCode != null && !moduleCode.isEmpty()) {
             return aiModelRegistry.chatByModule(prompt, moduleCode, ANALYZE_SYSTEM_PROMPT);

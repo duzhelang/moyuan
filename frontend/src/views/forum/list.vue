@@ -68,6 +68,11 @@ onMounted(() => {
     <canvas ref="particleCanvasRef" class="particle-bg"></canvas>
     <div class="container">
       <div class="page-nav">
+        <el-button text @click="router.back()">
+          <el-icon><ArrowLeft /></el-icon>
+          返回
+        </el-button>
+        <el-divider direction="vertical" />
         <el-button text @click="router.push('/')">
           <el-icon><HomeFilled /></el-icon>
           首页
@@ -91,6 +96,11 @@ onMounted(() => {
             发帖
           </el-button>
         </div>
+      </div>
+
+      <div class="decorative-quote">
+        <p class="quote-text">"诗者，志之所之也。在心为志，发言为诗。"</p>
+        <span class="quote-source">——《毛诗序》</span>
       </div>
       
       <div class="search-section">
@@ -239,11 +249,47 @@ onMounted(() => {
     bottom: -8px;
     left: 50%;
     transform: translateX(-50%);
-    width: 60px;
+    width: 80px;
     height: 3px;
-    background: linear-gradient(90deg, $primary-color, $accent-color);
+    background: linear-gradient(90deg, transparent, $primary-color, $accent-color, $primary-color, transparent);
     border-radius: 2px;
+    box-shadow: 0 1px 4px rgba($primary-color, 0.3);
   }
+}
+
+.decorative-quote {
+  text-align: center;
+  padding: 20px 40px;
+  margin-bottom: $spacing-xl;
+  position: relative;
+
+  &::before,
+  &::after {
+    content: '';
+    display: block;
+    width: 60px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, $primary-color, transparent);
+    margin: 0 auto 12px;
+  }
+
+  &::after {
+    margin: 12px auto 0;
+  }
+}
+
+.quote-text {
+  font-size: 16px;
+  color: $text-color-secondary;
+  font-style: italic;
+  letter-spacing: 2px;
+  line-height: 1.8;
+  margin: 0;
+}
+
+.quote-source {
+  font-size: 13px;
+  color: $text-color-light;
 }
 
 .page-subtitle {

@@ -1,0 +1,12 @@
+﻿[
+  { "date": "唐代", "title": "静夜思", "content": "床前明月光，疑是地上霜。\n举头望明月，低头思故乡。", "author": "李白", "image": "/img/lt_jx_1.jpg" },
+  { "date": "唐代", "title": "登鹳雀楼", "content": "白日依山尽，黄河入海流。\n欲穷千里目，更上一层楼。", "author": "王之涣", "image": "/img/lt_jx_2.jpg" },
+  { "date": "唐代", "title": "春晓", "content": "春眠不觉晓，处处闻啼鸟。\n夜来风雨声，花落知多少。", "author": "孟浩然", "image": "/img/lt_jx_3.jpg" },
+  { "date": "唐代", "title": "悯农", "content": "锄禾日当午，汗滴禾下土。\n谁知盘中餐，粒粒皆辛苦。", "author": "李绅", "image": "/img/lt_jx_4.jpg" },
+  { "date": "唐代", "title": "望庐山瀑布", "content": "日照香炉生紫烟，遥看瀑布挂前川。\n飞流直下三千尺，疑是银河落九天。", "author": "李白", "image": "/img/lt_jx_1.jpg" },
+  { "date": "宋代", "title": "水调歌头", "content": "明月几时有？把酒问青天。\n不知天上宫阙，今夕是何年。", "author": "苏轼", "image": "/img/lt_jx_2.jpg" },
+  { "date": "唐代", "title": "黄鹤楼送孟浩然之广陵", "content": "故人西辞黄鹤楼，烟花三月下扬州。\n孤帆远影碧空尽，唯见长江天际流。", "author": "李白", "image": "/img/lt_jx_3.jpg" },
+  { "date": "唐代", "title": "相思", "content": "红豆生南国，春来发几枝。\n愿君多采撷，此物最相思。", "author": "王维", "image": "/img/lt_jx_4.jpg" },
+  { "date": "宋代", "title": "念奴娇·赤壁怀古", "content": "大江东去，浪淘尽，千古风流人物。\n故垒西边，人道是，三国周郎赤壁。", "author": "苏轼", "image": "/img/lt_jx_1.jpg" },
+  { "date": "唐代", "title": "将进酒", "content": "君不见，黄河之水天上来，奔流到海不复回。\n君不见，高堂明镜悲白发，朝如青丝暮成雪。", "author": "李白", "image": "/img/lt_jx_2.jpg" }
+]

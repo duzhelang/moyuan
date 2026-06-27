@@ -1,11 +1,11 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePoemStore } from '@/stores/poem'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import type { Comment, PoemRatingsData } from '@/types/model'
-import { likePoem, favoritePoem, getPoemRatings, ratePoem, requestAiRating, regenerateAiRating } from '@/api/modules/poem'
+import { likePoem, favoritePoem, getPoemRatings, ratePoem, requestAiRating, regenerateAiRating, getCurrentUserRating } from '@/api/modules/poem'
 import { getComments, createComment, likeComment } from '@/api/modules/forum'
 import { addHistory } from '@/api/modules/history'
 import { getAiModuleConfig, type AiModuleConfig, fillAiContent, getFillStatus, previewAiContent, submitForReview } from '@/api/modules/ai'
@@ -36,6 +36,9 @@ const requestingAi = ref(false)
 const regeneratingAi = ref(false)
 const aiExpanded = ref(false)
 const aiPollTimer = ref<ReturnType<typeof setInterval> | null>(null)
+const hasRated = ref(false)
+const currentRating = ref<any>(null)
+const reRateDialogVisible = ref(false)
 
 const loginPromptVisible = ref(false)
 
@@ -64,6 +67,16 @@ const poemSentences = computed(() => {
     .map((s: string) => s.trim())
     .filter((s: string) => s.length > 0)
 })
+
+const aiAnalysisParagraphs = computed(() => {
+  const text = ratingsData.value?.aiRating?.aiAnalysis
+  if (!text) return []
+  return text.split(/\n\n+/).map((p: string) => p.trim()).filter((p: string) => p.length > 0)
+})
+
+const isSectionHeader = (text: string): boolean => {
+  return /^[\u4e00-\u9fa5]+[、．.]|^评分[：:]/.test(text)
+}
 
 const fetchPoem = async () => {
   loading.value = true
@@ -97,6 +110,30 @@ const fetchRatings = async () => {
     ratingsData.value = res.data
   } catch (error) {
     ElMessage.error('获取评分失败')
+  }
+}
+
+const checkUserRating = async () => {
+  if (!userStore.isLoggedIn) {
+    hasRated.value = false
+    currentRating.value = null
+    return
+  }
+  try {
+    const res = await getCurrentUserRating(poemId.value)
+    if (res.data) {
+      hasRated.value = true
+      currentRating.value = res.data
+      userScore.value = res.data.score
+      userComment.value = res.data.comment || ''
+    } else {
+      hasRated.value = false
+      currentRating.value = null
+      userScore.value = 0
+      userComment.value = ''
+    }
+  } catch (error) {
+    console.error('获取用户评分失败:', error)
   }
 }
 
@@ -218,14 +255,25 @@ const handleSubmitRating = async () => {
   try {
     await ratePoem(poemId.value, userScore.value, userComment.value || undefined)
     ElMessage.success('评分成功')
-    userScore.value = 0
-    userComment.value = ''
+    hasRated.value = true
     fetchRatings()
+    checkUserRating()
   } catch (error) {
     ElMessage.error('评分失败')
   } finally {
     submittingRating.value = false
   }
+}
+
+const handleReRate = () => {
+  reRateDialogVisible.value = true
+}
+
+const confirmReRate = () => {
+  reRateDialogVisible.value = false
+  hasRated.value = false
+  userScore.value = 0
+  userComment.value = ''
 }
 
 const pollAiRating = () => {
@@ -458,6 +506,7 @@ onMounted(async () => {
   loadFillStatus()
   fetchComments()
   fetchRatings()
+  checkUserRating()
 })
 </script>
 
@@ -465,10 +514,10 @@ onMounted(async () => {
   <div class="poem-detail-page" v-loading="loading">
     <div class="page-decoration">
       <div class="decoration-left">
-        <img src="/img/lb_shiwen (1).png" alt="" class="deco-img" />
+        <img src="/img/lb_shiwen_1.png" alt="" class="deco-img" />
       </div>
       <div class="decoration-right">
-        <img src="/img/lb_shiwen (2).png" alt="" class="deco-img" />
+        <img src="/img/lb_shiwen_2.png" alt="" class="deco-img" />
       </div>
     </div>
 
@@ -738,14 +787,17 @@ onMounted(async () => {
               </div>
               <div class="ai-analysis">
                 <div v-if="!aiExpanded && ratingsData.aiRating.aiSummary" class="ai-summary">
-                  <p>{{ ratingsData.aiRating.aiSummary }}</p>
+                  <p v-for="(line, idx) in ratingsData.aiRating.aiSummary.split(/\n\n+/).filter((s: string) => s.trim())" :key="idx">{{ line.trim() }}</p>
                   <el-button type="primary" link @click="toggleAiExpanded">
                     查看详情
                     <el-icon class="el-icon--right"><ArrowDown /></el-icon>
                   </el-button>
                 </div>
                 <div v-else-if="ratingsData.aiRating.aiAnalysis" class="ai-detail">
-                  <p v-for="(para, idx) in ratingsData.aiRating.aiAnalysis.split('\n').filter(p => p.trim())" :key="idx">{{ para }}</p>
+                  <template v-for="(para, idx) in aiAnalysisParagraphs" :key="idx">
+                    <p v-if="isSectionHeader(para)" class="ai-section-header">{{ para }}</p>
+                    <p v-else class="ai-paragraph">{{ para }}</p>
+                  </template>
                   <el-button type="primary" link @click="toggleAiExpanded" v-if="ratingsData.aiRating.aiSummary">
                     收起详情
                     <el-icon class="el-icon--right"><ArrowUp /></el-icon>
@@ -803,10 +855,10 @@ onMounted(async () => {
             <el-button
               type="primary"
               :loading="submittingRating"
-              @click="handleSubmitRating"
-              :disabled="userScore === 0"
+              @click="hasRated ? handleReRate() : handleSubmitRating()"
+              :disabled="userScore === 0 && !hasRated"
             >
-              提交评分
+              {{ hasRated ? '重新评价' : '提交评分' }}
             </el-button>
           </div>
         </div>
@@ -832,6 +884,14 @@ onMounted(async () => {
           </div>
         </div>
       </div>
+
+      <el-dialog v-model="reRateDialogVisible" title="修改评分" width="400px">
+        <p>您已经对这首诗评过分了，确定要修改评分吗？</p>
+        <template #footer>
+          <el-button @click="reRateDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="confirmReRate">确定修改</el-button>
+        </template>
+      </el-dialog>
 
       <div class="comment-section">
         <h2 class="section-title">评论区</h2>
@@ -1619,6 +1679,27 @@ onMounted(async () => {
 
   .ai-analysis {
     flex: 1;
+
+    .ai-section-header {
+      font-size: $font-size-base;
+      color: $primary-color;
+      font-weight: 600;
+      line-height: $line-height-loose;
+      margin: 0 0 $spacing-sm;
+      text-indent: 0;
+    }
+
+    .ai-paragraph {
+      font-size: $font-size-base;
+      color: $text-color;
+      line-height: $line-height-loose;
+      margin: 0 0 $spacing-md;
+      text-indent: 2em;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
 
     p {
       font-size: $font-size-base;

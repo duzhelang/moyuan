@@ -1,4 +1,4 @@
-	.header .daohang{
+﻿	.header .daohang{
 			display: flex;
 				width: 100%;
 				height: 50px;
@@ -59,9 +59,9 @@ font-weight:500;
 }
  /* 首页小登录窗口容器样式 */
   .sy_xdlchuang .login-container {
-	  background: url('../img/dt_0.0.jpg') no-repeat -155px 0 / cover;
+	  background: url('../img/dt_0_0.jpg') no-repeat -155px 0 / cover;
 	 
-	  /* background: url('../img/dt_0.0.jpg');
+	  /* background: url('../img/dt_0_0.jpg');
 	  background-repeat: no-repeat;
 	  background-position: -155px 0px;
 	  background-size: cover; *//*完全覆盖，改变比例 */ 

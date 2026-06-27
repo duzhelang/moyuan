@@ -116,6 +116,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     public List<Map<String, Object>> getPopularPoems(int limit) {
         LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Poem::getStatus, 1)
+                .eq(Poem::getPoemType, "classical")
                 .orderByDesc(Poem::getViewCount)
                 .orderByDesc(Poem::getLikeCount)
                 .last("LIMIT " + limit);
@@ -138,6 +139,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         // 搜索本地数据库
         LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Poem::getStatus, 1)
+                .eq(Poem::getPoemType, "classical")
                 .and(w -> w.like(Poem::getTitle, keyword)
                         .or().like(Poem::getContent, keyword))
                 .orderByDesc(Poem::getViewCount)
@@ -568,6 +570,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(Poem::getDynastyId, dynastyId)
                     .eq(Poem::getStatus, 1)
+                    .eq(Poem::getPoemType, "classical")
                     .select(Poem::getId);
             List<Poem> poems = poemMapper.selectList(wrapper);
             for (Poem poem : poems) {
@@ -583,7 +586,8 @@ public class RecommendationServiceImpl implements RecommendationService {
         List<Map<String, Object>> results = new ArrayList<>();
         for (Long poemId : poemIds) {
             Poem poem = poemMap.get(poemId);
-            if (poem != null && poem.getStatus() != null && poem.getStatus() == 1) {
+            if (poem != null && poem.getStatus() != null && poem.getStatus() == 1
+                    && "classical".equals(poem.getPoemType())) {
                 Map<String, Object> item = convertPoemToMap(poem);
                 item.put("source", "local");
                 item.put("recommendScore", combinedScores.get(poemId));
@@ -624,6 +628,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
         wrapper.isNotNull(Poem::getPoetId)
                 .eq(Poem::getStatus, 1)
+                .eq(Poem::getPoemType, "classical")
                 .select(Poem::getId, Poem::getPoetId);
         List<Poem> poems = poemMapper.selectList(wrapper);
         Map<Long, Long> map = new HashMap<>();

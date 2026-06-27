@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Back, List, ChatDotRound, Plus, SwitchButton } from '@element-plus/icons-vue'
 import { getRepairOrderDetail, getRepairComments, addRepairComment, closeRepairOrder, submitSatisfaction } from '@/api/modules/repair'
 import { useUserStore } from '@/stores/user'
 
@@ -42,6 +43,20 @@ const statusMap: Record<number, { text: string; type: string }> = {
   3: { text: '已关闭', type: 'danger' },
   4: { text: '已驳回', type: 'danger' }
 }
+
+const statusSteps = [
+  { title: '提交工单', status: 0 },
+  { title: '处理中', status: 1 },
+  { title: '已解决', status: 2 },
+  { title: '已关闭', status: 3 }
+]
+
+const currentStep = computed(() => {
+  if (!orderDetail.value) return 0
+  const status = orderDetail.value.status
+  if (status === 4) return -1
+  return statusSteps.findIndex(step => step.status === status)
+})
 
 const canClose = computed(() => {
   return orderDetail.value && (orderDetail.value.status === 0 || orderDetail.value.status === 1)
@@ -129,6 +144,18 @@ const goBack = () => {
   router.go(-1)
 }
 
+const goToRepairList = () => {
+  router.push('/repair')
+}
+
+const goToCreate = () => {
+  router.push('/repair/create')
+}
+
+const goToContact = () => {
+  router.push('/contact')
+}
+
 const handleLogout = async () => {
   try {
     await ElMessageBox.confirm('确定要退出登录吗？', '提示', { type: 'warning' })
@@ -155,15 +182,15 @@ onMounted(async () => {
         <h2 class="detail-title">报修详情</h2>
       </div>
       <div class="header-right">
-        <el-button @click="router.push('/repair')">
+        <el-button @click="goToRepairList">
           <el-icon><List /></el-icon>
           <span>报修列表</span>
         </el-button>
-        <el-button @click="router.push('/contact')">
+        <el-button @click="goToContact">
           <el-icon><ChatDotRound /></el-icon>
           <span>联系团队</span>
         </el-button>
-        <el-button @click="router.push('/repair/create')">
+        <el-button @click="goToCreate">
           <el-icon><Plus /></el-icon>
           <span>新建报修</span>
         </el-button>
@@ -175,6 +202,25 @@ onMounted(async () => {
     </div>
 
     <template v-if="orderDetail">
+      <el-card class="status-card">
+        <el-steps :active="currentStep" finish-status="success" align-center>
+          <el-step
+            v-for="step in statusSteps"
+            :key="step.status"
+            :title="step.title"
+            :status="orderDetail.status === 4 ? 'error' : undefined"
+          />
+        </el-steps>
+        <div v-if="orderDetail.status === 4" class="reject-notice">
+          <el-alert title="工单已被驳回" type="error" :closable="false" show-icon>
+            <template #default>
+              <p v-if="orderDetail.resolveContent">{{ orderDetail.resolveContent }}</p>
+              <p v-else>请联系管理员了解详情</p>
+            </template>
+          </el-alert>
+        </div>
+      </el-card>
+
       <el-card class="info-card">
         <template #header>
           <div class="card-header">
@@ -198,7 +244,7 @@ onMounted(async () => {
           <el-descriptions-item label="问题描述" :span="2">
             <div class="description-content">{{ orderDetail.description }}</div>
           </el-descriptions-item>
-          <el-descriptions-item v-if="orderDetail.resolveContent" label="解决方案" :span="2">
+          <el-descriptions-item v-if="orderDetail.resolveContent && orderDetail.status !== 4" label="解决方案" :span="2">
             <div class="resolve-content">{{ orderDetail.resolveContent }}</div>
           </el-descriptions-item>
           <el-descriptions-item v-if="orderDetail.images" label="相关图片" :span="2">
@@ -215,8 +261,9 @@ onMounted(async () => {
           </el-descriptions-item>
         </el-descriptions>
 
-        <div class="action-buttons" v-if="canClose">
-          <el-button type="danger" @click="handleCloseOrder">关闭工单</el-button>
+        <div class="action-buttons">
+          <el-button v-if="canClose" type="danger" @click="handleCloseOrder">关闭工单</el-button>
+          <el-button type="primary" @click="goToRepairList">返回列表</el-button>
         </div>
       </el-card>
 
@@ -253,7 +300,7 @@ onMounted(async () => {
           </el-timeline-item>
         </el-timeline>
 
-        <div v-if="comments.length === 0" class="no-comments">暂无沟通记录</div>
+        <el-empty v-if="comments.length === 0" description="暂无沟通记录" />
       </el-card>
 
       <el-card v-if="canEvaluate" class="evaluate-card">
@@ -330,6 +377,15 @@ onMounted(async () => {
   margin: 0;
 }
 
+.status-card {
+  margin-bottom: 20px;
+  border-radius: 8px;
+}
+
+.reject-notice {
+  margin-top: 16px;
+}
+
 .info-card,
 .comment-card,
 .evaluate-card,
@@ -366,6 +422,7 @@ onMounted(async () => {
   margin-top: 16px;
   display: flex;
   justify-content: flex-end;
+  gap: 12px;
 }
 
 .comment-item {

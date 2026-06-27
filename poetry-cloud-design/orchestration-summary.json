@@ -1,0 +1,73 @@
+{
+  "project": {
+    "name": "诗云",
+    "operation": "create",
+    "deviceType": "desktop",
+    "replicationMode": "reference",
+    "designRead": "古诗词可视化 / 文化爱好者 / 沉浸式探索 / 视觉驱动 / 避免过度现代化",
+    "designDials": {
+      "layoutVariance": 3,
+      "motionIntensity": 4,
+      "visualDensity": 2
+    },
+    "generationTree": {
+      "root": {
+        "nodeId": "gen-project-shell",
+        "kind": "project-shell",
+        "pageIds": ["page-index"],
+        "output": "partials/project-shell.html",
+        "sharedRegions": ["导航栏", "底部信息栏", "星空背景"],
+        "privateRegions": ["左侧控制面板", "中央星空区域", "右侧信息面板"],
+        "mutableSlots": [],
+        "status": "planned",
+        "children": [
+          {
+            "nodeId": "gen-page-index",
+            "kind": "page-leaf",
+            "pageIds": ["page-index"],
+            "output": "pages/index.html",
+            "sharedRegions": [],
+            "privateRegions": ["诗人信息面板", "诗歌详情", "星空交互"],
+            "mutableSlots": [],
+            "status": "planned",
+            "children": []
+          }
+        ]
+      }
+    }
+  },
+  "designSource": {
+    "operatingMode": "free-explore",
+    "styleConstraints": {
+      "radiusMax": 16,
+      "staticShadowAlphaMax": 0.05
+    },
+    "libraryIdentity": null
+  },
+  "pages": [
+    {
+      "nodeId": "page-index",
+      "title": "诗云星空",
+      "htmlSrc": "pages/index.html",
+      "pageIndex": 1,
+      "visualNorthStar": "沉浸式星空可视化，融合传统中国美学与现代交互设计",
+      "compositionPattern": "全屏沉浸式布局，左侧控制面板，中央星空，右侧信息面板",
+      "continuityAnchors": [
+        "深色星空背景",
+        "暖色调光点系统",
+        "书法字体标题",
+        "毛玻璃效果面板"
+      ],
+      "componentPlan": {
+        "contractKind": "free-explore",
+        "contractFile": null
+      },
+      "imagePlan": [],
+      "chartsRequired": false,
+      "miniProgramStyle": false
+    }
+  ],
+  "assets": [],
+  "wiringPlan": [],
+  "hiddenInteractionPlan": []
+}

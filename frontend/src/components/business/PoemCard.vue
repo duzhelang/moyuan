@@ -26,7 +26,7 @@ const formattedContent = computed(() => {
 <template>
   <div class="poem-card" @click="goToDetail">
     <div class="poem-image" v-if="showImage">
-      <img src="/images/h6.jpg" :alt="poem.title" />
+      <img src="/img/h6.jpg" :alt="poem.title" />
       <div class="original-badge" v-if="poem.isOriginal">
         <el-icon><EditPen /></el-icon>
         原创

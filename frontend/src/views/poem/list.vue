@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { usePoemStore } from '@/stores/poem'
@@ -14,7 +14,7 @@ import { getCache, setCache } from '@/utils/storage'
 import { searchApihzPoems, getApihzPoetryDetail } from '@/api/modules/external-poetry'
 import type { PoemSearchResult } from '@/api/modules/external-poetry'
 import { searchPoetryByTitle, searchPoetryByAuthor, getRandomPoetry, type PoetryDbPoem } from '@/api/modules/external-poetry'
-import { getAiModuleConfig, type AiModuleConfig } from '@/api/modules/ai'
+import { getAiModuleConfig, chat, type AiModuleConfig } from '@/api/modules/ai'
 import { smartSearch, getSearchSuggestions, getHotSearches, getSearchHistory, clearSearchHistory } from '@/api/modules/search'
 import type { SmartSearchResult } from '@/api/modules/search'
 import { getCachedContent as getPoemCachedContent, saveCachedContent as savePoemCachedContent } from '@/api/modules/poem-content'
@@ -51,9 +51,9 @@ const poets = ref<Poet[]>([])
 const activeTab = ref<'classical' | 'modern' | 'foreign'>('classical')
 
 const poemImages = [
-  '/img/lt_jx (2).jpg',
-  '/img/lt_jx (3).jpg',
-  '/img/lt_jx (4).jpg'
+  '/img/lt_jx_2.jpg',
+  '/img/lt_jx_3.jpg',
+  '/img/lt_jx_4.jpg'
 ]
 
 const filters = ref({
@@ -77,6 +77,8 @@ interface ForeignPoem {
   author: string
   linecount: string
   source: 'foreign'
+  originalLines: string[]
+  chineseContent?: string
 }
 
 const foreignFilters = ref({
@@ -318,7 +320,8 @@ const fetchForeignPoems = async () => {
       content: poem.lines?.join('\n') || '',
       author: poem.author,
       linecount: poem.linecount,
-      source: 'foreign' as const
+      source: 'foreign' as const,
+      originalLines: poem.lines || []
     }))
     foreignTotal.value = foreignPoemList.value.length
   } catch (error) {
@@ -331,6 +334,9 @@ const fetchForeignPoems = async () => {
 const openPoemDetail = async (poem: PoemSearchResult) => {
   if (poem.source === 'local' && poem.id) {
     router.push(`/poem/${poem.id}`)
+  } else if (poem.source === 'foreign') {
+    // 外文诗歌直接使用 PoetryDB 返回的英文原文
+    openForeignPoemDetail(poem)
   } else {
     selectedExternalPoem.value = poem
     externalDetailLoading.value = true
@@ -1076,16 +1082,67 @@ const goToDetail = (id: number | string) => {
   }
 }
 
-const openForeignPoemDetail = (poem: any) => {
+const showForeignOriginal = ref(false)
+const foreignOriginalLines = ref<string[]>([])
+const foreignTranslating = ref(false)
+
+const translateEnglishPoem = async (poem: any): Promise<string> => {
+  const englishText = poem.originalLines?.join('\n') || poem.content || ''
+  const prompt = `请将以下英文诗歌翻译成中文，要求译文优美、保留诗意和韵律感，仅返回中文译文即可，不要添加任何额外说明。\n\n原文标题：${poem.title}\n作者：${poem.author}\n\n原文：\n${englishText}`
+  try {
+    const res = await chat({ message: prompt })
+    return res.data.reply || ''
+  } catch (e) {
+    console.error('AI翻译失败:', e)
+    return ''
+  }
+}
+
+const openForeignPoemDetail = async (poem: any) => {
+  externalDetailLoading.value = true
   selectedExternalPoem.value = {
     title: poem.title,
     content: poem.content,
     author: poem.author,
     source: 'external'
   }
+
+  // 优先通过接口盒子API搜索中文版
+  let chineseText = poem.chineseContent || ''
+  if (!chineseText) {
+    try {
+      const apiResult = await getApihzPoetryDetail(poem.title)
+      if (apiResult && apiResult.content) {
+        chineseText = apiResult.content
+      }
+    } catch (e) {
+      // 接口盒子没有结果，走AI翻译
+    }
+  }
+
+  // 接口盒子没有找到，用AI翻译
+  if (!chineseText) {
+    foreignTranslating.value = true
+    chineseText = await translateEnglishPoem(poem)
+    foreignTranslating.value = false
+  }
+
+  // 保存中文翻译到诗歌对象
+  if (chineseText) {
+    poem.chineseContent = chineseText
+    poem.content = chineseText
+  }
+
+  externalPoemDetail.value = {
+    title: poem.title,
+    content: chineseText || poem.content,
+    author: poem.author
+  }
   externalDetailLoading.value = false
   externalActiveTab.value = 'translation'
-  showEnlargedContent.value = true
+  showEnlargedContent.value = false
+  showForeignOriginal.value = false
+  foreignOriginalLines.value = poem.originalLines || []
 }
 
 const handleLike = async (poem: any, event: Event) => {
@@ -1176,6 +1233,9 @@ onMounted(() => {
   fetchPoems()
   initSearchData()
 
+  window.addEventListener('scroll', handleSearchScroll, true)
+  window.addEventListener('resize', handleSearchScroll)
+
   if (query.poemTitle) {
     const poemTitle = String(query.poemTitle)
     const cachedPoem = getCache<PoemSearchResult>(`external_poem_${poemTitle}`)
@@ -1183,6 +1243,11 @@ onMounted(() => {
       openPoemDetail(cachedPoem)
     }
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleSearchScroll, true)
+  window.removeEventListener('resize', handleSearchScroll)
 })
 
 const initSearchData = async () => {
@@ -1210,7 +1275,19 @@ const handleSearchInput = async (value: string) => {
   }
 }
 
+let searchScrollTimer: ReturnType<typeof setTimeout> | null = null
+const handleSearchScroll = () => {
+  if (showSearchPanel.value) {
+    if (searchScrollTimer) clearTimeout(searchScrollTimer)
+    searchScrollTimer = setTimeout(() => updateSearchPanelPosition(), 100)
+  }
+}
+
+// 搜索面板与输入框的间距（px）
+const SEARCH_PANEL_GAP = 4
+
 const handleSearchFocus = () => {
+  updateSearchPanelPosition()
   showSearchPanel.value = true
 }
 
@@ -1218,6 +1295,20 @@ const handleSearchBlur = () => {
   setTimeout(() => {
     showSearchPanel.value = false
   }, 200)
+}
+
+const searchPanelStyle = ref<Record<string, string>>({})
+const searchInputRef = ref<HTMLElement | null>(null)
+
+const updateSearchPanelPosition = () => {
+  if (!searchInputRef.value) return
+  const rect = searchInputRef.value.getBoundingClientRect()
+  searchPanelStyle.value = {
+    position: 'fixed',
+    top: (rect.bottom + SEARCH_PANEL_GAP) + 'px',
+    left: rect.left + 'px',
+    width: rect.width + 'px'
+  }
 }
 
 const selectSuggestion = (suggestion: string) => {
@@ -1369,7 +1460,8 @@ const handleClearHistory = async () => {
 
             <div class="filter-item search-item">
               <label>搜索：</label>
-              <div class="search-input-wrapper">
+              <!-- 搜索面板定位参照：使用 div 而非 el-input，以便获取完整容器尺寸 -->
+              <div class="search-input-wrapper" ref="searchInputRef">
                 <el-input
                   v-model="filters.keyword"
                   placeholder="搜索诗词..."
@@ -1384,7 +1476,7 @@ const handleClearHistory = async () => {
                   </template>
                 </el-input>
                 
-                <div v-if="showSearchPanel && (searchSuggestions.length > 0 || hotSearches.length > 0 || searchHistoryList.length > 0)" class="search-panel">
+                <div v-if="showSearchPanel && (searchSuggestions.length > 0 || hotSearches.length > 0 || searchHistoryList.length > 0)" class="search-panel" :style="searchPanelStyle">
                   <div v-if="searchSuggestions.length > 0" class="panel-section">
                     <div class="panel-title">搜索建议</div>
                     <div v-for="item in searchSuggestions" :key="item" class="panel-item" @mousedown.prevent="selectSuggestion(item)">
@@ -1525,14 +1617,14 @@ const handleClearHistory = async () => {
         </el-card>
       </div>
 
-      <div class="result-stats" v-if="total > 0">
+      <div class="result-stats" v-if="total > 0 && !selectedExternalPoem">
         <span v-if="activeTab === 'foreign'">共找到 <strong>{{ total }}</strong> 首外文诗词</span>
         <span v-else>共找到 <strong>{{ total }}</strong> 首诗词</span>
         <el-tag v-if="searchLevel === 'fuzzy'" type="warning" size="small" class="search-level-tag">模糊匹配</el-tag>
         <el-tag v-else-if="searchLevel === 'pinyin'" type="info" size="small" class="search-level-tag">拼音匹配</el-tag>
       </div>
 
-      <div class="poem-grid" v-loading="loading || foreignLoading" v-if="loading || foreignLoading || poems.length > 0 || (!externalSearching && externalPoemResults.length === 0)">
+      <div class="poem-grid" v-loading="loading || foreignLoading" v-if="(loading || foreignLoading || poems.length > 0 || (!externalSearching && externalPoemResults.length === 0)) && !selectedExternalPoem">
         <el-empty v-if="!loading && !foreignLoading && !externalSearching && poems.length === 0 && externalPoemResults.length === 0" description="暂无诗词" />
 
         <div
@@ -1570,7 +1662,7 @@ const handleClearHistory = async () => {
               <span v-else-if="poem.author">{{ poem.author }}</span>
             </p>
             <div class="poem-verses">
-              <p v-for="(line, index) in getFormattedVerses(poem.content)" :key="index" class="verse-line">
+              <p v-for="(line, index) in getFormattedVerses(poem.chineseContent || poem.content)" :key="index" class="verse-line">
                 {{ line }}
               </p>
             </div>
@@ -1614,7 +1706,7 @@ const handleClearHistory = async () => {
         </div>
       </div>
 
-      <div class="pagination-section" v-if="total > 0">
+      <div class="pagination-section" v-if="total > 0 && !selectedExternalPoem">
         <el-pagination
           v-model:current-page="currentPage"
           v-model:page-size="pageSize"
@@ -1626,12 +1718,16 @@ const handleClearHistory = async () => {
         />
       </div>
 
-      <div class="external-results-section" v-if="externalSearching || externalPoemResults.length > 0">
+      <div class="external-results-section" v-if="externalSearching || externalPoemResults.length > 0 || selectedExternalPoem">
         <div class="section-header">
           <div class="section-title-area">
             <el-button v-if="poemHistory.length > 0" text class="back-btn" @click="goBackInHistory">
               <el-icon><ArrowLeft /></el-icon>
               返回上一篇
+            </el-button>
+            <el-button v-if="selectedExternalPoem && externalPoemResults.length === 0" text class="back-btn" @click="selectedExternalPoem = null; externalPoemDetail = null">
+              <el-icon><ArrowLeft /></el-icon>
+              返回诗词列表
             </el-button>
             <h1 class="section-title">寻章摘句</h1>
             <p class="section-subtitle">品读千年韵律，感悟诗词之美</p>
@@ -1724,6 +1820,14 @@ const handleClearHistory = async () => {
                     >
                       <el-icon><Document /></el-icon>
                       <span>创作背景</span>
+                    </el-button>
+                    <el-button
+                      v-if="foreignOriginalLines.length > 0"
+                      @click="showForeignOriginal = !showForeignOriginal"
+                      :class="['toolbar-btn', { 'is-active': showForeignOriginal }]"
+                    >
+                      <el-icon><Document /></el-icon>
+                      <span>{{ showForeignOriginal ? '隐藏原文' : '外文原文' }}</span>
                     </el-button>
                   </div>
 
@@ -1885,6 +1989,20 @@ const handleClearHistory = async () => {
                         </Transition>
                       </template>
                     </div>
+                    <Transition name="expand-line">
+                      <div v-if="showForeignOriginal && foreignOriginalLines.length > 0" class="foreign-original-panel">
+                        <div class="foreign-original-header">
+                          <el-icon><Document /></el-icon>
+                          <span>外文原文</span>
+                        </div>
+                        <div class="foreign-original-body">
+                          <div v-for="(line, idx) in foreignOriginalLines" :key="idx" class="foreign-original-line">
+                            <span class="foreign-line-number">{{ idx + 1 }}</span>
+                            <span class="foreign-line-text">{{ line }}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </Transition>
                   </div>
                 </div>
                 </div>
@@ -2196,7 +2314,7 @@ const handleClearHistory = async () => {
 .header-banner {
   position: relative;
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: $border-radius-lg;
   margin-bottom: $spacing-xl;
 
   .banner-particles {
@@ -2273,7 +2391,7 @@ const handleClearHistory = async () => {
 .filter-section {
   margin-bottom: $spacing-xl;
   background: url('/img/dt_5.jpg') no-repeat center / cover;
-  border-radius: 8px;
+  border-radius: $border-radius-md;
 }
 
 .filter-card {
@@ -2350,16 +2468,11 @@ const handleClearHistory = async () => {
 }
 
 .search-panel {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  background: $background-color-light;
-  border: 1px solid $border-color;
-  border-radius: $border-radius-sm;
-  box-shadow: $box-shadow;
-  margin-top: $spacing-xs;
+  z-index: 9999;
+  background: #fff;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
   max-height: 400px;
   overflow-y: auto;
   @include scrollbar;
@@ -2377,29 +2490,33 @@ const handleClearHistory = async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: $spacing-xs $spacing-md $spacing-sm;
-  font-size: $font-size-xs;
-  color: $text-color-light;
+  padding: 0 20px;
+  height: 30px;
+  line-height: 30px;
+  font-size: 12px;
+  color: #909399;
 }
 
 .panel-item {
   display: flex;
   align-items: center;
-  gap: $spacing-sm;
-  padding: $spacing-sm $spacing-md;
+  gap: 8px;
+  padding: 0 20px;
+  height: 34px;
+  line-height: 34px;
   cursor: pointer;
-  font-size: $font-size-base;
-  color: $text-color-secondary;
-  transition: all $transition-fast;
+  font-size: 14px;
+  color: #606266;
+  transition: all 0.2s;
   
   &:hover {
-    background: rgba($primary-color, 0.04);
-    color: $primary-color;
+    background: #f5f7fa;
+    color: #409eff;
   }
   
   .el-icon {
-    font-size: $font-size-base;
-    color: $text-color-light;
+    font-size: 14px;
+    color: #c0c4cc;
   }
 }
 
@@ -3046,7 +3163,7 @@ const handleClearHistory = async () => {
   }
 
   .el-icon {
-    font-size: 16px;
+    font-size: $font-size-lg;
   }
 }
 
@@ -3139,7 +3256,7 @@ const handleClearHistory = async () => {
   gap: 3px;
 
   .el-icon {
-    font-size: 18px;
+    font-size: $font-size-xl;
     color: $primary-color;
     animation: searchPulse 1.5s ease-in-out infinite;
   }
@@ -3230,7 +3347,7 @@ const handleClearHistory = async () => {
 }
 
 .verse-text {
-  font-size: 20px;
+  font-size: $font-size-xxl;
   font-family: $font-family-title;
   color: $text-color;
   line-height: 2;
@@ -3240,7 +3357,7 @@ const handleClearHistory = async () => {
 
 .verse-explain-icon {
   color: $primary-color;
-  font-size: 16px;
+  font-size: $font-size-lg;
   flex-shrink: 0;
 }
 
@@ -3264,7 +3381,7 @@ const handleClearHistory = async () => {
 .ai-explain-close {
   margin-left: auto;
   cursor: pointer;
-  font-size: 14px;
+  font-size: $font-size-base;
   color: $text-color-light;
   transition: color $transition-fast;
 
@@ -3291,9 +3408,62 @@ const handleClearHistory = async () => {
   white-space: pre-line;
 }
 
+.foreign-original-panel {
+  margin-top: $spacing-lg;
+  background: linear-gradient(135deg, rgba(#667eea, 0.05), rgba(#764ba2, 0.05));
+  border-radius: $border-radius-md;
+  padding: $spacing-lg;
+  border-left: 3px solid #667eea;
+}
+
+.foreign-original-header {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-md;
+  color: #667eea;
+  font-weight: 600;
+  font-size: $font-size-base;
+}
+
+.foreign-original-body {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.foreign-original-line {
+  display: flex;
+  align-items: baseline;
+  gap: $spacing-md;
+  padding: $spacing-xs 0;
+}
+
+.foreign-line-number {
+  min-width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(#667eea, 0.1);
+  color: #667eea;
+  font-size: $font-size-xs;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.foreign-line-text {
+  font-size: $font-size-base;
+  color: $text-color;
+  line-height: 1.8;
+  font-style: italic;
+  letter-spacing: 0.5px;
+}
+
 .expand-line-enter-active,
 .expand-line-leave-active {
-  transition: all 0.3s ease;
+  transition: all $transition-base;
   overflow: hidden;
 }
 
@@ -3361,7 +3531,7 @@ const handleClearHistory = async () => {
 }
 
 .enlarged-text {
-  font-size: 18px;
+  font-size: $font-size-xl;
   line-height: 2;
   color: $text-color;
   font-family: $font-family-title;
@@ -3460,13 +3630,13 @@ const handleClearHistory = async () => {
 .info-card-icon {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: $border-radius-md;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #e8d5b7 0%, #d4af87 100%);
   color: #5a3e2b;
-  font-size: 16px;
+  font-size: $font-size-lg;
 
   &.appreciation-icon {
     background: linear-gradient(135deg, #f0e4d7 0%, #e8d5b7 100%);

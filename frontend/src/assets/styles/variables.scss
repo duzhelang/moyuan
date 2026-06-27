@@ -38,7 +38,7 @@ $spacing-xl: 32px;
 $spacing-xxl: 48px;
 
 // 字体
-$font-family-base: 'YingBiXingShu', 'Noto Serif SC', 'Songti SC', serif;
+$font-family-base: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
 $font-family-title: 'KaiTi', 'STKaiti', serif;
 $font-family-input: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
 $font-size-xs: 12px;
@@ -96,3 +96,93 @@ $container-md: 720px;
 $container-lg: 960px;
 $container-xl: 1140px;
 $container-xxl: 1320px;
+
+// ============================================================
+// 色阶扩展 — $primary-color (#8B4513) 50-900
+// ============================================================
+$primary-50: #fdf5ef;
+$primary-100: #f9e6d5;
+$primary-200: #f0c9a6;
+$primary-300: #e5a76e;
+$primary-400: #c97d3a;
+$primary-500: #8B4513;
+$primary-600: #7a3c10;
+$primary-700: #602f0d;
+$primary-800: #47230a;
+$primary-900: #2e1707;
+
+// ============================================================
+// 色阶扩展 — $secondary-color (#D2691E) 50-900
+// ============================================================
+$secondary-50: #fef6f0;
+$secondary-100: #fce8d6;
+$secondary-200: #f7cda8;
+$secondary-300: #f0ac70;
+$secondary-400: #e08536;
+$secondary-500: #D2691E;
+$secondary-600: #b5591a;
+$secondary-700: #8e4515;
+$secondary-800: #6a3410;
+$secondary-900: #47230b;
+
+// ============================================================
+// 语义化表面色
+// ============================================================
+$surface-primary: #fffcf7;
+$surface-secondary: #f8f4ee;
+$surface-elevated: #ffffff;
+$surface-overlay: rgba(0, 0, 0, 0.45);
+
+// ============================================================
+// 中文排版变量
+// ============================================================
+$font-family-poetry: 'FangSong', 'STFangsong', 'Noto Serif SC', 'SimSun', serif;
+$font-family-seal: 'KaiTi', 'STKaiti', 'BiauKai', serif;
+$font-size-poem: 18px;
+$font-size-poem-title: 22px;
+$line-height-poem: 2;
+$letter-spacing-poem: 2px;
+
+// ============================================================
+// 间距系统补充
+// ============================================================
+$spacing-3xs: 2px;
+$spacing-2xl: 64px;
+
+// ============================================================
+// 组件级令牌
+// ============================================================
+$card-hover-shadow: 0 8px 24px rgba(139, 69, 19, 0.12);
+$transition-bounce: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+$badge-radius: 10px;
+$avatar-border-color: $border-color-bronze;
+$tag-bg-light: rgba($primary-color, 0.08);
+$tag-text-color: $primary-700;
+$divider-color: rgba($border-color-bronze, 0.5);
+$input-focus-ring: 0 0 0 3px rgba($primary-color, 0.15);
+
+// ============================================================
+// 深色主题预置（$dark- 前缀）
+// ============================================================
+$dark-bg-base: #0f1117;
+$dark-bg-surface: #1a1c24;
+$dark-bg-elevated: #24272f;
+$dark-text-primary: rgba(255, 255, 255, 0.92);
+$dark-text-secondary: rgba(255, 255, 255, 0.6);
+$dark-text-muted: rgba(255, 255, 255, 0.38);
+$dark-border-color: rgba(255, 255, 255, 0.1);
+$dark-border-color-light: rgba(255, 255, 255, 0.06);
+$dark-primary-color: #c97d3a;
+$dark-secondary-color: #e08536;
+$dark-surface-primary: #1a1c24;
+$dark-surface-secondary: #14161c;
+$dark-surface-elevated: #24272f;
+$dark-surface-overlay: rgba(0, 0, 0, 0.6);
+$dark-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+$dark-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+$dark-card-hover-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+$dark-comment-input-bg: rgba(255, 255, 255, 0.05);
+$dark-comment-input-border: rgba(255, 255, 255, 0.1);
+$dark-comment-input-border-focus: rgba($dark-primary-color, 0.5);
+$dark-comment-input-color: $dark-text-primary;
+$dark-comment-input-placeholder: $dark-text-muted;

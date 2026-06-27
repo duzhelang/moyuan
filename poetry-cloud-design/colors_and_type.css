@@ -1,0 +1,172 @@
+/* 诗云 - 墨渊系统适配版品牌 CSS */
+/* 融合星空可视化概念与传统中国风格 */
+
+:root {
+  /* 品牌主色 - 墨渊棕色系 */
+  --brand-primary: #8B4513;
+  --brand-primary-light: #CD853F;
+  --brand-primary-dark: #602f0d;
+  --brand-primary-50: #fdf5ef;
+  --brand-primary-100: #f9e6d5;
+  --brand-primary-200: #f0c9a6;
+  --brand-primary-300: #e5a76e;
+  --brand-primary-400: #c97d3a;
+  --brand-primary-500: #8B4513;
+  --brand-primary-600: #7a3c10;
+  --brand-primary-700: #602f0d;
+  --brand-primary-800: #47230a;
+  --brand-primary-900: #2e1707;
+
+  /* 星空主题色 - 暖色调光点 */
+  --star-gold: #FFD700;
+  --star-amber: #FFA500;
+  --star-copper: #B87333;
+  --star-bronze: #CD7F32;
+
+  /* 背景色 - 深色星空 */
+  --bg-deep: #0a0a0f;
+  --bg-surface: #1a1a2e;
+  --bg-elevated: #16213e;
+  --bg-card: rgba(26, 26, 46, 0.8);
+
+  /* 文本色 */
+  --text-primary: #f5f5f5;
+  --text-secondary: #b0b0b0;
+  --text-muted: #808080;
+  --text-accent: #CD853F;
+
+  /* 边框 */
+  --border-color: rgba(205, 133, 63, 0.2);
+  --border-light: rgba(205, 133, 63, 0.1);
+  --border-focus: rgba(205, 133, 63, 0.5);
+
+  /* 间距 */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-xxl: 48px;
+
+  /* 圆角 */
+  --radius-sm: 2px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+
+  /* 阴影 */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+  /* 字体 */
+  --font-family-title: 'YingBiXingShu', 'KaiTi', 'STKaiti', serif;
+  --font-family-body: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  --font-family-mono: 'FangSong', 'STFangsong', monospace;
+
+  /* 字体大小 */
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-base: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 18px;
+  --font-size-xxl: 20px;
+  --font-size-title: 24px;
+  --font-size-hero: 32px;
+
+  /* 行高 */
+  --line-height-tight: 1.2;
+  --line-height-base: 1.5;
+  --line-height-loose: 1.8;
+
+  /* 过渡 */
+  --transition-fast: 0.2s ease;
+  --transition-base: 0.3s ease;
+  --transition-slow: 0.5s ease;
+
+  /* 星空特效 */
+  --glow-gold: 0 0 10px rgba(255, 215, 0, 0.3);
+  --glow-amber: 0 0 10px rgba(255, 165, 0, 0.3);
+  --glow-copper: 0 0 10px rgba(184, 115, 51, 0.3);
+}
+
+/* 深色主题变量 */
+.dark {
+  --bg-deep: #050508;
+  --bg-surface: #0f0f1a;
+  --bg-elevated: #1a1a2e;
+  --bg-card: rgba(15, 15, 26, 0.9);
+  --text-primary: #ffffff;
+  --text-secondary: #d0d0d0;
+  --text-muted: #909090;
+  --border-color: rgba(205, 133, 63, 0.15);
+  --border-light: rgba(205, 133, 63, 0.08);
+}
+
+/* 响应式断点 */
+@media (max-width: 768px) {
+  :root {
+    --font-size-hero: 24px;
+    --font-size-title: 20px;
+    --spacing-xxl: 32px;
+  }
+}
+
+/* 通用组件样式 */
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-light));
+  color: white;
+  border: none;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--radius-md);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--brand-primary-dark), var(--brand-primary));
+  box-shadow: var(--glow-copper);
+  transform: translateY(-1px);
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  backdrop-filter: blur(10px);
+  transition: all var(--transition-base);
+}
+
+.card:hover {
+  border-color: var(--border-focus);
+  box-shadow: var(--shadow-md);
+}
+
+/* 星空粒子动画 */
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* 书法字体装饰 */
+.calligraphy {
+  font-family: var(--font-family-title);
+  color: var(--text-accent);
+  text-shadow: 0 0 10px rgba(205, 133, 63, 0.3);
+}
+
+/* 宣纸纹理背景 */
+.paper-texture {
+  background-image: 
+    radial-gradient(circle at 20% 80%, rgba(205, 133, 63, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(139, 69, 19, 0.05) 0%, transparent 50%),
+    linear-gradient(to bottom, var(--bg-deep), var(--bg-surface));
+}

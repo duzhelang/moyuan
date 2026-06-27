@@ -1,0 +1,26 @@
+{
+  "data": [
+    {
+      "id": "page-index",
+      "title": "诗云星空",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1782552800000,
+      "canvasData": {
+        "x": 0,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/index.html",
+        "interactions": []
+      }
+    }
+  ],
+  "config": {
+    "autoLayout": true,
+    "deviceType": "desktop",
+    "projectName": "诗云",
+    "designLibrary": null
+  }
+}

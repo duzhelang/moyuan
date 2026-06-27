@@ -8,10 +8,12 @@ import com.moyuan.mapper.PoetMapper;
 import com.moyuan.service.DynastyService;
 import com.moyuan.service.PoetSyncService;
 import com.moyuan.util.PoetDataExtractor;
+import com.moyuan.util.PoetDefaultAvatar;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
@@ -70,10 +72,6 @@ public class PoetSyncServiceImpl implements PoetSyncService {
                 poet.setStatus(1);
             }
 
-            if (poetData.containsKey("image") && poetData.get("image") != null) {
-                poet.setAvatar((String) poetData.get("image"));
-            }
-
             String dynastyName = (String) poetData.get("dynasty");
             if (dynastyName != null) {
                 Dynasty dynasty = dynastyMapper.selectOne(
@@ -93,13 +91,20 @@ public class PoetSyncServiceImpl implements PoetSyncService {
                 PoetDataExtractor.extractYears(content, poet);
                 PoetDataExtractor.extractBirthplace(content, poet);
             }
-            
+
             // 如果没有从API获取到朝代，根据生卒年确定朝代
             if (poet.getDynastyId() == null && (poet.getBirthYear() != null || poet.getDeathYear() != null)) {
                 Dynasty dynasty = dynastyService.determineDynastyByYears(poet.getBirthYear(), poet.getDeathYear());
                 if (dynasty != null) {
                     poet.setDynastyId(dynasty.getId());
                 }
+            }
+
+            // 头像赋值（放在朝代之后，确保智能分配时有朝代信息）
+            if (poetData.containsKey("image") && poetData.get("image") != null) {
+                poet.setAvatar((String) poetData.get("image"));
+            } else if (!StringUtils.hasText(poet.getAvatar())) {
+                poet.setAvatar(PoetDefaultAvatar.getAvatar(poet));
             }
 
             if (poetData.containsKey("rwsp") && poetData.get("rwsp") != null) {

@@ -1,9 +1,9 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
-import { getItem } from '@/utils/storage'
+import { getItem, setItem, removeItem } from '@/utils/storage'
 import { User, Star, Clock, Setting, SwitchButton } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -13,6 +13,7 @@ const showLoginDropdown = ref(false)
 const loginDropdownTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const isMouseInDropdownArea = ref(false)
 const isLoginInputFocused = ref(false)
+const rememberMe = ref(false)
 const quickLoginForm = ref({
   username: '',
   password: ''
@@ -81,6 +82,14 @@ const handleQuickLogin = async () => {
       password: quickLoginForm.value.password
     })
     ElMessage.success('登录成功')
+    if (rememberMe.value) {
+      setItem('remembered_account', {
+        username: quickLoginForm.value.username,
+        password: quickLoginForm.value.password
+      }, 30 * 24 * 60 * 60 * 1000)
+    } else {
+      removeItem('remembered_account')
+    }
     showLoginDropdown.value = false
     quickLoginForm.value = { username: '', password: '' }
   } catch (error: any) {
@@ -103,6 +112,7 @@ onMounted(() => {
   if (savedAccount) {
     quickLoginForm.value.username = savedAccount.username
     quickLoginForm.value.password = savedAccount.password
+    rememberMe.value = true
   }
 })
 </script>
@@ -168,6 +178,12 @@ onMounted(() => {
           <div class="lieb">
             <label for="ld-password" class="dl_ts">密&nbsp;&nbsp;码:</label>
             <input type="password" id="ld-password" v-model="quickLoginForm.password" class="input-field" placeholder="请输入密码" autocomplete="off" required @click.stop @focus="handleLoginInputFocus" @blur="handleLoginInputBlur">
+          </div>
+          <div class="remember-me-container">
+            <label class="remember-me-label" @click.stop>
+              <input type="checkbox" v-model="rememberMe" class="remember-me-checkbox" @click.stop>
+              <span class="remember-me-text">记住密码</span>
+            </label>
           </div>
           <button type="button" class="login-button" @click.stop="handleQuickLogin">登录</button>
           <div class="login-links">
@@ -242,7 +258,7 @@ onMounted(() => {
 }
 
 .login-container {
-  background: url('/img/dt_0.0.jpg') no-repeat -155px 0 / cover;
+  background: url('/img/dt_0_0.jpg') no-repeat -155px 0 / cover;
   width: 366px;
   min-height: 240px;
   background-color: #f4f4f4;
@@ -302,6 +318,32 @@ onMounted(() => {
   margin-top: 8px;
 }
 
+.remember-me-container {
+  display: flex;
+  align-items: center;
+  margin-top: 6px;
+  padding-left: 68px;
+}
+
+.remember-me-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.remember-me-checkbox {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: #007BFF;
+}
+
+.remember-me-text {
+  font-size: 13px;
+  color: #666;
+}
+
 .login-button:hover {
   background-color: #0056b3;
 }
@@ -336,7 +378,7 @@ onMounted(() => {
 }
 
 .user-menu-container {
-  background: url('/img/dt_0.0.jpg') no-repeat -155px 0 / cover;
+  background: url('/img/dt_0_0.jpg') no-repeat -155px 0 / cover;
   width: 160px;
   background-color: #f4f4f4;
   border: 1px solid #ccc;

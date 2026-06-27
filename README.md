@@ -187,7 +187,7 @@ cd sc-moyuan-backend
 mysql -u root -p < src/main/resources/db/init.sql
 ```
 
-> **说明**：`init.sql` 是全量合并版脚本（v3.0），包含数据库创建、全部16张表建表语句、初始数据（13个朝代、8个分类、1个诗人、11首诗词、2个测试用户、4个AI模型、6位精选诗人、24条首页导航）。
+> **说明**：`init.sql` 是全量合并版脚本（v3.0），包含数据库创建、全部28张表建表语句、初始数据（13个朝代、8个分类、1个诗人、11首诗词、2个测试用户、4个AI模型、6位精选诗人、24条首页导航）。
 
 ### 3. 后端配置
 
@@ -216,7 +216,7 @@ mvn spring-boot:run
 start.bat
 ```
 
-后端服务启动后，访问 http://localhost:8080/doc.html 查看API文档（Knife4j）。
+后端服务启动后，访问 http://localhost:8081/doc.html 查看API文档（Knife4j）。
 
 ### 5. 启动前端服务
 
@@ -249,7 +249,11 @@ SC_MoYuan2_/
 │   │   ├── api/                 # API接口定义
 │   │   ├── assets/              # 静态资源
 │   │   ├── components/          # 公共组件
+│   │   │   ├── business/        # 业务组件
+│   │   │   ├── common/          # 通用组件
+│   │   │   └── home/            # 首页子组件（HomeCarousel/ForumPreview等）
 │   │   ├── composables/         # 组合式函数
+│   │   ├── data/                # 静态数据（JSON）
 │   │   ├── layouts/             # 布局组件
 │   │   ├── router/              # 路由配置
 │   │   ├── stores/              # 状态管理
@@ -347,8 +351,8 @@ SC_MoYuan2_/
 
 启动后端服务后，访问以下地址查看完整的API文档：
 
-- **Knife4j文档**：http://localhost:8080/doc.html
-- **Swagger UI**：http://localhost:8080/swagger-ui.html
+- **Knife4j文档**：http://localhost:8081/doc.html
+- **Swagger UI**：http://localhost:8081/swagger-ui.html
 
 ## 数据库设计
 
@@ -368,10 +372,23 @@ SC_MoYuan2_/
 | 10 | user_history | 用户浏览历史表 | 100万+ |
 | 11 | operation_log | 操作日志表 | 1000万+ |
 | 12 | ai_model | AI模型配置表 | <100 |
+| 12.1 | ai_module_config | AI模块配置表 | <10 |
 | 13 | poet_featured | 精选诗人卡片表 | <100 |
 | 14 | home_navigation | 首页导航数据表 | <100 |
 | 15 | vision_article | 诗话视野文章表 | 100+ |
 | 16 | visit_log | 访问日志表 | 1000万+ |
+| 17 | file_metadata | 文件元数据表 | 100万+ |
+| 18 | ai_image_record | AI生成图片记录表 | 10万+ |
+| 19 | poet_profile | 认证诗人资料表 | 1万+ |
+| 20 | poem_rating | 诗词评分表 | 100万+ |
+| 21 | poem_content_cache | 诗词内容缓存表 | 10万+ |
+| 22 | poet_suggestion | 诗人内容建议表 | 1万+ |
+| 23 | ai_generated_content | AI生成内容审核表 | 10万+ |
+| 24 | rhyme | 韵部表 | 2000+ |
+| 25 | poet_draft | 诗人内容草稿表 | 1万+ |
+| 26 | static_page | 静态页面表 | <100 |
+| 27 | repair_order | 报修工单表 | 1万+ |
+| 28 | repair_comment | 报修评论表 | 10万+ |
 
 ### ER关系图
 
@@ -614,7 +631,7 @@ java -jar target/sc-moyuan-backend.jar --spring.profiles.active=prod
 ```dockerfile
 FROM openjdk:17-slim
 COPY target/sc-moyuan-backend.jar app.jar
-EXPOSE 8080
+EXPOSE 8081
 ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
 
@@ -852,6 +869,20 @@ A: 管理员可以在后台管理页面配置AI模型：
 
 ## 更新日志
 
+### v1.6.0 (2026-06-26)
+- ✅ 前端首页重构（3933行 → 819行，减少79%）
+- ✅ 提取设计系统（variables.scss 扩展至188行、mixins.scss 扩展至359行）
+- ✅ 清理旧版CSS全局覆盖（original.css 3处body覆盖删除）
+- ✅ 首页响应式适配（4个断点：1200/992/768/576px）
+- ✅ 组件化拆分（HomeCarousel/ForumPreview/AncientPoemSelection/ContemporaryPoems）
+- ✅ 数据外置（3个JSON文件替代硬编码数据）
+- ✅ 粒子效果性能优化（30fps限制、visibility暂停、prefers-reduced-motion）
+- ✅ 引入Swiper替代手写轮播
+- ✅ 新增诗人默认头像分配工具类（PoetDefaultAvatar）
+- ✅ 新增文件上传AI水印功能
+- ✅ 图片文件名规范化（去除空格）
+- ✅ 更新数据库初始化脚本
+
 ### v1.5.0 (2026-06-09)
 - ✅ 新增诗人推荐反馈功能（PoetSuggestion模块）
 - ✅ 新增AI模块配置管理接口
@@ -968,6 +999,6 @@ A: 管理员可以在后台管理页面配置AI模型：
 
 ---
 
-**文档版本**：v2.0  
-**最后更新**：2026-06-09  
+**文档版本**：v2.1  
+**最后更新**：2026-06-28  
 **维护人员**：墨渊开发团队

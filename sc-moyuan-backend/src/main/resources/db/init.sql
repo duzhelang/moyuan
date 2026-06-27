@@ -1,4 +1,4 @@
--- ============================================================
+﻿-- ============================================================
 -- 版本：v3.0（全量合并版）
 -- 日期：2026-06-01
 -- 说明：全量合并所有表结构和初始数据，删除过渡迁移脚本
@@ -442,13 +442,13 @@ INSERT IGNORE INTO `category` (`id`, `name`, `parent_id`, `description`, `sort_o
 -- ============================================================
 -- 初始数据：诗人
 -- ============================================================
-INSERT IGNORE INTO `poet` (`name`, `dynasty_id`, `biography`, `life_story`, `influence`, `evaluation`, `anecdotes`, `courtesy_name`, `pseudonym`, `birth_year`, `death_year`, `birthplace`, `poet_type`, `status`) VALUES
-('常平逼王', 13, '现代诗人，作品多表现个人情感与生活感悟', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'modern', 1),
-('陆游', 8, '（1125年—1210年），字务观，号放翁，越州山阴（今浙江绍兴）人。南宋文学家、史学家、爱国诗人。一生笔耕不辍，诗词文俱有很高成就，其诗语言平易晓畅、章法整饬谨严，兼具李白的雄奇奔放与杜甫的沉郁悲凉，尤以饱含爱国热情对后世影响深远。', '陆游出生于北宋末年，成长在民族危亡之际。他自幼聪慧好学，十二岁便能作诗文。青年时期，陆游积极投身抗金事业，曾参与张浚的北伐计划。然而，由于南宋朝廷的软弱妥协，他的政治理想屡屡受挫。陆游一生仕途坎坷，多次被贬谪，但他始终不改爱国初心。晚年退居山阴，仍心系国事，临终前写下"王师北定中原日，家祭无忘告乃翁"的千古名句。', '陆游是中国文学史上创作最丰富的诗人之一，现存诗作九千三百余首，堪称古今第一。他的诗歌涵盖爱国、抒情、写景、咏物等多种题材，对后世影响深远。其爱国诗篇激励了无数仁人志士，成为中国爱国主义文学的重要组成部分。陆游的词作同样成就斐然，与辛弃疾并称"辛陆"，是南宋豪放词派的代表人物。', '陆游一生笔耕不辍，诗词文俱有很高成就。其诗语言平易晓畅、章法整饬谨严，兼具李白的雄奇奔放与杜甫的沉郁悲凉，尤以饱含爱国热情对后世影响深远。梁启超曾赞其诗"集中十九从军乐，亘古男儿一放翁"。', '陆游与唐婉的爱情悲剧广为流传。二人本是表兄妹，婚后感情甚笃，但陆母认为陆游沉溺于儿女情长，强迫二人离异。多年后二人在沈园偶遇，陆游题写《钗头凤·红酥手》于园壁，唐婉见后悲痛不已，和词《钗头凤·世情薄》。陆游晚年仍对唐婉念念不忘，曾多次作诗怀念。', '务观', '放翁', 1125, 1210, '越州山阴（今浙江绍兴）', 'ancient', 1),
-('杜牧', 6, '（803年—852年），字牧之，号樊川居士，京兆万年（今陕西西安）人。唐代杰出的诗人、散文家。因晚年居长安南樊川别墅，故后世称"杜樊川"。杜牧为性情刚直，不拘小节，不屑逢迎。自负经略之才，诗文均有盛名。文以《阿房宫赋》为最著，诗作明丽隽永，绝句诗尤受人称赞，世称"小杜"。与李商隐齐名，合称"小李杜"。', '杜牧出身名门望族，祖父杜佑是唐朝宰相、史学家。杜牧自幼聪慧好学，博览群书，尤喜论政谈兵。太和二年（828年），杜牧进士及第，授弘文馆校书郎。后历任淮南节度使掌书记、监察御史、黄州刺史、池州刺史、睦州刺史等职。杜牧为人刚直有奇节，不为龌龊小谨，敢论列大事，指陈病利尤切至。然而生逢晚唐，牛李党争激烈，杜牧虽有济世之才，却未能充分施展抱负。晚年渐趋消极，纵情声色，放浪形骸。大中六年（852年），杜牧病逝，年仅五十岁。', '杜牧在文学上的成就是多方面的。他的诗歌创作成就最高，尤擅七言绝句和七言律诗。其诗风格俊朗，情致豪迈，与李商隐并称"小李杜"，以别于李白、杜甫"大杜"之称。杜牧的咏史诗最为出色，善于借古讽今，寓意深远。其赋作《阿房宫赋》是中国文学史上的名篇，开宋代文赋之先河。杜牧的诗歌对后世影响深远，宋人姜夔有"小杜才高气逸"之评。', '杜牧的诗歌以风格俊朗、情致豪迈著称。其咏史诗善于选取典型事件，借古讽今，议论精辟。写景抒情诗清新自然，意境深远。杜牧善于用典，却不露痕迹，语言精练，音韵和谐。清人沈德潜评价其诗"雄姿英发"，"拗峭"中有"风华"。杜牧与李商隐齐名，但二人风格迥异：李商隐深沉绵邈，杜牧俊朗明快。', '杜牧与张好好：杜牧在江西观察使沈传师幕府任职时，结识歌女张好好，二人情投意合。后张好好被沈传师之弟纳为妾，杜牧怅然若失。数年后杜牧在洛阳重逢张好好，此时她已沦为当垆卖酒女，杜牧感慨万千，作《张好好诗》相赠。此诗成为杜牧书法名作，现存故宫博物院。', '牧之', '樊川居士', 803, 852, '京兆万年（今陕西西安）', 'ancient', 1),
-('唐婉', 8, '（约1128年—约1156年），字蕙仙，越州山阴（今浙江绍兴）人。南宋才女，陆游的前妻。自幼聪慧，才华横溢，擅长诗词。与陆游的爱情悲剧令人扼腕，其《钗头凤·世情薄》传诵千古。', NULL, NULL, NULL, NULL, '蕙仙', NULL, 1128, 1156, '越州山阴（今浙江绍兴）', 'ancient', 1),
-('李煜', 7, '（937年—978年），初名从嘉，字重光，号钟隐、莲峰居士，彭城（今江苏徐州）人。南唐末代君主，世称南唐后主。精书法、工绘画、通音律，诗文均有一定造诣，尤以词的成就最高。其词作在晚唐五代词中别树一帜，对后世词坛影响深远。', NULL, NULL, NULL, NULL, '重光', '钟隐、莲峰居士', 937, 978, '彭城（今江苏徐州）', 'ancient', 1),
-('森垚', 13, '现代诗人，作品风格独特，善于运用古典意象表达现代情感。', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'modern', 1);
+INSERT IGNORE INTO `poet` (`name`, `dynasty_id`, `avatar`, `biography`, `life_story`, `influence`, `evaluation`, `anecdotes`, `courtesy_name`, `pseudonym`, `birth_year`, `death_year`, `birthplace`, `poet_type`, `status`) VALUES
+('常平逼王', 13, '/img/poet_avatars/avatar_cn_modern_male_01.jpg', '现代诗人，作品多表现个人情感与生活感悟', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'modern', 1),
+('陆游', 8, NULL, '（1125年—1210年），字务观，号放翁，越州山阴（今浙江绍兴）人。南宋文学家、史学家、爱国诗人。一生笔耕不辍，诗词文俱有很高成就，其诗语言平易晓畅、章法整饬谨严，兼具李白的雄奇奔放与杜甫的沉郁悲凉，尤以饱含爱国热情对后世影响深远。', '陆游出生于北宋末年，成长在民族危亡之际。他自幼聪慧好学，十二岁便能作诗文。青年时期，陆游积极投身抗金事业，曾参与张浚的北伐计划。然而，由于南宋朝廷的软弱妥协，他的政治理想屡屡受挫。陆游一生仕途坎坷，多次被贬谪，但他始终不改爱国初心。晚年退居山阴，仍心系国事，临终前写下"王师北定中原日，家祭无忘告乃翁"的千古名句。', '陆游是中国文学史上创作最丰富的诗人之一，现存诗作九千三百余首，堪称古今第一。他的诗歌涵盖爱国、抒情、写景、咏物等多种题材，对后世影响深远。其爱国诗篇激励了无数仁人志士，成为中国爱国主义文学的重要组成部分。陆游的词作同样成就斐然，与辛弃疾并称"辛陆"，是南宋豪放词派的代表人物。', '陆游一生笔耕不辍，诗词文俱有很高成就。其诗语言平易晓畅、章法整饬谨严，兼具李白的雄奇奔放与杜甫的沉郁悲凉，尤以饱含爱国热情对后世影响深远。梁启超曾赞其诗"集中十九从军乐，亘古男儿一放翁"。', '陆游与唐婉的爱情悲剧广为流传。二人本是表兄妹，婚后感情甚笃，但陆母认为陆游沉溺于儿女情长，强迫二人离异。多年后二人在沈园偶遇，陆游题写《钗头凤·红酥手》于园壁，唐婉见后悲痛不已，和词《钗头凤·世情薄》。陆游晚年仍对唐婉念念不忘，曾多次作诗怀念。', '务观', '放翁', 1125, 1210, '越州山阴（今浙江绍兴）', 'ancient', 1),
+('杜牧', 6, NULL, '（803年—852年），字牧之，号樊川居士，京兆万年（今陕西西安）人。唐代杰出的诗人、散文家。因晚年居长安南樊川别墅，故后世称"杜樊川"。杜牧为性情刚直，不拘小节，不屑逢迎。自负经略之才，诗文均有盛名。文以《阿房宫赋》为最著，诗作明丽隽永，绝句诗尤受人称赞，世称"小杜"。与李商隐齐名，合称"小李杜"。', '杜牧出身名门望族，祖父杜佑是唐朝宰相、史学家。杜牧自幼聪慧好学，博览群书，尤喜论政谈兵。太和二年（828年），杜牧进士及第，授弘文馆校书郎。后历任淮南节度使掌书记、监察御史、黄州刺史、池州刺史、睦州刺史等职。杜牧为人刚直有奇节，不为龌龊小谨，敢论列大事，指陈病利尤切至。然而生逢晚唐，牛李党争激烈，杜牧虽有济世之才，却未能充分施展抱负。晚年渐趋消极，纵情声色，放浪形骸。大中六年（852年），杜牧病逝，年仅五十岁。', '杜牧在文学上的成就是多方面的。他的诗歌创作成就最高，尤擅七言绝句和七言律诗。其诗风格俊朗，情致豪迈，与李商隐并称"小李杜"，以别于李白、杜甫"大杜"之称。杜牧的咏史诗最为出色，善于借古讽今，寓意深远。其赋作《阿房宫赋》是中国文学史上的名篇，开宋代文赋之先河。杜牧的诗歌对后世影响深远，宋人姜夔有"小杜才高气逸"之评。', '杜牧的诗歌以风格俊朗、情致豪迈著称。其咏史诗善于选取典型事件，借古讽今，议论精辟。写景抒情诗清新自然，意境深远。杜牧善于用典，却不露痕迹，语言精练，音韵和谐。清人沈德潜评价其诗"雄姿英发"，"拗峭"中有"风华"。杜牧与李商隐齐名，但二人风格迥异：李商隐深沉绵邈，杜牧俊朗明快。', '杜牧与张好好：杜牧在江西观察使沈传师幕府任职时，结识歌女张好好，二人情投意合。后张好好被沈传师之弟纳为妾，杜牧怅然若失。数年后杜牧在洛阳重逢张好好，此时她已沦为当垆卖酒女，杜牧感慨万千，作《张好好诗》相赠。此诗成为杜牧书法名作，现存故宫博物院。', '牧之', '樊川居士', 803, 852, '京兆万年（今陕西西安）', 'ancient', 1),
+('唐婉', 8, '/img/poet_avatars/avatar_cn_ancient_female_01.jpg', '（约1128年—约1156年），字蕙仙，越州山阴（今浙江绍兴）人。南宋才女，陆游的前妻。自幼聪慧，才华横溢，擅长诗词。与陆游的爱情悲剧令人扼腕，其《钗头凤·世情薄》传诵千古。', NULL, NULL, NULL, NULL, '蕙仙', NULL, 1128, 1156, '越州山阴（今浙江绍兴）', 'ancient', 1),
+('李煜', 7, '/img/poet_avatars/avatar_cn_ancient_male_03.jpg', '（937年—978年），初名从嘉，字重光，号钟隐、莲峰居士，彭城（今江苏徐州）人。南唐末代君主，世称南唐后主。精书法、工绘画、通音律，诗文均有一定造诣，尤以词的成就最高。其词作在晚唐五代词中别树一帜，对后世词坛影响深远。', NULL, NULL, NULL, NULL, '重光', '钟隐、莲峰居士', 937, 978, '彭城（今江苏徐州）', 'ancient', 1),
+('森垚', 13, '/img/poet_avatars/avatar_cn_modern_male_01.jpg', '现代诗人，作品风格独特，善于运用古典意象表达现代情感。', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'modern', 1);
 
 -- ============================================================
 -- 初始数据：诗词
@@ -624,12 +624,12 @@ INSERT IGNORE INTO `forum_post` (`title`, `content`, `user_id`, `view_count`, `l
 -- 初始数据：精选诗人
 -- ============================================================
 INSERT IGNORE INTO `poet_featured` (`poet_id`, `name`, `dynasty`, `description`, `biography`, `image_url`, `sort_order`) VALUES
-(1, '李清照', '宋代', '（1084年—1155年），号易安居士，齐州章丘人。宋代婉约派代表词人。', '李清照善于以简洁自然的语言表达真挚的情感，使词作通俗易懂却又意味深长。她的词作情感表达细腻入微，无论是少女的娇羞、对爱情的渴望，还是后期的国仇家恨、孤独愁苦，都能让读者产生强烈的共鸣。', '/img/cd_suolue (10).jpg', 1),
-(2, '杜牧', '唐代', '（803年—852年），字牧之，京兆万年（今陕西省西安市）人。唐朝文学家、诗人。', '杜牧为人性情刚直，不拘小节，不屑逢迎。自负经略之才，诗文均有盛名。文以《阿房宫赋》为最著，诗作明丽隽永，绝句诗尤受人称赞，世称小杜。与李商隐齐名，合称"小李杜"。', '/img/cd_suolue (11).jpg', 2),
-(3, '苏轼', '宋代', '（1037年—1101年），字子瞻，号东坡居士，世称苏东坡、苏仙、坡仙。', '苏轼的思想融合了儒、释、道三家。儒家思想使他积极入世，关心民生疾苦；道家思想让他在面对困境时能保持内心的超脱和豁达；佛家思想则使他在历经磨难后，获得心灵的慰藉和宁静。', '/img/cd_suolue (12).jpg', 3),
-(4, '上官婉儿', '唐代', '（664年—710年）是唐代一位极具影响力的女官和诗人。与蔡文姬、李清照、卓文君并称中国古代四大才女。', '她代朝廷品评天下诗文，大力提倡辞藻华丽、用律严谨的文风，使得当时宫廷内外都流行这种诗歌风格，对唐朝文坛的繁荣和诗歌艺术水平的提高作出了重要贡献。', '/img/cd_suolue (9).jpg', 4),
-(5, '辛弃疾', '宋代', '（1140年—1207年），字幼安，号稼轩，历城（今山东济南）人。南宋豪放派词人。', '辛弃疾一生以恢复为志，以功业自许，却命运多舛、壮志难酬。但他始终没有动摇恢复中原的信念，而是把满腔激情和对国家兴亡、民族命运的关切、忧虑，全部寄寓于词作之中。', '/img/cd_suolue (7).jpg', 5),
-(6, '李白', '唐代', '（701年—762年），字太白，号青莲居士，唐代伟大的浪漫主义诗人。', '李白的诗雄奇飘逸，艺术成就极高。他讴歌祖国山河与美丽的自然风光，风格雄奇奔放，俊逸清新，富有浪漫主义精神，达到了内容与艺术的完美统一。', '/img/cd_suolue (8).jpg', 6);
+(1, '李清照', '宋代', '（1084年—1155年），号易安居士，齐州章丘人。宋代婉约派代表词人。', '李清照善于以简洁自然的语言表达真挚的情感，使词作通俗易懂却又意味深长。她的词作情感表达细腻入微，无论是少女的娇羞、对爱情的渴望，还是后期的国仇家恨、孤独愁苦，都能让读者产生强烈的共鸣。', '/img/cd_suolue_10.jpg', 1),
+(2, '杜牧', '唐代', '（803年—852年），字牧之，京兆万年（今陕西省西安市）人。唐朝文学家、诗人。', '杜牧为人性情刚直，不拘小节，不屑逢迎。自负经略之才，诗文均有盛名。文以《阿房宫赋》为最著，诗作明丽隽永，绝句诗尤受人称赞，世称小杜。与李商隐齐名，合称"小李杜"。', '/img/cd_suolue_11.jpg', 2),
+(3, '苏轼', '宋代', '（1037年—1101年），字子瞻，号东坡居士，世称苏东坡、苏仙、坡仙。', '苏轼的思想融合了儒、释、道三家。儒家思想使他积极入世，关心民生疾苦；道家思想让他在面对困境时能保持内心的超脱和豁达；佛家思想则使他在历经磨难后，获得心灵的慰藉和宁静。', '/img/cd_suolue_12.jpg', 3),
+(4, '上官婉儿', '唐代', '（664年—710年）是唐代一位极具影响力的女官和诗人。与蔡文姬、李清照、卓文君并称中国古代四大才女。', '她代朝廷品评天下诗文，大力提倡辞藻华丽、用律严谨的文风，使得当时宫廷内外都流行这种诗歌风格，对唐朝文坛的繁荣和诗歌艺术水平的提高作出了重要贡献。', '/img/cd_suolue_9.jpg', 4),
+(5, '辛弃疾', '宋代', '（1140年—1207年），字幼安，号稼轩，历城（今山东济南）人。南宋豪放派词人。', '辛弃疾一生以恢复为志，以功业自许，却命运多舛、壮志难酬。但他始终没有动摇恢复中原的信念，而是把满腔激情和对国家兴亡、民族命运的关切、忧虑，全部寄寓于词作之中。', '/img/cd_suolue_7.jpg', 5),
+(6, '李白', '唐代', '（701年—762年），字太白，号青莲居士，唐代伟大的浪漫主义诗人。', '李白的诗雄奇飘逸，艺术成就极高。他讴歌祖国山河与美丽的自然风光，风格雄奇奔放，俊逸清新，富有浪漫主义精神，达到了内容与艺术的完美统一。', '/img/cd_suolue_8.jpg', 6);
 
 -- ============================================================
 -- 初始数据：首页导航-作品
@@ -665,10 +665,10 @@ INSERT IGNORE INTO `home_navigation` (`type`, `title`, `subtitle`, `image_url`, 
 ('dynasties', '两汉', '青青园中葵，朝露待日晞。', 'h6_chaodai_1.jpg', 2, 'dynasty', 2),
 ('dynasties', '唐朝', '秋风清，秋月明。', 'h6_chaodai_2.jpg', 3, 'dynasty', 3),
 ('dynasties', '宋朝', '十年生死两茫茫，不思量，自难忘。', 'h6_chaodai_3.jpg', 4, 'dynasty', 4),
-('dynasties', '元朝', '枯藤老树昏鸦，小桥流水人家。', 'cd_suolue (4).jpg', 5, 'dynasty', 5),
+('dynasties', '元朝', '枯藤老树昏鸦，小桥流水人家。', 'cd_suolue_4.jpg', 5, 'dynasty', 5),
 ('dynasties', '南北朝', '滚滚长江东逝水，浪花淘尽英雄。', 'h6_chaodai_2.jpg', 6, 'dynasty', 6),
 ('dynasties', '金朝', '人生若只如初见，何事秋风悲画扇。', 'h6_chaodai_3.jpg', 7, 'dynasty', 7),
-('dynasties', '明清', '春花秋月何时了？往事知多少。', 'cd_suolue (4).jpg', 8, 'dynasty', 8);
+('dynasties', '明清', '春花秋月何时了？往事知多少。', 'cd_suolue_4.jpg', 8, 'dynasty', 8);
 
 -- ============================================================
 -- 诗话视野文章表
@@ -1070,11 +1070,27 @@ INSERT IGNORE INTO `rhyme` (`character`, `rhyme_group`, `tone_type`, `rhyme_cate
 ('灭', '月', '入声', '入声', 10), ('绝', '月', '入声', '入声', 11), ('说', '月', '入声', '入声', 12);
 
 -- ============================================================
--- 增强 poet_suggestion 表（新增 category 和 ip 字段）
+-- 诗人内容建议表
 -- ============================================================
-ALTER TABLE `poet_suggestion`
-  ADD COLUMN IF NOT EXISTS `category` VARCHAR(50) DEFAULT 'other' COMMENT '意见分类：biography/life_story/influence/evaluation/anecdotes/other' AFTER `content`,
-  ADD COLUMN IF NOT EXISTS `ip` VARCHAR(50) DEFAULT NULL COMMENT '提交者IP' AFTER `reviewer_id`;
+CREATE TABLE IF NOT EXISTS `poet_suggestion` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `poet_id` BIGINT NOT NULL COMMENT '诗人ID',
+  `user_id` BIGINT NOT NULL COMMENT '建议用户ID',
+  `section` VARCHAR(50) NOT NULL COMMENT '修改板块',
+  `content` TEXT NOT NULL COMMENT '建议内容',
+  `category` VARCHAR(50) DEFAULT 'other' COMMENT '意见分类：biography/life_story/influence/evaluation/anecdotes/other',
+  `status` VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT '状态',
+  `review_comment` VARCHAR(500) DEFAULT NULL COMMENT '审核备注',
+  `reviewer_id` BIGINT DEFAULT NULL COMMENT '审核者ID',
+  `ip` VARCHAR(50) DEFAULT NULL COMMENT '提交者IP',
+  `review_time` DATETIME DEFAULT NULL COMMENT '审核时间',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_poet_suggestion_poet_id` (`poet_id`),
+  KEY `idx_poet_suggestion_user_id` (`user_id`),
+  KEY `idx_poet_suggestion_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='诗人内容建议表';
 
 -- ============================================================
 -- 22. 诗人内容草稿表
@@ -1143,3 +1159,66 @@ CREATE TABLE IF NOT EXISTS `ai_generated_content` (
   KEY `idx_agc_status` (`status`),
   KEY `idx_agc_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI生成内容审核表';
+
+-- ============================================================
+-- 25. 报修工单表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `repair_order` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `order_no` VARCHAR(32) NOT NULL COMMENT '工单编号',
+  `title` VARCHAR(200) NOT NULL COMMENT '问题标题',
+  `description` TEXT NOT NULL COMMENT '问题描述',
+  `category` VARCHAR(50) NOT NULL COMMENT '报修类别：system-系统故障,function-功能异常,ui-界面问题,data-数据问题,other-其他',
+  `priority` TINYINT NOT NULL DEFAULT 2 COMMENT '优先级：1-低,2-中,3-高,4-紧急',
+  `status` TINYINT NOT NULL DEFAULT 0 COMMENT '状态：0-待处理,1-处理中,2-已解决,3-已关闭,4-已驳回',
+  `images` TEXT DEFAULT NULL COMMENT '问题截图URL（JSON数组）',
+  `user_id` BIGINT NOT NULL COMMENT '提交用户ID',
+  `assignee_id` BIGINT DEFAULT NULL COMMENT '处理人ID',
+  `resolve_content` TEXT DEFAULT NULL COMMENT '解决方案',
+  `resolve_time` DATETIME DEFAULT NULL COMMENT '解决时间',
+  `close_time` DATETIME DEFAULT NULL COMMENT '关闭时间',
+  `satisfaction` TINYINT DEFAULT NULL COMMENT '满意度评分：1-5',
+  `satisfaction_comment` VARCHAR(500) DEFAULT NULL COMMENT '满意度评价',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_order_no` (`order_no`),
+  KEY `idx_repair_user_id` (`user_id`),
+  KEY `idx_repair_status` (`status`),
+  KEY `idx_repair_category` (`category`),
+  KEY `idx_repair_priority` (`priority`),
+  KEY `idx_repair_assignee_id` (`assignee_id`),
+  KEY `idx_repair_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='报修工单表';
+
+-- ============================================================
+-- 26. 报修反馈表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `repair_comment` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `repair_order_id` BIGINT NOT NULL COMMENT '工单ID',
+  `user_id` BIGINT NOT NULL COMMENT '评论用户ID',
+  `content` TEXT NOT NULL COMMENT '评论内容',
+  `images` TEXT DEFAULT NULL COMMENT '附图URL（JSON数组）',
+  `is_internal` TINYINT NOT NULL DEFAULT 0 COMMENT '是否内部备注：0-用户可见,1-仅管理员可见',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_rc_repair_order_id` (`repair_order_id`),
+  KEY `idx_rc_user_id` (`user_id`),
+  KEY `idx_rc_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='报修反馈表';
+
+-- ============================================================
+-- 更新无头像诗人为预设随机头像
+-- ============================================================
+UPDATE `poet`
+SET `avatar` = CASE (id % 6)
+    WHEN 0 THEN '/img/cd_suolue_1.jpg'
+    WHEN 1 THEN '/img/cd_suolue_2.jpg'
+    WHEN 2 THEN '/img/cd_suolue_3.jpg'
+    WHEN 3 THEN '/img/cd_suolue_4.jpg'
+    WHEN 4 THEN '/img/cd_suolue_5.jpg'
+    WHEN 5 THEN '/img/cd_suolue_6.jpg'
+END
+WHERE (`avatar` IS NULL OR `avatar` = '') AND `deleted` = 0;

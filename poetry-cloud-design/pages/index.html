@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>诗云星空 - 墨渊古诗词系统</title>
+    <style id="theme-vars">
+/* 诗云 - 墨渊系统适配版品牌 CSS */
+/* 融合星空可视化概念与传统中国风格 */
+
+:root {
+  /* 品牌主色 - 墨渊棕色系 */
+  --brand-primary: #8B4513;
+  --brand-primary-light: #CD853F;
+  --brand-primary-dark: #602f0d;
+  --brand-primary-50: #fdf5ef;
+  --brand-primary-100: #f9e6d5;
+  --brand-primary-200: #f0c9a6;
+  --brand-primary-300: #e5a76e;
+  --brand-primary-400: #c97d3a;
+  --brand-primary-500: #8B4513;
+  --brand-primary-600: #7a3c10;
+  --brand-primary-700: #602f0d;
+  --brand-primary-800: #47230a;
+  --brand-primary-900: #2e1707;
+
+  /* 星空主题色 - 暖色调光点 */
+  --star-gold: #FFD700;
+  --star-amber: #FFA500;
+  --star-copper: #B87333;
+  --star-bronze: #CD7F32;
+
+  /* 背景色 - 深色星空 */
+  --bg-deep: #0a0a0f;
+  --bg-surface: #1a1a2e;
+  --bg-elevated: #16213e;
+  --bg-card: rgba(26, 26, 46, 0.8);
+
+  /* 文本色 */
+  --text-primary: #f5f5f5;
+  --text-secondary: #b0b0b0;
+  --text-muted: #808080;
+  --text-accent: #CD853F;
+
+  /* 边框 */
+  --border-color: rgba(205, 133, 63, 0.2);
+  --border-light: rgba(205, 133, 63, 0.1);
+  --border-focus: rgba(205, 133, 63, 0.5);
+
+  /* 间距 */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-xxl: 48px;
+
+  /* 圆角 */
+  --radius-sm: 2px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+
+  /* 阴影 */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+  /* 字体 */
+  --font-family-title: 'YingBiXingShu', 'KaiTi', 'STKaiti', serif;
+  --font-family-body: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  --font-family-mono: 'FangSong', 'STFangsong', monospace;
+
+  /* 字体大小 */
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-base: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 18px;
+  --font-size-xxl: 20px;
+  --font-size-title: 24px;
+  --font-size-hero: 32px;
+
+  /* 行高 */
+  --line-height-tight: 1.2;
+  --line-height-base: 1.5;
+  --line-height-loose: 1.8;
+
+  /* 过渡 */
+  --transition-fast: 0.2s ease;
+  --transition-base: 0.3s ease;
+  --transition-slow: 0.5s ease;
+
+  /* 星空特效 */
+  --glow-gold: 0 0 10px rgba(255, 215, 0, 0.3);
+  --glow-amber: 0 0 10px rgba(255, 165, 0, 0.3);
+  --glow-copper: 0 0 10px rgba(184, 115, 51, 0.3);
+}
+
+/* 深色主题变量 */
+.dark {
+  --bg-deep: #050508;
+  --bg-surface: #0f0f1a;
+  --bg-elevated: #1a1a2e;
+  --bg-card: rgba(15, 15, 26, 0.9);
+  --text-primary: #ffffff;
+  --text-secondary: #d0d0d0;
+  --text-muted: #909090;
+  --border-color: rgba(205, 133, 63, 0.15);
+  --border-light: rgba(205, 133, 63, 0.08);
+}
+
+/* 响应式断点 */
+@media (max-width: 768px) {
+  :root {
+    --font-size-hero: 24px;
+    --font-size-title: 20px;
+    --spacing-xxl: 32px;
+  }
+}
+
+/* 通用组件样式 */
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-light));
+  color: white;
+  border: none;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--radius-md);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--brand-primary-dark), var(--brand-primary));
+  box-shadow: var(--glow-copper);
+  transform: translateY(-1px);
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  backdrop-filter: blur(10px);
+  transition: all var(--transition-base);
+}
+
+.card:hover {
+  border-color: var(--border-focus);
+  box-shadow: var(--shadow-md);
+}
+
+/* 星空粒子动画 */
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* 书法字体装饰 */
+.calligraphy {
+  font-family: var(--font-family-title);
+  color: var(--text-accent);
+  text-shadow: 0 0 10px rgba(205, 133, 63, 0.3);
+}
+
+/* 宣纸纹理背景 */
+.paper-texture {
+  background-image: 
+    radial-gradient(circle at 20% 80%, rgba(205, 133, 63, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(139, 69, 19, 0.05) 0%, transparent 50%),
+    linear-gradient(to bottom, var(--bg-deep), var(--bg-surface));
+}
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-primary: var(--brand-primary);
+  }
+  @layer base {
+    body { background: var(--brand-background); color: var(--brand-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="paper-texture">
+    <!-- 顶部导航栏 -->
+    <nav class="fixed top-0 left-0 right-0 z-50 glass-panel" style="border-radius: 0;">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo 和标题 -->
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <h1 class="calligraphy-title text-2xl font-bold">诗云</h1>
+                    </div>
+                    <div class="hidden md:block ml-10">
+                        <div class="flex items-baseline space-x-4">
+                            <a href="#" class="text-accent px-3 py-2 rounded-md text-sm font-medium">星空漫游</a>
+                            <a href="#" class="text-secondary hover:text-primary px-3 py-2 rounded-md text-sm font-medium">诗人星系</a>
+                            <a href="#" class="text-secondary hover:text-primary px-3 py-2 rounded-md text-sm font-medium">寻诗探幽</a>
+                            <a href="#" class="text-secondary hover:text-primary px-3 py-2 rounded-md text-sm font-medium">赠诗网络</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 搜索框 -->
+                <div class="flex-1 max-w-md mx-4">
+                    <div class="relative">
+                        <input type="text" placeholder="输入诗句或诗人姓名..." class="search-input w-full px-4 py-2 rounded-full text-sm">
+                        <button class="absolute right-2 top-1/2 transform -translate-y-1/2 text-accent">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 右侧功能区 -->
+                <div class="hidden md:flex items-center space-x-4">
+                    <button class="btn-primary px-4 py-2 rounded-full text-sm font-medium">
+                        探诗
+                    </button>
+                    <button class="text-secondary hover:text-primary">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区域 -->
+    <main class="relative z-10 pt-16 h-screen flex">
+        <!-- 左侧控制面板 -->
+        <aside class="w-64 glass-panel m-4 p-4 hidden lg:block">
+            <h2 class="calligraphy-title text-lg font-semibold mb-4">星空控制台</h2>
+            
+            <!-- 朝代筛选 -->
+            <div class="mb-6">
+                <h3 class="text-secondary text-sm font-medium mb-3">朝代筛选</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button class="dynasty-filter px-3 py-1.5 rounded-md text-xs">先秦</button>
+                    <button class="dynasty-filter px-3 py-1.5 rounded-md text-xs">汉代</button>
+                    <button class="dynasty-filter px-3 py-1.5 rounded-md text-xs active">唐代</button>
+                    <button class="dynasty-filter px-3 py-1.5 rounded-md text-xs">宋代</button>
+                    <button class="dynasty-filter px-3 py-1.5 rounded-md text-xs">元代</button>
+                    <button class="dynasty-filter px-3 py-1.5 rounded-md text-xs">明代</button>
+                    <button class="dynasty-filter px-3 py-1.5 rounded-md text-xs">清代</button>
+                    <button class="dynasty-filter px-3 py-1.5 rounded-md text-xs">近现代</button>
+                </div>
+            </div>
+            
+            <!-- 诗体选择 -->
+            <div class="mb-6">
+                <h3 class="text-secondary text-sm font-medium mb-3">诗体类型</h3>
+                <div class="space-y-2">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" class="form-checkbox text-accent" checked>
+                        <span class="text-sm">五言绝句</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" class="form-checkbox text-accent" checked>
+                        <span class="text-sm">七言绝句</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" class="form-checkbox text-accent">
+                        <span class="text-sm">五言律诗</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" class="form-checkbox text-accent">
+                        <span class="text-sm">七言律诗</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" class="form-checkbox text-accent">
+                        <span class="text-sm">词</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- 格律开关 -->
+            <div class="mb-6">
+                <h3 class="text-secondary text-sm font-medium mb-3">格律控制</h3>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm">仅显示合律作品</span>
+                    <button class="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2">
+                        <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-1"></span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 星空模式 -->
+            <div class="mb-6">
+                <h3 class="text-secondary text-sm font-medium mb-3">星空模式</h3>
+                <div class="space-y-2">
+                    <button class="w-full text-left px-3 py-2 rounded-md text-sm bg-accent/10 border border-accent/20">
+                        随机漫游
+                    </button>
+                    <button class="w-full text-left px-3 py-2 rounded-md text-sm hover:bg-white/5">
+                        诗人定位
+                    </button>
+                    <button class="w-full text-left px-3 py-2 rounded-md text-sm hover:bg-white/5">
+                        赠诗网络
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 统计信息 -->
+            <div class="mt-auto pt-4 border-t border-white/10">
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-accent">32,657</div>
+                    <div class="text-xs text-secondary">位历史诗人</div>
+                </div>
+                <div class="text-center mt-2">
+                    <div class="text-2xl font-bold text-accent">933,857</div>
+                    <div class="text-xs text-secondary">首诗歌作品</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 中央星空可视化区域 -->
+        <div class="flex-1 relative">
+            <!-- 星空背景 -->
+            <div id="starfield" class="starfield"></div>
+            
+            <!-- 星空交互层 -->
+            <div id="star-interactive" class="absolute inset-0 z-20"></div>
+            
+            <!-- 中央提示信息 -->
+            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div class="text-center fade-in">
+                    <h2 class="calligraphy-title text-4xl md:text-6xl font-bold mb-4">
+                        诗云
+                    </h2>
+                    <p class="text-secondary text-lg max-w-md mx-auto">
+                        每位诗人是一颗星，每首诗都有自己的坐标
+                    </p>
+                    <p class="text-muted text-sm mt-2">
+                        点击星空探索，或使用左侧控制台筛选
+                    </p>
+                </div>
+            </div>
+            
+            <!-- 加载状态 -->
+            <div id="loading" class="absolute inset-0 flex items-center justify-center z-30 hidden">
+                <div class="text-center">
+                    <div class="loading-spinner mx-auto mb-4"></div>
+                    <p class="text-secondary">正在加载星空数据...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧信息面板 -->
+        <aside id="info-panel" class="info-panel w-80 glass-panel m-4 p-4 absolute right-0 top-16 bottom-4 z-40">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="calligraphy-title text-lg font-semibold">诗人信息</h2>
+                <button id="close-panel" class="text-secondary hover:text-primary">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- 诗人卡片 -->
+            <div id="poet-card" class="poem-card p-4 rounded-lg mb-4">
+                <div class="flex items-center mb-3">
+                    <div class="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center mr-3">
+                        <span class="calligraphy-title text-xl">李</span>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold">李白</h3>
+                        <p class="text-secondary text-sm">唐代 · 诗仙</p>
+                    </div>
+                </div>
+                <p class="text-sm text-secondary mb-3">
+                    字太白，号青莲居士，唐代伟大的浪漫主义诗人。
+                </p>
+                <div class="flex justify-between text-xs text-muted">
+                    <span>作品：1,010首</span>
+                    <span>朝代：唐代</span>
+                </div>
+            </div>
+            
+            <!-- 诗歌列表 -->
+            <div class="mb-4">
+                <h3 class="text-secondary text-sm font-medium mb-3">代表作品</h3>
+                <div class="space-y-2">
+                    <div class="poem-card p-3 rounded-lg cursor-pointer">
+                        <h4 class="font-medium text-sm">静夜思</h4>
+                        <p class="text-muted text-xs mt-1">床前明月光，疑是地上霜...</p>
+                    </div>
+                    <div class="poem-card p-3 rounded-lg cursor-pointer">
+                        <h4 class="font-medium text-sm">将进酒</h4>
+                        <p class="text-muted text-xs mt-1">君不见黄河之水天上来...</p>
+                    </div>
+                    <div class="poem-card p-3 rounded-lg cursor-pointer">
+                        <h4 class="font-medium text-sm">望庐山瀑布</h4>
+                        <p class="text-muted text-xs mt-1">日照香炉生紫烟，遥看瀑布挂前川...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 诗歌详情 -->
+            <div id="poem-detail" class="hidden">
+                <h3 class="text-secondary text-sm font-medium mb-3">诗歌详情</h3>
+                <div class="poem-card p-4 rounded-lg">
+                    <h4 class="font-semibold calligraphy-title text-lg mb-2">静夜思</h4>
+                    <div class="text-center my-4">
+                        <p class="text-lg leading-relaxed">床前明月光，</p>
+                        <p class="text-lg leading-relaxed">疑是地上霜。</p>
+                        <p class="text-lg leading-relaxed">举头望明月，</p>
+                        <p class="text-lg leading-relaxed">低头思故乡。</p>
+                    </div>
+                    <div class="text-xs text-muted mt-4">
+                        <p>五言绝句 · 唐代</p>
+                        <p>编号：T-5-001-0001</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 操作按钮 -->
+            <div class="mt-4 space-y-2">
+                <button class="btn-primary w-full py-2 rounded-lg text-sm font-medium">
+                    定位到此诗人
+                </button>
+                <button class="w-full py-2 rounded-lg text-sm font-medium border border-accent/20 text-accent hover:bg-accent/10 transition-colors">
+                    分享诗人星系
+                </button>
+            </div>
+        </aside>
+    </main>
+
+    <!-- 底部信息栏 -->
+    <footer class="fixed bottom-0 left-0 right-0 z-50 glass-panel" style="border-radius: 0;">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-12">
+                <div class="flex items-center space-x-4">
+                    <span class="text-muted text-xs">诗云 · 墨渊古诗词系统</span>
+                    <span class="text-muted text-xs">|</span>
+                    <span class="text-muted text-xs">32,657 位诗人</span>
+                    <span class="text-muted text-xs">|</span>
+                    <span class="text-muted text-xs">933,857 首诗</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button class="text-muted hover:text-secondary text-xs">帮助</button>
+                    <button class="text-muted hover:text-secondary text-xs">关于</button>
+                    <button class="text-muted hover:text-secondary text-xs">反馈</button>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // 星空生成器
+        class StarfieldGenerator {
+            constructor() {
+                this.container = document.getElementById('starfield');
+                this.interactive = document.getElementById('star-interactive');
+                this.stars = [];
+                this.poets = [
+                    { name: '李白', dynasty: '唐代', works: 1010, x: 30, y: 40 },
+                    { name: '杜甫', dynasty: '唐代', works: 1500, x: 60, y: 35 },
+                    { name: '白居易', dynasty: '唐代', works: 2800, x: 45, y: 60 },
+                    { name: '苏轼', dynasty: '宋代', works: 2700, x: 70, y: 55 },
+                    { name: '李清照', dynasty: '宋代', works: 50, x: 25, y: 70 },
+                    { name: '辛弃疾', dynasty: '宋代', works: 600, x: 80, y: 45 },
+                    { name: '王维', dynasty: '唐代', works: 400, x: 50, y: 25 },
+                    { name: '孟浩然', dynasty: '唐代', works: 260, x: 35, y: 50 }
+                ];
+                
+                this.init();
+            }
+            
+            init() {
+                this.createBackgroundStars();
+                this.createPoetStars();
+                this.addEventListeners();
+            }
+            
+            createBackgroundStars() {
+                for (let i = 0; i < 200; i++) {
+                    const star = document.createElement('div');
+                    star.className = 'star';
+                    
+                    const size = Math.random() * 2 + 1;
+                    const x = Math.random() * 100;
+                    const y = Math.random() * 100;
+                    const duration = Math.random() * 3 + 2;
+                    
+                    star.style.cssText = `
+                        width: ${size}px;
+                        height: ${size}px;
+                        left: ${x}%;
+                        top: ${y}%;
+                        --duration: ${duration}s;
+                        animation-delay: ${Math.random() * 2}s;
+                    `;
+                    
+                    this.container.appendChild(star);
+                    this.stars.push(star);
+                }
+            }
+            
+            createPoetStars() {
+                this.poets.forEach(poet => {
+                    const star = document.createElement('div');
+                    star.className = 'star poet';
+                    star.dataset.poet = poet.name;
+                    
+                    const size = Math.log(poet.works) * 2 + 5;
+                    
+                    star.style.cssText = `
+                        width: ${size}px;
+                        height: ${size}px;
+                        left: ${poet.x}%;
+                        top: ${poet.y}%;
+                        cursor: pointer;
+                        z-index: 10;
+                    `;
+                    
+                    star.addEventListener('click', () => this.showPoetInfo(poet));
+                    this.interactive.appendChild(star);
+                });
+            }
+            
+            showPoetInfo(poet) {
+                const panel = document.getElementById('info-panel');
+                const poetCard = document.getElementById('poet-card');
+                
+                poetCard.innerHTML = `
+                    <div class="flex items-center mb-3">
+                        <div class="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center mr-3">
+                            <span class="calligraphy-title text-xl">${poet.name[0]}</span>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold">${poet.name}</h3>
+                            <p class="text-secondary text-sm">${poet.dynasty}</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-secondary mb-3">
+                        点击查看详细作品列表
+                    </p>
+                    <div class="flex justify-between text-xs text-muted">
+                        <span>作品：${poet.works.toLocaleString()}首</span>
+                        <span>朝代：${poet.dynasty}</span>
+                    </div>
+                `;
+                
+                panel.classList.add('active');
+            }
+            
+            addEventListeners() {
+                // 关闭面板
+                document.getElementById('close-panel').addEventListener('click', () => {
+                    document.getElementById('info-panel').classList.remove('active');
+                });
+                
+                // 点击空白处关闭面板
+                this.interactive.addEventListener('click', (e) => {
+                    if (e.target === this.interactive) {
+                        document.getElementById('info-panel').classList.remove('active');
+                    }
+                });
+                
+                // 搜索功能
+                const searchInput = document.querySelector('.search-input');
+                searchInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        this.searchPoetry(searchInput.value);
+                    }
+                });
+            }
+            
+            searchPoetry(query) {
+                // 模拟搜索功能
+                console.log('搜索:', query);
+                // 这里可以添加实际的搜索逻辑
+            }
+        }
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 模拟加载延迟
+            setTimeout(() => {
+                document.getElementById('loading').classList.add('hidden');
+                new StarfieldGenerator();
+            }, 1000);
+        });
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: var(--font-family-body);
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        .starfield {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+        
+        .star {
+            position: absolute;
+            border-radius: 50%;
+            animation: twinkle var(--duration) ease-in-out infinite;
+            opacity: 0.3;
+        }
+        
+        .star.poet {
+            background: radial-gradient(circle, var(--star-gold), var(--star-amber));
+            box-shadow: 0 0 10px var(--star-gold), 0 0 20px var(--star-amber);
+        }
+        
+        .star.poem {
+            background: radial-gradient(circle, var(--star-copper), var(--star-bronze));
+            box-shadow: 0 0 8px var(--star-copper), 0 0 16px var(--star-bronze);
+        }
+        
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+        
+        .glass-panel {
+            background: rgba(26, 26, 46, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+        }
+        
+        .calligraphy-title {
+            font-family: var(--font-family-title);
+            color: var(--text-accent);
+            text-shadow: 0 0 20px rgba(205, 133, 63, 0.5);
+        }
+        
+        .info-panel {
+            transition: all var(--transition-base);
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        
+        .info-panel.active {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        
+        .search-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-light);
+            color: var(--text-primary);
+            transition: all var(--transition-base);
+        }
+        
+        .search-input:focus {
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px rgba(205, 133, 63, 0.15);
+            outline: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-light));
+            transition: all var(--transition-base);
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(135deg, var(--brand-primary-dark), var(--brand-primary));
+            box-shadow: var(--glow-copper);
+            transform: translateY(-1px);
+        }
+        
+        .dynasty-filter {
+            background: rgba(139, 69, 19, 0.1);
+            border: 1px solid rgba(139, 69, 19, 0.2);
+            transition: all var(--transition-base);
+        }
+        
+        .dynasty-filter:hover, .dynasty-filter.active {
+            background: rgba(139, 69, 19, 0.3);
+            border-color: var(--brand-primary);
+        }
+        
+        .poem-card {
+            background: linear-gradient(135deg, rgba(26, 26, 46, 0.9), rgba(22, 33, 62, 0.9));
+            border: 1px solid var(--border-color);
+            transition: all var(--transition-base);
+        }
+        
+        .poem-card:hover {
+            border-color: var(--brand-primary);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+        
+        .loading-spinner {
+            border: 3px solid rgba(205, 133, 63, 0.2);
+            border-top: 3px solid var(--brand-primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</body>
+</html>

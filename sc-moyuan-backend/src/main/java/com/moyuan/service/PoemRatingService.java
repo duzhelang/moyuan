@@ -11,4 +11,5 @@ public interface PoemRatingService extends IService<PoemRating> {
     void requestAiRating(Long poemId);
     Map<String, Object> getPoemRatings(Long poemId);
     BigDecimal getAverageScore(Long poemId);
+    PoemRating getUserRating(Long poemId, Long userId);
 }

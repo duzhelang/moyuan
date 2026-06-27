@@ -65,6 +65,11 @@ onMounted(() => {
   <div class="vision-list-page" v-loading="loading">
     <div class="page-nav">
       <div class="nav-left">
+        <el-button text @click="router.back()">
+          <el-icon><ArrowLeft /></el-icon>
+          返回
+        </el-button>
+        <el-divider direction="vertical" />
         <el-button text @click="goHome">
           <el-icon><HomeFilled /></el-icon>
           首页
@@ -153,6 +158,21 @@ onMounted(() => {
 .vision-list-page {
   min-height: 100vh;
   background: linear-gradient(180deg, #f5f0e8 0%, #e8e0d0 100%);
+  position: relative;
+
+  &::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background:
+      radial-gradient(circle at 10% 20%, rgba(139, 69, 19, 0.03) 0%, transparent 50%),
+      radial-gradient(circle at 90% 80%, rgba(210, 105, 30, 0.03) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
 }
 
 .page-nav {
@@ -203,6 +223,17 @@ onMounted(() => {
     color: #2c1810;
     margin-bottom: 8px;
     font-weight: 700;
+    position: relative;
+
+    &::after {
+      content: '';
+      display: block;
+      width: 80px;
+      height: 3px;
+      background: linear-gradient(90deg, #8b4513, #d2691e, #8b4513);
+      margin: 12px auto 0;
+      border-radius: 2px;
+    }
   }
 }
 

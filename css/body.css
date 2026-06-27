@@ -1,4 +1,4 @@
-			ul,
+﻿			ul,
 			li {
 				list-style: none;
 			}
@@ -30,7 +30,7 @@
 				/* border: 1px solid gainsboro; */
 			
 			}/*背景简略写法*/
-			/* background: url('../img/dt_0.0.jpg') no-repeat -155px 0px / cover; */
+			/* background: url('../img/dt_0_0.jpg') no-repeat -155px 0px / cover; */
 			body{
 				background: rgba(227,196,165,0.75);
 				/*background-size: contain;/*保持比例，可能出现空白*/

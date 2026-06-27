@@ -27,8 +27,16 @@ export function useParticles(canvasRef: Ref<HTMLCanvasElement | null>, options: 
     connectionDistance = 150
   } = options
 
+  const prefersReducedMotion = typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  const FPS_LIMIT = 30
+  const FRAME_INTERVAL = 1000 / FPS_LIMIT
+  let lastFrameTime = 0
+
   const animationId = ref<number>(0)
   let particles: Particle[] = []
+  let isAnimating = false
 
   const createParticles = (canvas: HTMLCanvasElement): Particle[] => {
     const result: Particle[] = []
@@ -93,16 +101,51 @@ export function useParticles(canvasRef: Ref<HTMLCanvasElement | null>, options: 
     }
   }
 
+  let canvasEl: HTMLCanvasElement | null = null
+  let ctxEl: CanvasRenderingContext2D | null = null
+
+  const animate = (timestamp: number) => {
+    if (!isAnimating) return
+
+    if (timestamp - lastFrameTime < FRAME_INTERVAL) {
+      animationId.value = requestAnimationFrame(animate)
+      return
+    }
+    lastFrameTime = timestamp
+
+    if (canvasEl && ctxEl) {
+      updateParticles(canvasEl)
+      drawParticles(ctxEl)
+    }
+
+    animationId.value = requestAnimationFrame(animate)
+  }
+
+  const stopAnimation = () => {
+    if (animationId.value) {
+      cancelAnimationFrame(animationId.value)
+      animationId.value = 0
+    }
+    isAnimating = false
+  }
+
   const startAnimation = (canvas: HTMLCanvasElement) => {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const animate = () => {
-      updateParticles(canvas)
-      drawParticles(ctx)
-      animationId.value = requestAnimationFrame(animate)
+    canvasEl = canvas
+    ctxEl = ctx
+    isAnimating = true
+    lastFrameTime = 0
+    animationId.value = requestAnimationFrame(animate)
+  }
+
+  const handleVisibility = () => {
+    if (document.hidden) {
+      stopAnimation()
+    } else if (canvasEl) {
+      startAnimation(canvasEl)
     }
-    animate()
   }
 
   const initCanvas = () => {
@@ -141,17 +184,21 @@ export function useParticles(canvasRef: Ref<HTMLCanvasElement | null>, options: 
   }
 
   onMounted(() => {
+    if (prefersReducedMotion) return
+
     setTimeout(() => {
       initCanvas()
     }, 300)
     window.addEventListener('resize', handleResize)
+    document.addEventListener('visibilitychange', handleVisibility)
   })
 
   onUnmounted(() => {
-    if (animationId.value) {
-      cancelAnimationFrame(animationId.value)
-    }
+    stopAnimation()
     window.removeEventListener('resize', handleResize)
+    document.removeEventListener('visibilitychange', handleVisibility)
+    canvasEl = null
+    ctxEl = null
   })
 
   return {

@@ -68,7 +68,7 @@ public class SecurityConfig {
                     "/api/poems/fix-external-poems",
                     "/uploads/**"
                 ).permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/poems", "/api/poems/{id:[0-9]+}").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/poems", "/api/poems/{id:[0-9]+}", "/api/poems/{id:[0-9]+}/ratings", "/api/poems/{id:[0-9]+}/ratings/ai").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/poet-featured", "/api/poet-featured/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/home-navigation", "/api/home-navigation/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/rhyme/**").permitAll()

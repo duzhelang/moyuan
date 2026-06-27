@@ -172,6 +172,7 @@
 @mixin el-comment-input {
   :deep(.el-textarea__inner) {
     font-family: $font-family-input;
+    font-size: $font-size-base;
     color: $comment-input-color;
     letter-spacing: 0.5px;
     line-height: 1.6;
@@ -185,6 +186,7 @@
     
     &::placeholder {
       color: $comment-input-placeholder;
+      font-size: inherit !important;
     }
     
     &:focus {
@@ -225,5 +227,135 @@
     &:hover {
       background: $text-color-light;
     }
+  }
+}
+
+// ============================================================
+// 响应式快捷 mixin
+// ============================================================
+@mixin mobile {
+  @media (max-width: #{$breakpoint-sm - 1}) { @content; }
+}
+
+@mixin tablet {
+  @media (min-width: $breakpoint-sm) and (max-width: #{$breakpoint-lg - 1}) { @content; }
+}
+
+@mixin desktop {
+  @media (min-width: $breakpoint-lg) { @content; }
+}
+
+// ============================================================
+// 装饰性 mixin
+// ============================================================
+@mixin decorative-border {
+  border: 1px solid $border-color-bronze;
+  border-image: linear-gradient(
+    135deg,
+    $border-color-bronze 0%,
+    rgba($border-color-bronze, 0.3) 25%,
+    $border-color-bronze 50%,
+    rgba($border-color-bronze, 0.3) 75%,
+    $border-color-bronze 100%
+  ) 1;
+  position: relative;
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border: 1px solid $primary-600;
+  }
+
+  &::before {
+    top: -4px;
+    left: -4px;
+    border-right: none;
+    border-bottom: none;
+  }
+
+  &::after {
+    bottom: -4px;
+    right: -4px;
+    border-left: none;
+    border-top: none;
+  }
+}
+
+@mixin ink-wash-bg {
+  background: linear-gradient(
+    180deg,
+    $surface-primary 0%,
+    rgba($background-color-paper, 0.95) 30%,
+    rgba(#e8e0d4, 0.3) 60%,
+    rgba(#d4c5a9, 0.15) 100%
+  );
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse at 20% 50%,
+      rgba($primary-100, 0.3) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse at 80% 30%,
+      rgba($secondary-100, 0.2) 0%,
+      transparent 40%
+    );
+    pointer-events: none;
+  }
+}
+
+// ============================================================
+// 卡片 mixin 增强
+// ============================================================
+@mixin card-poetry {
+  @include card;
+  background: $surface-primary;
+  border: 1px solid rgba($border-color-bronze, 0.4);
+  padding: $spacing-xl $spacing-lg;
+  font-family: $font-family-poetry;
+  line-height: $line-height-poem;
+  letter-spacing: $letter-spacing-poem;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      $primary-300 20%,
+      $primary-500 50%,
+      $primary-300 80%,
+      transparent 100%
+    );
+  }
+}
+
+@mixin card-hover-lift {
+  transition:
+    transform $transition-base,
+    box-shadow $transition-base;
+  will-change: transform;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: $card-hover-shadow;
+  }
+
+  &:active {
+    transform: translateY(-1px);
   }
 }

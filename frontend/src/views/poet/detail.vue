@@ -1019,24 +1019,15 @@ const handleChatKeydown = (e: Event | KeyboardEvent) => {
 }
 
 const startChatDrag = (e: MouseEvent) => {
+  const panel = document.querySelector('.panel-ai-chat') as HTMLElement
+  if (!panel) return
+
   if (!chatDraggable.value) {
+    const rect = panel.getBoundingClientRect()
+    chatPos.value = { x: rect.left, y: rect.top }
     chatDraggable.value = true
-    nextTick(() => {
-      const panel = document.querySelector('.panel-ai-chat') as HTMLElement
-      if (panel) {
-        const rect = panel.getBoundingClientRect()
-        chatPos.value = { x: rect.left, y: rect.top }
-      }
-      chatDragging.value = true
-      chatDragOffset.value = {
-        x: e.clientX - chatPos.value.x,
-        y: e.clientY - chatPos.value.y
-      }
-      document.addEventListener('mousemove', onChatDrag)
-      document.addEventListener('mouseup', stopChatDrag)
-    })
-    return
   }
+
   chatDragging.value = true
   chatDragOffset.value = {
     x: e.clientX - chatPos.value.x,
@@ -1048,10 +1039,13 @@ const startChatDrag = (e: MouseEvent) => {
 
 const onChatDrag = (e: MouseEvent) => {
   if (!chatDragging.value) return
+  const panel = document.querySelector('.panel-ai-chat') as HTMLElement
   const newX = e.clientX - chatDragOffset.value.x
   const newY = e.clientY - chatDragOffset.value.y
-  const maxX = window.innerWidth - 400
-  const maxY = window.innerHeight - 100
+  const panelWidth = panel ? panel.offsetWidth : 400
+  const panelHeight = panel ? panel.offsetHeight : 420
+  const maxX = window.innerWidth - panelWidth
+  const maxY = window.innerHeight - panelHeight
   chatPos.value = {
     x: Math.max(0, Math.min(newX, maxX)),
     y: Math.max(0, Math.min(newY, maxY))
@@ -1087,6 +1081,7 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
   window.removeEventListener('resize', adjustPoetNameFontSize)
+  stopChatDrag()
   stopReading()
   if (audioElement) {
     audioElement.pause()
@@ -1776,13 +1771,24 @@ onUnmounted(() => {
   cursor: pointer;
   font-size: 20px;
   color: $text-color-secondary;
-  transition: all $transition-fast;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   text-decoration: none;
   white-space: nowrap;
+  position: relative;
+  transform: translateX(0);
+
+  .el-icon {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
 
   &:hover {
     color: #409eff;
     background: rgba(64, 158, 255, 0.06);
+    transform: translateX(4px);
+
+    .el-icon {
+      transform: scale(1.15);
+    }
   }
 
   &.active {
@@ -1790,6 +1796,7 @@ onUnmounted(() => {
     background: rgba(64, 158, 255, 0.15);
     font-weight: 600;
     position: relative;
+    transform: translateX(4px);
 
     &::before {
       content: '';
@@ -1798,9 +1805,23 @@ onUnmounted(() => {
       top: 50%;
       transform: translateY(-50%);
       width: 3px;
-      height: 16px;
-      background: #409eff;
+      height: 20px;
+      background: linear-gradient(to bottom, #409eff, rgba(64, 158, 255, 0.4));
       border-radius: 0 2px 2px 0;
+      box-shadow: 0 0 6px rgba(64, 158, 255, 0.3);
+    }
+
+    &::after {
+      content: '';
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 4px;
+      height: 4px;
+      background: #409eff;
+      border-radius: 50%;
+      box-shadow: 0 0 4px rgba(64, 158, 255, 0.4);
     }
   }
 }
@@ -1904,6 +1925,19 @@ onUnmounted(() => {
   height: 120px;
   background: url('/img/dt_4.jpg') no-repeat 0 -160px / cover;
   overflow: hidden;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      rgba($primary-color, 0.25) 0%,
+      rgba(0, 0, 0, 0.05) 40%,
+      rgba($secondary-color, 0.18) 100%
+    );
+    pointer-events: none;
+  }
 }
 
 .hero-decoration {
@@ -2055,8 +2089,40 @@ onUnmounted(() => {
 
 .section-divider {
   height: 2px;
-  background: linear-gradient(to right, $primary-color, transparent);
   margin: $spacing-sm 0 $spacing-lg;
+  position: relative;
+  background: linear-gradient(
+    to right,
+    $primary-color 0%,
+    rgba($primary-color, 0.3) 20%,
+    rgba($primary-color, 0.08) 50%,
+    transparent 80%
+  );
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    background: $primary-color;
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba($primary-color, 0.4);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 3px;
+    background: rgba($primary-color, 0.5);
+    border-radius: 50%;
+  }
 }
 
 .section-body {
@@ -2327,7 +2393,7 @@ onUnmounted(() => {
   width: 400px;
   flex-shrink: 0;
   align-self: flex-start;
-  z-index: 99;
+  z-index: 1001;
   display: flex;
   flex-direction: column;
   gap: $spacing-md;
@@ -2567,20 +2633,45 @@ onUnmounted(() => {
     justify-content: center;
     cursor: pointer;
     box-shadow: $box-shadow;
-    transition: all $transition-fast;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
 
     .el-icon {
       font-size: 18px;
       color: $text-color-secondary;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      z-index: 1;
+    }
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: radial-gradient(circle at center, rgba($primary-color, 0.12), transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
     }
 
     &:hover {
       border-color: $primary-color;
-      box-shadow: $box-shadow-md;
+      box-shadow: $box-shadow-md, 0 0 12px rgba($primary-color, 0.15);
+      transform: translateY(-2px) scale(1.05);
+
+      &::before {
+        opacity: 1;
+      }
 
       .el-icon {
         color: $primary-color;
+        transform: scale(1.1);
       }
+    }
+
+    &:active {
+      transform: translateY(0) scale(0.98);
     }
   }
 }

@@ -227,6 +227,10 @@ onMounted(() => {
 
 .post-header {
   margin-bottom: $spacing-lg;
+  padding: $spacing-lg $spacing-xl;
+  background: linear-gradient(135deg, rgba(139, 69, 19, 0.04), rgba(210, 105, 30, 0.06));
+  border-radius: $border-radius-lg;
+  border: 1px solid rgba(139, 69, 19, 0.08);
 }
 
 .back-button {
@@ -259,6 +263,19 @@ onMounted(() => {
   margin-bottom: $spacing-lg;
   letter-spacing: 1px;
   line-height: 1.4;
+  position: relative;
+  padding-left: $spacing-lg;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 4px;
+    bottom: 4px;
+    width: 4px;
+    background: linear-gradient(to bottom, $primary-color, $accent-color);
+    border-radius: 2px;
+  }
 }
 
 .post-meta {
@@ -349,10 +366,21 @@ onMounted(() => {
   color: $text-color;
   margin-bottom: $spacing-lg;
   padding-bottom: $spacing-sm;
-  border-bottom: 2px solid $primary-color;
-  display: inline-block;
   font-weight: 600;
   letter-spacing: 1px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  &::before {
+    content: '';
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(to bottom, $primary-color, $accent-color);
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
 }
 
 .comment-form {
@@ -391,10 +419,12 @@ onMounted(() => {
   @include card;
   padding: $spacing-lg;
   border-radius: $border-radius-lg;
+  border-left: 3px solid transparent;
   transition: all $transition-fast;
 
   &:hover {
     box-shadow: $box-shadow-md;
+    border-left-color: $primary-color;
   }
 }
 

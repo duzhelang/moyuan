@@ -115,7 +115,7 @@ const handleUserCommand = (command: string) => {
     <div class="header-content">
       <div class="header-left">
         <router-link to="/" class="logo-link">
-          <img :src="asset('/img/tubiao (1).jpg')" alt="墨渊" class="logo-img">
+          <img :src="asset('/img/tubiao_1.jpg')" alt="墨渊" class="logo-img">
           <span class="logo-text">墨渊</span>
         </router-link>
       </div>
@@ -130,7 +130,7 @@ const handleUserCommand = (command: string) => {
         <div class="contact-item">
           <span class="contact-text">了解我们</span>
           <div class="qr-popup">
-            <img :src="asset('/img/微信二维.jpg')" alt="了解我们">
+            <img :src="asset('/img/wechat_qr.jpg')" alt="了解我们">
           </div>
         </div>
         <div class="contact-item" @click="router.push('/contact')">
@@ -392,6 +392,7 @@ const handleUserCommand = (command: string) => {
     height: 110px;
     border-radius: 6px;
     display: block;
+    object-fit: cover;
   }
 }
 

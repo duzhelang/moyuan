@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
@@ -224,7 +224,7 @@ defineExpose({ searchInputRef })
   left: 0;
   right: 0;
   width: 100%;
-  background: url('/img/dt_0.0.jpg');
+  background: url('/img/dt_0_0.jpg');
   background-size: cover;
   background-repeat: no-repeat;
   background-position: 0px -320px;

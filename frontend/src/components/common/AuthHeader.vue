@@ -37,7 +37,7 @@ const goHome = () => {
     <div class="auth-header-content">
       <div class="auth-header-left">
         <router-link to="/" class="logo-link">
-          <img src="/img/tubiao (1).jpg" alt="墨渊" class="logo-img" />
+          <img src="/img/tubiao_1.jpg" alt="墨渊" class="logo-img" />
           <span class="logo-text">墨渊</span>
         </router-link>
       </div>
@@ -52,13 +52,13 @@ const goHome = () => {
         <div class="contact-item">
           <span class="contact-text">了解我们</span>
           <div class="qr-popup">
-            <img src="/img/微信二维.jpg" alt="了解我们" />
+            <img src="/img/wechat_qr.jpg" alt="了解我们" />
           </div>
         </div>
         <div class="contact-item">
           <span class="contact-text">联系我们</span>
           <div class="qr-popup">
-            <img src="/img/微信二维.jpg" alt="联系我们" />
+            <img src="/img/wechat_qr.jpg" alt="联系我们" />
           </div>
         </div>
         <div class="divider"></div>
@@ -206,6 +206,7 @@ const goHome = () => {
     height: 110px;
     border-radius: 6px;
     display: block;
+    object-fit: cover;
   }
 }
 

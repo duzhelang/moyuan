@@ -1,0 +1,428 @@
+// ============================================================
+// 响应式样式 - home-responsive.scss
+// 仅处理布局/尺寸/显隐，不修改颜色、字体、间距等功能性样式
+// ============================================================
+
+// ========== 基础断点变量 ==========
+$bp-xl: 1200px;
+$bp-lg: 992px;
+$bp-md: 768px;
+$bp-sm: 576px;
+
+// ========== 主轮播 (.lbye) ==========
+@media (max-width: $bp-lg) {
+  .lbye {
+    width: 95%;
+    height: 420px;
+  }
+  .lbye .lb_zhutu {
+    height: 400px;
+  }
+  .lbye ul {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+@media (max-width: $bp-md) {
+  .lbye {
+    width: 100%;
+    height: 300px;
+    border-radius: 0;
+    top: 0;
+    margin-bottom: 0;
+  }
+  .lbye .lb_zhutu {
+    height: 280px;
+    border-radius: 0;
+  }
+  .lbye .lb_jiantou_left,
+  .lbye .lb_jiantou_right {
+    width: 24px;
+    height: 280px;
+    border-radius: 0;
+  }
+  .lbye .lb_jiantou_left:hover,
+  .lbye .lb_jiantou_right:hover {
+    width: 30px;
+  }
+  .sy_top_daohang_biao {
+    right: 20px;
+  }
+}
+
+// ========== 诗文轮播 (.lbye_shiwen) ==========
+@media (max-width: $bp-lg) {
+  .lbye_shiwen {
+    width: 95%;
+    height: 320px;
+  }
+  .lbye_shiwen .lb_zhushi {
+    width: 95%;
+    height: 300px;
+    left: 10px;
+    margin-left: 0;
+  }
+  .lbye_shiwen ul {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+@media (max-width: $bp-md) {
+  .shiwen-wrapper {
+    height: auto;
+  }
+  .lbye_shiwen {
+    width: 100%;
+    height: 240px;
+  }
+  .lbye_shiwen .lb_zhushi {
+    width: 100%;
+    height: 220px;
+    left: 0;
+    border-radius: 0;
+  }
+}
+
+// ========== 诗话视野 (.z_right) ==========
+@media (max-width: $bp-xl) {
+  .z_right {
+    width: 400px;
+  }
+}
+
+@media (max-width: $bp-lg) {
+  .z_right_container {
+    flex-direction: column;
+    align-items: center;
+  }
+  .z_right {
+    width: 90%;
+    max-width: 600px;
+    height: 500px;
+  }
+}
+
+@media (max-width: $bp-md) {
+  .z_right {
+    width: 95%;
+    height: 400px;
+    padding: 15px;
+  }
+  .vision-header h4 {
+    font-size: 16px;
+  }
+}
+
+// ========== 论坛区域 (.luntan) ==========
+@media (max-width: $bp-lg) {
+  .luntan {
+    width: 80%;
+  }
+}
+
+@media (max-width: $bp-md) {
+  .luntan {
+    width: 95%;
+    border-radius: 10px;
+  }
+  .luntan_title h1 {
+    font-size: 28px;
+  }
+  .luntan_anniu ul {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .luntan_pin_top {
+    flex-direction: column;
+  }
+  .jxh_left_nr0 img {
+    width: 140px;
+    height: 105px;
+  }
+}
+
+@media (max-width: $bp-sm) {
+  .luntan {
+    width: 100%;
+    border-radius: 0;
+  }
+  .sy_ss_0_lt {
+    width: 90%;
+  }
+  .jxh_left_nr {
+    flex-direction: column;
+  }
+  .jxh_left_nr0 img {
+    width: 100%;
+    height: auto;
+  }
+}
+
+// ========== 古诗推选/当代精选 (.poem_selection_container) ==========
+@media (max-width: $bp-lg) {
+  .poem_selection_container {
+    width: 95%;
+    gap: 20px;
+  }
+}
+
+@media (max-width: $bp-md) {
+  .poem_selection_container {
+    flex-direction: column;
+    width: 100%;
+    gap: 20px;
+  }
+  .poem_selection_left,
+  .poem_selection_right {
+    width: 100%;
+  }
+  .luntan_jx_title {
+    font-size: 28px;
+  }
+  .poem_card {
+    flex-direction: column;
+  }
+  .poem_card_img {
+    width: 100%;
+    min-height: 120px;
+    max-height: 160px;
+  }
+  .poem_card_img img {
+    width: 100%;
+    height: 140px;
+  }
+  .contemporary_card {
+    flex-direction: column;
+  }
+  .contemporary_card_img {
+    width: 100%;
+    height: 160px;
+    border-radius: 10px 10px 0 0;
+  }
+  .luntan_jx_scroll {
+    max-height: 350px;
+  }
+  .luntan_jx,
+  .luntan_ddjx {
+    padding: 15px;
+    min-height: 400px;
+  }
+}
+
+@media (max-width: $bp-sm) {
+  .luntan_jx_title {
+    font-size: 22px;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .poem_search_bar {
+    flex-direction: column;
+  }
+  .poem_search_btn,
+  .poem_search_clear {
+    width: 100%;
+  }
+  .contemporary_card_body {
+    padding: 10px 12px;
+  }
+}
+
+// ========== AI 区域 (.ai-container) ==========
+@media (max-width: $bp-md) {
+  .ai-container {
+    max-width: 100%;
+    padding: 20px 16px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+  .ai-header-title {
+    font-size: 1.5em;
+  }
+  .ai-tab-nav {
+    gap: 4px;
+  }
+  .ai-tab-btn {
+    padding: 8px 14px;
+    font-size: 0.85em;
+  }
+  .ai-extra-features {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .ai-upload-zone {
+    padding: 24px 12px;
+  }
+  .ai-upload-emoji {
+    font-size: 36px;
+  }
+  .ai-upload-text {
+    font-size: 1em;
+  }
+  .ai-analyze-textarea {
+    min-height: 80px;
+    font-size: 1em;
+  }
+  .rhyme-search-input {
+    flex-direction: column;
+  }
+  .couplet-input-area {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: $bp-sm) {
+  .ai-container {
+    padding: 16px 12px;
+  }
+  .ai-extra-features {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ai-tab-btn {
+    padding: 6px 10px;
+    font-size: 0.8em;
+  }
+}
+
+// ========== 分类精赏 (.z_top) ==========
+@media (max-width: $bp-lg) {
+  .z_top {
+    padding: 0 15px;
+  }
+}
+
+@media (max-width: $bp-md) {
+  .z_top {
+    padding: 0 10px;
+  }
+  .sy_fljx {
+    font-size: 24px;
+  }
+}
+
+// ========== 顶部栏 (.top) ==========
+@media (max-width: $bp-md) {
+  .top {
+    height: 45px;
+  }
+  .top .logo_img {
+    width: 36px;
+    height: 36px;
+  }
+  .logo-txt {
+    font-size: 22px;
+  }
+  .top_txt {
+    gap: 6px;
+    margin-right: 10px;
+  }
+  .shijian {
+    display: none;
+  }
+}
+
+@media (max-width: $bp-sm) {
+  .top {
+    height: 40px;
+  }
+  .top .logo_img {
+    width: 32px;
+    height: 32px;
+  }
+  .logo-txt {
+    font-size: 18px;
+  }
+}
+
+// ========== 右侧工具栏 (.youce_fangbiao) ==========
+@media (max-width: $bp-md) {
+  .youce_fangbiao img {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+// ========== 论坛+诗词布局 (.forum_poem_layout) ==========
+@media (max-width: $bp-md) {
+  .forum_poem_layout {
+    padding: 0 10px;
+  }
+  .luntan_section_title {
+    font-size: 22px;
+  }
+}
+
+// ========== 底部导航指示器 ==========
+@media (max-width: $bp-md) {
+  .sy_top_daohang_biao img {
+    width: 24px;
+    height: 24px;
+    margin: 0 6px;
+  }
+}
+
+// ========== hr 分隔线 ==========
+@media (max-width: $bp-md) {
+  .home-page hr {
+    margin: 10px 0;
+  }
+}
+
+// ========== 装饰元素响应式覆盖 ==========
+// 问题元素：.zhuang_s6 ~ .zhuang_s11 使用固定 top: Npx 绝对定位
+// 在内容高度变化或视口缩小时必然错位
+// 策略：中屏隐藏问题元素，小屏隐藏所有装饰元素
+
+// --- 中屏（< 1200px）：隐藏定位值为魔法数字的装饰元素 ---
+@media (max-width: 1200px) {
+  .zhuang_s6,
+  .zhuang_s7,
+  .zhuang_s8,
+  .zhuang_s9,
+  .zhuang_s10,
+  .zhuang_s11 {
+    display: none !important;
+  }
+
+  // 保留的装饰元素在中屏下适当缩小，避免遮挡内容
+  .zhuang_s1 {
+    width: 80px;
+    height: auto;
+  }
+
+  .zhuang_s2 {
+    width: 120px;
+    height: auto;
+  }
+
+  .zhuang_s3 {
+    width: 200px;
+    height: auto;
+  }
+
+  .zhuang_s5 {
+    width: 200px;
+    height: auto;
+  }
+}
+
+// --- 小屏（< 768px）：隐藏所有装饰元素 ---
+@media (max-width: 768px) {
+  .zhuang_s1,
+  .zhuang_s2,
+  .zhuang_s3,
+  .zhuang_s4,
+  .zhuang_s4_top,
+  .zhuang_s4_1,
+  .zhuang_s5,
+  .zhuang_s6,
+  .zhuang_s7,
+  .zhuang_s8,
+  .zhuang_s9,
+  .zhuang_s10,
+  .zhuang_s11 {
+    display: none !important;
+  }
+}

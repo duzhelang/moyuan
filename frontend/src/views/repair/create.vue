@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { FormInstance, FormRules } from 'element-plus'
+import type { FormInstance, FormRules, UploadProps, UploadFile, UploadRawFile } from 'element-plus'
+import { Back, List, ChatDotRound, SwitchButton, Plus, Delete } from '@element-plus/icons-vue'
 import { createRepairOrder } from '@/api/modules/repair'
 import { useUserStore } from '@/stores/user'
 
@@ -10,13 +11,15 @@ const router = useRouter()
 const userStore = useUserStore()
 const formRef = ref<FormInstance>()
 const submitting = ref(false)
+const fileList = ref<UploadFile[]>([])
+const pasteAreaRef = ref<HTMLDivElement>()
 
 const form = reactive({
   title: '',
   description: '',
   category: '',
   priority: 2,
-  images: ''
+  images: [] as string[]
 })
 
 const categoryOptions = [
@@ -48,21 +51,78 @@ const rules: FormRules = {
   ]
 }
 
+const uploadHeaders = computed(() => ({
+  Authorization: userStore.token ? `Bearer ${userStore.token}` : ''
+}))
+
+const uploadAction = '/api/file/upload/image'
+
+const handleUploadSuccess = (response: any, file: UploadFile) => {
+  if (response.code === 200) {
+    form.images.push(response.data.url)
+    ElMessage.success('图片上传成功')
+  } else {
+    ElMessage.error('图片上传失败')
+  }
+}
+
+const handleUploadError = () => {
+  ElMessage.error('图片上传失败')
+}
+
+const handleRemoveFile = (file: UploadFile) => {
+  const index = fileList.value.indexOf(file)
+  if (index > -1) {
+    fileList.value.splice(index, 1)
+    form.images.splice(index, 1)
+  }
+}
+
+const handlePaste = (event: ClipboardEvent) => {
+  const items = event.clipboardData?.items
+  if (!items) return
+
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf('image') !== -1) {
+      event.preventDefault()
+      const file = items[i].getAsFile()
+      if (file) {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          const base64 = e.target?.result as string
+          form.images.push(base64)
+          ElMessage.success('图片已粘贴')
+        }
+        reader.readAsDataURL(file)
+      }
+      break
+    }
+  }
+}
+
+const handleRemoveImage = (index: number) => {
+  form.images.splice(index, 1)
+}
+
 const handleSubmit = async () => {
   if (!formRef.value) return
   await formRef.value.validate(async (valid) => {
     if (valid) {
       submitting.value = true
       try {
-        await createRepairOrder({
+        const res = await createRepairOrder({
           title: form.title,
           description: form.description,
           category: form.category,
           priority: form.priority,
-          images: form.images || undefined
+          images: form.images.length > 0 ? form.images.join(',') : undefined
         })
         ElMessage.success('报修提交成功')
-        router.push('/repair')
+        if (res.data?.id) {
+          router.push(`/repair/${res.data.id}`)
+        } else {
+          router.push('/repair')
+        }
       } catch (error) {
         console.error('提交报修失败', error)
       } finally {
@@ -70,6 +130,12 @@ const handleSubmit = async () => {
       }
     }
   })
+}
+
+const handleReset = () => {
+  formRef.value?.resetFields()
+  form.images = []
+  fileList.value = []
 }
 
 const handleCancel = () => {
@@ -181,15 +247,48 @@ const handleLogout = async () => {
         </el-row>
 
         <el-form-item label="相关图片（可选）">
-          <el-input
-            v-model="form.images"
-            placeholder="请输入图片URL，多个用逗号分隔"
-          />
-          <div class="form-tip">支持粘贴图片链接，多个链接用逗号分隔</div>
+          <div class="image-upload-area">
+            <el-upload
+              v-model:file-list="fileList"
+              :action="uploadAction"
+              :headers="uploadHeaders"
+              :on-success="handleUploadSuccess"
+              :on-error="handleUploadError"
+              :on-remove="handleRemoveFile"
+              list-type="picture-card"
+              :limit="5"
+              accept="image/*"
+            >
+              <el-icon><Plus /></el-icon>
+              <template #tip>
+                <div class="upload-tip">支持上传图片，最多5张</div>
+              </template>
+            </el-upload>
+          </div>
+
+          <div class="paste-area" ref="pasteAreaRef" @paste="handlePaste">
+            <el-icon><Plus /></el-icon>
+            <span>在此处粘贴图片 (Ctrl+V)</span>
+          </div>
+
+          <div v-if="form.images.length > 0" class="image-preview-list">
+            <div v-for="(img, index) in form.images" :key="index" class="image-preview-item">
+              <el-image :src="img" fit="cover" class="preview-img" />
+              <el-button
+                class="remove-btn"
+                type="danger"
+                :icon="Delete"
+                circle
+                size="small"
+                @click="handleRemoveImage(index)"
+              />
+            </div>
+          </div>
         </el-form-item>
 
         <el-form-item>
           <el-button type="primary" :loading="submitting" @click="handleSubmit">提交报修</el-button>
+          <el-button @click="handleReset">重置</el-button>
           <el-button @click="handleCancel">取消</el-button>
         </el-form-item>
       </el-form>
@@ -237,5 +336,62 @@ const handleLogout = async () => {
   font-size: 12px;
   color: #909399;
   margin-top: 4px;
+}
+
+.image-upload-area {
+  margin-bottom: 16px;
+}
+
+.upload-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 8px;
+}
+
+.paste-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 200px;
+  height: 120px;
+  border: 2px dashed #dcdfe6;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: #909399;
+  font-size: 14px;
+  gap: 8px;
+
+  &:hover {
+    border-color: #409eff;
+    color: #409eff;
+  }
+}
+
+.image-preview-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.image-preview-item {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.preview-img {
+  width: 100%;
+  height: 100%;
+}
+
+.remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
 }
 </style>

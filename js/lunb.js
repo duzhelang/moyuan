@@ -29,7 +29,7 @@
       }
   
       function updateImage() {
-          document.getElementById("ad_scroll").src = "img/lb_ (" + now + ").jpg";
+          document.getElementById("ad_scroll").src = "img/lb_" + now + ".jpg";
           for (var i = 1; i <= max; i++) {
               document.getElementById("li" + i).style.color = now == i ? "rgb(249,255,0)" : "black";
           }
@@ -45,7 +45,7 @@
 		now_shi=diji;
 		// 先让当前图片淡入（设置为显示并利用CSS过渡效果）
 		//    document.getElementById("ad_scroll_shiwen").classList.add('active');
-		document.getElementById("ad_scroll_shiwen").src="img/lb_shiwen ("+now_shi+").png";
+		document.getElementById("ad_scroll_shiwen").src="img/lb_shiwen_"+now_shi+".png";
 		const carouselImages = document.querySelectorAll('.lb_zhushi');
 		// function showNextImage() {
 		//        carouselImages[currentIndex].classList.remove('active');
@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // 	var max=6;
 // 	function imgLoopShow(id){
 // 		now=id;
-// 		document.getElementById("ad_scroll").src="img/lb_ ("+now+").jpg";
+// 		document.getElementById("ad_scroll").src="img/lb_"+now+".jpg";
 // 		for(var i=1;i<=max;i++){
 // 			if(now==i){
 // 				document.getElementById("li"+i).style="color:rgb(249,255,0)";
@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // 				document.getElementById("li"+i).style="color:black";
 // 			}
 // 		}
-// 		let imgs=["img/lb_ (1).jpg","img/lb_ (2).jpg","img/lb_ (3).jpg","img/lb_ (4).jpg","img/lb_ (5).jpg","img/lb_ (6).jpg"];
+// 		let imgs=["img/lb_1.jpg","img/lb_2.jpg","img/lb_3.jpg","img/lb_4.jpg","img/lb_5.jpg","img/lb_6.jpg"];
 
 
 // 		document.getElementById('lb_jt_z').addEventListener('click',function (){

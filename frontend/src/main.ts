@@ -7,6 +7,7 @@ import 'element-plus/dist/index.css'
 import router from './router'
 import App from './App.vue'
 import '@/assets/styles/original.css'
+import '@/assets/styles/global.scss'
 import { permission, permissionOr, permissionAnd } from './directives/permission'
 
 const app = createApp(App)
