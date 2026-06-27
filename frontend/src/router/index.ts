@@ -50,6 +50,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '交流广场', keepAlive: true }
       },
       {
+        path: 'poetry-cloud',
+        name: 'PoetryCloud',
+        component: () => import('@/views/poetry-cloud/index.vue'),
+        meta: { title: '诗云星空', hideHeader: true }
+      },
+      {
         path: 'forum',
         name: 'Forum',
         component: () => import('@/views/forum/list.vue'),
