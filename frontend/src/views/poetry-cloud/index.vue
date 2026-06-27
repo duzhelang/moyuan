@@ -733,9 +733,9 @@ onUnmounted(() => {
   // 清理位置缓存
   poetPositionMap.clear()
 
+  scene?.clear()
   renderer?.dispose()
   controls?.dispose()
-  scene?.clear()
 })
 </script>
 
