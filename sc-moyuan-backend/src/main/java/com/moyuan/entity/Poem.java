@@ -35,6 +35,8 @@ public class Poem {
     private String poetName;
     @TableField(exist = false)
     private String dynastyName;
+    @TableField(exist = false)
+    private String categoryName;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
     @TableField(fill = FieldFill.INSERT_UPDATE)

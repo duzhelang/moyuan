@@ -70,6 +70,23 @@ public class AiController {
         ));
     }
 
+    @Operation(summary = "图片OCR识别")
+    @PostMapping("/ocr")
+    public R<Map<String, String>> ocrImage(
+            @RequestParam("image") MultipartFile image,
+            @RequestParam(value = "model", defaultValue = "zhipu") String model,
+            @RequestParam(value = "visionModel", required = false) String visionModel,
+            @RequestParam(value = "moduleCode", required = false) String moduleCode) {
+
+        String text = aiService.ocrImage(image, model, visionModel, moduleCode);
+
+        return R.success(Map.of(
+                "text", text,
+                "model", model,
+                "visionModel", visionModel != null ? visionModel : "default"
+        ));
+    }
+
     @Operation(summary = "AI对对联")
     @PostMapping("/couplet")
     public R<Map<String, String>> matchCouplet(@RequestBody Map<String, String> request) {

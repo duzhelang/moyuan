@@ -21,4 +21,6 @@ public interface AiService {
     String matchCouplet(String upperCouplet, String model);
 
     String matchCouplet(String upperCouplet, String model, String moduleCode);
+
+    String ocrImage(MultipartFile image, String model, String visionModel, String moduleCode);
 }

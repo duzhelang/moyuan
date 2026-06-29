@@ -29,13 +29,13 @@ public class PoetDefaultAvatar {
                     AVATAR_PATH + "avatar_west_classical_male_01.jpg"
             ),
             "west_classical_female", List.of(
-                    AVATAR_PATH + "avatar_west_modern_female_01.jpg"
+                    AVATAR_PATH + "avatar_west_classical_female_01.jpg"
             ),
             "west_romantic_male", List.of(
                     AVATAR_PATH + "avatar_west_romantic_male_01.jpg"
             ),
             "west_romantic_female", List.of(
-                    AVATAR_PATH + "avatar_west_modern_female_01.jpg"
+                    AVATAR_PATH + "avatar_west_romantic_female_01.jpg"
             ),
             "west_modern_female", List.of(
                     AVATAR_PATH + "avatar_west_modern_female_01.jpg"

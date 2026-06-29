@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted, onActivated, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getForumPostList } from '@/api/modules/forum'
-import { writePoemFromImage, analyzePoem, matchCouplet } from '@/api/modules/ai'
+import { writePoemFromImage, analyzePoem, matchCouplet, ocrImage } from '@/api/modules/ai'
 import { queryRhymeByCharacter, queryRhymeByGroup } from '@/api/modules/rhyme'
 import type { RhymeItem } from '@/api/modules/rhyme'
 import { getRandomPoetFeatured } from '@/api/modules/poetFeatured'
@@ -56,7 +56,75 @@ const analyzeInput = ref('')
 const analyzeResult = ref('')
 const analyzeLoading = ref(false)
 
-const activeExtraPanel = ref<'rhyme' | 'couplet' | null>(null)
+const activeExtraPanel = ref<'rhyme' | 'couplet' | 'ocr' | null>(null)
+
+const ocrFile = ref<File | null>(null)
+const ocrPreview = ref('')
+const ocrResult = ref('')
+const ocrLoading = ref(false)
+const ocrUploadRef = ref<HTMLInputElement | null>(null)
+
+const processOcrFile = (file: File) => {
+  if (!file.type.startsWith('image/')) {
+    ElMessage.warning('请上传图片文件')
+    return
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.warning('图片大小不能超过5MB')
+    return
+  }
+  ocrFile.value = file
+  const reader = new FileReader()
+  reader.onload = (e) => { ocrPreview.value = e.target?.result as string }
+  reader.readAsDataURL(file)
+}
+
+const handleOcrUpload = (e: Event) => {
+  const input = e.target as HTMLInputElement
+  if (input.files && input.files.length > 0) {
+    processOcrFile(input.files[0])
+  }
+}
+
+const handleOcrDragOver = (e: DragEvent) => {
+  (e.currentTarget as HTMLElement)?.classList.add('ai-drag-over')
+}
+
+const handleOcrDragLeave = (e: DragEvent) => {
+  (e.currentTarget as HTMLElement)?.classList.remove('ai-drag-over')
+}
+
+const handleOcrDrop = (e: DragEvent) => {
+  (e.currentTarget as HTMLElement)?.classList.remove('ai-drag-over')
+  const files = e.dataTransfer?.files
+  if (files && files.length > 0) {
+    processOcrFile(files[0])
+  }
+}
+
+const clearOcrImage = () => {
+  ocrFile.value = null
+  ocrPreview.value = ''
+  ocrResult.value = ''
+  if (ocrUploadRef.value) ocrUploadRef.value.value = ''
+}
+
+const handleOcrRecognize = async () => {
+  if (!ocrFile.value) {
+    ElMessage.warning('请先上传图片')
+    return
+  }
+  ocrLoading.value = true
+  ocrResult.value = ''
+  try {
+    const res = await ocrImage(ocrFile.value, aiModel.value, visionModel.value, 'ocr')
+    ocrResult.value = res.data.text
+  } catch {
+    ocrResult.value = '抱歉，AI服务暂时不可用，请稍后重试。'
+  } finally {
+    ocrLoading.value = false
+  }
+}
 
 const rhymeInput = ref('')
 const rhymeResults = ref<RhymeItem[]>([])
@@ -661,6 +729,11 @@ onActivated(() => {
           <div class="ai-extra-title">AI 对对联</div>
           <div class="ai-extra-desc">上联出题，AI 对下联</div>
         </div>
+        <div class="ai-extra-card" :class="{ active: activeExtraPanel === 'ocr' }" @click="activeExtraPanel = activeExtraPanel === 'ocr' ? null : 'ocr'">
+          <div class="ai-extra-icon">📷</div>
+          <div class="ai-extra-title">古籍识文</div>
+          <div class="ai-extra-desc">AI识别图片中的古诗词文字</div>
+        </div>
         <div class="ai-extra-card">
           <div class="ai-extra-icon">✒️</div>
           <div class="ai-extra-title">书法生成</div>
@@ -739,6 +812,33 @@ onActivated(() => {
             <div class="couplet-divider">—</div>
             <div class="couplet-lower">{{ coupletResult }}</div>
           </div>
+        </div>
+      </div>
+
+      <div v-if="activeExtraPanel === 'ocr'" class="ai-extra-panel">
+        <div class="ai-extra-panel-header">
+          <span class="ai-extra-panel-title">📷 古籍识文</span>
+          <button class="ai-extra-panel-close" @click="activeExtraPanel = null">&times;</button>
+        </div>
+        <p class="ai-explore-hint" style="margin-bottom:12px;">上传古诗词图片、书法作品或碑帖，AI 将精准识别其中的文字</p>
+        <div class="ai-upload-zone" style="margin-bottom:12px;" @click="ocrUploadRef?.click()" @dragover.prevent="handleOcrDragOver" @dragleave="handleOcrDragLeave" @drop.prevent="handleOcrDrop">
+          <span class="ai-upload-emoji">📷</span>
+          <p class="ai-upload-text">点击上传图片，或拖拽至此处</p>
+          <p class="ai-upload-hint">支持 JPG / PNG / WebP，最大 5MB</p>
+          <input ref="ocrUploadRef" type="file" accept="image/jpeg,image/png,image/webp" style="display:none" @change="handleOcrUpload">
+        </div>
+        <div v-if="ocrPreview" class="ai-preview-area" style="margin-bottom:12px;">
+          <img :src="ocrPreview" alt="预览图片">
+          <div class="ai-preview-actions">
+            <button class="ai-btn-primary" @click="handleOcrRecognize" :disabled="ocrLoading">
+              {{ ocrLoading ? 'AI识别中...' : '🔍 开始识别' }}
+            </button>
+            <button class="ai-btn-outline" @click="clearOcrImage">重新选择</button>
+          </div>
+        </div>
+        <div v-if="ocrResult" class="ai-result-card">
+          <div class="ai-analysis-label">📖 识别结果</div>
+          <div class="ai-analysis-text" style="white-space:pre-wrap;">{{ ocrResult }}</div>
         </div>
       </div>
     </div>

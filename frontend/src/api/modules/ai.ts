@@ -89,6 +89,29 @@ export function getAiModuleConfig(moduleCode: string) {
   return request.get<AiModuleConfig>(`/ai/config/${moduleCode}`)
 }
 
+export interface OcrResponse {
+  text: string
+  model: string
+  visionModel: string
+}
+
+export function ocrImage(image: File, model: string = 'zhipu', visionModel?: string, moduleCode?: string) {
+  const formData = new FormData()
+  formData.append('image', image)
+  formData.append('model', model)
+  if (visionModel) {
+    formData.append('visionModel', visionModel)
+  }
+  if (moduleCode) {
+    formData.append('moduleCode', moduleCode)
+  }
+  return request.post<OcrResponse>('/ai/ocr', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
 export function fillAiContent(data: { targetType: string; targetId: number; fieldName: string; moduleCode?: string }) {
   return request.post<any>('/ai/fill-content', data)
 }

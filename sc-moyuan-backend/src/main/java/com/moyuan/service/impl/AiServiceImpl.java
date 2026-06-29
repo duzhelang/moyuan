@@ -44,6 +44,12 @@ public class AiServiceImpl implements AiService {
             "创作要求：1.严格遵循对联的平仄规则（上联仄收，下联平收）；2.词性相对、结构相当；3.意境相承、内容相关；4.语言典雅、对仗工稳。" +
             "输出格式：先给出下联，再简要说明对仗思路。";
 
+    private static final String OCR_SYSTEM_PROMPT =
+            "你是一个专业的古籍文字识别专家，擅长识别中国古典诗词、书法作品、碑帖拓片等图像中的文字。" +
+            "你的任务是精确识别图片中的所有文字内容。" +
+            "识别要求：1.逐字准确识别，不得遗漏或篡改任何文字；2.保留原文的段落和换行结构；3.对于无法确定的字，用[?]标注；" +
+            "4.如果有印章、题款、落款等辅助信息，也需识别并标注；5.直接输出识别结果，不需要额外解释。";
+
     @Override
     public String chat(String message, String model) {
         return chat(message, model, null);
@@ -119,5 +125,23 @@ public class AiServiceImpl implements AiService {
             return aiModelRegistry.chatByModule(prompt, moduleCode, COUPLET_SYSTEM_PROMPT);
         }
         return aiModelRegistry.chat(prompt, model, COUPLET_SYSTEM_PROMPT);
+    }
+
+    @Override
+    public String ocrImage(MultipartFile image, String model, String visionModel, String moduleCode) {
+        if (image == null || image.isEmpty()) {
+            throw new BusinessException(ResultCode.ERROR, "图片不能为空");
+        }
+        try {
+            String base64Image = Base64.getEncoder().encodeToString(image.getBytes());
+            String prompt = "请识别这张图片中的所有文字内容，逐字准确识别，保留原文的段落和换行结构。如有印章、题款等也需识别。";
+            if (moduleCode != null && !moduleCode.isEmpty()) {
+                return aiModelRegistry.visionByModule(prompt, base64Image, moduleCode, visionModel, OCR_SYSTEM_PROMPT);
+            }
+            return aiModelRegistry.vision(prompt, base64Image, model, visionModel, OCR_SYSTEM_PROMPT);
+        } catch (IOException e) {
+            log.error("图片处理失败", e);
+            throw new BusinessException(ResultCode.ERROR, "图片处理失败: " + e.getMessage());
+        }
     }
 }

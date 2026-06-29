@@ -9,6 +9,7 @@ import com.moyuan.common.ResultCode;
 import com.moyuan.entity.Poem;
 import com.moyuan.entity.Poet;
 import com.moyuan.entity.Dynasty;
+import com.moyuan.entity.Category;
 import com.moyuan.entity.UserFavorite;
 import com.moyuan.entity.UserLike;
 import com.moyuan.enums.TargetType;
@@ -16,6 +17,7 @@ import com.moyuan.exception.BusinessException;
 import com.moyuan.mapper.PoemMapper;
 import com.moyuan.mapper.PoetMapper;
 import com.moyuan.mapper.DynastyMapper;
+import com.moyuan.mapper.CategoryMapper;
 import com.moyuan.mapper.UserFavoriteMapper;
 import com.moyuan.mapper.UserLikeMapper;
 import com.moyuan.service.PoemService;
@@ -39,6 +41,7 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
     private final PoemMapper poemMapper;
     private final PoetMapper poetMapper;
     private final DynastyMapper dynastyMapper;
+    private final CategoryMapper categoryMapper;
     private final UserLikeMapper userLikeMapper;
     private final UserFavoriteMapper userFavoriteMapper;
     private final CacheManager cacheManager;
@@ -165,10 +168,15 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
                 .map(Poem::getDynastyId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
+        Set<Long> categoryIds = poems.stream()
+                .map(Poem::getCategoryId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
 
-        // 批量查询诗人和朝代
+        // 批量查询诗人、朝代和分类
         Map<Long, String> poetNameMap = new HashMap<>();
         Map<Long, String> dynastyNameMap = new HashMap<>();
+        Map<Long, String> categoryNameMap = new HashMap<>();
 
         if (!poetIds.isEmpty()) {
             poetMapper.selectBatchIds(poetIds).forEach(
@@ -178,6 +186,10 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
             dynastyMapper.selectBatchIds(dynastyIds).forEach(
                     dynasty -> dynastyNameMap.put(dynasty.getId(), dynasty.getName()));
         }
+        if (!categoryIds.isEmpty()) {
+            categoryMapper.selectBatchIds(categoryIds).forEach(
+                    category -> categoryNameMap.put(category.getId(), category.getName()));
+        }
 
         // 填充数据
         for (Poem poem : poems) {
@@ -186,6 +198,9 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
             }
             if (poem.getDynastyId() != null) {
                 poem.setDynastyName(dynastyNameMap.get(poem.getDynastyId()));
+            }
+            if (poem.getCategoryId() != null) {
+                poem.setCategoryName(categoryNameMap.get(poem.getCategoryId()));
             }
         }
     }
