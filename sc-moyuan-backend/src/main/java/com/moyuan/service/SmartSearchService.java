@@ -5,8 +5,8 @@ import java.util.Map;
 
 public interface SmartSearchService {
     
-    Map<String, Object> smartSearch(Long dynastyId, Long categoryId, Long poetId, 
-                                     String keyword, String sortBy, int pageNum, int pageSize);
+    Map<String, Object> smartSearch(Long dynastyId, Long categoryId, Long poetId,
+                                     String poetName, String keyword, String sortBy, int pageNum, int pageSize);
     
     List<String> getSearchSuggestions(String keyword, int limit);
     

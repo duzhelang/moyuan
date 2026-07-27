@@ -119,6 +119,7 @@ public class SearchController {
             @RequestParam(required = false) Long dynastyId,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Long poetId,
+            @RequestParam(required = false) String poetName,
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "latest") String sortBy,
             @RequestParam(defaultValue = "1") int pageNum,
@@ -128,7 +129,7 @@ public class SearchController {
             userId = SecurityUtil.getCurrentUserId();
         } catch (Exception ignored) {}
         
-        Map<String, Object> result = smartSearchService.smartSearch(dynastyId, categoryId, poetId, keyword, sortBy, pageNum, pageSize);
+        Map<String, Object> result = smartSearchService.smartSearch(dynastyId, categoryId, poetId, poetName, keyword, sortBy, pageNum, pageSize);
         
         if (userId != null && StringUtils.hasText(keyword)) {
             smartSearchService.saveSearchHistory(userId, keyword);

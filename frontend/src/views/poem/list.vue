@@ -60,6 +60,7 @@ const filters = ref({
   dynastyId: undefined as number | undefined,
   categoryId: undefined as number | undefined,
   poetId: undefined as number | undefined,
+  poetName: '' as string,
   keyword: '',
   sortBy: 'latest' as 'latest' | 'popular' | 'likes'
 })
@@ -199,6 +200,7 @@ const fetchPoems = async () => {
         dynastyId: filters.value.dynastyId,
         categoryId: filters.value.categoryId,
         poetId: filters.value.poetId,
+        poetName: filters.value.poetName || undefined,
         keyword: filters.value.keyword,
         sortBy: filters.value.sortBy
       })
@@ -995,12 +997,23 @@ const handleFilterChange = () => {
   fetchPoems()
 }
 
+const handlePoetChange = (value: string | number | undefined) => {
+  if (typeof value === 'string') {
+    filters.value.poetId = undefined
+    filters.value.poetName = value
+  } else {
+    filters.value.poetName = ''
+  }
+  handleFilterChange()
+}
+
 const clearFilters = () => {
   if (activeTab.value === 'classical') {
     filters.value = {
       dynastyId: undefined,
       categoryId: undefined,
       poetId: undefined,
+      poetName: '',
       keyword: '',
       sortBy: 'latest'
     }
@@ -1032,6 +1045,7 @@ const syncFiltersToUrl = () => {
     if (filters.value.dynastyId) query.dynastyId = String(filters.value.dynastyId)
     if (filters.value.categoryId) query.categoryId = String(filters.value.categoryId)
     if (filters.value.poetId) query.poetId = String(filters.value.poetId)
+    if (filters.value.poetName) query.poetName = filters.value.poetName
     if (filters.value.keyword) query.keyword = filters.value.keyword
     if (filters.value.sortBy !== 'latest') query.sortBy = filters.value.sortBy
   } else if (activeTab.value === 'modern') {
@@ -1049,7 +1063,7 @@ const syncFiltersToUrl = () => {
 
 const hasActiveFilters = computed(() => {
   if (activeTab.value === 'classical') {
-    return filters.value.dynastyId || filters.value.categoryId || filters.value.poetId || filters.value.keyword || filters.value.sortBy !== 'latest'
+    return filters.value.dynastyId || filters.value.categoryId || filters.value.poetId || filters.value.poetName || filters.value.keyword || filters.value.sortBy !== 'latest'
   }
   if (activeTab.value === 'modern') {
     return modernFilters.value.isOriginal !== undefined || modernFilters.value.hasCertifiedPoet !== undefined || modernFilters.value.sortBy !== 'latest'
@@ -1199,6 +1213,9 @@ onMounted(() => {
   if (query.poetId) {
     filters.value.poetId = Number(query.poetId)
   }
+  if (query.poetName) {
+    filters.value.poetName = String(query.poetName)
+  }
   if (query.keyword) {
     if (activeTab.value === 'foreign') {
       foreignFilters.value.keyword = String(query.keyword)
@@ -1243,7 +1260,69 @@ onMounted(() => {
       openPoemDetail(cachedPoem)
     }
   }
+
+  // 从今日诗词推荐跳转时，自动触发外部搜索
+  if (query.searchType && query.keyword) {
+    handleDailyPoetrySearch(String(query.keyword), String(query.searchType))
+  }
 })
+
+const handleDailyPoetrySearch = async (keyword: string, searchType: string) => {
+  // 等待初始搜索完成
+  await nextTick()
+  
+  // 如果本地搜索无结果，自动进行外部搜索
+  if (poemStore.poemList.length === 0) {
+    try {
+      externalSearching.value = true
+      let results: PoemSearchResult[] = []
+      
+      // 根据搜索类型调整搜索策略
+      if (searchType === 'poet') {
+        // 诗人搜索：优先搜索诗人，再搜索包含诗人名的诗词
+        results = await searchApihzPoems(keyword, 20)
+        // 如果结果较少，尝试添加"诗"字扩大搜索
+        if (results.length < 3 && !keyword.includes('诗')) {
+          const moreResults = await searchApihzPoems(keyword + '诗', 20)
+          results = [...results, ...moreResults.filter(r => 
+            !results.some(existing => existing.title === r.title && existing.author === r.author)
+          )]
+        }
+      } else if (searchType === 'title') {
+        // 标题搜索：直接搜索标题
+        results = await searchApihzPoems(keyword, 20)
+      } else if (searchType === 'content') {
+        // 内容搜索：搜索诗句内容
+        results = await searchApihzPoems(keyword, 20)
+        // 如果结果较少，尝试截取前半句搜索
+        if (results.length < 3 && keyword.length > 10) {
+          const halfKeyword = keyword.substring(0, Math.floor(keyword.length / 2))
+          const moreResults = await searchApihzPoems(halfKeyword, 20)
+          results = [...results, ...moreResults.filter(r => 
+            !results.some(existing => existing.title === r.title && existing.author === r.author)
+          )]
+        }
+      } else {
+        // 默认搜索
+        results = await searchApihzPoems(keyword, 20)
+      }
+      
+      if (results.length > 0) {
+        externalPoemResults.value = results
+        // 如果只有一个结果，直接打开详情
+        if (results.length === 1) {
+          await openPoemDetail(results[0])
+        }
+      } else {
+        ElMessage.info('未找到相关诗词，请尝试其他关键词')
+      }
+    } catch (error) {
+      console.error('外部搜索失败:', error)
+    } finally {
+      externalSearching.value = false
+    }
+  }
+}
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleSearchScroll, true)
@@ -1432,7 +1511,9 @@ const handleClearHistory = async () => {
                 placeholder="全部诗人"
                 clearable
                 filterable
-                @change="handleFilterChange"
+                allow-create
+                default-first-option
+                @change="handlePoetChange"
               >
                 <el-option
                   v-for="poet in poets"

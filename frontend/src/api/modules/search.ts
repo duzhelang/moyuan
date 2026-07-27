@@ -4,6 +4,7 @@ export interface SmartSearchParams {
   dynastyId?: number
   categoryId?: number
   poetId?: number
+  poetName?: string
   keyword?: string
   sortBy?: 'latest' | 'popular' | 'likes'
   pageNum?: number
