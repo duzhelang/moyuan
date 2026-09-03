@@ -989,9 +989,9 @@ A: 管理员可以在后台管理页面配置AI模型：
 
 ## 联系方式
 
-- **项目维护者**：墨渊开发团队
-- **邮箱**：your-email@example.com
-- **GitHub**：https://github.com/your-username/SC_MoYuan2
+- **项目维护者**：墨渊
+- **邮箱**：
+- **GitHub**：
 
 ## 致谢
 
