@@ -1,5 +1,6 @@
 package com.moyuan.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.moyuan.entity.Poem;
@@ -7,8 +8,10 @@ import com.moyuan.service.DynastyService;
 import com.moyuan.service.PoemService;
 import com.moyuan.service.PoetService;
 import com.moyuan.service.UserService;
+import com.moyuan.util.JwtUtil;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.cache.CacheManager;
@@ -29,7 +32,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(PoemController.class)
+@WebMvcTest(value = PoemController.class, properties = {"apihz.id=test", "apihz.key=test", "app.mapper-scan-enabled=false"})
+@AutoConfigureMockMvc(addFilters = false)
 class PoemControllerTest {
 
     @Autowired
@@ -37,6 +41,8 @@ class PoemControllerTest {
 
     @MockBean
     private PoemService poemService;
+    @MockBean
+    private JwtUtil jwtUtil;
     @MockBean
     private UserService userService;
     @MockBean
@@ -137,7 +143,7 @@ class PoemControllerTest {
         poem2.setStatus(1);
         poem2.setViewCount(800);
 
-        when(poemService.list(any())).thenReturn(Arrays.asList(poem1, poem2));
+        when(poemService.list(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(poem1, poem2));
 
         mockMvc.perform(get("/api/poems/daily"))
                 .andExpect(status().isOk())

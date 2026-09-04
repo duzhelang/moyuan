@@ -13,7 +13,7 @@
 - 后端框架: Spring Boot 3.x
 - 认证方式: JWT
 - 响应格式: 统一 JSON 响应 `R<T>` (code/message/data)
-- API 文档: Knife4j (http://localhost:8081/doc.html)
+- API 文档: Knife4j (http://localhost:8085/doc.html)
 
 ## 统一响应格式
 

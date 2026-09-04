@@ -295,7 +295,7 @@
 ### 开发环境
 
 - 前端：Vite Dev Server (localhost:5173)
-- 后端：Spring Boot (localhost:8081)
+- 后端：Spring Boot (localhost:8085)
 - 数据库：本地MySQL
 
 ### 生产环境

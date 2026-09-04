@@ -19,7 +19,7 @@
     <description>古今诗话——墨渊 父项目</description>
 
     <properties>
-        <java.version>23</java.version>
+        <java.version>21</java.version>
         <mybatis-plus.version>3.5.5</mybatis-plus.version>
         <druid.version>1.2.20</druid.version>
         <jjwt.version>0.12.5</jjwt.version>

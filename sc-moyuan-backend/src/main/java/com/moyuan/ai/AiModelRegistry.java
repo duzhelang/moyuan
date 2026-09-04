@@ -1,6 +1,7 @@
 package com.moyuan.ai;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.moyuan.config.AiProviderProperties;
 import com.moyuan.entity.AiModel;
 import com.moyuan.entity.AiModuleConfig;
 import com.moyuan.exception.BusinessException;
@@ -22,13 +23,16 @@ public class AiModelRegistry {
     private final AiModelMapper aiModelMapper;
     private final AiModuleConfigMapper aiModuleConfigMapper;
     private final List<AiModelAdapter> adapters;
+    private final AiProviderProperties providerProperties;
     private final Map<String, AiModel> modelCache = new ConcurrentHashMap<>();
     private final Map<String, AiModuleConfig> moduleConfigCache = new ConcurrentHashMap<>();
 
-    public AiModelRegistry(AiModelMapper aiModelMapper, AiModuleConfigMapper aiModuleConfigMapper, List<AiModelAdapter> adapters) {
+    public AiModelRegistry(AiModelMapper aiModelMapper, AiModuleConfigMapper aiModuleConfigMapper,
+                           List<AiModelAdapter> adapters, AiProviderProperties providerProperties) {
         this.aiModelMapper = aiModelMapper;
         this.aiModuleConfigMapper = aiModuleConfigMapper;
         this.adapters = adapters;
+        this.providerProperties = providerProperties;
     }
 
     @PostConstruct
@@ -41,6 +45,7 @@ public class AiModelRegistry {
         List<AiModel> models = aiModelMapper.selectList(null);
         for (AiModel model : models) {
             if (model.getIsEnabled() == 1) {
+                injectApiKey(model);
                 modelCache.put(model.getName(), model);
             }
         }
@@ -72,6 +77,22 @@ public class AiModelRegistry {
 
     public List<AiModel> getAllEnabledModels() {
         return List.copyOf(modelCache.values());
+    }
+
+    /**
+     * 若数据库中的 api_key 为空或为占位符，则用 ai.providers.<provider>.api-key 覆盖。
+     * 真实密钥统一维护在 secrets/application-secrets.yml，避免落库。
+     */
+    private void injectApiKey(AiModel model) {
+        String key = model.getApiKey();
+        boolean isPlaceholder = key == null || key.isEmpty() || key.startsWith("your-");
+        if (!isPlaceholder) {
+            return;
+        }
+        String cfgKey = providerProperties.getApiKey(model.getProvider());
+        if (cfgKey != null && !cfgKey.isEmpty() && !cfgKey.startsWith("your-")) {
+            model.setApiKey(cfgKey);
+        }
     }
 
     public AiModelAdapter getAdapter(String provider) {

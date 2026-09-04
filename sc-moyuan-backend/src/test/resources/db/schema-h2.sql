@@ -42,8 +42,11 @@ CREATE TABLE IF NOT EXISTS poet (
 CREATE TABLE IF NOT EXISTS category (
   id BIGINT NOT NULL AUTO_INCREMENT,
   name VARCHAR(50) NOT NULL,
+  parent_id BIGINT DEFAULT NULL,
   description VARCHAR(255) DEFAULT NULL,
+  icon VARCHAR(255) DEFAULT NULL,
   sort_order INT NOT NULL DEFAULT 0,
+  status TINYINT NOT NULL DEFAULT 1,
   create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -167,10 +170,10 @@ CREATE TABLE IF NOT EXISTS user_history (
   target_id BIGINT NOT NULL,
   target_type VARCHAR(20) NOT NULL,
   create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  INDEX idx_user_history_user_id (user_id),
-  INDEX idx_user_history_target (target_id, target_type)
+  PRIMARY KEY (id)
 );
+CREATE INDEX idx_user_history_user_id ON user_history(user_id);
+CREATE INDEX idx_user_history_target ON user_history(target_id, target_type);
 
 -- 首页导航表
 CREATE TABLE IF NOT EXISTS home_navigation (

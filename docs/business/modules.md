@@ -363,7 +363,7 @@
 
 ### 功能说明
 
-- AI诗词问答（支持多模型切换：智谱AI、DeepSeek、Kimi、NVIDIA NIM）
+- AI诗词问答（支持多模型切换；实测可用：智谱 glm-4-flash / glm-4.7-flash，DeepSeek deepseek-v4-flash，OpenRouter MiniMax-M2.7 免费档；默认模型为智谱 glm-4.7-flash）
 - 看图写诗（上传图片，AI生成古诗词，支持视觉模型GLM-4V-Flash）
 - 智能分析（输入诗句进行深度解析）
 - AI对对联（输入上联，AI生成下联，遵循平仄规则）
@@ -382,7 +382,7 @@
 - 调用大语言模型 API（智谱AI、DeepSeek、Kimi、NVIDIA NIM）
 - 智谱AI视觉模型（GLM-4V-Flash / GLM-4.6V-Flash）用于看图写诗和OCR识别
 - OCR识别复用视觉模型基础设施，通过专用提示词引导模型精准识别古籍文字
-- AI模型配置存入数据库（ai_model 表），支持动态管理
+- AI模型配置存入数据库（ai_model 表），支持动态管理；api_key 为占位符，真实密钥从 secrets/application-secrets.yml 的 ai.providers.* 运行时注入
 - 前端首页集成AI问答组件（右下角悬浮按钮）
 - 前端首页"展风拓潮"模块集成看图写诗、智能分析、对联和OCR功能
 
@@ -837,7 +837,7 @@ uploads/
 ```yaml
 file:
   upload-dir: ./uploads
-  base-url: http://localhost:8081/uploads
+  base-url: http://localhost:8085/uploads
   allowed-extensions: .jpg,.jpeg,.png,.gif,.webp,.bmp
   max-size: 10485760
   watermark:

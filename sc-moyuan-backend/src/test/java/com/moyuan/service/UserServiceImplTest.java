@@ -5,6 +5,7 @@ import com.moyuan.common.ResultCode;
 import com.moyuan.dto.request.LoginRequest;
 import com.moyuan.dto.request.RegisterRequest;
 import com.moyuan.dto.request.UserUpdateRequest;
+import com.moyuan.dto.response.TokenResponse;
 import com.moyuan.entity.User;
 import com.moyuan.exception.BusinessException;
 import com.moyuan.mapper.UserMapper;
@@ -46,15 +47,16 @@ class UserServiceImplTest {
         user.setUsername("testuser");
         user.setPassword("encodedPassword");
         user.setRole("user");
+        user.setStatus(1);
 
         when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(user);
         when(passwordEncoder.matches("password123", "encodedPassword")).thenReturn(true);
-        when(jwtUtil.generateToken(1L, "user")).thenReturn("test-token");
+        when(jwtUtil.generateToken(1L, "testuser")).thenReturn("test-token");
 
-        String token = userService.login(request);
+        TokenResponse tokenResponse = userService.login(request);
 
-        assertNotNull(token);
-        assertEquals("test-token", token);
+        assertNotNull(tokenResponse);
+        assertEquals("test-token", tokenResponse.getToken());
     }
 
     @Test
@@ -80,6 +82,7 @@ class UserServiceImplTest {
         user.setId(1L);
         user.setUsername("testuser");
         user.setPassword("encodedPassword");
+        user.setStatus(1);
 
         when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(user);
         when(passwordEncoder.matches("wrongpassword", "encodedPassword")).thenReturn(false);
@@ -96,7 +99,7 @@ class UserServiceImplTest {
         request.setPassword("password123");
         request.setEmail("test@example.com");
 
-        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
         when(passwordEncoder.encode("password123")).thenReturn("encodedPassword");
         when(userMapper.insert(any(User.class))).thenReturn(1);
 
@@ -111,7 +114,7 @@ class UserServiceImplTest {
         request.setUsername("existinguser");
         request.setPassword("password123");
 
-        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
+        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(new User());
 
         assertThrows(BusinessException.class, () -> {
             userService.register(request);
@@ -127,7 +130,7 @@ class UserServiceImplTest {
 
         when(userMapper.selectById(1L)).thenReturn(user);
 
-        User result = userService.getUserById(1L);
+        User result = userService.getUserInfo(1L);
 
         assertNotNull(result);
         assertEquals("testuser", result.getUsername());
@@ -135,12 +138,12 @@ class UserServiceImplTest {
     }
 
     @Test
-    void getUserById_不存在时返回null() {
+    void getUserInfo_不存在时抛出异常() {
         when(userMapper.selectById(999L)).thenReturn(null);
 
-        User result = userService.getUserById(999L);
-
-        assertNull(result);
+        assertThrows(BusinessException.class, () -> {
+            userService.getUserInfo(999L);
+        });
     }
 
     @Test
@@ -157,7 +160,7 @@ class UserServiceImplTest {
         when(userMapper.updateById(any(User.class))).thenReturn(1);
 
         assertDoesNotThrow(() -> {
-            userService.updateUser(1L, request);
+            userService.updateUserInfo(1L, request);
         });
 
         assertEquals("new@example.com", user.getEmail());
@@ -172,7 +175,7 @@ class UserServiceImplTest {
         when(userMapper.selectById(999L)).thenReturn(null);
 
         assertThrows(BusinessException.class, () -> {
-            userService.updateUser(999L, request);
+            userService.updateUserInfo(999L, request);
         });
     }
 }

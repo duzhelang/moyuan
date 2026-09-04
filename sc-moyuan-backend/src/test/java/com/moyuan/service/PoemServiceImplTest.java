@@ -1,6 +1,7 @@
 package com.moyuan.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.moyuan.entity.Poem;
@@ -10,12 +11,14 @@ import com.moyuan.enums.TargetType;
 import com.moyuan.exception.BusinessException;
 import com.moyuan.mapper.*;
 import com.moyuan.service.impl.PoemServiceImpl;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cache.CacheManager;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.cache.Cache;
 
 import java.util.Arrays;
@@ -47,6 +50,12 @@ class PoemServiceImplTest {
 
     @InjectMocks
     private PoemServiceImpl poemService;
+
+    @BeforeEach
+    void setUp() {
+        // 注入 MyBatis-Plus 的 baseMapper，使 save/getById/updateById 等基类方法可用
+        ReflectionTestUtils.setField(poemService, "baseMapper", poemMapper);
+    }
 
     @Test
     void getPoemList_返回分页结果() {
@@ -128,7 +137,7 @@ class PoemServiceImplTest {
         poemService.toggleLike(1L, 1L);
 
         verify(userLikeMapper).insert(any(UserLike.class));
-        verify(poemMapper).update(any(), any(LambdaQueryWrapper.class));
+        verify(poemMapper).update(any(), any(LambdaUpdateWrapper.class));
     }
 
     @Test
@@ -139,7 +148,7 @@ class PoemServiceImplTest {
         poemService.toggleLike(1L, 1L);
 
         verify(userLikeMapper).delete(any(LambdaQueryWrapper.class));
-        verify(poemMapper).update(any(), any(LambdaQueryWrapper.class));
+        verify(poemMapper).update(any(), any(LambdaUpdateWrapper.class));
     }
 
     @Test

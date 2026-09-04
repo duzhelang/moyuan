@@ -25,7 +25,8 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/moyuan?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
-    password: ${MYSQL_PASSWORD}
+    # 默认值仅用于本地开发兜底；实际密码请通过环境变量 MYSQL_PASSWORD 覆盖
+    password: ${MYSQL_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
     druid:
       connection-error-retry-attempts: 3
@@ -53,7 +54,8 @@ logging:
 
 # ==================== JWT 配置 ====================
 jwt:
-  secret: ${JWT_SECRET}
+  # 默认密钥仅用于本地开发兜底（长度≥32字节，满足HS256要求）；生产环境必须通过环境变量 JWT_SECRET 覆盖
+  secret: ${JWT_SECRET:moyuan-dev-secret-key-0123456789-abcdef}
   expiration: 86400000
 
 # ==================== 跨域配置 ====================
@@ -67,9 +69,10 @@ knife4j:
     language: zh_cn
 
 # ==================== 第三方 API 配置 ====================
+# 接口盒子（apihz）第三方诗词 API 凭证；默认空值兜底保证启动，调用对应功能前请通过环境变量配置
 apihz:
-  id: ${APIHZ_ID}
-  key: ${APIHZ_KEY}
+  id: ${APIHZ_ID:}
+  key: ${APIHZ_KEY:}
 
 # ==================== 业务配置 ====================
 external:

@@ -48,6 +48,8 @@
 | Druid | 1.2.20 | 数据库连接池 |
 | Lombok | 1.18.30 | 代码简化 |
 | Maven | 3.8+ | 项目构建 |
+| JUnit 5 + Mockito | 5.10.x | 后端测试框架 |
+| H2 | 2.x | 测试内存数据库 |
 
 ### 开发工具
 
@@ -216,7 +218,16 @@ mvn spring-boot:run
 start.bat
 ```
 
-后端服务启动后，访问 http://localhost:8081/doc.html 查看API文档（Knife4j）。
+后端服务启动后，访问 http://localhost:8085/doc.html 查看API文档（Knife4j）。
+
+### 4.1 运行后端测试
+
+```bash
+cd sc-moyuan-backend
+mvn test
+```
+
+测试使用 H2 内存数据库（`src/test/resources/db/schema-h2.sql`、`data-h2.sql` 初始化），覆盖 Service 单元测试、Controller 切片测试与数据库集成测试。详见 [docs/guides/testing-guide.md](docs/guides/testing-guide.md)。
 
 ### 5. 启动前端服务
 
@@ -351,8 +362,8 @@ SC_MoYuan2_/
 
 启动后端服务后，访问以下地址查看完整的API文档：
 
-- **Knife4j文档**：http://localhost:8081/doc.html
-- **Swagger UI**：http://localhost:8081/swagger-ui.html
+- **Knife4j文档**：http://localhost:8085/doc.html
+- **Swagger UI**：http://localhost:8085/swagger-ui.html
 
 ## 数据库设计
 
@@ -999,6 +1010,6 @@ A: 管理员可以在后台管理页面配置AI模型：
 
 ---
 
-**文档版本**：v2.1  
-**最后更新**：2026-06-28  
+**文档版本**：v2.2
+**最后更新**：2026-09-04
 **维护人员**：墨渊开发团队
