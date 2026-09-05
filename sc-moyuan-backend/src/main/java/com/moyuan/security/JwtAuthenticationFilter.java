@@ -1,6 +1,7 @@
 package com.moyuan.security;
 
 import com.moyuan.entity.User;
+import com.moyuan.service.TokenBlacklistService;
 import com.moyuan.service.UserService;
 import com.moyuan.util.JwtUtil;
 import jakarta.servlet.FilterChain;
@@ -26,13 +27,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtUtil jwtUtil;
     @Lazy
     private final UserService userService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         String token = extractToken(request);
-        if (StringUtils.hasText(token) && jwtUtil.validateToken(token)) {
+        if (StringUtils.hasText(token) && jwtUtil.validateAccessToken(token)) {
             try {
+                // 已登出的 token（在访问黑名单中）直接拒绝
+                if (tokenBlacklistService.isBlacklisted(jwtUtil.getTokenId(token))) {
+                    filterChain.doFilter(request, response);
+                    return;
+                }
                 Long userId = jwtUtil.getUserId(token);
                 User user = userService.getById(userId);
                 if (user != null && user.getStatus() == 1) {

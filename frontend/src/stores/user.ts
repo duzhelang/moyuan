@@ -1,11 +1,15 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { User } from '@/types/model'
-import { login as loginApi, register as registerApi, getUserInfo, updateUser as updateUserApi, updatePassword as updatePasswordApi } from '@/api/modules/user'
+import { login as loginApi, register as registerApi, getUserInfo, updateUser as updateUserApi, updatePassword as updatePasswordApi, logout as logoutApi, refreshToken as refreshTokenApi } from '@/api/modules/user'
 import type { LoginRequest, RegisterRequest, UserUpdateRequest, PasswordUpdateRequest } from '@/types/api'
 
+const TOKEN_KEY = 'token'
+const REFRESH_TOKEN_KEY = 'refresh_token'
+
 export const useUserStore = defineStore('user', () => {
-  const token = ref<string>(localStorage.getItem('token') || '')
+  const token = ref<string>(localStorage.getItem(TOKEN_KEY) || '')
+  const refreshToken = ref<string>(localStorage.getItem(REFRESH_TOKEN_KEY) || '')
   const userInfo = ref<User | null>(null)
 
   const isLoggedIn = computed(() => !!token.value)
@@ -17,17 +21,24 @@ export const useUserStore = defineStore('user', () => {
     fetchUserInfo()
   }
 
+  function persistTokens(t: { token: string; refreshToken?: string }) {
+    token.value = t.token
+    localStorage.setItem(TOKEN_KEY, t.token)
+    if (t.refreshToken) {
+      refreshToken.value = t.refreshToken
+      localStorage.setItem(REFRESH_TOKEN_KEY, t.refreshToken)
+    }
+  }
+
   async function login(params: LoginRequest) {
     const response = await loginApi(params)
-    token.value = response.data.token
-    localStorage.setItem('token', response.data.token)
+    persistTokens(response.data)
     await fetchUserInfo()
   }
 
   async function register(params: RegisterRequest) {
     const response = await registerApi(params)
-    token.value = response.data.token
-    localStorage.setItem('token', response.data.token)
+    persistTokens(response.data)
     await fetchUserInfo()
   }
 
@@ -62,14 +73,22 @@ export const useUserStore = defineStore('user', () => {
   }
 
   function logout() {
+    // 通知后端使 access token 失效（失败不阻塞，前端照常清理）
+    try {
+      logoutApi()
+    } catch (e) {
+      console.warn('调用登出接口失败:', e)
+    }
     token.value = ''
+    refreshToken.value = ''
     userInfo.value = null
-    localStorage.removeItem('token')
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(REFRESH_TOKEN_KEY)
   }
 
   function setToken(newToken: string) {
     token.value = newToken
-    localStorage.setItem('token', newToken)
+    localStorage.setItem(TOKEN_KEY, newToken)
   }
 
   async function updateUser(data: UserUpdateRequest) {
@@ -83,6 +102,7 @@ export const useUserStore = defineStore('user', () => {
 
   return {
     token,
+    refreshToken,
     userInfo,
     isLoggedIn,
     username,

@@ -103,7 +103,8 @@ public class OpenAiCompatibleAdapter implements AiModelAdapter {
 
     @Override
     public boolean supports(String provider) {
-        return "zhipu".equals(provider) || "deepseek".equals(provider) || "kimi".equals(provider) || "mimo".equals(provider);
+        return "zhipu".equals(provider) || "deepseek".equals(provider) || "kimi".equals(provider) || "mimo".equals(provider)
+                || "qwen".equals(provider) || "openrouter".equals(provider);
     }
 
     private List<Map<String, String>> buildMessages(String systemPrompt, String userMessage) {

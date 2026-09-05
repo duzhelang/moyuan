@@ -9,6 +9,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.stream.Collectors;
 
@@ -40,6 +41,13 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining("; "));
         log.warn("参数绑定失败：{}", message);
         return R.error(ResultCode.BAD_REQUEST.getCode(), message);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public R<Void> handleNoResourceFoundException(NoResourceFoundException e) {
+        // 静态资源/未映射路径缺失属于正常 404，不应作为系统故障记录 ERROR 日志
+        return R.error(ResultCode.NOT_FOUND.getCode(), ResultCode.NOT_FOUND.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

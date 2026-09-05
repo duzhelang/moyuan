@@ -23,7 +23,11 @@ export function updatePassword(data: PasswordUpdateRequest) {
 }
 
 export function logout() {
-  return Promise.resolve()
+  return request.post<void>('/auth/logout')
+}
+
+export function refreshToken(refreshToken: string) {
+  return request.post<TokenResponse>('/auth/refresh', { refreshToken })
 }
 
 export function getUserList(params: { page?: number; size?: number; keyword?: string }) {

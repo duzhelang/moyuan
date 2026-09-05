@@ -11,7 +11,7 @@ const routes: RouteRecordRaw[] = [
         path: '',
         name: 'Home',
         component: () => import('@/views/home/index.vue'),
-        meta: { title: '首页', keepAlive: true, hideHeader: true }
+        meta: { title: '首页', keepAlive: true, hideHeader: true, hideBackToTop: true }
       },
       {
         path: 'poem',

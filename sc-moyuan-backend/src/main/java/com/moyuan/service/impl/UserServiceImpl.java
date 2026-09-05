@@ -19,6 +19,7 @@ import com.moyuan.mapper.UserHistoryMapper;
 import com.moyuan.mapper.UserLikeMapper;
 import com.moyuan.mapper.UserMapper;
 import com.moyuan.service.ForumPostService;
+import com.moyuan.service.TokenBlacklistService;
 import com.moyuan.service.UserService;
 import com.moyuan.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -47,6 +49,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Lazy
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Override
     @Transactional
@@ -72,8 +75,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setStatus(1);
         userMapper.insert(user);
 
-        String token = jwtUtil.generateToken(user.getId(), user.getUsername());
-        return new TokenResponse(token, jwtUtil.getExpiration());
+        return buildTokenResponse(user);
     }
 
     @Override
@@ -93,8 +95,38 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setLastLoginIp(getClientIp());
         userMapper.updateById(user);
 
-        String token = jwtUtil.generateToken(user.getId(), user.getUsername());
-        return new TokenResponse(token, jwtUtil.getExpiration());
+        return buildTokenResponse(user);
+    }
+
+    @Override
+    public TokenResponse refreshToken(String refreshToken) {
+        if (!StringUtils.hasText(refreshToken) || !jwtUtil.validateRefreshToken(refreshToken)) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED);
+        }
+        Long userId = jwtUtil.getUserId(refreshToken);
+        User user = userMapper.selectById(userId);
+        if (user == null || user.getStatus() != 1) {
+            throw new BusinessException(ResultCode.ACCOUNT_DISABLED);
+        }
+        // 刷新时签发全新双 token（refresh token 轮换），并让旧 refresh token 作废
+        tokenBlacklistService.addToBlacklist(jwtUtil.getTokenId(refreshToken), jwtUtil.getRefreshExpiration());
+        return buildTokenResponse(user);
+    }
+
+    @Override
+    public void logout(String accessToken) {
+        if (StringUtils.hasText(accessToken) && jwtUtil.validateAccessToken(accessToken)) {
+            tokenBlacklistService.addToBlacklist(jwtUtil.getTokenId(accessToken), jwtUtil.getExpiration());
+        }
+    }
+
+    /**
+     * 组装 access + refresh 双 token 响应
+     */
+    private TokenResponse buildTokenResponse(User user) {
+        String accessToken = jwtUtil.generateToken(user.getId(), user.getUsername());
+        String refreshToken = jwtUtil.generateRefreshToken(user.getId(), user.getUsername());
+        return new TokenResponse(accessToken, jwtUtil.getExpiration(), refreshToken, jwtUtil.getRefreshExpiration());
     }
 
     @Override

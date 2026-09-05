@@ -10,4 +10,11 @@ import lombok.NoArgsConstructor;
 public class TokenResponse {
     private String token;
     private Long expiresIn;
+    private String refreshToken;
+    private Long refreshExpiresIn;
+
+    public TokenResponse(String token, Long expiresIn) {
+        this.token = token;
+        this.expiresIn = expiresIn;
+    }
 }

@@ -13,6 +13,8 @@ import java.util.Map;
 public interface UserService extends IService<User> {
     TokenResponse register(RegisterRequest request);
     TokenResponse login(LoginRequest request);
+    TokenResponse refreshToken(String refreshToken);
+    void logout(String accessToken);
     User getUserInfo(Long id);
     User updateUserInfo(Long userId, UserUpdateRequest request);
     void updatePassword(Long userId, PasswordUpdateRequest request);

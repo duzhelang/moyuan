@@ -42,14 +42,15 @@ public class PoetDefaultAvatar {
             )
     );
 
-    private static final Map<String, String> STYLE_MAP = Map.of(
-            "豪放派", AVATAR_PATH + "avatar_cn_ancient_male_01.jpg",
-            "婉约派", AVATAR_PATH + "avatar_cn_ancient_female_01.jpg",
-            "现实主义", AVATAR_PATH + "avatar_cn_ancient_male_02.jpg",
-            "田园派", AVATAR_PATH + "avatar_cn_ancient_male_03.jpg",
-            "新月派", AVATAR_PATH + "avatar_cn_modern_male_01.jpg",
-            "浪漫主义", AVATAR_PATH + "avatar_west_romantic_male_01.jpg",
-            "古典主义", AVATAR_PATH + "avatar_west_classical_male_01.jpg"
+    // 流派 → 候选头像列表（第0级优先匹配；同一流派可包含多份图片便于随机）
+    private static final Map<String, List<String>> STYLE_MAP = Map.of(
+            "豪放派", List.of(AVATAR_PATH + "avatar_cn_ancient_male_01.jpg"),
+            "婉约派", List.of(AVATAR_PATH + "avatar_cn_ancient_female_01.jpg"),
+            "现实主义", List.of(AVATAR_PATH + "avatar_cn_ancient_male_02.jpg"),
+            "田园派", List.of(AVATAR_PATH + "avatar_cn_ancient_male_03.jpg"),
+            "新月派", List.of(AVATAR_PATH + "avatar_cn_modern_male_01.jpg"),
+            "浪漫主义", List.of(AVATAR_PATH + "avatar_west_romantic_male_01.jpg"),
+            "古典主义", List.of(AVATAR_PATH + "avatar_west_classical_male_01.jpg")
     );
 
     // 西方诗人名单（用于区分中西方）
@@ -76,8 +77,14 @@ public class PoetDefaultAvatar {
         String poetType = poet.getPoetType();
         Long dynastyId = poet.getDynastyId();
 
-        // 第0级：精确流派匹配
-        // 暂不支持，因为Poet没有style字段，跳过
+        // 第0级：精确流派匹配（基于 poet.style 字段，优先级最高）
+        String style = poet.getStyle();
+        if (style != null && !style.isBlank()) {
+            List<String> styleCandidates = STYLE_MAP.get(style.trim());
+            if (styleCandidates != null && !styleCandidates.isEmpty()) {
+                return randomPick(styleCandidates);
+            }
+        }
 
         // 判断性别
         boolean isFemale = FEMALE_POETS.contains(name);

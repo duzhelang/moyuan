@@ -7,6 +7,7 @@ import BackToTop from '@/components/common/BackToTop.vue'
 
 const route = useRoute()
 const showHeader = computed(() => !route.meta?.hideHeader)
+const showBackToTop = computed(() => !route.meta?.hideBackToTop)
 </script>
 
 <template>
@@ -16,7 +17,7 @@ const showHeader = computed(() => !route.meta?.hideHeader)
       <router-view />
     </main>
     <AppFooter />
-    <BackToTop />
+    <BackToTop v-if="showBackToTop" />
   </div>
 </template>
 

@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS `poet` (
   `anecdotes` TEXT DEFAULT NULL COMMENT '轶事典故',
   `avatar` VARCHAR(255) DEFAULT NULL COMMENT '头像URL',
   `poet_type` VARCHAR(20) DEFAULT 'ancient' COMMENT '诗人类型：ancient-古籍，modern-现代',
+  `style` VARCHAR(32) DEFAULT NULL COMMENT '诗人流派/风格，如：豪放派、婉约派、浪漫主义',
   `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -107,7 +108,7 @@ CREATE TABLE IF NOT EXISTS `poem` (
   KEY `idx_poem_category_id` (`category_id`),
   KEY `idx_poem_status` (`status`),
   KEY `idx_poem_create_time` (`create_time`),
-  FULLTEXT KEY `ft_poem_title_content` (`title`, `content`)
+  FULLTEXT KEY `ft_poem_title_content` (`title`, `content`) WITH PARSER ngram
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='诗词表';
 
 -- ============================================================

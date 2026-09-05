@@ -25,6 +25,7 @@ public class Poet {
     private String anecdotes;
     private String avatar;
     private String poetType;
+    private String style;
     private Integer status;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

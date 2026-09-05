@@ -44,6 +44,10 @@ public class SmartSearchServiceImpl implements SmartSearchService {
     @Value("${search.pinyin.limit:200}")
     private int pinyinSearchLimit;
 
+    // #7 中文搜索增强开关（默认 false 保持 LIKE 匹配；true 时对 keyword 走 ngram 全文索引）
+    @Value("${search.fulltext-enabled:false}")
+    private boolean fulltextEnabled;
+
     private static final double SCORE_TITLE_EXACT = 1.0;
     private static final double SCORE_TITLE_CONTAINS = 0.8;
     private static final double SCORE_TITLE_SPLIT_KEYWORD = 0.3;
@@ -141,11 +145,17 @@ public class SmartSearchServiceImpl implements SmartSearchService {
     
     private List<PoemWithScore> searchPoems(Long dynastyId, Long categoryId, Long poetId, Set<Long> poetNameIds, String keyword) {
         LambdaQueryWrapper<Poem> wrapper = buildPoemWrapper(dynastyId, categoryId, poetId, poetNameIds);
-        
+
+        // #7 方案A：开启全文索引时，对 title/content 用 ngram 分词检索（相关度更高、性能更优）
+        if (fulltextEnabled) {
+            wrapper.apply("MATCH(`title`, `content`) AGAINST ({0} IN NATURAL LANGUAGE MODE)", keyword);
+            return scoreAndRank(wrapper, keyword);
+        }
+
         // 清理关键词：去除标点符号，拆分
         String cleanKeyword = PUNCTUATION_PATTERN.matcher(keyword).replaceAll(" ").trim();
         String[] keywords = cleanKeyword.split("\\s+");
-        
+
         // 同时用原始关键词和拆分后的关键词搜索
         wrapper.and(w -> {
             // 用原始关键词搜索（可能包含标点）
@@ -159,15 +169,20 @@ public class SmartSearchServiceImpl implements SmartSearchService {
                 }
             }
         });
-        
+
+        return scoreAndRank(wrapper, keyword);
+    }
+
+    /** 统一按现有 Java 评分规则打分并封装结果 */
+    private List<PoemWithScore> scoreAndRank(LambdaQueryWrapper<Poem> wrapper, String keyword) {
+        String cleanKeyword = PUNCTUATION_PATTERN.matcher(keyword).replaceAll(" ").trim();
+        String[] keywords = cleanKeyword.split("\\s+");
         List<Poem> poems = poemMapper.selectList(wrapper);
         List<PoemWithScore> results = new ArrayList<>();
-        
         for (Poem poem : poems) {
             double score = calculateScore(poem, keyword, keywords);
             results.add(new PoemWithScore(poem, score));
         }
-        
         return results;
     }
     

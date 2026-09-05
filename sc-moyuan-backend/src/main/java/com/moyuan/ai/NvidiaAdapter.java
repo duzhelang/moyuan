@@ -55,7 +55,9 @@ public class NvidiaAdapter implements AiModelAdapter {
 
     @Override
     public String vision(String prompt, String base64Image, AiModel model, String systemPrompt) {
-        throw new BusinessException(ResultCode.ERROR, "NVIDIA NIM暂不支持视觉模型");
+        // 当前无合适的 NVIDIA NIM 视觉模型：该供应商仅用于文本生成场景。
+        // 完善流程：明确抛出可操作的错误，提示前端回退到支持视觉的模型（如智谱/千问的视觉模型）。
+        throw new BusinessException(ResultCode.ERROR, "当前所选 NVIDIA NIM 模型不支持视觉识别，请改用支持视觉的模型（如智谱 glm-4v-flash 或千问视觉模型）");
     }
 
     @Override

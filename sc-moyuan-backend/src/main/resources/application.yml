@@ -57,6 +57,8 @@ jwt:
   # 默认密钥仅用于本地开发兜底（长度≥32字节，满足HS256要求）；生产环境必须通过环境变量 JWT_SECRET 覆盖
   secret: ${JWT_SECRET:moyuan-dev-secret-key-0123456789-abcdef}
   expiration: 86400000
+  # 访问/刷新双 token：access token 有效期（默认 24h），refresh token 有效期（默认 7 天）
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
 
 # ==================== 跨域配置 ====================
 cors:
@@ -75,6 +77,12 @@ apihz:
   key: ${APIHZ_KEY:}
 
 # ==================== 业务配置 ====================
+search:
+  # 中文搜索增强开关：#7 方案A（MySQL ngram 全文索引）。开启后 smartSearch 对 keyword 走
+  # MATCH(...) AGAINST(...) 全文检索（中文 ngram 分词）；关闭则保持原 LIKE 匹配。
+  fulltext-enabled: ${SEARCH_FULLTEXT_ENABLED:true}
+  pinyin:
+    limit: ${SEARCH_PINYIN_LIMIT:200}
 external:
   poetry:
     api:
