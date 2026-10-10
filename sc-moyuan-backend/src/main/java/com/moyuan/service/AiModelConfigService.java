@@ -148,6 +148,32 @@ public class AiModelConfigService {
         return existing;
     }
 
+    /**
+     * 解析实际生效的模型显示名：
+     * - 指定了 visionModel 名称时，优先按其解析；
+     * - 指定了 moduleCode 且已绑定模型时，按模块绑定解析；
+     * - 否则回退到入参 model 名或默认模型。
+     */
+    public String resolveModelName(String model, String moduleCode, String visionModel) {
+        String effectiveModel = visionModel != null && !visionModel.isEmpty() ? visionModel : model;
+        if (moduleCode != null && !moduleCode.isEmpty()
+                && (visionModel == null || visionModel.isEmpty())) {
+            AiModel bound = aiModelRegistry.getModelByModuleCode(moduleCode);
+            if (bound != null) {
+                return bound.getDisplayName() != null ? bound.getDisplayName() : bound.getModelId();
+            }
+        }
+        if (effectiveModel != null && !effectiveModel.isEmpty()) {
+            AiModel byName = aiModelRegistry.getModel(effectiveModel);
+            if (byName != null) {
+                return byName.getDisplayName() != null ? byName.getDisplayName() : byName.getModelId();
+            }
+            return effectiveModel;
+        }
+        AiModel def = aiModelRegistry.getDefaultModel();
+        return def != null ? (def.getDisplayName() != null ? def.getDisplayName() : def.getModelId()) : effectiveModel;
+    }
+
     public List<AiModel> getModelsForModule(String moduleCode) {
         AiModuleConfig config = aiModuleConfigMapper.selectOne(
                 new LambdaQueryWrapper<AiModuleConfig>().eq(AiModuleConfig::getModuleCode, moduleCode)

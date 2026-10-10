@@ -100,6 +100,8 @@
 | evaluation | TEXT | 否 | NULL | 历史评价 |
 | anecdotes | TEXT | 否 | NULL | 轶事典故 |
 | avatar | VARCHAR(255) | 否 | NULL | 头像URL |
+| poet_type | VARCHAR(20) | 否 | 'ancient' | 诗人类型：ancient-古籍，modern-现代 |
+| style | VARCHAR(32) | 否 | NULL | 诗人流派/风格（如：豪放派、婉约派），用于头像流派匹配 |
 | status | TINYINT | 是 | 1 | 状态：0-禁用，1-正常 |
 | create_time | DATETIME | 是 | CURRENT_TIMESTAMP | 创建时间 |
 | update_time | DATETIME | 是 | CURRENT_TIMESTAMP | 更新时间 |
@@ -198,7 +200,7 @@
 - KEY idx_poem_category_id (category_id)
 - KEY idx_poem_status (status)
 - KEY idx_poem_create_time (create_time)
-- FULLTEXT KEY ft_poem_title_content (title, content)
+- FULLTEXT KEY ft_poem_title_content (title, content) WITH PARSER ngram — 中文全文检索索引（#7 方案A，配合 search.fulltext-enabled 开关，默认开启）
 
 **外键**：
 - fk_poem_poet → poet(id)
@@ -366,7 +368,7 @@
 | api_url | VARCHAR(255) | 是 | - | API地址 |
 | api_key | VARCHAR(255) | 是 | - | API密钥 |
 | model_id | VARCHAR(100) | 是 | - | 模型ID（如 glm-4） |
-| vision_model_id | VARCHAR(100) | 否 | NULL | 视觉模型ID（如 glm-4.6v-flash） |
+| vision_model_id | VARCHAR(100) | 否 | NULL | 视觉模型ID（如 glm-4v-flash） |
 | max_tokens | INT | 否 | 1024 | 最大token数 |
 | extra_config | JSON | 否 | NULL | 额外配置（JSON格式） |
 | is_enabled | TINYINT | 是 | 1 | 是否启用：0-禁用，1-启用 |
@@ -954,6 +956,6 @@ static_page（独立静态页面表，无外键关联）
 
 ---
 
-**文档版本**：v2.3
-**最后更新**：2026-08-29（表清单补全至 29 张表，新增 ai_module_config、poem_content_cache、poet_suggestion、poet_draft、static_page、ai_generated_content、repair_order、repair_comment 结构说明，同步 init.sql v3.0 全量合并版）
+**文档版本**：v2.5
+**最后更新**：2026-10-10（poet 表补充 32 位初始数据说明；poet_featured 初始/扩充数据描述更新为 poet_id 已全部关联 poet 表；同步 init.sql v3.4）
 **维护人员**：墨渊开发团队

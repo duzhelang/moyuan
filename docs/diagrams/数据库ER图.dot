@@ -1,0 +1,160 @@
+// 墨渊（MoYuan）数据库 ER 关系图源码（Graphviz）
+// 全量 29 张核心表，与 docs/database/schema.md 及 init.sql 保持一致
+// 注：本文档由脚本解析生成对应 SVG（docs/diagrams/数据库ER图.svg）
+digraph ER_Diagram {
+    bgcolor="#1a1a2e"
+    rankdir=TB
+    node [shape=record, style=filled, fillcolor="#16213e", fontcolor="#e0e0e0", fontname="Microsoft YaHei", fontsize=11, color="#4a90e2", penwidth=1.5]
+    edge [color="#4a90e2", fontcolor="#00d2ff", fontname="Microsoft YaHei", fontsize=9, arrowsize=0.8]
+
+    labelloc="t"
+    label="墨渊（MoYuan）- 数据库 ER 关系图\n29 张核心表 | MySQL 8.0+"
+    fontcolor="#ffffff"
+    fontsize=16
+    fontname="Microsoft YaHei Bold"
+
+    // ============ 诗词核心域 ============
+    subgraph cluster_poem_domain {
+        label="诗词核心域"
+        labeljust=l
+        style=filled
+        fillcolor="#0d1b2a"
+        color="#4a90e2"
+        fontcolor="#4a90e2"
+        fontsize=12
+
+        dynasty [label="{ dynasty\n朝代表 | {<pk> id (主键)\n| name (朝代名称, 唯一)\n| start_year (开始年份)\n| end_year (结束年份)\n| description (朝代简介)\n| sort_order (排序顺序)\n| create_time (创建时间)\n| update_time (更新时间) } }"]
+
+        poet [label="{ poet\n诗人表 | {<pk> id (主键)\n| name (诗人姓名)\n| courtesy_name (字)\n| pseudonym (号)\n| <fk> dynasty_id (朝代ID, 外键)\n| birthplace (出生地)\n| biography (生平简介)\n| avatar (头像URL)\n| style (流派/风格)\n| status (状态)\n| deleted (逻辑删除) } }"]
+
+        category [label="{ category\n诗词分类表 | {<pk> id (主键)\n| name (分类名称)\n| parent_id (父分类ID, 自关联)\n| description (分类描述)\n| icon (分类图标)\n| sort_order (排序顺序)\n| status (状态)\n| create_time (创建时间)\n| update_time (更新时间) } }"]
+
+        poem [label="{ poem\n诗词表 (核心) | {<pk> id (主键)\n| title (诗词标题)\n| content (诗词内容)\n| <fk> poet_id (诗人ID, 外键)\n| <fk> dynasty_id (朝代ID, 外键)\n| <fk> category_id (分类ID, 外键)\n| translation (译文)\n| appreciation (赏析)\n| background (创作背景)\n| view_count (浏览次数)\n| like_count (点赞次数)\n| favorite_count (收藏次数)\n| status (状态)\n| is_featured (是否精选)\n| deleted (逻辑删除) } }"]
+
+        poem_rating [label="{ poem_rating\n诗词评分表 | {<pk> id (主键)\n| <fk> poem_id (诗词ID, 外键)\n| <fk> user_id (评分用户ID)\n| score (评分 1.0-5.0)\n| rating_type (1用户/2AI)\n| dimension (评分维度)\n| ai_analysis (AI分析)\n| create_time (创建时间) } }"]
+
+        poem_content_cache [label="{ poem_content_cache\n诗词内容缓存表 | {<pk> id (主键)\n| poem_title (诗词标题)\n| poet_name (诗人姓名)\n| content_type (内容类型)\n| content (缓存内容)\n| source (ai/manual)\n| create_time (创建时间)\n| update_time (更新时间) } }"]
+
+        poet_featured [label="{ poet_featured\n精选诗人卡片表 | {<pk> id (主键)\n| poet_id (关联诗人ID)\n| name (诗人姓名)\n| dynasty (朝代)\n| description (简介)\n| image_url (意境图URL)\n| sort_order (排序顺序)\n| status (状态)\n| deleted (逻辑删除) } }"]
+
+        poet_suggestion [label="{ poet_suggestion\n诗人内容建议表 | {<pk> id (主键)\n| <fk> poet_id (诗人ID, 外键)\n| <fk> user_id (建议用户ID)\n| section (修改板块)\n| content (建议内容)\n| category (意见分类)\n| status (状态)\n| review_comment (审核备注)\n| create_time (创建时间) } }"]
+
+        poet_draft [label="{ poet_draft\n诗人内容草稿表 | {<pk> id (主键)\n| <fk> poet_id (诗人ID, 外键)\n| section (编辑板块)\n| content (草稿内容)\n| editor_id (编辑者ID)\n| status (状态)\n| reviewer_id (审核者ID)\n| create_time (创建时间) } }"]
+
+        ai_generated_content [label="{ ai_generated_content\nAI生成内容审核表 | {<pk> id (主键)\n| target_type (poem/poet)\n| target_id (目标ID)\n| target_name (目标名称)\n| field_name (字段名)\n| content (AI生成内容)\n| ai_model (AI模型)\n| status (审核状态)\n| create_time (创建时间) } }"]
+    }
+
+    // ============ 用户社交域 ============
+    subgraph cluster_user_social {
+        label="用户社交域"
+        labeljust=l
+        style=filled
+        fillcolor="#0d1b2a"
+        color="#a855f7"
+        fontcolor="#a855f7"
+        fontsize=12
+
+        user [label="{ user\n用户表 | {<pk> id (主键)\n| username (用户名, 唯一)\n| password (密码加密)\n| email (邮箱, 唯一)\n| phone (手机号)\n| nickname (昵称)\n| avatar (头像URL)\n| role (user/admin)\n| poet_verified (诗人认证状态)\n|\| status (状态)\n| create_time (创建时间)\n| update_time (更新时间) } }"]
+
+        poet_profile [label="{ poet_profile\n认证诗人资料表 | {<pk> id (主键)\n| <fk> user_id (关联用户ID, 唯一)\n| pen_name (笔名)\n| specialty (擅长体裁)\n| introduction (诗人简介)\n| verified_status (认证状态)\n| work_count (作品数量)\n| like_count (获赞总数)\n| follower_count (粉丝数)\n| create_time (创建时间) } }"]
+
+        forum_post [label="{ forum_post\n论坛帖子表 | {<pk> id (主键)\n| title (帖子标题)\n| content (帖子内容)\n| <fk> user_id (发帖用户ID, 外键)\n| category (帖子分类)\n| view_count (浏览次数)\n| like_count (点赞次数)\n| comment_count (评论数量)\n| is_top (是否置顶)\n| status (状态)\n| deleted (逻辑删除) } }"]
+
+        comment [label="{ comment\n评论表 | {<pk> id (主键)\n| content (评论内容)\n| <fk> user_id (评论用户ID, 外键)\n| target_id (目标ID)\n| target_type (1诗词/2帖子/3评论)\n| parent_id (父评论ID, 自关联)\n| reply_to_user_id (回复目标用户ID)\n| like_count (点赞次数)\n| create_time (创建时间) } }"]
+
+        user_favorite [label="{ user_favorite\n用户收藏表 | {<pk> id (主键)\n| <fk> user_id (用户ID, 外键)\n| target_id (收藏目标ID)\n| target_type (1诗词/2帖子/3诗人)\n| create_time (创建时间) } }"]
+
+        user_like [label="{ user_like\n用户点赞表 | {<pk> id (主键)\n| <fk> user_id (用户ID, 外键)\n| target_id (点赞目标ID)\n| target_type (1诗词/2帖子/3评论)\n| create_time (创建时间) } }"]
+
+        user_history [label="{ user_history\n用户浏览历史表 | {<pk> id (主键)\n| <fk> user_id (用户ID, 外键)\n| target_id (浏览目标ID)\n| target_type (1诗词/2帖子)\n| create_time (创建时间) } }"]
+
+        operation_log [label="{ operation_log\n操作日志表 | {<pk> id (主键)\n| <fk> user_id (操作用户ID)\n| username (操作用户名)\n| operation (操作类型)\n| method (请求方法)\n| uri (请求URI)\n| params (请求参数)\n| ip (请求IP)\n| duration (请求时长)\n| status (操作状态)\n| create_time (创建时间) } }"]
+
+        visit_log [label="{ visit_log\n访问日志表 | {<pk> id (主键)\n| <fk> user_id (用户ID)\n| ip (访问IP)\n| user_agent (浏览器UA)\n| path (访问路径)\n| visit_date (访问日期)\n| create_time (创建时间) } }"]
+    }
+
+    // ============ AI / 文件域 ============
+    subgraph cluster_ai_file {
+        label="AI / 文件域"
+        labeljust=l
+        style=filled
+        fillcolor="#0d1b2a"
+        color="#00d2ff"
+        fontcolor="#00d2ff"
+        fontsize=12
+
+        ai_model [label="{ ai_model\nAI模型配置表 | {<pk> id (主键)\n| name (模型标识, 唯一)\n| display_name (显示名称)\n| provider (提供商)\n| model_type (text/vision/both)\n| api_url (API地址)\n| model_id (模型ID)\n| vision_model_id (视觉模型ID)\n| is_enabled (是否启用)\n| is_default (是否默认) } }"]
+
+        ai_module_config [label="{ ai_module_config\nAI模块模型配置表 | {<pk> id (主键)\n| module_code (模块编码, 唯一)\n| module_name (模块名称)\n| <fk> model_id (AI模型ID, 外键)\n| require_vision (是否需要视觉)\n| prompt_template (提示词模板)\n| response_style (回答风格)\n| max_response_length (最大回答长度) } }"]
+
+        ai_image_record [label="{ ai_image_record\nAI生成图片记录表 | {<pk> id (主键)\n| session_id (会话ID)\n| <fk> user_id (用户ID)\n| model_name (模型名称)\n| prompt (生成提示词)\n| image_url (图片URL)\n| width (图片宽度)\n| height (图片高度)\n| create_time (创建时间) } }"]
+
+        file_metadata [label="{ file_metadata\n文件元数据表 | {<pk> id (主键)\n| file_key (存储路径, 唯一)\n| original_name (原始文件名)\n| file_type (文件类型)\n| mime_type (MIME类型)\n| size (文件大小)\n| md5 (文件MD5)\n| related_id (关联ID)\n| related_type (关联类型)\n| storage_type (local/oss)\n| create_time (创建时间) } }"]
+    }
+
+    // ============ 内容 / 配置域 ============
+    subgraph cluster_content_config {
+        label="内容 / 配置域"
+        labeljust=l
+        style=filled
+        fillcolor="#0d1b2a"
+        color="#f59e0b"
+        fontcolor="#f59e0b"
+        fontsize=12
+
+        vision_article [label="{ vision_article\n诗话视野文章表 | {<pk> id (主键)\n| title (文章标题)\n| content (文章内容)\n| summary (文章摘要)\n| cover_image (封面图片URL)\n| category (文章分类)\n| author (作者)\n| view_count (浏览次数)\n| like_count (点赞次数)\n| is_featured (是否推荐)\n| status (状态) } }"]
+
+        home_navigation [label="{ home_navigation\n首页导航表 | {<pk> id (主键)\n| type (works/genres/dynasties)\n| title (标题)\n| subtitle (副标题)\n| image_url (图片URL)\n| link_id (关联ID)\n| link_type (poem/category/dynasty)\n| sort_order (排序)\n| status (状态) } }"]
+
+        static_page [label="{ static_page\n静态页面内容表 | {<pk> id (主键)\n| page_key (页面标识, 唯一)\n| title (页面标题)\n| content (页面内容)\n| status (状态)\n| create_time (创建时间)\n| update_time (更新时间) } }"]
+    }
+
+    // ============ 报修 / 其他域 ============
+    subgraph cluster_repair_misc {
+        label="报修 / 其他域"
+        labeljust=l
+        style=filled
+        fillcolor="#0d1b2a"
+        color="#22c55e"
+        fontcolor="#22c55e"
+        fontsize=12
+
+        repair_order [label="{ repair_order\n报修工单表 | {<pk> id (主键)\n| order_no (工单编号, 唯一)\n| title (问题标题)\n| description (问题描述)\n| category (报修类别)\n| priority (优先级)\n| status (状态)\n| <fk> user_id (提交用户ID)\n| assignee_id (处理人ID)\n| satisfaction (满意度评分) } }"]
+
+        repair_comment [label="{ repair_comment\n报修反馈表 | {<pk> id (主键)\n| <fk> repair_order_id (工单ID, 外键)\n| <fk> user_id (评论用户ID)\n| content (评论内容)\n| images (附图URL)\n| is_internal (是否内部备注)\n| create_time (创建时间) } }"]
+
+        rhyme [label="{ rhyme\n韵脚表 (平水韵) | {<pk> id (主键)\n| character (汉字)\n| rhyme_group (韵部)\n| tone_type (声调类型)\n| rhyme_category (韵类)\n| sort_order (排序顺序) } }"]
+    }
+
+    // ============ 关系线 ============
+    // 诗词核心
+    dynasty -> poet [label="  1:N 朝代→诗人\ndynasty_id", style=solid]
+    dynasty -> poem [label="  1:N 朝代→诗词\ndynasty_id", style=solid]
+    poet -> poem [label="  1:N 诗人→诗词\npoet_id", style=solid]
+    category -> poem [label="  1:N 分类→诗词\ncategory_id", style=solid]
+    category -> category [label="  自关联\nparent_id", style=dashed, constraint=false]
+    poem -> poem_rating [label="  1:N 诗词→评分\npoem_id", style=solid]
+    poet -> poet_suggestion [label="  1:N 诗人→建议\npoet_id", style=solid]
+    poet -> poet_draft [label="  1:N 诗人→草稿\npoet_id", style=solid]
+    poet -> poet_featured [label="  1:N 诗人→精选\npoet_id", style=dashed]
+
+    // 用户社交
+    user -> poet_profile [label="  1:1 用户→认证资料\nuser_id", style=solid]
+    user -> forum_post [label="  1:N 用户→帖子\nuser_id", style=solid]
+    user -> comment [label="  1:N 用户→评论\nuser_id", style=solid]
+    comment -> comment [label="  自关联\nparent_id", style=dashed, constraint=false]
+    user -> user_favorite [label="  1:N 多态关联\nuser_id", style=dashed]
+    user -> user_like [label="  1:N 多态关联\nuser_id", style=dashed]
+    user -> user_history [label="  1:N 多态关联\nuser_id", style=dashed]
+    user -> operation_log [label="  1:N 可为NULL\nuser_id", style=dashed]
+    user -> visit_log [label="  1:N 可为NULL\nuser_id", style=dashed]
+
+    // AI / 文件
+    ai_model -> ai_module_config [label="  1:N 模型→模块配置\nmodel_id", style=solid]
+    user -> ai_image_record [label="  1:N 可为NULL\nuser_id", style=dashed]
+    file_metadata -> user [label="  多态关联\nrelated_id", style=dashed]
+
+    // 报修
+    user -> repair_order [label="  1:N 用户→工单\nuser_id", style=solid]
+    repair_order -> repair_comment [label="  1:N 工单→反馈\nrepair_order_id", style=solid]
+}

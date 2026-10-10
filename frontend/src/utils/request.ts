@@ -125,6 +125,18 @@ async function handleUnauthorized(originalError: any): Promise<any> {
     return Promise.reject(originalError)
   }
 
+  const userStore = useUserStore()
+  // 该 401 来自已被替换的旧 token（例如用户刚重新登录、或 token 已静默续期），属于过期信息：
+  // 不能据此登出当前会话（否则会清掉新 token 并把它加入后端黑名单），改用当前 token 重放一次
+  const sentAuth = originalError?.config?.headers?.Authorization
+  if (sentAuth && userStore.token && sentAuth !== `Bearer ${userStore.token}`) {
+    const config = originalError.config
+    config.headers = config.headers || {}
+    config.headers.Authorization = `Bearer ${userStore.token}`
+    config.__isRetry = true
+    return service(config)
+  }
+
   if (!refreshPromise) {
     refreshPromise = tryRefreshToken().finally(() => {
       refreshPromise = null

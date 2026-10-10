@@ -331,6 +331,456 @@ CREATE TABLE `ai_model` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI模型配置表';
 ```
 
+#### 13. poet_featured（精选诗人卡片表）
+
+```sql
+CREATE TABLE IF NOT EXISTS `poet_featured` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `poet_id` BIGINT DEFAULT NULL COMMENT '关联诗人ID',
+  `name` VARCHAR(50) NOT NULL COMMENT '诗人姓名',
+  `dynasty` VARCHAR(50) DEFAULT NULL COMMENT '朝代',
+  `description` VARCHAR(500) DEFAULT NULL COMMENT '简介',
+  `biography` TEXT DEFAULT NULL COMMENT '详细生平',
+  `image_url` VARCHAR(255) DEFAULT NULL COMMENT '意境图URL',
+  `sort_order` INT NOT NULL DEFAULT 0 COMMENT '排序顺序',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  PRIMARY KEY (`id`),
+  KEY `idx_poet_featured_status` (`status`),
+  KEY `idx_poet_featured_sort` (`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='精选诗人卡片表';
+```
+
+---
+
+
+#### 14. home_navigation（首页导航数据表）
+
+```sql
+CREATE TABLE IF NOT EXISTS `home_navigation` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `type` VARCHAR(20) NOT NULL COMMENT '类型：works-作品，genres-流派，dynasties-朝代',
+  `title` VARCHAR(100) NOT NULL COMMENT '标题',
+  `subtitle` VARCHAR(200) DEFAULT NULL COMMENT '副标题/描述',
+  `image_url` VARCHAR(500) DEFAULT NULL COMMENT '图片URL',
+  `link_id` BIGINT DEFAULT NULL COMMENT '关联ID（诗词ID、分类ID、朝代ID等）',
+  `link_type` VARCHAR(20) DEFAULT NULL COMMENT '链接类型：poem-诗词，category-分类，dynasty-朝代',
+  `sort_order` INT NOT NULL DEFAULT 0 COMMENT '排序',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1-启用，0-禁用',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  PRIMARY KEY (`id`),
+  KEY `idx_home_navigation_type` (`type`),
+  KEY `idx_home_navigation_sort_order` (`sort_order`),
+  KEY `idx_home_navigation_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='首页导航数据表';
+```
+
+---
+
+
+#### 15. ai_module_config（AI模块模型配置表）
+
+```sql
+CREATE TABLE IF NOT EXISTS `ai_module_config` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `module_code` VARCHAR(50) NOT NULL COMMENT '模块编码',
+  `module_name` VARCHAR(100) NOT NULL COMMENT '模块名称',
+  `model_id` BIGINT DEFAULT NULL COMMENT '关联的AI模型ID',
+  `require_vision` TINYINT NOT NULL DEFAULT 0 COMMENT '是否需要视觉能力：0-否，1-是',
+  `description` VARCHAR(255) DEFAULT NULL COMMENT '模块描述/角色设定',
+  `prompt_template` TEXT DEFAULT NULL COMMENT '提示词模板，支持{poetName}等变量',
+  `max_response_length` INT NOT NULL DEFAULT 200 COMMENT '最大回答长度(字数)',
+  `response_style` VARCHAR(50) DEFAULT 'concise' COMMENT '回答风格：concise-简洁，detailed-详细，balanced-均衡',
+  `first_response_length` INT NOT NULL DEFAULT 100 COMMENT '首次回答最大长度(字数)',
+  `enable_markdown` TINYINT NOT NULL DEFAULT 0 COMMENT '是否允许Markdown格式：0-否，1-是',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_module_code` (`module_code`),
+  KEY `idx_model_id` (`model_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI模块模型配置表';
+```
+
+---
+
+
+#### 16. vision_article（诗话视野文章表）
+
+```sql
+CREATE TABLE IF NOT EXISTS `vision_article` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `title` VARCHAR(200) NOT NULL COMMENT '文章标题',
+  `summary` VARCHAR(500) DEFAULT NULL COMMENT '文章摘要',
+  `content` TEXT NOT NULL COMMENT '文章正文',
+  `cover_image` VARCHAR(500) DEFAULT NULL COMMENT '封面图片URL',
+  `author` VARCHAR(50) DEFAULT NULL COMMENT '作者',
+  `category` VARCHAR(50) DEFAULT NULL COMMENT '文章分类',
+  `view_count` INT NOT NULL DEFAULT 0 COMMENT '浏览次数',
+  `like_count` INT NOT NULL DEFAULT 0 COMMENT '点赞次数',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-草稿，1-已发布',
+  `is_featured` TINYINT NOT NULL DEFAULT 0 COMMENT '是否推荐：0-否，1-是',
+  `sort_order` INT NOT NULL DEFAULT 0 COMMENT '排序顺序',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0-未删除，1-已删除',
+  PRIMARY KEY (`id`),
+  KEY `idx_vision_article_status` (`status`),
+  KEY `idx_vision_article_category` (`category`),
+  KEY `idx_vision_article_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='诗话视野文章表';
+```
+
+---
+
+
+#### 17. visit_log（访问日志表）
+
+```sql
+CREATE TABLE IF NOT EXISTS `visit_log` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id` BIGINT DEFAULT NULL COMMENT '用户ID（未登录为NULL）',
+  `ip` VARCHAR(50) NOT NULL COMMENT '访问IP',
+  `user_agent` VARCHAR(500) DEFAULT NULL COMMENT '浏览器UA',
+  `path` VARCHAR(200) DEFAULT NULL COMMENT '访问路径',
+  `visit_date` DATE DEFAULT NULL COMMENT '访问日期',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_visit_log_create_time` (`create_time`),
+  KEY `idx_visit_log_visit_date` (`visit_date`),
+  KEY `idx_visit_log_ip` (`ip`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='访问日志表';
+```
+
+---
+
+
+#### 18. file_metadata（文件元数据表）
+
+```sql
+CREATE TABLE IF NOT EXISTS `file_metadata` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `file_key` VARCHAR(255) NOT NULL COMMENT '存储路径（相对uploads）',
+  `original_name` VARCHAR(255) DEFAULT NULL COMMENT '原始文件名',
+  `file_type` VARCHAR(50) NOT NULL COMMENT '文件类型：avatar/poem/forum/ai_generated/vision/config/export/temp/backup/audit/watermark/cache',
+  `mime_type` VARCHAR(100) DEFAULT NULL COMMENT 'MIME类型',
+  `size` BIGINT NOT NULL DEFAULT 0 COMMENT '文件大小（字节）',
+  `md5` VARCHAR(32) DEFAULT NULL COMMENT '文件MD5',
+  `width` INT DEFAULT NULL COMMENT '图片宽度',
+  `height` INT DEFAULT NULL COMMENT '图片高度',
+  `related_id` BIGINT DEFAULT NULL COMMENT '关联的用户ID/诗词ID/帖子ID',
+  `related_type` VARCHAR(50) DEFAULT NULL COMMENT '关联类型：user/poem/forum/vision/article',
+  `storage_type` VARCHAR(20) NOT NULL DEFAULT 'local' COMMENT '存储类型：local/oss',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_file_key` (`file_key`),
+  KEY `idx_file_type` (`file_type`),
+  KEY `idx_related` (`related_type`, `related_id`),
+  KEY `idx_md5` (`md5`),
+  KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件元数据表';
+```
+
+---
+
+
+#### 19. ai_image_record（AI生成图片记录表）
+
+```sql
+CREATE TABLE IF NOT EXISTS `ai_image_record` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `session_id` VARCHAR(100) DEFAULT NULL COMMENT '会话ID',
+  `user_id` BIGINT DEFAULT NULL COMMENT '用户ID',
+  `model_name` VARCHAR(50) NOT NULL COMMENT '模型名称',
+  `prompt` TEXT NOT NULL COMMENT '生成提示词',
+  `negative_prompt` TEXT DEFAULT NULL COMMENT '负面提示词',
+  `image_url` VARCHAR(500) NOT NULL COMMENT '图片URL',
+  `image_key` VARCHAR(255) DEFAULT NULL COMMENT '图片存储路径',
+  `width` INT DEFAULT NULL COMMENT '图片宽度',
+  `height` INT DEFAULT NULL COMMENT '图片高度',
+  `seed` BIGINT DEFAULT NULL COMMENT '随机种子',
+  `steps` INT DEFAULT NULL COMMENT '生成步数',
+  `cfg_scale` DECIMAL(5,2) DEFAULT NULL COMMENT 'CFG缩放',
+  `generation_time` INT DEFAULT NULL COMMENT '生成耗时（毫秒）',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-删除，1-正常',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_session_id` (`session_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_model_name` (`model_name`),
+  KEY `idx_create_time` (`create_time`),
+  CONSTRAINT `fk_ai_image_record_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI生成图片记录表';
+```
+
+---
+
+
+#### 20. poet_profile（认证诗人资料表）
+
+```sql
+CREATE TABLE IF NOT EXISTS `poet_profile` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id` BIGINT NOT NULL COMMENT '关联用户ID',
+  `pen_name` VARCHAR(50) DEFAULT NULL COMMENT '笔名',
+  `real_name` VARCHAR(50) DEFAULT NULL COMMENT '真实姓名',
+  `specialty` VARCHAR(200) DEFAULT NULL COMMENT '擅长体裁（逗号分隔：古体诗,近体诗,词,曲,现代诗）',
+  `introduction` TEXT DEFAULT NULL COMMENT '诗人简介',
+  `literary_concept` TEXT DEFAULT NULL COMMENT '创作理念',
+  `achievements` TEXT DEFAULT NULL COMMENT '主要成就',
+  `contact_info` VARCHAR(200) DEFAULT NULL COMMENT '联系方式（邮箱/微信）',
+  `verified_status` TINYINT NOT NULL DEFAULT 0 COMMENT '认证状态：0-未认证，1-已认证，2-认证中，3-认证失败',
+  `verified_time` DATETIME DEFAULT NULL COMMENT '认证时间',
+  `verified_reason` VARCHAR(500) DEFAULT NULL COMMENT '认证审核备注',
+  `work_count` INT NOT NULL DEFAULT 0 COMMENT '作品数量',
+  `like_count` INT NOT NULL DEFAULT 0 COMMENT '获赞总数',
+  `favorite_count` INT NOT NULL DEFAULT 0 COMMENT '被收藏总数',
+  `follower_count` INT NOT NULL DEFAULT 0 COMMENT '粉丝数',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_poet_profile_user_id` (`user_id`),
+  KEY `idx_poet_profile_verified_status` (`verified_status`),
+  KEY `idx_poet_profile_work_count` (`work_count`),
+  KEY `idx_poet_profile_like_count` (`like_count`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='认证诗人资料表';
+```
+
+---
+
+
+#### 21. poem_rating（诗词评分表）
+
+```sql
+CREATE TABLE IF NOT EXISTS `poem_rating` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `poem_id` BIGINT NOT NULL COMMENT '诗词ID',
+  `user_id` BIGINT DEFAULT NULL COMMENT '评分用户ID（AI评分时为NULL）',
+  `score` DECIMAL(3,1) NOT NULL COMMENT '评分（1.0-5.0）',
+  `rating_type` TINYINT NOT NULL DEFAULT 1 COMMENT '评分类型：1-用户评分，2-AI评分',
+  `dimension` VARCHAR(50) DEFAULT NULL COMMENT '评分维度（格律,意境,用词,情感,创新）',
+  `comment` TEXT DEFAULT NULL COMMENT '评分说明',
+  `ai_model` VARCHAR(50) DEFAULT NULL COMMENT 'AI模型名称（AI评分时使用）',
+  `ai_summary` TEXT DEFAULT NULL COMMENT 'AI评价概要',
+  `ai_analysis` TEXT DEFAULT NULL COMMENT 'AI分析详情',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_poem_rating_poem_id` (`poem_id`),
+  KEY `idx_poem_rating_user_id` (`user_id`),
+  KEY `idx_poem_rating_type` (`rating_type`),
+  UNIQUE KEY `uk_poem_rating_user_poem` (`poem_id`, `user_id`, `rating_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='诗词评分表';
+```
+
+---
+
+
+#### 22. poem_content_cache（诗词内容缓存表）
+
+```sql
+CREATE TABLE IF NOT EXISTS `poem_content_cache` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `poem_title` VARCHAR(100) NOT NULL COMMENT '诗词标题',
+  `poet_name` VARCHAR(50) NOT NULL DEFAULT '' COMMENT '诗人姓名',
+  `content_type` VARCHAR(50) NOT NULL COMMENT '内容类型：annotation/appreciation/background/author_info/knowledge_dynastyPoetry/knowledge_literarySchool/knowledge_historicalContext',
+  `content` TEXT NOT NULL COMMENT '缓存内容',
+  `source` VARCHAR(20) NOT NULL DEFAULT 'ai' COMMENT '来源：ai/manual',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_poem_content_cache` (`poem_title`, `poet_name`, `content_type`),
+  KEY `idx_poem_content_cache_title` (`poem_title`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='诗词内容缓存表';
+```
+
+---
+
+
+#### 23. rhyme（韵脚表（平水韵））
+
+```sql
+CREATE TABLE IF NOT EXISTS `rhyme` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `character` VARCHAR(4) NOT NULL COMMENT '汉字',
+  `rhyme_group` VARCHAR(20) NOT NULL COMMENT '韵部名称（如：东、冬、江、支）',
+  `tone_type` VARCHAR(4) NOT NULL COMMENT '声调类型：平声、上声、去声、入声',
+  `rhyme_category` VARCHAR(10) NOT NULL COMMENT '韵类：平声（上平/下平）、仄声（上声/去声/入声）',
+  `sort_order` INT NOT NULL DEFAULT 0 COMMENT '排序顺序',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_rhyme_character` (`character`),
+  KEY `idx_rhyme_group` (`rhyme_group`),
+  KEY `idx_rhyme_tone` (`tone_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='韵脚表（平水韵）';
+```
+
+---
+
+
+#### 24. poet_suggestion（诗人内容建议表）
+
+```sql
+CREATE TABLE IF NOT EXISTS `poet_suggestion` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `poet_id` BIGINT NOT NULL COMMENT '诗人ID',
+  `user_id` BIGINT NOT NULL COMMENT '建议用户ID',
+  `section` VARCHAR(50) NOT NULL COMMENT '修改板块',
+  `content` TEXT NOT NULL COMMENT '建议内容',
+  `category` VARCHAR(50) DEFAULT 'other' COMMENT '意见分类：biography/life_story/influence/evaluation/anecdotes/other',
+  `status` VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT '状态',
+  `review_comment` VARCHAR(500) DEFAULT NULL COMMENT '审核备注',
+  `reviewer_id` BIGINT DEFAULT NULL COMMENT '审核者ID',
+  `ip` VARCHAR(50) DEFAULT NULL COMMENT '提交者IP',
+  `review_time` DATETIME DEFAULT NULL COMMENT '审核时间',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_poet_suggestion_poet_id` (`poet_id`),
+  KEY `idx_poet_suggestion_user_id` (`user_id`),
+  KEY `idx_poet_suggestion_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='诗人内容建议表';
+```
+
+---
+
+
+#### 25. poet_draft（诗人内容草稿表）
+
+```sql
+CREATE TABLE IF NOT EXISTS `poet_draft` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `poet_id` BIGINT NOT NULL COMMENT '诗人ID',
+  `section` VARCHAR(50) NOT NULL COMMENT '编辑板块：biography/life_story/influence/evaluation/anecdotes',
+  `content` TEXT NOT NULL COMMENT '草稿内容',
+  `original_content` TEXT DEFAULT NULL COMMENT '修改前的原始内容',
+  `editor_id` BIGINT NOT NULL COMMENT '编辑者ID（管理员）',
+  `status` TINYINT NOT NULL DEFAULT 0 COMMENT '状态：0-待审核，1-已通过（已发布），2-已拒绝',
+  `reviewer_id` BIGINT DEFAULT NULL COMMENT '审核者ID',
+  `review_comment` VARCHAR(500) DEFAULT NULL COMMENT '审核备注',
+  `review_time` DATETIME DEFAULT NULL COMMENT '审核时间',
+  `ip` VARCHAR(50) DEFAULT NULL COMMENT '编辑者IP',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_poet_draft_poet_id` (`poet_id`),
+  KEY `idx_poet_draft_editor_id` (`editor_id`),
+  KEY `idx_poet_draft_status` (`status`),
+  KEY `idx_poet_draft_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='诗人内容草稿表';
+```
+
+---
+
+
+#### 26. static_page（静态页面内容表）
+
+```sql
+CREATE TABLE IF NOT EXISTS `static_page` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `page_key` VARCHAR(50) NOT NULL COMMENT '页面标识（如：terms、privacy、contact）',
+  `title` VARCHAR(100) NOT NULL COMMENT '页面标题',
+  `content` TEXT NOT NULL COMMENT '页面内容',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-启用',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_static_page_key` (`page_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='静态页面内容表';
+```
+
+---
+
+
+#### 27. ai_generated_content（AI生成内容审核表）
+
+```sql
+CREATE TABLE IF NOT EXISTS `ai_generated_content` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `target_type` VARCHAR(20) NOT NULL COMMENT '目标类型：poem-诗词，poet-诗人',
+  `target_id` BIGINT NOT NULL COMMENT '目标ID（诗词ID或诗人ID）',
+  `target_name` VARCHAR(200) DEFAULT NULL COMMENT '目标名称（诗词标题或诗人姓名）',
+  `field_name` VARCHAR(50) NOT NULL COMMENT '字段名：translation/appreciation/background/biography/life_story/influence/evaluation/anecdotes',
+  `content` TEXT NOT NULL COMMENT 'AI生成的内容',
+  `ai_model` VARCHAR(50) DEFAULT NULL COMMENT '使用的AI模型',
+  `status` TINYINT NOT NULL DEFAULT 0 COMMENT '审核状态：0-待审核，1-已通过，2-已拒绝',
+  `reviewer_id` BIGINT DEFAULT NULL COMMENT '审核者ID',
+  `review_comment` VARCHAR(500) DEFAULT NULL COMMENT '审核备注',
+  `review_time` DATETIME DEFAULT NULL COMMENT '审核时间',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_agc_target` (`target_type`, `target_id`),
+  KEY `idx_agc_status` (`status`),
+  KEY `idx_agc_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI生成内容审核表';
+```
+
+---
+
+
+#### 28. repair_order（报修工单表）
+
+```sql
+CREATE TABLE IF NOT EXISTS `repair_order` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `order_no` VARCHAR(32) NOT NULL COMMENT '工单编号',
+  `title` VARCHAR(200) NOT NULL COMMENT '问题标题',
+  `description` TEXT NOT NULL COMMENT '问题描述',
+  `category` VARCHAR(50) NOT NULL COMMENT '报修类别：system-系统故障,function-功能异常,ui-界面问题,data-数据问题,other-其他',
+  `priority` TINYINT NOT NULL DEFAULT 2 COMMENT '优先级：1-低,2-中,3-高,4-紧急',
+  `status` TINYINT NOT NULL DEFAULT 0 COMMENT '状态：0-待处理,1-处理中,2-已解决,3-已关闭,4-已驳回',
+  `images` TEXT DEFAULT NULL COMMENT '问题截图URL（JSON数组）',
+  `user_id` BIGINT NOT NULL COMMENT '提交用户ID',
+  `assignee_id` BIGINT DEFAULT NULL COMMENT '处理人ID',
+  `resolve_content` TEXT DEFAULT NULL COMMENT '解决方案',
+  `resolve_time` DATETIME DEFAULT NULL COMMENT '解决时间',
+  `close_time` DATETIME DEFAULT NULL COMMENT '关闭时间',
+  `satisfaction` TINYINT DEFAULT NULL COMMENT '满意度评分：1-5',
+  `satisfaction_comment` VARCHAR(500) DEFAULT NULL COMMENT '满意度评价',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_order_no` (`order_no`),
+  KEY `idx_repair_user_id` (`user_id`),
+  KEY `idx_repair_status` (`status`),
+  KEY `idx_repair_category` (`category`),
+  KEY `idx_repair_priority` (`priority`),
+  KEY `idx_repair_assignee_id` (`assignee_id`),
+  KEY `idx_repair_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='报修工单表';
+```
+
+---
+
+
+#### 29. repair_comment（报修反馈表）
+
+```sql
+CREATE TABLE IF NOT EXISTS `repair_comment` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `repair_order_id` BIGINT NOT NULL COMMENT '工单ID',
+  `user_id` BIGINT NOT NULL COMMENT '评论用户ID',
+  `content` TEXT NOT NULL COMMENT '评论内容',
+  `images` TEXT DEFAULT NULL COMMENT '附图URL（JSON数组）',
+  `is_internal` TINYINT NOT NULL DEFAULT 0 COMMENT '是否内部备注：0-用户可见,1-仅管理员可见',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_rc_repair_order_id` (`repair_order_id`),
+  KEY `idx_rc_user_id` (`user_id`),
+  KEY `idx_rc_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='报修反馈表';
+```
+
+---
+
 ## 索引设计规范
 
 ### 索引设计原则
@@ -648,6 +1098,6 @@ ANALYZE TABLE poem, poet, dynasty;
 
 ---
 
-**文档版本**：v1.5
-**最后更新**：2026-06-06
+**文档版本**：v2.0
+**最后更新**：2026-09-05（建表 DDL 由第 12 张补齐至全部 29 张，新增 13-29 张表结构，与 init.sql / schema.md 对齐）
 **维护人员**：墨渊开发团队

@@ -5,9 +5,11 @@ import { ElMessage } from 'element-plus'
 import type { ForumPost, Comment } from '@/types/model'
 import { getForumPostById, likeForumPost, getComments, createComment, likeComment } from '@/api/modules/forum'
 import { addHistory } from '@/api/modules/history'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 
 const loading = ref(false)
 const post = ref<ForumPost | null>(null)
@@ -26,7 +28,10 @@ const fetchPost = async () => {
   try {
     const res = await getForumPostById(postId.value)
     post.value = res.data
-    addHistory(route.params.id as unknown as number, 2).catch(() => {})
+    // 浏览历史接口需要登录态，游客调用会返回 401 并触发误跳登录页，故仅登录后记录
+    if (userStore.isLoggedIn) {
+      addHistory(route.params.id as unknown as number, 2).catch(() => {})
+    }
   } catch (error) {
     ElMessage.error('获取帖子详情失败')
     router.push('/forum')

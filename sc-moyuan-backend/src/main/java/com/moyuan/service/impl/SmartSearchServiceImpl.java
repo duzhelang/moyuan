@@ -44,8 +44,8 @@ public class SmartSearchServiceImpl implements SmartSearchService {
     @Value("${search.pinyin.limit:200}")
     private int pinyinSearchLimit;
 
-    // #7 中文搜索增强开关（默认 false 保持 LIKE 匹配；true 时对 keyword 走 ngram 全文索引）
-    @Value("${search.fulltext-enabled:false}")
+    // #7 中文搜索增强开关（默认 true 对 keyword 走 ngram 全文索引；置 false 时回退 LIKE 匹配）
+    @Value("${search.fulltext-enabled:${SEARCH_FULLTEXT_ENABLED:true}}")
     private boolean fulltextEnabled;
 
     private static final double SCORE_TITLE_EXACT = 1.0;

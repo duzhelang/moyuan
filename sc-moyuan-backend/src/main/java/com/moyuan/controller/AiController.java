@@ -46,10 +46,11 @@ public class AiController {
             @RequestParam(value = "moduleCode", required = false) String moduleCode) {
 
         String poem = aiService.writePoemFromImage(image, model, visionModel, moduleCode);
+        String actualModel = aiModelConfigService.resolveModelName(model, moduleCode, visionModel);
 
         return R.success(Map.of(
                 "poem", poem,
-                "model", model,
+                "model", actualModel,
                 "visionModel", visionModel != null ? visionModel : "default"
         ));
     }
@@ -79,10 +80,11 @@ public class AiController {
             @RequestParam(value = "moduleCode", required = false) String moduleCode) {
 
         String text = aiService.ocrImage(image, model, visionModel, moduleCode);
+        String actualModel = aiModelConfigService.resolveModelName(model, moduleCode, visionModel);
 
         return R.success(Map.of(
                 "text", text,
-                "model", model,
+                "model", actualModel,
                 "visionModel", visionModel != null ? visionModel : "default"
         ));
     }

@@ -32,7 +32,9 @@
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
 | POST | /api/auth/register | 用户注册（支持兴趣选项） | 否 |
-| POST | /api/auth/login | 用户登录 | 否 |
+| POST | /api/auth/login | 用户登录（返回 access + refresh 双 token） | 否 |
+| POST | /api/auth/refresh | 用 refresh token 换取新一对（轮换，旧 token 拉黑） | 否 |
+| POST | /api/auth/logout | 登出（将当前 token 的 jti 拉黑，立即使其失效） | 是 |
 
 ### 用户模块 (/api/users)
 
@@ -254,12 +256,12 @@
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
 | GET | /api/search | 全局搜索（跨模块：诗词+诗人+帖子） | 否 |
-| GET | /api/search/poems | 诗词搜索（支持协同过滤推荐） | 否 |
+| GET | /api/search/poems | 诗词搜索（LIKE + 兴趣加权推荐，本地不足时回源外部接口盒子） | 否 |
 | GET | /api/search/poems/recommended | 获取推荐诗词（基于协同过滤） | 否 |
 | GET | /api/search/poems/popular | 获取热门诗词 | 否 |
 | GET | /api/search/poems/external | 从外部API获取古诗词 | 否 |
 | GET | /api/search/poems/external/detail | 外部API获取诗词详情 | 否 |
-| GET | /api/search/smart | 智能搜索（复合筛选+评分排序） | 否 |
+| GET | /api/search/smart | 智能搜索（复合筛选+评分排序；关键词默认走 MySQL ngram 全文检索 `MATCH...AGAINST`，可经 `SEARCH_FULLTEXT_ENABLED` 关闭回退 LIKE） | 否 |
 | GET | /api/search/suggestions | 获取搜索建议 | 否 |
 | GET | /api/search/hot | 获取热门搜索 | 否 |
 | GET | /api/search/history | 获取搜索历史 | 是 |
@@ -482,7 +484,7 @@
 ```json
 {
   "message": "用户问题",
-  "model": "zhipu"  // 可选: zhipu, deepseek, kimi, nvidia
+  "model": "zhipu"  // 可选: zhipu, deepseek, kimi, mimo, qwen, openrouter, nvidia
 }
 ```
 
@@ -521,7 +523,7 @@
 ```json
 {
   "poem": "要分析的诗词内容",
-  "model": "zhipu"  // 可选: zhipu, deepseek, kimi, nvidia
+  "model": "zhipu"  // 可选: zhipu, deepseek, kimi, mimo, qwen, openrouter, nvidia
 }
 ```
 
@@ -542,7 +544,7 @@
 ```json
 {
   "upperCouplet": "上联内容",
-  "model": "zhipu"  // 可选: zhipu, deepseek, kimi, nvidia
+  "model": "zhipu"  // 可选: zhipu, deepseek, kimi, mimo, qwen, openrouter, nvidia
 }
 ```
 
@@ -564,7 +566,7 @@
 - 参数：
   - `image`: 图片文件（必填）
   - `model`: AI模型（可选，默认zhipu）
-  - `visionModel`: 视觉模型（可选，默认glm-4.6v-flash）
+  - `visionModel`: 视觉模型（可选，默认glm-4v-flash）
 
 **图片OCR识别响应示例**：
 ```json
@@ -574,7 +576,7 @@
   "data": {
     "text": "识别出的文字内容",
     "model": "zhipu",
-    "visionModel": "glm-4.6v-flash"
+    "visionModel": "glm-4v-flash"
   }
 }
 ```
@@ -897,6 +899,6 @@
 
 ---
 
-**文档版本**：v3.4
-**最后更新**：2026-07-28（搜索模块优化：补充搜索建议接口性能优化说明，外部诗词接口关键词长度限制）
+**文档版本**：v3.5
+**最后更新**：2026-09-05（认证模块补充 /auth/refresh、/auth/logout；/search/smart 补充 ngram 全文检索说明、/search/poems 描述修正；AI 模型清单补齐 mimo/qwen/openrouter；OCR 视觉模型修正为 glm-4v-flash；此前 v3.4 为搜索建议性能优化与外部接口长度限制）
 **维护人员**：墨渊开发团队

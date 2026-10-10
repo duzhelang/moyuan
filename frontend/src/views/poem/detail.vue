@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePoemStore } from '@/stores/poem'
@@ -82,7 +82,10 @@ const fetchPoem = async () => {
   loading.value = true
   try {
     await poemStore.fetchPoemDetail(poemId.value)
-    addHistory(route.params.id as unknown as number, 1).catch(() => {})
+    // 浏览历史接口需要登录态，游客调用会返回 401 并触发误跳登录页，故仅登录后记录
+    if (userStore.isLoggedIn) {
+      addHistory(route.params.id as unknown as number, 1).catch(() => {})
+    }
   } catch (error) {
     ElMessage.error('获取诗词详情失败')
     router.push('/poem')

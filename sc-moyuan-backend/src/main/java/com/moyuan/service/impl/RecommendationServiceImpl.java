@@ -198,11 +198,16 @@ public class RecommendationServiceImpl implements RecommendationService {
                     }
                     for (Map<String, Object> item : data) {
                         if (results.size() >= limit) break;
+                        String title = (String) item.get("name");
+                        String content = stripHtml((String) item.get("content"));
                         String author = (String) item.get("author");
-                        if (author != null && author.contains(keyword)) {
+                        // 相关性校验：标题、正文、作者任一包含关键词才保留，避免返回无关结果
+                        if (containsKeyword(title, keyword)
+                                || containsKeyword(content, keyword)
+                                || containsKeyword(author, keyword)) {
                             Map<String, Object> poem = new HashMap<>();
-                            poem.put("title", item.get("name"));
-                            poem.put("content", stripHtml((String) item.get("content")));
+                            poem.put("title", title);
+                            poem.put("content", content);
                             poem.put("author", author);
                             poem.put("dynasty", item.get("dynasty"));
                             poem.put("source", "external");
@@ -274,6 +279,11 @@ public class RecommendationServiceImpl implements RecommendationService {
     private String stripHtml(String html) {
         if (html == null) return null;
         return html.replaceAll("<[^>]+>", "").replaceAll("&nbsp;", " ").trim();
+    }
+
+    private boolean containsKeyword(String text, String keyword) {
+        if (text == null || keyword == null || keyword.isEmpty()) return false;
+        return text.contains(keyword);
     }
 
     // ==================== 通用协同过滤算法 ====================

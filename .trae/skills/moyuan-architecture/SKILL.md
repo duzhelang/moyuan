@@ -64,6 +64,7 @@ description: "古今诗话——墨渊（SC_MoYuan2）项目的系统架构文�
 | 文档 | 路径 | 内容 |
 |------|------|------|
 | 业务模块 | [business/modules.md](../../docs/business/modules.md) | 23 大业务模块功能说明、页面组件清单 |
+| 系统工作流 | [business/system-workflow.md](../../docs/business/system-workflow.md) | 系统运行时工作流集中记录（诗人数据懒加载与头像分配等流程） |
 
 ### 技术栈约束
 
@@ -98,7 +99,7 @@ description: "古今诗话——墨渊（SC_MoYuan2）项目的系统架构文�
 | 智能体协作 | [reports/agent-skill-coordination-report.md](../../docs/reports/agent-skill-coordination-report.md) | 智能体与技能协作报告 |
 | 代码审查 | [review/code-review-report-2026-06-06.md](../../docs/review/code-review-report-2026-06-06.md) | 代码审查报告 |
 | 后端数据库计划 | [backend-database-plan.md](../../docs/backend-database-plan.md) | 后端数据库建设计划 |
-| ER 图 | [diagrams/er-diagram.dot](../../docs/diagrams/er-diagram.dot) [er-diagram.svg](../../docs/diagrams/er-diagram.svg) | 数据库 ER 关系图（Graphviz/SVG） |
+| ER 图 | [diagrams/数据库ER图.dot](../../docs/diagrams/数据库ER图.dot) [数据库ER图.svg](../../docs/diagrams/数据库ER图.svg) | 数据库 ER 关系图（Graphviz/SVG，全量 29 张核心表） |
 
 > 数据资产相关文档索引见 [moyuan-data-assets](../moyuan-data-assets/SKILL.md) 技能
 > 文档同步更新规范见 [doc-manager](../doc-manager/SKILL.md) 技能

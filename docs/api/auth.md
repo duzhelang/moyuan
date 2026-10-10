@@ -43,26 +43,23 @@
    Token 无效 → 返回 401 未授权
 ```
 
-## JWT Token 结构
+## JWT Token 结构（双 token）
 
-### Token 生成
+系统采用 **access + refresh 双 token** 机制，登录成功后由 `JwtUtil` 签发一对并同时返回（见 `TokenResponse`）：
 
-```java
-String token = Jwts.builder()
-    .subject(userId.toString())
-    .claim("username", username)
-    .issuedAt(new Date())
-    .expiration(new Date(System.currentTimeMillis() + 86400000)) // 24小时
-    .signWith(secretKey)
-    .compact();
-```
+- **access token**：短时效（`jwt.expiration`，默认 24 小时），作为 `Authorization: Bearer` 用于受保护接口鉴权；过期后由 refresh token 换取新一对。
+- **refresh token**：长时效（`jwt.refresh-expiration`，默认 7 天，配置 `JWT_REFRESH_EXPIRATION` 可改），仅在 `POST /api/auth/refresh` 内使用并**轮换**（旧 access/refresh 写入黑名单、签发新对）；同时 `POST /api/auth/logout` 将当前 token 的 `jti` 拉黑实现登出失效。
 
-### Token 内容
+两种 token 均含 `type`（`access`/`refresh`）与每次签发唯一的 `jti`；黑名单由 `TokenBlacklistService` 管理（优先 Redis，Redis 失败时降级进程内内存）。
+
+### Token 内容（access 示例）
 
 ```json
 {
   "sub": "12345",           // 用户ID
   "username": "zhangsan",   // 用户名
+  "type": "access",         // 类型：access / refresh
+  "jti": "uuid-random",     // 每次签发随机，用于黑名单失效
   "iat": 1716633600,        // 签发时间
   "exp": 1716720000         // 过期时间
 }
@@ -120,20 +117,29 @@ String token = Jwts.builder()
 
 ## 前端实现
 
-### Token 存储
+### Token 存储（双 token）
+
+前端 `useUserStore` 同时持久化 access 与 refresh 两个 token：
 
 ```typescript
 // stores/user.ts
 const token = ref<string>(localStorage.getItem('token') || '')
+const refreshToken = ref<string>(localStorage.getItem('refreshToken') || '')
 
-function setToken(newToken: string) {
-  token.value = newToken
-  localStorage.setItem('token', newToken)
+function setToken(t: { token: string; refreshToken?: string }) {
+  token.value = t.token
+  localStorage.setItem('token', t.token)
+  if (t.refreshToken) {
+    refreshToken.value = t.refreshToken
+    localStorage.setItem('refreshToken', t.refreshToken)
+  }
 }
 
 function clearToken() {
   token.value = ''
+  refreshToken.value = ''
   localStorage.removeItem('token')
+  localStorage.removeItem('refreshToken')
 }
 ```
 
@@ -215,37 +221,46 @@ service.interceptors.request.use((config) => {
 })
 ```
 
-### 401 处理
+### 401 处理（静默续期 + 重放）
 
-公开路径（首页、诗词、诗人、论坛浏览等）的 401 响应不会触发跳转，仅需认证的接口（个人中心、管理后台等）才会跳转登录页：
+公开路径（首页、诗词、诗人、论坛浏览等）的 401 不会触发登出。对于需认证的接口，收到 401 时先用 refresh token 调 `POST /api/auth/refresh` 换取新一对，**重放原请求**；仅当续期失败（refresh 缺失/过期）才清理登录态并跳转登录页：
 
 ```typescript
 // utils/request.ts
 const PUBLIC_PATHS = [
   '/poems', '/poets', '/dynasties', '/categories',
   '/forum/posts', '/forum/comments',
-  '/poet-featured', '/home-navigation', '/ai',
-  '/search', '/auth'
+  '/poet-featured', '/home-navigation', '/vision',
+  '/ai', '/rhyme', '/search', '/static-pages', '/auth'
 ]
 
 function isPublicRequest(url: string = ''): boolean {
   return PUBLIC_PATHS.some(path => url.includes(path))
 }
 
-service.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      if (!isPublicRequest(error.config?.url)) {
-        const userStore = useUserStore()
-        userStore.logout()
-        window.location.href = '/user/login'
+async function tryRefreshToken(): Promise<boolean> {
+  const userStore = useUserStore()
+  if (!userStore.refreshToken) return false
+  try {
+    const response = await refreshService.post('/auth/refresh', { refreshToken: userStore.refreshToken })
+    if (response.data?.code === '200' && response.data?.data?.token) {
+      userStore.setToken(response.data.data.token)
+      if (response.data.data.refreshToken) {
+        // refresh 轮换：更新本地 refresh token
+        localStorage.setItem('refresh_token', response.data.data.refreshToken)
       }
+      return true
     }
-    return Promise.reject(error)
+    return false
+  } catch {
+    return false
   }
-)
+}
 ```
+
+- `/auth/refresh`、`/auth/logout` 自身会跳过续期逻辑，避免层层递归。
+- 并发多个 401 时复用同一次刷新（`refreshPromise` 去重），刷新成功后用新 token 重放原请求；二次重试仍 401 则停止。
+- 续期失败才执行 `userStore.logout()` 并跳 `/user/login`（`isRedirectingToLogin` 防跳转重入）。
 
 ## 安全配置
 
@@ -298,6 +313,6 @@ public PasswordEncoder passwordEncoder() {
 
 ---
 
-**文档版本**：v1.4  
-**最后更新**：2026-06-01  
+**文档版本**：v1.5
+**最后更新**：2026-09-05（JWT 说明更新为 access/refresh 双 token 与黑名单；前端 token 存储与 401 静默续期说明）  
 **维护人员**：墨渊开发团队

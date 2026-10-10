@@ -228,10 +228,10 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '诗词审核', requiresAuth: true, requiresAdmin: true }
       },
       {
-        path: 'poet-profiles',
-        name: 'PoetProfiles',
-        component: () => import('@/views/admin/poet-profiles.vue'),
-        meta: { title: '诗人认证审核', requiresAuth: true, requiresAdmin: true }
+        path: 'poet-suggestions',
+        name: 'PoetSuggestions',
+        component: () => import('@/views/admin/poet-suggestions.vue'),
+        meta: { title: '诗人审核', requiresAuth: true, requiresAdmin: true }
       },
       {
         path: 'comments',

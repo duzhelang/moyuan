@@ -1,17 +1,4 @@
-import axios from 'axios'
 import request from '@/utils/request'
-
-// 今日诗词 API
-const jinrishiciApi = axios.create({
-  baseURL: 'https://v2.jinrishici.com',
-  timeout: 10000
-})
-
-// PoetryDB API
-const poetryDbApi = axios.create({
-  baseURL: 'https://poetrydb.org',
-  timeout: 10000
-})
 
 // 今日诗词响应类型
 export interface JinrishiciResponse {
@@ -49,7 +36,7 @@ export interface PoetryDbPoem {
  */
 export async function getDailyPoetry(): Promise<JinrishiciResponse['data'] | null> {
   try {
-    const response = await jinrishiciApi.get<JinrishiciResponse>('/one.json')
+    const response = await request.get<JinrishiciResponse>('/external-poetry/jinrishici')
     if (response.data.status === 'success') {
       return response.data.data
     }
@@ -61,15 +48,14 @@ export async function getDailyPoetry(): Promise<JinrishiciResponse['data'] | nul
 }
 
 /**
- * 按标题搜索英文诗词
+ * 按标题搜索英文诗词（后端代理，规避浏览器直连 PoetryDB 被 QUIC 中断）
  */
 export async function searchPoetryByTitle(title: string): Promise<PoetryDbPoem[]> {
   try {
-    const response = await poetryDbApi.get<PoetryDbPoem[]>(`/title/${encodeURIComponent(title)}`)
-    if (Array.isArray(response.data)) {
-      return response.data
-    }
-    return []
+    const response = await request.get('/external-poetry/poetrydb/title', {
+      params: { q: title }
+    })
+    return Array.isArray(response.data) ? response.data : []
   } catch (error) {
     console.error('搜索诗词失败:', error)
     return []
@@ -77,15 +63,14 @@ export async function searchPoetryByTitle(title: string): Promise<PoetryDbPoem[]
 }
 
 /**
- * 按作者搜索英文诗词
+ * 按作者搜索英文诗词（后端代理）
  */
 export async function searchPoetryByAuthor(author: string): Promise<PoetryDbPoem[]> {
   try {
-    const response = await poetryDbApi.get<PoetryDbPoem[]>(`/author/${encodeURIComponent(author)}`)
-    if (Array.isArray(response.data)) {
-      return response.data
-    }
-    return []
+    const response = await request.get('/external-poetry/poetrydb/author', {
+      params: { q: author }
+    })
+    return Array.isArray(response.data) ? response.data : []
   } catch (error) {
     console.error('搜索作者诗词失败:', error)
     return []
@@ -93,15 +78,14 @@ export async function searchPoetryByAuthor(author: string): Promise<PoetryDbPoem
 }
 
 /**
- * 获取随机英文诗词
+ * 获取随机英文诗词（后端代理）
  */
 export async function getRandomPoetry(count: number = 1): Promise<PoetryDbPoem[]> {
   try {
-    const response = await poetryDbApi.get<PoetryDbPoem[]>(`/random/${count}`)
-    if (Array.isArray(response.data)) {
-      return response.data
-    }
-    return []
+    const response = await request.get('/external-poetry/poetrydb/random', {
+      params: { count }
+    })
+    return Array.isArray(response.data) ? response.data : []
   } catch (error) {
     console.error('获取随机诗词失败:', error)
     return []
@@ -109,17 +93,14 @@ export async function getRandomPoetry(count: number = 1): Promise<PoetryDbPoem[]
 }
 
 /**
- * 按标题和作者组合搜索
+ * 按标题和作者组合搜索（后端代理）
  */
 export async function searchPoetry(title: string, author: string): Promise<PoetryDbPoem[]> {
   try {
-    const response = await poetryDbApi.get<PoetryDbPoem[]>(
-      `/title,author/${encodeURIComponent(title)};${encodeURIComponent(author)}`
-    )
-    if (Array.isArray(response.data)) {
-      return response.data
-    }
-    return []
+    const response = await request.get('/external-poetry/poetrydb/title-author', {
+      params: { title, author }
+    })
+    return Array.isArray(response.data) ? response.data : []
   } catch (error) {
     console.error('组合搜索诗词失败:', error)
     return []

@@ -105,14 +105,14 @@
 #### 5. AI模块
 
 - **功能**：AI诗词问答（多模型切换）、看图写诗（视觉模型）、智能诗词分析、AI对对联、AI模型配置管理
-- **技术**：调用大语言模型API（智谱AI、DeepSeek、Kimi、NVIDIA NIM），视觉模型（GLM-4V-Flash / GLM-4.6V-Flash）
+- **技术**：调用大语言模型API（智谱AI、DeepSeek、Kimi、小米MiMo、千问、OpenRouter、NVIDIA NIM），视觉模型（GLM-4V-Flash）
 - **提示词模板**：支持动态变量替换（`{poetName}`、`{poemTitle}`、`{poemContent}`、`{maxLength}`、`{styleHint}`），前端 `buildAiPrompt` 统一构建
 - **状态**：已实现（前端首页AI问答组件 + 后端API（AiController）+ AI模型管理（AiModelConfigController））
 
 #### 6. 搜索模块
 
 - **功能**：复合筛选搜索（朝代/分类/诗人/关键词）、诗人模糊输入、智能评分排序、拼音匹配、搜索建议、热门搜索、搜索历史
-- **技术**：SmartSearchService（复合查询+评分排序）+ PinyinUtil（拼音匹配）+ Redis（缓存建议/历史/热门）+ MySQL LIKE模糊查询
+- **技术**：SmartSearchService（复合查询+评分排序）+ PinyinUtil（拼音匹配）+ Redis（缓存建议/历史/热门）；诗词内容默认走 MySQL 8 ngram 全文检索（`search.fulltext-enabled=true`，`MATCH(...) AGAINST(...)`，`poem` 表 ngram 全文索引），经环境变量 `SEARCH_FULLTEXT_ENABLED` 可回退 LIKE
 - **状态**：已实现跨模块搜索（`GET /api/search/smart` 支持多维度复合筛选，诗人下拉框支持自行输入模糊匹配）
 
 #### 7. 管理模块（新增）
@@ -211,22 +211,30 @@
 - **前端**：contact/index.vue
 - **状态**：已实现
 
-#### 19. 诗云模块（新增）
+#### 19. 诗云模块
 
-- **功能**：Three.js 3D 星空可视化，展示中国古诗词数据
-  - 诗人星系：每位诗人是一颗发光的星，按朝代分层排列（12个同心壳层）
-  - 诗星光点云：每首诗是一个微小光点，围绕在所属诗人星周围
-  - 赠诗连线：同朝代诗人之间的关系网络连线
+- **功能**：Three.js 3D 星空可视化，以「诗人—诗作」两级层级星图展示中国古诗词数据
+  - 诗人星系：每位诗人是一颗发光的星（一级大节点），节点大小随作品数自适应
+  - 诗作节点：每首诗是一个可交互小球（二级小节点），按「诗人为中心、诗作环绕分布」的球面螺旋排布，并经松弛迭代强制拉开最小间距
+  - 诗人↔诗连线：诗人与其名下诗作之间同色线段连接（LineSegments2 像素级线宽渲染）
+  - 赠诗连线：同朝代相邻诗人之间的贝塞尔曲线网络连线
+  - 诗人姓名标注：DOM 投影层跟随诗人星的屏幕投影显示姓名，选中时变金色加粗
+  - 配色实验室：页面底部控制模块，可切换 7 套配色方案并实时调节光晕强度、连线可见度、节点尺寸、整体亮度与标签显示
   - 朝代筛选：按朝代过滤诗人和诗词
   - 诗人信息面板：点击诗人星显示诗人信息和代表作品
-  - 相机漫游：支持鼠标拖动旋转、滚轮缩放、右键平移
-  - 诗体分类着色：五绝/七绝/五律/七律/词/现代诗不同颜色
+  - 诗作详情浮层：点击诗作点显示诗词详情，并保留「查看详情」跳转按钮
+  - 悬浮提示：鼠标悬停节点显示其含义（跟随鼠标的 DOM 提示框）
+  - 相机漫游：鼠标拖动旋转、滚轮缩放、右键平移
+  - 回归原点：一键关闭全部面板并缓动飞回初始视角
 - **技术方案**：
-  - Three.js 渲染引擎（WebGL）
-  - OrbitControls 相机控制
-  - 自定义 Shader 实现发光效果
-  - Points 点云渲染诗词
-  - Raycaster 射线检测点击和hover
+  - Three.js 渲染引擎（WebGL，ACESFilmicToneMapping）
+  - OrbitControls 相机控制（自动环绕，autoRotateSpeed 0.15）
+  - FogExp2 雾效 + 自定义 Shader 背景星（3200 颗，AdditiveBlending）
+  - 诗人/诗作节点用 SphereGeometry + MeshBasicMaterial（可交互 Mesh）
+  - 诗人↔诗连线用 LineSegments2 + LineSegmentsGeometry + LineMaterial（像素级线宽，toneMapped=false）
+  - 屏幕像素级命中检测（hover 18px 与 click 22px）
+  - 悬浮提示为跟随鼠标的 DOM 提示框
+  - 视觉参数由 `reactive(viz)` 驱动，`applyVizStyles()` 统一重涂场景；整体亮度经画布 CSS `filter: brightness()`
   - 响应式布局适配移动端
 - **前端组件**：poetry-cloud/index.vue
 - **API 接口**：GET /api/dynasties、GET /api/poets、GET /api/poems
@@ -294,9 +302,62 @@
 
 ### 开发环境
 
-- 前端：Vite Dev Server (localhost:5173)
-- 后端：Spring Boot (localhost:8085)
-- 数据库：本地MySQL
+开发环境各组件本地运行。前端通过 Vite 代理把 `/api`、`/uploads` 请求转发到后端 8085，规避跨域；后端通过环境变量注入各类密钥。
+
+#### 组件与端口
+
+| 组件 | 地址/说明 | 关键配置 |
+|------|-----------|----------|
+| 前端 | Vite Dev Server (localhost:5173) | `frontend/vite.config.ts`：端口 5173，代理 `/api`、`/uploads` 到后端；可用 `VITE_BACKEND_URL` 环境变量覆盖后端地址 |
+| 后端 | Spring Boot (localhost:8085) | `application.yml`：端口 8085，激活 `dev` profile，`context-path` 为 `/` |
+| 数据库 | 本地 MySQL (3306) | 库名 `moyuan`，驱动 utf8mb4；初始化脚本见 `sc-moyuan-backend/src/main/resources/db/`（`init.sql` 建表+基础数据，`seed.sql` 补充数据） |
+| 缓存 | 本地 Redis (6379) | 会话/热点数据缓存 |
+| 文件存储 | 本地磁盘目录 | 用户上传头像、图片等本地落盘；生产切换为对象存储（OSS/COS） |
+
+#### 环境要求
+
+| 依赖 | 说明 |
+|------|------|
+| JDK 17+ | Spring Boot 3.x 需要 |
+| Maven 3.6+ | 后端构建 |
+| Node.js 18+ / pnpm 或 npm | 前端构建 |
+| MySQL 8.0+ | 主数据库，需能创建 `moyuan` 库 |
+| Redis 6+ | 缓存服务，默认本机 6379 且无密码 |
+
+#### 环境变量配置
+
+以下密钥通过系统环境变量（或 `application-secrets.yml`）注入，**不要**写入或提交明文到仓库：
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `MYSQL_PASSWORD` | `root` | MySQL 密码，覆盖 `application.yml` 中 `datasource.password` |
+| `JWT_SECRET` | 开发兜底密钥 | 生产必须覆盖，长度≥32 字节满足 HS256 |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:*` | 允许的跨域来源 |
+| `APIHZ_ID` / `APIHZ_KEY` | 空 | 接口盒子(apihz)第三方诗词 API 凭证，见 `apihz` 配置 |
+| `VITE_BACKEND_URL` | `http://localhost:8085` | 前端代理目标地址（仅前端） |
+
+AI 模型密钥：智谱 AI、DeepSeek、Kimi、小米 MiMo、NVIDIA NIM、OpenRouter 等多家提供方，管理中配置于 `secrets/application-secrets.yml` 并通过 `ai_model` 表 / `AiModelRegistry` 加载。
+
+#### 启动步骤
+
+1. **初始化数据库**：在 MySQL 中创建 `moyuan` 库，执行 `init.sql`（可选再执行 `seed.sql` 补充数据）
+2. **启动 Redis**：确保 6379 端口可用
+3. **启动后端**：配置上述环境变量后运行 `Maven 启动类`（`ScMoYuanApplication`），监听 8085；接口文档见 Knife4j（`/doc.html`）
+4. **启动前端**：在 `frontend/` 目录执行 `pnpm install && pnpm dev`，访问 `http://localhost:5173`
+
+#### 验证
+
+- 后端健康：浏览器访问 `http://localhost:8085/doc.html` 能打开 Knife4j 文档
+- 前端代理：在 `http://localhost:5173` 页面中任一涉及 `/api` 的请求，其请求头 `Host` 指向 5173 且能正常访问数据（由 Vite 转发至 8085）
+
+#### 外部 API 依赖
+
+| 外部服务 | 用途 | 配置项 |
+|----------|------|--------|
+| AI 模型多厂商 | AI 辅助创作、诗人详情 AI 补全、智能对话 | 智谱 AI、DeepSeek、Kimi、小米 MiMo、NVIDIA NIM、OpenRouter 等 |
+| 诗人数据源 API（接口盒子） | 诗人详情懒加载（生卒年、生平、头像图等） | `apihz.id` / `apihz.key`，见 `PoetServiceImpl` |
+
+> **诗人头像说明**：优先使用诗人数据源 API 返回的 `image` 字段（网络图片）；未返回或为空时，由 `PoetDefaultAvatar` 根据「地区（中/西）+ 时期 + 性别」从本地 `/img/poet_avatars/` 静态图片池中智能分配兜底。
 
 ### 生产环境
 
@@ -437,6 +498,6 @@
 
 ***
 
-**文档版本**：v3.4
-**最后更新**：2026-06-29（补充测试架构和覆盖率统计）
+**文档版本**：v3.5
+**最后更新**：2026-09-05（AI 模块适配补齐小米MiMo/千问/OpenRouter，视觉模型统一 GLM-4V-Flash；搜索模块改为 MySQL ngram 全文检索默认开启；此前 v3.4 为测试架构与覆盖率）
 **维护人员**：墨渊开发团队

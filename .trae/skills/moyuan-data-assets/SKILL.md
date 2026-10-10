@@ -58,8 +58,8 @@ description: "古今诗话——墨渊（SC_MoYuan2）项目的数据资产文�
 
 | 文件 | 路径 | 内容 |
 |------|------|------|
-| ER 图源码 | [docs/diagrams/er-diagram.dot](../../docs/diagrams/er-diagram.dot) | Graphviz 关系图源码 |
-| ER 图成品 | [docs/diagrams/er-diagram.svg](../../docs/diagrams/er-diagram.svg) | 可视化关系图 |
+| ER 图源码 | [docs/diagrams/数据库ER图.dot](../../docs/diagrams/数据库ER图.dot) | Graphviz 关系图源码 |
+| ER 图成品 | [docs/diagrams/数据库ER图.svg](../../docs/diagrams/数据库ER图.svg) | 可视化关系图 |
 
 > 系统整体架构文档索引见 [moyuan-architecture](../moyuan-architecture/SKILL.md) 技能
 > 文档同步更新规范见 [doc-manager](../doc-manager/SKILL.md) 技能

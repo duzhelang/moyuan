@@ -1104,7 +1104,7 @@ const translateEnglishPoem = async (poem: any): Promise<string> => {
   const englishText = poem.originalLines?.join('\n') || poem.content || ''
   const prompt = `请将以下英文诗歌翻译成中文，要求译文优美、保留诗意和韵律感，仅返回中文译文即可，不要添加任何额外说明。\n\n原文标题：${poem.title}\n作者：${poem.author}\n\n原文：\n${englishText}`
   try {
-    const res = await chat({ message: prompt })
+    const res = await chat({ message: prompt, moduleCode: 'chat' })
     return res.data.reply || ''
   } catch (e) {
     console.error('AI翻译失败:', e)

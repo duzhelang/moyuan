@@ -69,8 +69,8 @@ const processOcrFile = (file: File) => {
     ElMessage.warning('请上传图片文件')
     return
   }
-  if (file.size > 5 * 1024 * 1024) {
-    ElMessage.warning('图片大小不能超过5MB')
+  if (file.size > 10 * 1024 * 1024) {
+    ElMessage.warning('图片大小不能超过10MB')
     return
   }
   ocrFile.value = file
@@ -219,6 +219,8 @@ const poetsData = ref<PoetFeatured[]>([])
 const poetPool = ref<PoetFeatured[]>([])
 const displayedPoetIds = ref<Set<number>>(new Set())
 const poetRefreshTimer = ref<ReturnType<typeof setInterval> | null>(null)
+// 鼠标悬浮在“著名诗人”行时暂停定时轮换
+const isPoetHovering = ref(false)
 const visionArticles = ref<VisionArticle[]>([])
 const visionCurrentPage = ref(1)
 const visionPageSize = ref(5)
@@ -311,8 +313,8 @@ const handleImageUpload = (event: Event) => {
 }
 
 const processImageFile = (file: File) => {
-  if (!file.type.match(/image\/(jpeg|png|webp)/)) {
-    ElMessage.warning('请上传 JPG / PNG / WebP 格式的图片')
+  if (!file.type.match(/image\/(jpeg|png|webp|gif)/)) {
+    ElMessage.warning('请上传 JPG / PNG / GIF / WebP 格式的图片')
     return
   }
   imageFile.value = file
@@ -445,7 +447,11 @@ onMounted(async () => {
   window.addEventListener('scroll', handleScroll)
 
   fetchRandomPoets()
-  poetRefreshTimer.value = setInterval(fetchRandomPoets, 20000)
+  poetRefreshTimer.value = setInterval(() => {
+    if (!isPoetHovering.value) {
+      fetchRandomPoets()
+    }
+  }, 20000)
 
   try {
     const postRes = await getForumPostList({ pageNum: 1, pageSize: 5 }).catch(() => ({ data: { list: [] as ForumPost[] } }))
@@ -599,7 +605,7 @@ onActivated(() => {
     <h1 class="sy_fljx">分类精赏</h1>
 
     <div class="z_top">
-      <div class="h4">
+      <div class="h4" @mouseenter="isPoetHovering = true" @mouseleave="isPoetHovering = false">
         <h1>著名诗人</h1>
         <PoetCard
           v-for="poetItem in poetsData"
@@ -662,8 +668,8 @@ onActivated(() => {
           <div class="ai-upload-zone" @click="imageUploadRef?.click()" @dragover.prevent="handleDragOver" @dragleave="handleDragLeave" @drop.prevent="handleDrop">
             <span class="ai-upload-emoji">🏔️</span>
             <p class="ai-upload-text">点击上传图片，或拖拽至此处</p>
-            <p class="ai-upload-hint">支持 JPG / PNG / WebP，AI 将为您赋诗一首</p>
-            <input ref="imageUploadRef" type="file" accept="image/jpeg,image/png,image/webp" style="display:none" @change="handleImageUpload">
+            <p class="ai-upload-hint">支持 JPG / PNG / GIF / WebP，单图 ≤32MB，AI 将为您赋诗一首</p>
+            <input ref="imageUploadRef" type="file" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" @change="handleImageUpload">
           </div>
           <div v-if="imagePreview" class="ai-preview-area">
             <img :src="imagePreview" alt="预览图片">
@@ -824,8 +830,8 @@ onActivated(() => {
         <div class="ai-upload-zone" style="margin-bottom:12px;" @click="ocrUploadRef?.click()" @dragover.prevent="handleOcrDragOver" @dragleave="handleOcrDragLeave" @drop.prevent="handleOcrDrop">
           <span class="ai-upload-emoji">📷</span>
           <p class="ai-upload-text">点击上传图片，或拖拽至此处</p>
-          <p class="ai-upload-hint">支持 JPG / PNG / WebP，最大 5MB</p>
-          <input ref="ocrUploadRef" type="file" accept="image/jpeg,image/png,image/webp" style="display:none" @change="handleOcrUpload">
+          <p class="ai-upload-hint">支持 JPG / PNG / GIF / WebP，单图 ≤10MB</p>
+          <input ref="ocrUploadRef" type="file" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" @change="handleOcrUpload">
         </div>
         <div v-if="ocrPreview" class="ai-preview-area" style="margin-bottom:12px;">
           <img :src="ocrPreview" alt="预览图片">

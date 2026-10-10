@@ -1,0 +1,40 @@
+﻿6a2b7e6cb9923910a3c328c135060e9dcd339ea4|2026-09-05 18:00:57|duzhelang|feat: 开放全文检索并落地JWT双token等多项增强
+f6838c8c967e5fd056524d77974c1ce64f3e962e|2026-09-04 23:13:34|duzhelang|feat: 完善AI密钥运行时注入并同步技术文档
+856435d5dd4f184e7597c3b3e32711d0e185997e|2026-09-03 23:22:15|duzhelang|Revise maintainer details in README
+a55ca703ce5eea505795010d5b276f2da77fffd5|2026-07-28 07:44:44|senyao|feat: 搜索模块支持复合筛选和诗人模糊输入
+2ab24fcb0714974d8ed051f48dad7bb2e3c0b810|2026-06-29 16:18:51|senyao|test: 补充前端和后端测试用例
+65177dc8a697744c375629b1b716daa78e71e0fc|2026-06-29 16:18:30|senyao|feat: 新增OCR图片识别功能并修复空值检查
+f8f9212cb6525fa2988a44855d67a38a1d1a3448|2026-06-28 02:25:09|senyao|feat: 前端首页重构与全站升级 - 组件化/响应式/设计系统/性能优化 - 首页重构拆分为4个子组件 - 引入Swiper/设计系统/响应式适配 - 新增诗人默认头像/AI水印 - 更新项目文档体系
+335db098f9150d062dddf5450e1e9fe01d88c2d8|2026-06-28 00:23:04|senyao|fix: 修正Three.js资源清理顺序 - 先scene.clear()再renderer.dispose()
+819fb77c758e7a23141504afadc3399dc628bcb0|2026-06-28 00:18:24|senyao|feat: 新增诗云星空3D可视化页面 - Three.js渲染诗人星点/诗星光云/赠诗连线 - 修复内存泄漏和错误处理 - 同步更新项目文档
+cac84b4c837344ab71f86a83df18001545e5d26e|2026-06-26 00:44:40|senyao|feat: 前端优化与构建修复 - 修复poem/list.vue条件结构 - 移除不存在的el-back-top组件 - 优化登录页面布局 - 添加favicon.ico引用 - Vite配置允许自动切换端口
+8687a36e5f7055b8f57af7703bb9acf3e0954dde|2026-06-20 03:17:30|senyao|feat: 新增审核管理功能（评论管理、帖子审核、AI内容审核、审核统计）
+c58ab553cfca605703c8435c4f12534786c42ab9|2026-06-19 03:12:42|senyao|feat: 寻章摘句页面布局重构与AI功能增强 - 修复Grid布局,新增poem-left-panel,AI按钮改为向左展开弹窗,AI逐句解析支持多句展开和内存缓存,鉴赏赏析改为名人点评,AI生成提示改为搜索风格动画,更新业务模块文档
+0ed6d033c81f530b8072e0b76a4efda221c68100|2026-06-11 02:49:24|senyao|重构首页导航栏,提取LoginDropdown和HomeNavBar组件: 提取登录下拉窗为独立组件; 提取导航栏搜索栏为独立组件; 修复下拉框位置偏移缝隙重叠UI问题; 修复悬浮交互和子菜单居中问题
+d80cdc78d8cc30559158b22728e110d582c08fcd|2026-06-09 02:03:36|senyao|feat: 更新项目文档体系和代码优化
+9d31ce1b97232d486ec63b9d931ab731bbb691e4|2026-06-08 03:33:10|senyao|fix: 将 secrets 目录添加到 gitignore，移除敏感文件
+b33e69571fd590f27fc8afaaaed089911e936597|2026-06-08 03:31:39|senyao|feat: 优化分类管理页面交互，修复诗词管理接口问题
+d28b9c96a32f2bd7632253f36ce296e93c003ef6|2026-06-07 03:30:29|senyao|feat: 扩展分类管理页面 + 修复编码问题 - 分类管理: 新增统计栏、搜索过滤、状态切换、图标字段、展开折叠、空状态 - 编码修复: JDBC characterEncoding UTF-8、Element Plus中文语言包 - 文档更新: 技术栈限制文档编码配置规范化 - 清理: gitignore添加frontend/dist和uploads
+5946e14ef870c741efc3854e0cf4797f69347dd5|2026-06-04 01:13:26|senyao|feat: 新增每日诗词、诗词搜索、权限管理、交流模块及访问日志功能
+1ff2375366f1282c8345c0efaa45fdfba19db9d8|2026-06-03 21:45:35|senyao|fix: 修复前后端连接问题和MyBatis实体字段映射错误
+ff44537b00516a5d130ca52d9a389b32ac72917d|2026-06-02 01:08:42|senyao|feat: v1.3.0 新增诗人推荐、首页导航、精选诗人、诗话视野模块，更新文档
+4aa1cbc0623ea1a13cfb5623f3af99a6443c3d27|2026-06-01 02:38:51|senyao|docs: 添加数据库初始化说明文档
+be66321d0ac1176acd4fa8a536e168bbcd17514a|2026-05-30 18:37:40|senyao|[文档] 全面更新项目文档至最新代码状态
+a1107f322ab0682edf2459c88284e3b875a7a875|2026-05-30 18:03:16|senyao|[配置]: 将 .trae/ 和 docs/ 迁移至本地 .git/info/exclude 管理
+a2bad3f1158ebfbda97f4a9e437b0feb52566b40|2026-05-30 02:10:37|senyao|feat: 添加NVIDIA NIM模型支持和GLM-4V-Flash视觉模型配置
+496ea7fe2322738cbff580dcdfe25db1900f9940|2026-05-28 18:51:09|senyao|[Task: HTML到Vue迁移] 还原原始页面布局并整合CSS资源
+4bc8c2899430b6f4f8a93a6126707899b60ab407|2026-05-28 14:03:32|senyao|[项目配置与测试] 添加配置、技能库及测试页面
+9a399011aac9b7e132340be086c709c1182366ff|2026-05-28 13:58:12|senyao|[前端项目] 搭建Vue3前端工程
+044f0c228fedd72ac17ae6f95b4f75879258ea58|2026-05-28 13:48:32|senyao|[后端完整实现] 构建全功能后端服务
+e60774c7244150c2063d704ca559829322b6add1|2026-05-28 13:47:15|senyao|[后端原型] 搭建Spring Boot基础框架
+2b0005ecadac1f327341e6dc34bf9c84d1c66618|2026-05-28 13:45:57|senyao|[项目基础设施] 更新README、首页和启动脚本
+8640d71c32fa6cb4b30c8dbf3dd933464e3b1bde|2026-04-06 23:57:42|senyao|基础
+df84527d841a3f21a30b73c5da3627e44e578a10|2026-04-06 23:42:11|senyao|基础
+322b9699f3eae554db83cc87e3b88155709390b5|2026-04-06 23:37:57|senyao|基础
+c8c2f7fde96ecd6bba20fe2ce6452b50aef5b023|2026-04-06 23:15:48|senyao|初git
+10a5797799ea9c6a1da79135b6d6ba198e49ee34|2025-05-17 14:03:16|duzhelang|Add files via upload
+b5583420041cf1b8e52ec5b419df6c4e2ef6ba7c|2025-05-17 13:57:22|duzhelang|Add files via upload
+c39479add4b94eb777f614b771940a2b997bc9be|2025-05-17 13:50:35|duzhelang|Add files via upload
+705a4f3eeca63abfbe6bf56e6692009a9b9edf8c|2025-05-17 13:39:17|duzhelang|Add files via upload
+f85449bb94b8bf771d88fa52d7501bddca261ea5|2025-05-17 03:27:05|duzhelang|Add files via upload
+

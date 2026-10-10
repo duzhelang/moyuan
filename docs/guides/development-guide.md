@@ -847,7 +847,7 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 | 提供商 | 模型 | 类型 | 状态 |
 |--------|------|------|------|
 | 智谱AI | glm-4, glm-4.7-flash | 文本+视觉 | 默认启用 |
-| DeepSeek | deepseek-chat, deepseek-v3 | 文本 | 默认禁用（需配置密钥） |
+| DeepSeek | deepseek-v4-flash | 文本 | 默认启用（密钥运行时注入） |
 | Kimi | moonshot-v1-8k, kimi-k2.6 | 文本 | 默认禁用（需配置密钥） |
 | 小米MiMo | mimo-v2.5 | 文本 | 默认禁用（需配置密钥） |
 | 千问 | qwen3.6-plus | 文本 | 默认禁用（需配置密钥） |
@@ -917,6 +917,6 @@ powershell -ExecutionPolicy Bypass -File test-apis.ps1
 
 ---
 
-**文档版本**：v1.4
-**最后更新**：2026-08-29（更新数据库表数量为29张、初始数据数量、AI模型列表为27个、后端端口为8085）
+**文档版本**：v1.5
+**最后更新**：2026-09-05（AI 模型列表更新：DeepSeek 采用 deepseek-v4-flash 并默认启用；此前 v1.4 为表数量/初始数据/AI 模型数量/后端端口）
 **维护人员**：墨渊开发团队

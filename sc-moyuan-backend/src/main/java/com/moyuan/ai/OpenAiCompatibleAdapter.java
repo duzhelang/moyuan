@@ -81,6 +81,10 @@ public class OpenAiCompatibleAdapter implements AiModelAdapter {
         body.put("model", visionModelId);
         body.put("messages", messages);
         body.put("max_tokens", model.getMaxTokens() != null ? model.getMaxTokens() : 1024);
+        // DeepSeek 官方视觉模型默认走思考模式，会导致 content 为空；此处显式关闭思考，保证 content 返回实际内容（其余厂商忽略该参数）
+        if ("deepseek".equals(model.getProvider())) {
+            body.put("thinking", Map.of("type", "disabled"));
+        }
 
         log.info("视觉模型请求体: model={}, messages数量={}", visionModelId, messages.size());
 

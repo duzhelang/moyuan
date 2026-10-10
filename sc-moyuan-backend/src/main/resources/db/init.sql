@@ -1226,3 +1226,4 @@ SET `avatar` = CASE (id % 6)
     WHEN 5 THEN '/img/cd_suolue_6.jpg'
 END
 WHERE (`avatar` IS NULL OR `avatar` = '') AND `deleted` = 0;
+

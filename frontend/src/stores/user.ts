@@ -17,7 +17,10 @@ export const useUserStore = defineStore('user', () => {
   const avatar = computed(() => userInfo.value?.avatar || '')
   const lastAdminUsername = computed(() => localStorage.getItem('lastAdminUsername') || '')
 
-  if (token.value && !userInfo.value) {
+  // 登录/注册页不预取用户信息：此时 localStorage 里可能残留旧 token，
+  // 它发出的失败请求会干扰即将进行的新登录（清掉新 token、把用户踢回登录页）
+  const isAuthPage = /^\/user\/(login|register)/.test(window.location.pathname)
+  if (token.value && !userInfo.value && !isAuthPage) {
     fetchUserInfo()
   }
 
