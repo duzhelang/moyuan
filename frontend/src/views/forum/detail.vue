@@ -110,7 +110,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="forum-detail-page" v-loading="loading">
+  <div class="forum-detail-page ink-bg ink-bg--2" v-loading="loading">
     <div class="container" v-if="post">
       <div class="post-header">
         <el-button @click="router.push('/forum')" class="back-button">

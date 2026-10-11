@@ -228,7 +228,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="poem-create-page">
+  <div class="poem-create-page ink-bg ink-bg--4">
     <div class="container page-container">
       <div class="page-header">
         <div class="header-content">
@@ -495,7 +495,6 @@ onUnmounted(() => {
 .poem-create-page {
   padding: 75px 0 $spacing-xl;
   min-height: 60vh;
-  background-color: $background-color-page;
 }
 
 .page-container {
@@ -814,5 +813,292 @@ onUnmounted(() => {
 
 :deep(.el-radio) {
   margin-right: 0;
+}
+
+/* ============================================================
+   视觉统一优化（宣纸 + 铜墨风格）
+   复用规范见 .trae/documents/墨渊-视觉风格与可复用细节要点.md
+   仅样式层调整，不改动模板结构与交互逻辑
+   ============================================================ */
+
+/* 页面标题：左对齐 + 渐变装饰线（覆盖全局 h1 的 flex 居中） */
+.page-title {
+  display: block;
+  text-align: left;
+  position: relative;
+  letter-spacing: 2px;
+  margin-bottom: $spacing-md;
+  padding-bottom: $spacing-sm;
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 72px;
+    height: 3px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, $primary-color, $accent-color, transparent);
+    box-shadow: 0 1px 4px rgba($primary-color, 0.25);
+  }
+}
+
+/* 卡片统一：宣纸底 + 铜色细边 + 顶部渐变装饰条 */
+.create-card,
+.tips-card,
+.writing-guide-card,
+.examples-card {
+  position: relative;
+  overflow: hidden;
+  background: $surface-primary;
+  border: 1px solid rgba($border-color-bronze, 0.45);
+  border-radius: $border-radius-lg;
+  box-shadow: 0 2px 10px rgba($primary-color, 0.06);
+  transition: box-shadow $transition-base, border-color $transition-base;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      $primary-300 20%,
+      $primary-500 50%,
+      $primary-300 80%,
+      transparent
+    );
+  }
+
+  &:hover {
+    box-shadow: 0 6px 18px rgba($primary-color, 0.12);
+    border-color: rgba($border-color-bronze, 0.75);
+  }
+}
+
+.create-card {
+  :deep(.el-card__body) {
+    padding: $spacing-xl;
+  }
+}
+
+/* 主输入区：宣纸暖色底块 */
+.main-input-section {
+  background: linear-gradient(180deg, rgba($primary-50, 0.55), rgba($surface-primary, 0.9));
+  border: 1px solid rgba($border-color-bronze, 0.4);
+  border-radius: $border-radius-lg;
+}
+
+/* 原创标识：暖色底块 + 铜色描边 */
+.original-form-item {
+  background-color: rgba($primary-50, 0.6);
+  border: 1px solid rgba($border-color-bronze, 0.35);
+  border-radius: $border-radius-md;
+}
+
+/* 表单标签图标徽章 */
+.form-label .el-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: $border-radius-md;
+  background: $tag-bg-light;
+  color: $primary-color;
+  font-size: 15px;
+  box-shadow: inset 0 0 0 1px rgba($border-color-bronze, 0.5);
+}
+
+/* 操作区：铜色分隔线 */
+.form-actions {
+  border-top-color: rgba($border-color-bronze, 0.35);
+}
+
+/* 侧栏卡片头部：暖色渐变 + 铜色分隔线 */
+.tips-card,
+.writing-guide-card,
+.examples-card {
+  :deep(.el-card__header) {
+    padding: $spacing-md $spacing-lg;
+    background: linear-gradient(180deg, rgba($primary-50, 0.8), rgba($surface-primary, 0.2));
+    border-bottom: 1px solid rgba($border-color-bronze, 0.35);
+  }
+
+  :deep(.el-card__body) {
+    padding: $spacing-lg;
+  }
+}
+
+/* 侧栏区块标题：左侧渐变竖条 */
+.tips-header,
+.writing-guide-header,
+.examples-header {
+  position: relative;
+  padding-left: $spacing-sm;
+  font-weight: 600;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 16px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, $secondary-color, $primary-color);
+  }
+}
+
+/* 发布提示列表：自定义铜色圆点 */
+.tips-list {
+  padding-left: 0;
+  list-style: none;
+
+  li {
+    position: relative;
+    padding-left: $spacing-md;
+    transition: color $transition-fast;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 10px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: $accent-color;
+      box-shadow: 0 0 0 3px rgba($accent-color, 0.15);
+    }
+
+    &:hover {
+      color: $text-color;
+    }
+  }
+}
+
+/* 创作指南：圆形图标改淡铜底 + 铜色描边 */
+.guide-item .guide-icon {
+  background-color: $tag-bg-light;
+  box-shadow: inset 0 0 0 1px rgba($border-color-bronze, 0.5);
+}
+
+/* 优秀示例：暖色块 + 左色条 + 悬停位移 */
+.examples-content .example-item {
+  background: linear-gradient(135deg, rgba($primary-50, 0.85), rgba($surface-primary, 0.9));
+  border-left: 3px solid rgba($secondary-color, 0.55);
+  border-radius: $border-radius-md;
+  transition: all $transition-fast;
+
+  &:hover {
+    border-left-color: $primary-color;
+    transform: translateX(2px);
+  }
+}
+
+/* 输入框 / 下拉框：铜色细边 + 主题聚焦光环 */
+/* 注意：伪类必须写在 :deep() 括号内，Sass 会把 &:hover 提到 :deep() 外面导致选择器失效 */
+:deep(.el-input__wrapper),
+:deep(.el-select__wrapper) {
+  border-radius: $border-radius-md;
+  background-color: $background-color-light;
+  box-shadow: 0 0 0 1px rgba($border-color-bronze, 0.7) inset;
+  transition: box-shadow $transition-fast;
+}
+
+:deep(.el-input__wrapper:hover),
+:deep(.el-select__wrapper:hover) {
+  box-shadow: 0 0 0 1px $accent-color inset;
+}
+
+:deep(.el-input__wrapper.is-focus),
+:deep(.el-select__wrapper.is-focused) {
+  box-shadow: 0 0 0 1px $primary-color inset, $input-focus-ring;
+}
+
+/* 文本域：铜色描边 + 主题聚焦光环（去掉 EP 默认灰内阴影，避免双边框） */
+:deep(.el-textarea__inner) {
+  font-family: $font-family-input;
+  color: $text-color;
+  background-color: $background-color-light;
+  border: 1px solid rgba($border-color-bronze, 0.7);
+  border-radius: $border-radius-md;
+  box-shadow: none;
+  transition: all $transition-fast;
+}
+
+:deep(.el-textarea__inner::placeholder) {
+  color: $text-color-light;
+}
+
+:deep(.el-textarea__inner:hover) {
+  border-color: $accent-color;
+  box-shadow: none;
+}
+
+:deep(.el-textarea__inner:focus) {
+  border-color: $primary-color;
+  box-shadow: $input-focus-ring;
+}
+
+/* 原创标识单选：替换 Element Plus 默认蓝 */
+:deep(.el-radio__inner:hover) {
+  border-color: $primary-color;
+}
+
+:deep(.el-radio__input.is-checked .el-radio__inner) {
+  background: $primary-color;
+  border-color: $primary-color;
+}
+
+:deep(.el-radio__input.is-checked + .el-radio__label) {
+  color: $primary-color;
+}
+
+/* 主按钮：棕金渐变，替代 Element Plus 默认蓝 */
+:deep(.el-button--primary) {
+  --el-button-bg-color: #{$primary-color};
+  --el-button-border-color: #{$primary-color};
+  --el-button-hover-bg-color: #{$primary-600};
+  --el-button-hover-border-color: #{$primary-600};
+  --el-button-active-bg-color: #{$primary-700};
+  --el-button-active-border-color: #{$primary-700};
+
+  height: 40px;
+  padding: 0 $spacing-lg;
+  border-radius: $border-radius-md;
+  font-size: $font-size-base;
+  font-weight: 600;
+  letter-spacing: 1px;
+  background-image: linear-gradient(135deg, $primary-400, $primary-color);
+  border-color: $primary-color;
+  box-shadow: 0 2px 8px rgba($primary-color, 0.25);
+}
+
+:deep(.el-button--primary:hover) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba($primary-color, 0.3);
+}
+
+/* 次要按钮（返回列表 / 重置）：铜色描边幽灵按钮 */
+:deep(.el-button:not(.el-button--primary)) {
+  height: 40px;
+  padding: 0 $spacing-md;
+  border-radius: $border-radius-md;
+  color: $primary-color;
+  background-color: $background-color-light;
+  border-color: rgba($primary-color, 0.5);
+}
+
+:deep(.el-button:not(.el-button--primary):hover),
+:deep(.el-button:not(.el-button--primary):focus) {
+  color: $primary-color;
+  background-color: $primary-50;
+  border-color: $primary-color;
 }
 </style>

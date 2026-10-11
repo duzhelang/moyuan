@@ -1,4 +1,4 @@
-﻿/* ===== 旧版兼容样式 ===== */
+/* ===== 旧版兼容样式 ===== */
 /* 已清理：body 背景、全局 font-size/font-family 覆盖 */
 /* 保留：基础重置、链接样式、布局规则 */
 
@@ -711,8 +711,32 @@ textarea::placeholder {
   margin-top: 12px;
 }
 
+/* 「著名诗人」标题竖排，字号与悬浮效果参考「作品/流派」标题（略小） */
 .z_top .h4 h1 {
-  width: 80px;
+  width: auto;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-family: cursive;
+  font-size: 42px;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+  transition: color 0.3s ease, transform 0.2s ease;
+  user-select: none;
+}
+
+.z_top .h4 h1:hover {
+  color: #8B4513;
+  transform: scale(1.05);
+}
+
+.z_top .h4 h1:active {
+  transform: scale(0.98);
+}
+
+/* 展风拓潮标题字号与「分类精赏」保持一致 */
+.z_top > h2 {
+  font-size: 32px;
 }
 
 .l2 {

@@ -50,7 +50,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="user-homepage">
+  <div class="user-homepage ink-bg ink-bg--1">
     <div class="container">
       <div class="page-nav">
         <el-button text @click="$router.push('/')">

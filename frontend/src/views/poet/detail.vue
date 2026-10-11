@@ -1091,7 +1091,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="poet-detail-page" v-loading="loading">
+  <div class="poet-detail-page ink-bg ink-bg--5" v-loading="loading">
     <canvas ref="particleCanvasRef" class="particle-bg"></canvas>
     <aside class="poet-sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-header">

@@ -212,7 +212,7 @@ const POET_VISIBLE_COUNT = 4
 const PLACEHOLDER_POET: PoetFeatured = {
   id: -1, poetId: null, name: '敬请期待', dynasty: '',
   description: '更多诗人正在收录中...', biography: '',
-  imageUrl: '', sortOrder: 0, status: 1
+  imageUrl: '', sortOrder: 0, status: 1, isShow: 0
 }
 
 const poetsData = ref<PoetFeatured[]>([])

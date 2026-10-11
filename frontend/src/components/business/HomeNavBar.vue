@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
@@ -119,11 +119,11 @@ defineExpose({ searchInputRef })
 
 <style scoped>
 .daohang {
-  width: 80%;
+  width: 100%;
   height: 58px;
   margin: 0 auto;
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   align-items: center;
   position: relative;
   z-index: 50;

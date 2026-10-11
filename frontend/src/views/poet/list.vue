@@ -138,7 +138,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="poet-list-page">
+  <div class="poet-list-page ink-bg ink-bg--4">
     <canvas ref="particleCanvasRef" class="particle-bg"></canvas>
     <div class="container">
       <div class="page-nav">

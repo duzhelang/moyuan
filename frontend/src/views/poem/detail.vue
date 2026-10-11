@@ -514,7 +514,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="poem-detail-page" v-loading="loading">
+  <div class="poem-detail-page ink-bg ink-bg--7" v-loading="loading">
     <div class="page-decoration">
       <div class="decoration-left">
         <img src="/img/lb_shiwen_1.png" alt="" class="deco-img" />
@@ -1040,6 +1040,15 @@ onMounted(async () => {
   position: relative;
   overflow-x: hidden;
   background-color: $background-color-page;
+
+  /* 统一 Element Plus 主色为墨渊棕金，避免默认蓝 */
+  --el-color-primary: #{$primary-color};
+  --el-color-primary-light-3: #{$primary-400};
+  --el-color-primary-light-5: #{$primary-300};
+  --el-color-primary-light-7: #{$primary-200};
+  --el-color-primary-light-8: #{$primary-100};
+  --el-color-primary-light-9: #{$primary-50};
+  --el-color-primary-dark-2: #{$primary-600};
 }
 
 .page-decoration {
@@ -1094,11 +1103,35 @@ onMounted(async () => {
 }
 
 .poem-card {
+  position: relative;
+  overflow: hidden;
   margin-bottom: $spacing-xl;
   border-radius: $border-radius-md;
   padding: $spacing-xl;
   background: $background-color-paper;
+  border: 1px solid rgba($border-color-bronze, 0.45);
   box-shadow: 0 2px 12px rgba($primary-color, 0.08);
+
+  /* 顶部水墨头图：江南水乡柔墨，向下渐隐，不干扰诗句阅读 */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 320px;
+    z-index: 0;
+    pointer-events: none;
+    background: url('/img/bg_ink_3.jpg') center top / cover no-repeat;
+    opacity: 0.32;
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.4) 45%, transparent 100%);
+    mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.4) 45%, transparent 100%);
+  }
+
+  :deep(.el-card__body) {
+    position: relative;
+    z-index: 1;
+  }
 }
 
 .poem-title-section {
@@ -1134,6 +1167,7 @@ onMounted(async () => {
   font-family: $font-family-title;
   margin-bottom: $spacing-md;
   letter-spacing: 4px;
+  text-shadow: 0 1px 3px rgba($surface-primary, 0.9);
 }
 
 .title-underline {
@@ -1185,6 +1219,7 @@ onMounted(async () => {
     font-family: $font-family-title;
     margin-bottom: $spacing-xs;
     text-indent: 0;
+    text-shadow: 0 1px 2px rgba($surface-primary, 0.85);
   }
 }
 
@@ -1241,15 +1276,29 @@ onMounted(async () => {
 }
 
 .info-card {
+  position: relative;
   background: $background-color-paper;
   border-radius: $border-radius-md;
   box-shadow: 0 2px 8px rgba($primary-color, 0.06);
   overflow: hidden;
   transition: all $transition-fast;
-  border: 1px solid rgba($border-color-bronze, 0.3);
+  border: 1px solid rgba($border-color-bronze, 0.4);
+
+  /* 顶部渐变装饰条 */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    z-index: 2;
+    background: linear-gradient(90deg, transparent, $primary-300 20%, $primary-500 50%, $primary-300 80%, transparent);
+  }
 
   &:hover {
-    box-shadow: 0 4px 12px rgba($primary-color, 0.1);
+    border-color: rgba($border-color-bronze, 0.7);
+    box-shadow: 0 4px 12px rgba($primary-color, 0.12);
     transform: translateY(-2px);
   }
 }
@@ -1479,27 +1528,67 @@ onMounted(async () => {
 }
 
 .comment-section {
+  position: relative;
+  overflow: hidden;
   margin-top: $spacing-xl;
-  background: $background-color-light;
-  border-radius: $border-radius-md;
+  background: $surface-primary;
+  border: 1px solid rgba($border-color-bronze, 0.45);
+  border-radius: $border-radius-lg;
   padding: $spacing-xl;
-  box-shadow: $box-shadow;
+  box-shadow: 0 2px 10px rgba($primary-color, 0.06);
+
+  /* 顶部渐变装饰条 */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, $primary-300 20%, $primary-500 50%, $primary-300 80%, transparent);
+  }
 }
 
 .section-title {
+  position: relative;
+  display: inline-block;
   font-size: $font-size-xl;
   color: $primary-color;
   margin-bottom: $spacing-lg;
-  padding-bottom: $spacing-sm;
-  border-bottom: 2px solid $primary-color;
-  display: inline-block;
+  padding: 0 0 $spacing-sm $spacing-md;
   font-family: $font-family-title;
+  letter-spacing: 2px;
+
+  /* 左侧渐变竖条 */
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 4px;
+    width: 4px;
+    height: 20px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, $secondary-color, $primary-color);
+  }
+
+  /* 底部渐变装饰线 */
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, $primary-color, $accent-color 55%, transparent);
+  }
 }
 
 .comment-form {
   margin-bottom: $spacing-xl;
   padding: $spacing-lg;
-  background: $background-color;
+  background: $surface-secondary;
+  border: 1px solid rgba($border-color-bronze, 0.4);
   border-radius: $border-radius-md;
   position: relative;
   z-index: 2;
@@ -1509,6 +1598,25 @@ onMounted(async () => {
   }
 
   @include el-comment-input;
+
+  /* 铜边文本域 + 主题聚焦光环（覆盖灰冷色默认样式） */
+  :deep(.el-textarea__inner) {
+    background-color: $background-color-light;
+    border: 1px solid rgba($border-color-bronze, 0.7);
+    border-radius: $border-radius-md;
+    box-shadow: none;
+    transition: border-color $transition-fast, box-shadow $transition-fast;
+  }
+
+  :deep(.el-textarea__inner:hover) {
+    border-color: $accent-color;
+    box-shadow: none;
+  }
+
+  :deep(.el-textarea__inner:focus) {
+    border-color: $primary-color;
+    box-shadow: $input-focus-ring;
+  }
 }
 
 .submit-button {
@@ -1526,13 +1634,18 @@ onMounted(async () => {
 }
 
 .comment-item {
-  @include card;
   padding: $spacing-lg;
+  background: $background-color-light;
+  border: 1px solid rgba($border-color-bronze, 0.35);
   border-left: 3px solid transparent;
+  border-radius: $border-radius-md;
+  box-shadow: 0 1px 6px rgba($primary-color, 0.05);
   transition: all $transition-fast;
 
   &:hover {
+    border-color: rgba($border-color-bronze, 0.6);
     border-left-color: $primary-color;
+    box-shadow: 0 4px 14px rgba($primary-color, 0.1);
   }
 }
 
@@ -1572,6 +1685,15 @@ onMounted(async () => {
 .comment-actions {
   display: flex;
   gap: $spacing-sm;
+
+  :deep(.el-button.is-text) {
+    color: $primary-color;
+  }
+
+  :deep(.el-button.is-text:hover) {
+    color: $primary-600;
+    background-color: rgba($primary-color, 0.06);
+  }
 }
 
 .comment-pagination {
@@ -1581,12 +1703,25 @@ onMounted(async () => {
 }
 
 .rating-section {
+  position: relative;
+  overflow: hidden;
   margin-top: $spacing-xl;
   padding: $spacing-xl;
   background: $background-color-paper;
-  border-radius: $border-radius-md;
-  box-shadow: 0 2px 8px rgba($primary-color, 0.06);
-  border: 1px solid rgba($border-color-bronze, 0.3);
+  border-radius: $border-radius-lg;
+  box-shadow: 0 2px 10px rgba($primary-color, 0.06);
+  border: 1px solid rgba($border-color-bronze, 0.45);
+
+  /* 顶部渐变装饰条 */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, $primary-300 20%, $primary-500 50%, $primary-300 80%, transparent);
+  }
 }
 
 .rating-overview {
@@ -1609,7 +1744,7 @@ onMounted(async () => {
 .score-value {
   font-size: $font-size-hero;
   font-weight: bold;
-  color: $warning-color;
+  color: $secondary-color;
   font-family: $font-family-title;
 }
 
@@ -1645,6 +1780,19 @@ onMounted(async () => {
 
 .ai-rating-card {
   margin-bottom: $spacing-xl;
+
+  :deep(.el-card) {
+    background: $surface-primary;
+    border: 1px solid rgba($border-color-bronze, 0.4);
+    border-radius: $border-radius-lg;
+  }
+
+  /* 卡片头部：暖色渐变底 + 铜色分隔线 */
+  :deep(.el-card__header) {
+    padding: $spacing-md $spacing-lg;
+    background: linear-gradient(180deg, rgba($primary-50, 0.8), rgba($surface-primary, 0.2));
+    border-bottom: 1px solid rgba($border-color-bronze, 0.35);
+  }
 
   .ai-rating-header {
     display: flex;
@@ -1737,7 +1885,8 @@ onMounted(async () => {
   margin-bottom: $spacing-xl;
   text-align: center;
   padding: $spacing-lg;
-  background: $background-color;
+  background: $surface-secondary;
+  border: 1px dashed rgba($border-color-bronze, 0.6);
   border-radius: $border-radius-md;
 }
 
@@ -1774,6 +1923,19 @@ onMounted(async () => {
 
     :deep(.el-textarea__inner) {
       min-height: 60px;
+      background-color: $background-color-light;
+      border: 1px solid rgba($border-color-bronze, 0.7);
+      border-radius: $border-radius-md;
+      box-shadow: none;
+    }
+
+    :deep(.el-textarea__inner:hover) {
+      border-color: $accent-color;
+    }
+
+    :deep(.el-textarea__inner:focus) {
+      border-color: $primary-color;
+      box-shadow: $input-focus-ring;
     }
   }
 }
@@ -1831,13 +1993,13 @@ onMounted(async () => {
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, $accent-color 0%, $primary-color 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 1000;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 15px rgba($primary-color, 0.35);
   transition: all $transition-fast;
 
   .el-icon {
@@ -1847,11 +2009,11 @@ onMounted(async () => {
 
   &:hover {
     transform: scale(1.1);
-    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+    box-shadow: 0 6px 20px rgba($primary-color, 0.45);
   }
 
   &.active {
-    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    background: linear-gradient(135deg, $primary-color 0%, $primary-700 100%);
   }
 }
 
@@ -1861,7 +2023,8 @@ onMounted(async () => {
   bottom: 90px;
   width: 380px;
   height: 500px;
-  background: $background-color-light;
+  background: $surface-primary;
+  border: 1px solid rgba($border-color-bronze, 0.5);
   border-radius: $border-radius-lg;
   box-shadow: $box-shadow-xl;
   display: flex;
@@ -1875,7 +2038,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   padding: $spacing-md $spacing-lg;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, $primary-color 0%, $primary-700 100%);
   color: white;
 
   .ai-chat-title {
@@ -1915,7 +2078,7 @@ onMounted(async () => {
       flex-direction: row-reverse;
 
       .message-content {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, $primary-400 0%, $primary-color 100%);
         color: white;
         border-radius: 18px 18px 4px 18px;
       }
@@ -1923,7 +2086,7 @@ onMounted(async () => {
 
     &.assistant {
       .message-content {
-        background: #f4f4f5;
+        background: $surface-secondary;
         color: $text-color;
         border-radius: 18px 18px 18px 4px;
       }
@@ -1934,11 +2097,11 @@ onMounted(async () => {
     flex-shrink: 0;
 
     .ai-avatar {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, $accent-color 0%, $primary-color 100%);
       color: white;
       font-size: 11px;
       font-weight: 600;
-      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+      box-shadow: 0 2px 8px rgba($primary-color, 0.3);
     }
   }
 
@@ -1973,11 +2136,11 @@ onMounted(async () => {
 
 .ai-chat-input {
   padding: $spacing-md;
-  border-top: 1px solid $border-color;
+  border-top: 1px solid rgba($border-color-bronze, 0.4);
   display: flex;
   gap: $spacing-sm;
   align-items: flex-end;
-  background: linear-gradient(to bottom, #fafafa, #f5f5f5);
+  background: linear-gradient(to bottom, $surface-primary, $surface-secondary);
 
   .el-textarea {
     flex: 1;
@@ -1987,6 +2150,14 @@ onMounted(async () => {
     :deep(.el-textarea__inner) {
       border-radius: $comment-input-radius;
       padding: $comment-input-padding;
+      background-color: $background-color-light;
+      border: 1px solid rgba($border-color-bronze, 0.7);
+      box-shadow: none;
+    }
+
+    :deep(.el-textarea__inner:focus) {
+      border-color: $primary-color;
+      box-shadow: $input-focus-ring;
     }
   }
 
@@ -1994,12 +2165,14 @@ onMounted(async () => {
     border-radius: 20px;
     padding: 10px 24px;
     font-weight: 500;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, $primary-400 0%, $primary-color 100%);
     border: none;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba($primary-color, 0.3);
 
     &:hover {
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      background: linear-gradient(135deg, $primary-400 0%, $primary-600 100%);
+      box-shadow: 0 4px 12px rgba($primary-color, 0.4);
     }
   }
 }
@@ -2013,5 +2186,36 @@ onMounted(async () => {
 .ai-chat-slide-leave-to {
   opacity: 0;
   transform: translateY(20px) scale(0.95);
+}
+
+/* ============================================================
+   Element Plus 覆盖：主按钮改棕金渐变（排除 link / text / plain）
+   ============================================================ */
+:deep(.el-button--primary:not(.is-link):not(.is-text):not(.is-plain)) {
+  --el-button-hover-bg-color: #{$primary-600};
+  --el-button-hover-border-color: #{$primary-600};
+  --el-button-active-bg-color: #{$primary-700};
+  --el-button-active-border-color: #{$primary-700};
+  background-image: linear-gradient(135deg, $primary-400, $primary-color);
+  border-color: $primary-color;
+  box-shadow: 0 2px 8px rgba($primary-color, 0.25);
+}
+
+:deep(.el-button--primary:not(.is-link):not(.is-text):not(.is-plain):hover) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba($primary-color, 0.3);
+}
+
+/* 次要按钮：暖白底 + 半透明铜边（排除 text / link，避免破坏评论区文字按钮） */
+:deep(.el-button--default:not(.is-text):not(.is-link)) {
+  color: $primary-color;
+  background-color: $background-color-light;
+  border-color: rgba($primary-color, 0.5);
+}
+
+:deep(.el-button--default:not(.is-text):not(.is-link):hover) {
+  color: $primary-color;
+  background-color: $primary-50;
+  border-color: $primary-color;
 }
 </style>

@@ -39,6 +39,8 @@ defineProps<{
   background: rgba(100, 100, 100, 0.6);
   border-radius: 12px;
   z-index: 100;
+  /* 绝对定位元素默认按父级（触发文字）宽度收缩，需固定为内容宽度，避免二维码被压扁 */
+  width: max-content;
 }
 
 .qr-popup img {
@@ -46,6 +48,8 @@ defineProps<{
   height: 120px;
   border-radius: 8px;
   object-fit: cover;
+  /* 覆盖全局 img{max-width:100%}，否则图片宽度会被父级收缩宽度裁切导致非正方形 */
+  max-width: none;
 }
 
 .qr-code-link:hover .qr-text {

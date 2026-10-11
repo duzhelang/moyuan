@@ -285,7 +285,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="vision-detail-page" v-loading="loading">
+  <div class="vision-detail-page ink-bg ink-bg--6" v-loading="loading">
     <div class="reading-progress">
       <div class="progress-bar" :style="{ width: readProgress + '%' }"></div>
     </div>
@@ -513,7 +513,6 @@ onUnmounted(() => {
 .vision-detail-page {
   padding: 20px 0 60px;
   min-height: 100vh;
-  background: linear-gradient(180deg, #f5f0e8 0%, #e8e0d0 100%);
 }
 
 .container {

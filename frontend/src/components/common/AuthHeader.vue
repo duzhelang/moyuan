@@ -182,6 +182,8 @@ const goHome = () => {
   border-radius: 10px;
   padding: 10px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  /* 绝对定位元素默认按父级（触发文字）宽度收缩，需固定为内容宽度，避免二维码被压扁 */
+  width: max-content;
 
   &::before {
     content: '';
@@ -207,6 +209,8 @@ const goHome = () => {
     border-radius: 6px;
     display: block;
     object-fit: cover;
+    /* 覆盖全局 img{max-width:100%}，避免二维码被压扁 */
+    max-width: none;
   }
 }
 

@@ -1265,6 +1265,11 @@ onMounted(() => {
   if (query.searchType && query.keyword) {
     handleDailyPoetrySearch(String(query.keyword), String(query.searchType))
   }
+
+  // 从个人中心「AI对话」入口进入时，自动打开一首诗词的 AI 诗词助手对话
+  if (query.aiChat === '1') {
+    autoOpenAiChat()
+  }
 })
 
 const handleDailyPoetrySearch = async (keyword: string, searchType: string) => {
@@ -1322,6 +1327,39 @@ const handleDailyPoetrySearch = async (keyword: string, searchType: string) => {
       externalSearching.value = false
     }
   }
+}
+
+const autoOpenAiChat = async () => {
+  if (aiChatVisible.value) return
+  await nextTick()
+
+  // 优先复用页面上已选中的诗词，否则从诗词库随机取一首作为对话对象
+  let poem = selectedExternalPoem.value || externalPoemResults.value[0]
+  if (!poem) {
+    const seeds = ['月', '春', '风', '花', '山水']
+    const keyword = seeds[Math.floor(Math.random() * seeds.length)]
+    const results = await searchApihzPoems(keyword, 20)
+    if (results.length === 0) {
+      ElMessage.info('暂无可对话的诗词，请稍后重试')
+      return
+    }
+    externalPoemResults.value = results
+    poem = results[0]
+  }
+
+  await openPoemDetail(poem)
+  // 诗词详情未加载成功时无法展示对话区
+  if (!externalPoemDetail.value) return
+
+  aiChatVisible.value = true
+  if (!aiChatInitialized) {
+    aiChatInitialized = true
+    await nextTick()
+    sendAiChatMessage('请简要介绍一下这首诗', true)
+  }
+
+  await nextTick()
+  document.querySelector('.ai-chat-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
 onUnmounted(() => {
@@ -1420,7 +1458,7 @@ const handleClearHistory = async () => {
 </script>
 
 <template>
-  <div class="poem-list-page">
+  <div class="poem-list-page ink-bg ink-bg--1">
     <canvas ref="particleCanvasRef" class="particle-bg"></canvas>
     <div class="container">
       <div class="page-nav">

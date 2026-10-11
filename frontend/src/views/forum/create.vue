@@ -84,7 +84,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="forum-create-page">
+  <div class="forum-create-page ink-bg ink-bg--3">
     <div class="container">
       <div class="page-header">
         <div class="header-content">
@@ -216,7 +216,8 @@ onUnmounted(() => {
 
 <style scoped lang="scss">
 .forum-create-page {
-  padding: $spacing-xl 0;
+  /* 顶部预留固定头部（AppHeader 高 55px）空间，避免右上角「返回列表」按钮被遮挡 */
+  padding: 75px 0 $spacing-xl;
   min-height: 60vh;
 }
 
@@ -232,10 +233,29 @@ onUnmounted(() => {
 }
 
 .page-title {
+  /* 覆盖全局 h1 的 flex 居中，避免标题与左对齐的副标题错位 */
+  display: block;
+  text-align: left;
+  position: relative;
   font-size: $font-size-title;
   color: $primary-color;
   font-family: $font-family-title;
-  margin-bottom: $spacing-sm;
+  letter-spacing: 2px;
+  margin-bottom: $spacing-md;
+  padding-bottom: $spacing-sm;
+
+  /* 标题下方渐变装饰线 */
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 72px;
+    height: 3px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, $primary-color, $accent-color, transparent);
+    box-shadow: 0 1px 4px rgba($primary-color, 0.25);
+  }
 }
 
 .page-subtitle {
@@ -254,9 +274,47 @@ onUnmounted(() => {
   }
 }
 
+/* 卡片统一：宣纸底色 + 铜色细边 + 顶部渐变装饰条 */
+.create-card,
+.tips-card,
+.category-guide-card {
+  position: relative;
+  overflow: hidden;
+  background: $surface-primary;
+  border: 1px solid rgba($border-color-bronze, 0.45);
+  border-radius: $border-radius-lg;
+  box-shadow: 0 2px 10px rgba($primary-color, 0.06);
+  transition: box-shadow $transition-base, border-color $transition-base;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      $primary-300 20%,
+      $primary-500 50%,
+      $primary-300 80%,
+      transparent
+    );
+  }
+
+  &:hover {
+    box-shadow: 0 6px 18px rgba($primary-color, 0.12);
+    border-color: rgba($border-color-bronze, 0.75);
+  }
+}
+
 .create-card {
   flex: 1;
-  border-radius: $border-radius-md;
+
+  :deep(.el-card__body) {
+    padding: $spacing-xl;
+  }
 }
 
 .side-panel {
@@ -277,6 +335,20 @@ onUnmounted(() => {
   font-size: $font-size-lg;
   font-weight: 600;
   color: $text-color;
+
+  /* 图标徽章 */
+  .el-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: $border-radius-md;
+    background: $tag-bg-light;
+    color: $primary-color;
+    font-size: 15px;
+    box-shadow: inset 0 0 0 1px rgba($border-color-bronze, 0.5);
+  }
 }
 
 .form-actions {
@@ -300,42 +372,88 @@ onUnmounted(() => {
 }
 
 .tips-card {
-  border-radius: $border-radius-md;
-  
-  .tips-header {
-    display: flex;
-    align-items: center;
-    gap: $spacing-sm;
-    font-size: $font-size-lg;
-    color: $primary-color;
+  :deep(.el-card__header) {
+    padding: $spacing-md $spacing-lg;
+    background: linear-gradient(180deg, rgba($primary-50, 0.8), rgba($surface-primary, 0.2));
+    border-bottom: 1px solid rgba($border-color-bronze, 0.35);
+  }
+
+  :deep(.el-card__body) {
+    padding: $spacing-lg;
+  }
+}
+
+.tips-header,
+.category-guide-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  padding-left: $spacing-sm;
+  font-size: $font-size-lg;
+  font-weight: 600;
+  color: $primary-color;
+
+  /* 左侧装饰竖条 */
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 16px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, $secondary-color, $primary-color);
   }
 }
 
 .tips-list {
   margin: 0;
-  padding-left: $spacing-lg;
+  padding: 0;
+  list-style: none;
   
   li {
+    position: relative;
+    padding-left: $spacing-md;
     font-size: $font-size-base;
     color: $text-color-secondary;
     line-height: $line-height-loose;
     margin-bottom: $spacing-sm;
+    transition: color $transition-fast;
+
+    /* 自制铜色圆点标记 */
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 10px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: $accent-color;
+      box-shadow: 0 0 0 3px rgba($accent-color, 0.15);
+    }
     
     &:last-child {
       margin-bottom: 0;
+    }
+
+    &:hover {
+      color: $text-color;
     }
   }
 }
 
 .category-guide-card {
-  border-radius: $border-radius-md;
-  
-  .category-guide-header {
-    display: flex;
-    align-items: center;
-    gap: $spacing-sm;
-    font-size: $font-size-lg;
-    color: $primary-color;
+  :deep(.el-card__header) {
+    padding: $spacing-md $spacing-lg;
+    background: linear-gradient(180deg, rgba($primary-50, 0.8), rgba($surface-primary, 0.2));
+    border-bottom: 1px solid rgba($border-color-bronze, 0.35);
+  }
+
+  :deep(.el-card__body) {
+    padding: $spacing-lg;
   }
 }
 
@@ -349,6 +467,17 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: $spacing-xs;
+  padding: $spacing-sm $spacing-md;
+  border-radius: $border-radius-md;
+  background: rgba($primary-50, 0.7);
+  border-left: 3px solid rgba($secondary-color, 0.55);
+  transition: all $transition-fast;
+
+  &:hover {
+    background: rgba($primary-100, 0.75);
+    border-left-color: $primary-color;
+    transform: translateX(2px);
+  }
   
   .category-name {
     font-size: $font-size-base;
@@ -373,11 +502,102 @@ onUnmounted(() => {
   width: 100%;
 }
 
+/* 输入框 / 下拉框：铜色细边 + 更大圆角 + 主题聚焦光环 */
+/* 注意：伪类必须写在 :deep() 括号内，Sass 会把 &:hover 提到 :deep() 外面导致选择器失效 */
+:deep(.el-input__wrapper),
+:deep(.el-select__wrapper) {
+  padding: 6px 12px;
+  border-radius: $border-radius-md;
+  background-color: $background-color-light;
+  box-shadow: 0 0 0 1px rgba($border-color-bronze, 0.7) inset;
+  transition: box-shadow $transition-fast;
+}
+
+:deep(.el-input__wrapper:hover),
+:deep(.el-select__wrapper:hover) {
+  box-shadow: 0 0 0 1px $accent-color inset;
+}
+
+:deep(.el-input__wrapper.is-focus),
+:deep(.el-select__wrapper.is-focused) {
+  box-shadow: 0 0 0 1px $primary-color inset, $input-focus-ring;
+}
+
 :deep(.el-input__inner) {
   font-family: $font-family-input;
   letter-spacing: 0.5px;
   line-height: 1.5;
 }
 
-@include el-comment-input;
+/* 文本域：宣纸质感 + 主题聚焦光环 */
+:deep(.el-textarea__inner) {
+  padding: 12px 14px;
+  font-family: $font-family-input;
+  font-size: $font-size-base;
+  line-height: 1.8;
+  letter-spacing: 0.5px;
+  color: $text-color;
+  background-color: $background-color-light;
+  border: 1px solid rgba($border-color-bronze, 0.7);
+  border-radius: $border-radius-md;
+  /* 覆盖 Element Plus 默认的灰色内阴影，避免与铜色描边形成双边框 */
+  box-shadow: none;
+  transition: all $transition-fast;
+}
+
+:deep(.el-textarea__inner::placeholder) {
+  color: $text-color-light;
+}
+
+:deep(.el-textarea__inner:hover) {
+  border-color: $accent-color;
+  box-shadow: none;
+}
+
+:deep(.el-textarea__inner:focus) {
+  border-color: $primary-color;
+  box-shadow: $input-focus-ring;
+}
+
+/* 主按钮：棕金渐变，替代 Element Plus 默认蓝 */
+:deep(.el-button--primary) {
+  --el-button-bg-color: #{$primary-color};
+  --el-button-border-color: #{$primary-color};
+  --el-button-hover-bg-color: #{$primary-600};
+  --el-button-hover-border-color: #{$primary-600};
+  --el-button-active-bg-color: #{$primary-700};
+  --el-button-active-border-color: #{$primary-700};
+
+  height: 40px;
+  padding: 0 $spacing-lg;
+  border-radius: $border-radius-md;
+  font-size: $font-size-base;
+  font-weight: 600;
+  letter-spacing: 1px;
+  background-image: linear-gradient(135deg, $primary-400, $primary-color);
+  border-color: $primary-color;
+  box-shadow: 0 2px 8px rgba($primary-color, 0.25);
+}
+
+:deep(.el-button--primary:hover) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba($primary-color, 0.3);
+}
+
+/* 次要按钮（返回列表 / 取消）：铜色描边幽灵按钮 */
+:deep(.el-button:not(.el-button--primary)) {
+  height: 40px;
+  padding: 0 $spacing-md;
+  border-radius: $border-radius-md;
+  color: $primary-color;
+  background-color: $background-color-light;
+  border-color: rgba($primary-color, 0.5);
+}
+
+:deep(.el-button:not(.el-button--primary):hover),
+:deep(.el-button:not(.el-button--primary):focus) {
+  color: $primary-color;
+  background-color: $primary-50;
+  border-color: $primary-color;
+}
 </style>

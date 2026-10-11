@@ -1,0 +1,41 @@
+@use "variables" as *;
+
+// ============================================================
+// 水墨整页背景（可复用工具类）
+// ------------------------------------------------------------
+// 用法：给页面根元素同时加 `ink-bg` 与 `ink-bg--N`
+//   <div class="poem-list-page ink-bg ink-bg--7">
+// 图片为 1920 宽 JPEG，存放于 public/img/，用 /img/xxx.jpg 引用
+// 每层 = 纸色遮罩（上层）+ 水墨图（下层）；固定在视口，长页面滚动不拉伸
+// 注意：页面自身的 scoped 根选择器若写了 background / background-image，
+//       会因作用域属性选择器优先级更高而盖掉本工具类，必须删掉。
+// ============================================================
+
+.ink-bg {
+  background-color: $background-color-page;
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+// 遮罩透明度按各图本身的墨色深浅分别校准（图越深、遮罩越实），
+// 整体落在「水墨轮廓明显可见、正文依然清晰」的区间
+@mixin ink-bg-layer($img, $top, $mid, $bottom) {
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba($surface-primary, $top) 0%,
+      rgba($surface-primary, $mid) 45%,
+      rgba($background-color-page, $bottom) 100%
+    ),
+    url($img);
+}
+
+.ink-bg--1 { @include ink-bg-layer('/img/bg_ink_1.jpg', 0.42, 0.54, 0.64); } // 淡山水与竹石
+.ink-bg--2 { @include ink-bg-layer('/img/bg_ink_2.jpg', 0.54, 0.66, 0.76); } // 峻峰云海，墨色最重
+.ink-bg--3 { @include ink-bg-layer('/img/bg_ink_3.jpg', 0.44, 0.56, 0.66); } // 江南水乡小桥
+.ink-bg--4 { @include ink-bg-layer('/img/bg_ink_4.jpg', 0.40, 0.52, 0.62); } // 竹影，极淡
+.ink-bg--5 { @include ink-bg-layer('/img/bg_ink_5.jpg', 0.50, 0.62, 0.72); } // 松与山寺
+.ink-bg--6 { @include ink-bg-layer('/img/bg_ink_6.jpg', 0.46, 0.58, 0.68); } // 雪里梅花
+.ink-bg--7 { @include ink-bg-layer('/img/bg_ink_7.jpg', 0.44, 0.56, 0.66); } // 荷塘柳影

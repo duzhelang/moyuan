@@ -62,7 +62,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="vision-list-page" v-loading="loading">
+  <div class="vision-list-page ink-bg ink-bg--3" v-loading="loading">
     <div class="page-nav">
       <div class="nav-left">
         <el-button text @click="router.back()">
@@ -157,7 +157,6 @@ onMounted(() => {
 <style scoped lang="scss">
 .vision-list-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #f5f0e8 0%, #e8e0d0 100%);
   position: relative;
 
   &::before {

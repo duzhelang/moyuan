@@ -391,7 +391,7 @@ onMounted(() => {
             <el-icon><HomeFilled /></el-icon>
             <span>首页</span>
           </el-button>
-          <el-button @click="router.push('/poems')">
+          <el-button @click="router.push('/poem')">
             <el-icon><Reading /></el-icon>
             <span>诗词库</span>
           </el-button>
@@ -399,7 +399,7 @@ onMounted(() => {
             <el-icon><ChatDotSquare /></el-icon>
             <span>论坛</span>
           </el-button>
-          <el-button @click="router.push('/ai-chat')">
+          <el-button @click="router.push({ path: '/poem', query: { aiChat: '1' } })">
             <el-icon><ChatLineSquare /></el-icon>
             <span>AI对话</span>
           </el-button>
