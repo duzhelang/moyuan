@@ -12,13 +12,13 @@ const statusFilter = ref<number | null>(null)
 
 const statusOptions = [
   { label: '全部', value: null },
-  { label: '正常', value: 0 },
-  { label: '隐藏', value: 1 },
+  { label: '正常', value: 1 },
+  { label: '隐藏', value: 0 },
 ]
 
 const statusTagMap: Record<number, { type: string; label: string }> = {
-  0: { type: 'success', label: '正常' },
-  1: { type: 'warning', label: '隐藏' },
+  1: { type: 'success', label: '正常' },
+  0: { type: 'warning', label: '隐藏' },
 }
 
 const targetTypeMap: Record<number, string> = {
@@ -35,8 +35,8 @@ const fetchData = async () => {
       size: size.value,
       status: statusFilter.value
     })
-    dataList.value = res.records || []
-    total.value = res.total || 0
+    dataList.value = res.data.records || []
+    total.value = res.data.total || 0
   } catch (e) {
     ElMessage.error('获取数据失败')
   } finally {
@@ -47,7 +47,7 @@ const fetchData = async () => {
 const handleApprove = async (row: any) => {
   try {
     await ElMessageBox.confirm('确认通过该评论？', '审核确认', { type: 'warning' })
-    await auditComment(row.id, 0)
+    await auditComment(row.id, 1)
     ElMessage.success('审核通过')
     fetchData()
   } catch (e: any) {
@@ -61,7 +61,7 @@ const handleReject = async (row: any) => {
       inputPlaceholder: '拒绝原因',
       type: 'warning',
     })
-    await auditComment(row.id, 1, value || undefined)
+    await auditComment(row.id, 0, value || undefined)
     ElMessage.success('已隐藏')
     fetchData()
   } catch (e: any) {
@@ -123,11 +123,11 @@ onMounted(() => fetchData())
       <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
           <template v-if="row.status === 1">
-            <el-button type="success" size="small" @click="handleApprove(row)">通过</el-button>
+            <el-button type="warning" size="small" @click="handleReject(row)">隐藏</el-button>
             <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
           </template>
           <template v-else>
-            <el-button type="warning" size="small" @click="handleReject(row)">隐藏</el-button>
+            <el-button type="success" size="small" @click="handleApprove(row)">通过</el-button>
             <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
           </template>
         </template>

@@ -213,14 +213,9 @@ public class AdminController {
     public R<?> listPoems(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String keyword) {
-        LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
-        if (StringUtils.hasText(keyword)) {
-            wrapper.like(Poem::getTitle, keyword).or()
-                    .like(Poem::getContent, keyword);
-        }
-        wrapper.orderByDesc(Poem::getCreateTime);
-        return R.success(poemService.page(new Page<>(page, size), wrapper));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer auditStatus) {
+        return R.success(poemService.getAdminPoemList(page, size, keyword, auditStatus));
     }
 
     @Operation(summary = "获取诗词详情")
@@ -396,8 +391,15 @@ public class AdminController {
     @GetMapping("/poet-featured")
     public R<?> listPoetFeatured(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String keyword) {
         LambdaQueryWrapper<PoetFeatured> wrapper = new LambdaQueryWrapper<>();
+        // 关键词筛选：支持按诗人姓名或朝代模糊匹配
+        if (StringUtils.hasText(keyword)) {
+            wrapper.and(w -> w.like(PoetFeatured::getName, keyword)
+                    .or()
+                    .like(PoetFeatured::getDynasty, keyword));
+        }
         wrapper.orderByAsc(PoetFeatured::getSortOrder)
                .orderByDesc(PoetFeatured::getCreateTime);
         return R.success(poetFeaturedService.page(new Page<>(page, size), wrapper));
@@ -432,6 +434,46 @@ public class AdminController {
     @DeleteMapping("/poet-featured/{id}")
     public R<Void> deletePoetFeatured(@PathVariable Long id) {
         poetFeaturedService.removeById(id);
+        return R.success();
+    }
+
+    @Operation(summary = "设置单个精选诗人首页展示状态")
+    @PutMapping("/poet-featured/{id}/show")
+    public R<Void> updatePoetFeaturedShow(@PathVariable Long id, @RequestBody Map<String, Integer> params) {
+        Integer isShow = params.get("isShow");
+        if (isShow == null) {
+            return R.error("展示状态不能为空");
+        }
+        PoetFeatured poetFeatured = poetFeaturedService.getById(id);
+        if (poetFeatured == null) {
+            return R.error("精选诗人不存在");
+        }
+        poetFeatured.setIsShow(isShow);
+        poetFeaturedService.updateById(poetFeatured);
+        return R.success();
+    }
+
+    @Operation(summary = "批量设置精选诗人首页展示状态")
+    @PutMapping("/poet-featured/batch-show")
+    public R<Void> batchShowPoetFeatured(@RequestBody Map<String, Object> params) {
+        Object idsObj = params.get("ids");
+        Integer isShow = params.get("isShow") == null ? null : ((Number) params.get("isShow")).intValue();
+        if (!(idsObj instanceof List<?> rawIds) || rawIds.isEmpty()) {
+            return R.error("请选择要操作的记录");
+        }
+        if (isShow == null) {
+            return R.error("展示状态不能为空");
+        }
+        List<Long> ids = rawIds.stream()
+                .map(item -> ((Number) item).longValue())
+                .toList();
+        for (Long id : ids) {
+            PoetFeatured poetFeatured = poetFeaturedService.getById(id);
+            if (poetFeatured != null) {
+                poetFeatured.setIsShow(isShow);
+                poetFeaturedService.updateById(poetFeatured);
+            }
+        }
         return R.success();
     }
 

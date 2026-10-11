@@ -62,6 +62,22 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
     }
 
     @Override
+    public IPage<Poem> getAdminPoemList(int pageNum, int pageSize, String keyword, Integer auditStatus) {
+        LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.hasText(keyword)) {
+            wrapper.and(w -> w.like(Poem::getTitle, keyword).or()
+                    .like(Poem::getContent, keyword));
+        }
+        if (auditStatus != null) {
+            wrapper.eq(Poem::getAuditStatus, auditStatus);
+        }
+        wrapper.orderByDesc(Poem::getCreateTime);
+        IPage<Poem> page = poemMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
+        populatePoetAndDynasty(page.getRecords());
+        return page;
+    }
+
+    @Override
     public IPage<Poem> getModernPoems(int pageNum, int pageSize, Boolean isOriginal, Boolean hasCertifiedPoet, String sortBy) {
         LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Poem::getStatus, 1);
@@ -225,8 +241,25 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
         poem.setAuditTime(java.time.LocalDateTime.now());
         if (status == 1) {
             poem.setStatus(1);
+            // 审核通过公开后，确保其诗人可见（静默收录可能将诗人建为隐藏）
+            activatePoetIfHidden(poem.getPoetId());
         }
         updateById(poem);
+    }
+
+    /** 诗人若为隐藏状态（status!=1）则置为可见，并清理诗人缓存 */
+    private void activatePoetIfHidden(Long poetId) {
+        if (poetId == null) {
+            return;
+        }
+        Poet poet = poetMapper.selectById(poetId);
+        if (poet != null && !Integer.valueOf(1).equals(poet.getStatus())) {
+            poet.setStatus(1);
+            poetMapper.updateById(poet);
+            if (cacheManager.getCache("poets") != null) {
+                cacheManager.getCache("poets").clear();
+            }
+        }
     }
 
     @Override

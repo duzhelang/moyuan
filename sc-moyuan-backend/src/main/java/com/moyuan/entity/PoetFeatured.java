@@ -17,6 +17,8 @@ public class PoetFeatured {
     private String imageUrl;
     private Integer sortOrder;
     private Integer status;
+    @TableField("is_show")
+    private Integer isShow;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
     @TableField(fill = FieldFill.INSERT_UPDATE)

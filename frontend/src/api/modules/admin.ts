@@ -21,7 +21,7 @@ export function deleteUser(id: number) {
   return request.delete<void>(`/admin/users/${id}`)
 }
 
-export function getAdminPoems(params: { page?: number; size?: number; keyword?: string }) {
+export function getAdminPoems(params: { page?: number; size?: number; keyword?: string; auditStatus?: number }) {
   return request.get<{ records: any[]; total: number }>('/admin/poems', { params })
 }
 
@@ -131,7 +131,7 @@ export function getAdminLogs(params?: { page?: number; size?: number; keyword?: 
   return request.get<{ records: any[]; total: number }>('/admin/logs', { params })
 }
 
-export function getAdminPoetFeatured(params: { page?: number; size?: number }) {
+export function getAdminPoetFeatured(params: { page?: number; size?: number; keyword?: string }) {
   return request.get<{ records: any[]; total: number }>('/admin/poet-featured', { params })
 }
 
@@ -149,6 +149,14 @@ export function updateAdminPoetFeatured(id: number, data: any) {
 
 export function deleteAdminPoetFeatured(id: number) {
   return request.delete<void>(`/admin/poet-featured/${id}`)
+}
+
+export function updateAdminPoetFeaturedShow(id: number, isShow: number) {
+  return request.put<void>(`/admin/poet-featured/${id}/show`, { isShow })
+}
+
+export function batchShowAdminPoetFeatured(ids: number[], isShow: number) {
+  return request.put<void>('/admin/poet-featured/batch-show', { ids, isShow })
 }
 
 export function getHomeNavigationList(params?: { type?: string }) {

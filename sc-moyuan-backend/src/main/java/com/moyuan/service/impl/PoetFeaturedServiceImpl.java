@@ -32,7 +32,8 @@ public class PoetFeaturedServiceImpl extends ServiceImpl<PoetFeaturedMapper, Poe
     @Override
     public List<PoetFeatured> getRandomPoetFeatured(int count) {
         LambdaQueryWrapper<PoetFeatured> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(PoetFeatured::getStatus, 1);
+        wrapper.eq(PoetFeatured::getStatus, 1)
+               .eq(PoetFeatured::getIsShow, 1);
         List<PoetFeatured> allList = poetFeaturedMapper.selectList(wrapper);
         if (allList.size() <= count) {
             return allList;

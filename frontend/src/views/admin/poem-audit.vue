@@ -12,16 +12,15 @@ const statusFilter = ref<number | null>(null)
 
 const statusOptions = [
   { label: '全部', value: null },
-  { label: '待审核', value: 2 },
+  { label: '待审核', value: 0 },
   { label: '已通过', value: 1 },
-  { label: '已拒绝', value: 3 },
+  { label: '已拒绝', value: 2 },
 ]
 
 const statusTagMap: Record<number, { type: string; label: string }> = {
-  0: { type: 'info', label: '草稿' },
+  0: { type: 'warning', label: '待审核' },
   1: { type: 'success', label: '已通过' },
-  2: { type: 'warning', label: '待审核' },
-  3: { type: 'danger', label: '已拒绝' },
+  2: { type: 'danger', label: '已拒绝' },
 }
 
 const fetchData = async () => {
@@ -30,10 +29,10 @@ const fetchData = async () => {
     const res = await getAdminPoems({
       page: page.value,
       size: size.value,
-      status: statusFilter.value
+      auditStatus: statusFilter.value ?? undefined
     })
-    dataList.value = res.records || []
-    total.value = res.total || 0
+    dataList.value = res.data.records || []
+    total.value = res.data.total || 0
   } catch (e) {
     ElMessage.error('获取数据失败')
   } finally {
@@ -58,7 +57,7 @@ const handleReject = async (row: any) => {
       inputPlaceholder: '拒绝原因',
       type: 'warning',
     })
-    await auditPoem(row.id, 3, value || undefined)
+    await auditPoem(row.id, 2, value || undefined)
     ElMessage.success('已拒绝')
     fetchData()
   } catch (e: any) {
@@ -85,25 +84,25 @@ onMounted(() => fetchData())
     <el-table :data="dataList" v-loading="loading" stripe>
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="title" label="标题" min-width="150" show-overflow-tooltip />
-      <el-table-column prop="author" label="作者" width="100" />
-      <el-table-column prop="dynasty" label="朝代" width="80" />
+      <el-table-column prop="poetName" label="作者" width="100" />
+      <el-table-column prop="dynastyName" label="朝代" width="80" />
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
-          <el-tag :type="statusTagMap[row.status]?.type as any" size="small">
-            {{ statusTagMap[row.status]?.label || '未知' }}
+          <el-tag :type="statusTagMap[row.auditStatus]?.type as any" size="small">
+            {{ statusTagMap[row.auditStatus]?.label || '未知' }}
           </el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="createTime" label="创建时间" width="170" />
       <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
-          <template v-if="row.status === 2">
+          <template v-if="row.auditStatus === 0">
             <el-button type="success" size="small" @click="handleApprove(row)">通过</el-button>
             <el-button type="danger" size="small" @click="handleReject(row)">拒绝</el-button>
           </template>
-          <span v-else-if="row.status === 1" class="text-success">已通过</span>
-          <span v-else-if="row.status === 3" class="text-danger">已拒绝</span>
-          <span v-else class="text-muted">草稿</span>
+          <span v-else-if="row.auditStatus === 1" class="text-success">已通过</span>
+          <span v-else-if="row.auditStatus === 2" class="text-danger">已拒绝</span>
+          <span v-else class="text-muted">未知</span>
         </template>
       </el-table-column>
     </el-table>

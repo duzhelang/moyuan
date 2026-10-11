@@ -10,6 +10,7 @@ export interface PoetFeatured {
   imageUrl: string
   sortOrder: number
   status: number
+  isShow: number
 }
 
 export function getRandomPoetFeatured(count: number = 4) {

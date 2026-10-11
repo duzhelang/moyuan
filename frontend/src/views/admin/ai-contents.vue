@@ -43,8 +43,8 @@ const fetchData = async () => {
   loading.value = true
   try {
     const res = await getAdminAiContents({ page: page.value, size: size.value, status: statusFilter.value })
-    dataList.value = res.records || []
-    total.value = res.total || 0
+    dataList.value = res.data.records || []
+    total.value = res.data.total || 0
   } catch (e) {
     ElMessage.error('获取数据失败')
   } finally {

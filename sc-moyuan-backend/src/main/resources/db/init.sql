@@ -275,12 +275,14 @@ CREATE TABLE IF NOT EXISTS `poet_featured` (
   `image_url` VARCHAR(255) DEFAULT NULL COMMENT '意境图URL',
   `sort_order` INT NOT NULL DEFAULT 0 COMMENT '排序顺序',
   `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
+  `is_show` TINYINT NOT NULL DEFAULT 0 COMMENT '首页展示：0-否，1-是',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   PRIMARY KEY (`id`),
   KEY `idx_poet_featured_status` (`status`),
-  KEY `idx_poet_featured_sort` (`sort_order`)
+  KEY `idx_poet_featured_sort` (`sort_order`),
+  KEY `idx_poet_featured_show` (`is_show`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='精选诗人卡片表';
 
 -- ============================================================
@@ -451,6 +453,17 @@ INSERT IGNORE INTO `poet` (`name`, `dynasty_id`, `avatar`, `biography`, `life_st
 ('李煜', 7, '/img/poet_avatars/avatar_cn_ancient_male_03.jpg', '（937年—978年），初名从嘉，字重光，号钟隐、莲峰居士，彭城（今江苏徐州）人。南唐末代君主，世称南唐后主。精书法、工绘画、通音律，诗文均有一定造诣，尤以词的成就最高。其词作在晚唐五代词中别树一帜，对后世词坛影响深远。', NULL, NULL, NULL, NULL, '重光', '钟隐、莲峰居士', 937, 978, '彭城（今江苏徐州）', 'ancient', 1),
 ('森垚', 13, '/img/poet_avatars/avatar_cn_modern_male_01.jpg', '现代诗人，作品风格独特，善于运用古典意象表达现代情感。', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'modern', 1);
 
+-- 补充：首页「分类精赏-作品」所引用的唐代诗人（固定 id，保证 home_navigation.link_id 有效引用）
+INSERT IGNORE INTO `poet` (`id`, `name`, `dynasty_id`, `poet_type`, `status`) VALUES
+(6, '崔颢', 6, 'ancient', 1),
+(7, '杜荀鹤', 6, 'ancient', 1),
+(8, '许浑', 6, 'ancient', 1),
+(9, '王湾', 6, 'ancient', 1),
+(10, '王之涣', 6, 'ancient', 1),
+(11, '孟浩然', 6, 'ancient', 1),
+(12, '李绅', 6, 'ancient', 1),
+(13, '李白', 6, 'ancient', 1);
+
 -- ============================================================
 -- 初始数据：诗词
 -- ============================================================
@@ -470,6 +483,17 @@ INSERT IGNORE INTO `poem` (`title`, `content`, `poet_id`, `dynasty_id`, `categor
 ('钗头凤·红酥手', '红酥手，黄縢酒，满城春色宫墙柳。东风恶，欢情薄。一怀愁绪，几年离索。错、错、错。\n春如旧，人空瘦，泪痕红浥鲛绡透。桃花落，闲池阁。山盟虽在，锦书难托。莫、莫、莫。', 2, 8, 9, '陆游词', 1, 1, 'classical'),
 ('长相思·一重山', '一重山，两重山，山远天高烟水寒，相思枫叶丹。\n菊花开，菊花残，塞雁高飞人未还，一帘风月闲。', 4, 7, 9, '李煜词', 1, 1, 'classical'),
 ('白夜月望', '经日积灰新作旧，魂安大腹杯弓痛。\n可怜嫦娥广寒丑，才识沧桑无激流。', 5, 13, 25, '森垚', 1, 1, 'modern');
+
+-- 补充：首页「分类精赏-作品」所引用的经典唐诗（固定 id，保证 home_navigation.link_id 有效引用）
+INSERT IGNORE INTO `poem` (`id`, `title`, `content`, `poet_id`, `dynasty_id`, `category_id`, `source`, `status`, `is_featured`, `poem_type`) VALUES
+(16, '黄鹤楼', '昔人已乘黄鹤去，此地空余黄鹤楼。\n黄鹤一去不复返，白云千载空悠悠。\n晴川历历汉阳树，芳草萋萋鹦鹉洲。\n日暮乡关何处是？烟波江上使人愁。', 6, 6, 1, '唐诗', 1, 0, 'classical'),
+(17, '春宫怨', '早被婵娟误，欲妆临镜慵。\n承恩不在貌，教妾若为容。\n风暖鸟声碎，日高花影重。\n年年越溪女，相忆采芙蓉。', 7, 6, 1, '唐诗', 1, 0, 'classical'),
+(18, '秋日赴阙题潼关驿楼', '红叶晚萧萧，长亭酒一瓢。\n残云归太华，疏雨过中条。\n树色随关迥，河声入海遥。\n帝乡明日到，犹自梦渔樵。', 8, 6, 1, '唐诗', 1, 0, 'classical'),
+(19, '次北固山下', '客路青山外，行舟绿水前。\n潮平两岸阔，风正一帆悬。\n海日生残夜，江春入旧年。\n乡书何处达？归雁洛阳边。', 9, 6, 1, '唐诗', 1, 0, 'classical'),
+(20, '静夜思', '床前明月光，疑是地上霜。\n举头望明月，低头思故乡。', 13, 6, 1, '唐诗', 1, 0, 'classical'),
+(21, '登鹳雀楼', '白日依山尽，黄河入海流。\n欲穷千里目，更上一层楼。', 10, 6, 1, '唐诗', 1, 0, 'classical'),
+(22, '春晓', '春眠不觉晓，处处闻啼鸟。\n夜来风雨声，花落知多少。', 11, 6, 1, '唐诗', 1, 0, 'classical'),
+(23, '悯农', '锄禾日当午，汗滴禾下土。\n谁知盘中餐，粒粒皆辛苦。', 12, 6, 1, '唐诗', 1, 0, 'classical');
 
 -- ============================================================
 -- 更新诗词翻译和赏析
@@ -627,39 +651,39 @@ INSERT IGNORE INTO `forum_post` (`title`, `content`, `user_id`, `view_count`, `l
 -- ============================================================
 -- 初始数据：精选诗人
 -- ============================================================
-INSERT IGNORE INTO `poet_featured` (`poet_id`, `name`, `dynasty`, `description`, `biography`, `image_url`, `sort_order`) VALUES
-(1, '李清照', '宋代', '（1084年—1155年），号易安居士，齐州章丘人。宋代婉约派代表词人。', '李清照善于以简洁自然的语言表达真挚的情感，使词作通俗易懂却又意味深长。她的词作情感表达细腻入微，无论是少女的娇羞、对爱情的渴望，还是后期的国仇家恨、孤独愁苦，都能让读者产生强烈的共鸣。', '/img/cd_suolue_10.jpg', 1),
-(2, '杜牧', '唐代', '（803年—852年），字牧之，京兆万年（今陕西省西安市）人。唐朝文学家、诗人。', '杜牧为人性情刚直，不拘小节，不屑逢迎。自负经略之才，诗文均有盛名。文以《阿房宫赋》为最著，诗作明丽隽永，绝句诗尤受人称赞，世称小杜。与李商隐齐名，合称"小李杜"。', '/img/cd_suolue_11.jpg', 2),
-(3, '苏轼', '宋代', '（1037年—1101年），字子瞻，号东坡居士，世称苏东坡、苏仙、坡仙。', '苏轼的思想融合了儒、释、道三家。儒家思想使他积极入世，关心民生疾苦；道家思想让他在面对困境时能保持内心的超脱和豁达；佛家思想则使他在历经磨难后，获得心灵的慰藉和宁静。', '/img/cd_suolue_12.jpg', 3),
-(4, '上官婉儿', '唐代', '（664年—710年）是唐代一位极具影响力的女官和诗人。与蔡文姬、李清照、卓文君并称中国古代四大才女。', '她代朝廷品评天下诗文，大力提倡辞藻华丽、用律严谨的文风，使得当时宫廷内外都流行这种诗歌风格，对唐朝文坛的繁荣和诗歌艺术水平的提高作出了重要贡献。', '/img/cd_suolue_9.jpg', 4),
-(5, '辛弃疾', '宋代', '（1140年—1207年），字幼安，号稼轩，历城（今山东济南）人。南宋豪放派词人。', '辛弃疾一生以恢复为志，以功业自许，却命运多舛、壮志难酬。但他始终没有动摇恢复中原的信念，而是把满腔激情和对国家兴亡、民族命运的关切、忧虑，全部寄寓于词作之中。', '/img/cd_suolue_7.jpg', 5),
-(6, '李白', '唐代', '（701年—762年），字太白，号青莲居士，唐代伟大的浪漫主义诗人。', '李白的诗雄奇飘逸，艺术成就极高。他讴歌祖国山河与美丽的自然风光，风格雄奇奔放，俊逸清新，富有浪漫主义精神，达到了内容与艺术的完美统一。', '/img/cd_suolue_8.jpg', 6);
+INSERT IGNORE INTO `poet_featured` (`poet_id`, `name`, `dynasty`, `description`, `biography`, `image_url`, `sort_order`, `is_show`) VALUES
+(1, '李清照', '宋代', '（1084年—1155年），号易安居士，齐州章丘人。宋代婉约派代表词人。', '李清照善于以简洁自然的语言表达真挚的情感，使词作通俗易懂却又意味深长。她的词作情感表达细腻入微，无论是少女的娇羞、对爱情的渴望，还是后期的国仇家恨、孤独愁苦，都能让读者产生强烈的共鸣。', '/img/cd_suolue_10.jpg', 1, 1),
+(2, '杜牧', '唐代', '（803年—852年），字牧之，京兆万年（今陕西省西安市）人。唐朝文学家、诗人。', '杜牧为人性情刚直，不拘小节，不屑逢迎。自负经略之才，诗文均有盛名。文以《阿房宫赋》为最著，诗作明丽隽永，绝句诗尤受人称赞，世称小杜。与李商隐齐名，合称"小李杜"。', '/img/cd_suolue_11.jpg', 2, 1),
+(3, '苏轼', '宋代', '（1037年—1101年），字子瞻，号东坡居士，世称苏东坡、苏仙、坡仙。', '苏轼的思想融合了儒、释、道三家。儒家思想使他积极入世，关心民生疾苦；道家思想让他在面对困境时能保持内心的超脱和豁达；佛家思想则使他在历经磨难后，获得心灵的慰藉和宁静。', '/img/cd_suolue_12.jpg', 3, 1),
+(4, '上官婉儿', '唐代', '（664年—710年）是唐代一位极具影响力的女官和诗人。与蔡文姬、李清照、卓文君并称中国古代四大才女。', '她代朝廷品评天下诗文，大力提倡辞藻华丽、用律严谨的文风，使得当时宫廷内外都流行这种诗歌风格，对唐朝文坛的繁荣和诗歌艺术水平的提高作出了重要贡献。', '/img/cd_suolue_9.jpg', 4, 1),
+(5, '辛弃疾', '宋代', '（1140年—1207年），字幼安，号稼轩，历城（今山东济南）人。南宋豪放派词人。', '辛弃疾一生以恢复为志，以功业自许，却命运多舛、壮志难酬。但他始终没有动摇恢复中原的信念，而是把满腔激情和对国家兴亡、民族命运的关切、忧虑，全部寄寓于词作之中。', '/img/cd_suolue_7.jpg', 5, 1),
+(6, '李白', '唐代', '（701年—762年），字太白，号青莲居士，唐代伟大的浪漫主义诗人。', '李白的诗雄奇飘逸，艺术成就极高。他讴歌祖国山河与美丽的自然风光，风格雄奇奔放，俊逸清新，富有浪漫主义精神，达到了内容与艺术的完美统一。', '/img/cd_suolue_8.jpg', 6, 1);
 
 -- ============================================================
 -- 初始数据：首页导航-作品
 -- ============================================================
 INSERT IGNORE INTO `home_navigation` (`type`, `title`, `subtitle`, `image_url`, `link_id`, `link_type`, `sort_order`) VALUES
-('works', '黄鹤楼', '唐代:崔颢', 'h6.jpg', 42, 'poem', 1),
-('works', '春宫怨', '唐代:杜荀鹤', 'h6.2.jpg', 51, 'poem', 2),
-('works', '秋日赴阙题潼关驿楼', '唐代:杜荀鹤', 'h6.3.jpg', 62, 'poem', 3),
-('works', '次北固山下', '唐代:许浑', 'h6.4.jpg', 73, 'poem', 4),
-('works', '静夜思', '唐代:李白', 'h6.jpg', 84, 'poem', 5),
-('works', '登鹳雀楼', '唐代:王之涣', 'h6.2.jpg', 95, 'poem', 6),
-('works', '春晓', '唐代:孟浩然', 'h6.3.jpg', 106, 'poem', 7),
-('works', '悯农', '唐代:李绅', 'h6.4.jpg', 117, 'poem', 8);
+('works', '黄鹤楼', '唐代:崔颢', 'h6.jpg', 16, 'poem', 1),
+('works', '春宫怨', '唐代:杜荀鹤', 'h6.2.jpg', 17, 'poem', 2),
+('works', '秋日赴阙题潼关驿楼', '唐代:许浑', 'h6.3.jpg', 18, 'poem', 3),
+('works', '次北固山下', '唐代:王湾', 'h6.4.jpg', 19, 'poem', 4),
+('works', '静夜思', '唐代:李白', 'h6.jpg', 20, 'poem', 5),
+('works', '登鹳雀楼', '唐代:王之涣', 'h6.2.jpg', 21, 'poem', 6),
+('works', '春晓', '唐代:孟浩然', 'h6.3.jpg', 22, 'poem', 7),
+('works', '悯农', '唐代:李绅', 'h6.4.jpg', 23, 'poem', 8);
 
 -- ============================================================
 -- 初始数据：首页导航-流派
 -- ============================================================
 INSERT IGNORE INTO `home_navigation` (`type`, `title`, `subtitle`, `image_url`, `link_id`, `link_type`, `sort_order`) VALUES
-('genres', '边塞·豪放', NULL, 'h6_liupai_4.png', 1, 'category', 1),
-('genres', '唐宋八大家', NULL, 'h6_liupai_1.jpg', 2, 'category', 2),
-('genres', '竹林七贤', NULL, 'h6_liupai_3.png', 3, 'category', 3),
-('genres', '元曲四大家', NULL, 'h6_liupai_2.jpg', 4, 'category', 4),
-('genres', '婉约派', NULL, 'h6_liupai_5.jpg', 5, 'category', 5),
-('genres', '豪放派', NULL, 'h6_liupai_6.jpg', 6, 'category', 6),
-('genres', '田园诗派', NULL, 'h6_liupai_7.jpg', 7, 'category', 7),
-('genres', '山水诗派', NULL, 'h6_liupai_8.jpg', 8, 'category', 8);
+('genres', '婉约派', NULL, 'h6_liupai_5.jpg', 65, 'category', 1),
+('genres', '豪放派', NULL, 'h6_liupai_6.jpg', 66, 'category', 2),
+('genres', '山水田园诗派', NULL, 'h6_liupai_7.jpg', 67, 'category', 3),
+('genres', '边塞诗派', NULL, 'h6_liupai_8.jpg', 68, 'category', 4),
+('genres', '新乐府运动', NULL, 'h6_liupai_1.jpg', 69, 'category', 5),
+('genres', '江西诗派', NULL, 'h6_liupai_2.jpg', 70, 'category', 6),
+('genres', '花间词派', NULL, 'h6_liupai_3.png', 71, 'category', 7),
+('genres', '桐城派', NULL, 'h6_liupai_4.png', 72, 'category', 8);
 
 -- ============================================================
 -- 初始数据：首页导航-朝代
