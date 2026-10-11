@@ -1,9 +1,13 @@
 package com.moyuan.controller;
 
 import com.moyuan.common.R;
+import com.moyuan.service.ExternalPoemImportService;
+import com.moyuan.util.JinrishiciParser;
+import com.moyuan.util.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -14,6 +18,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 外部诗词源统一代理控制器
@@ -22,12 +27,14 @@ import java.util.List;
  * 规避浏览器直连外站被 QUIC 中断 / CORS / 被墙等问题，前端只与自家后端交互。</p>
  */
 @Tag(name = "外部诗词代理接口")
+@Slf4j
 @RestController
 @RequestMapping("/api/external-poetry")
 @RequiredArgsConstructor
 public class ExternalPoetryController {
 
     private final RestTemplate restTemplate;
+    private final ExternalPoemImportService externalPoemImportService;
 
     private static final String POETRYDB_BASE = "https://poetrydb.org";
     private static final String JINRISHICI_URL = "https://v2.jinrishici.com/one.json";
@@ -101,9 +108,37 @@ public class ExternalPoetryController {
             }
             jinrishiciCache = body;
             jinrishiciCachedAt = now;
+            // 静默收录当日推荐的这首诗词（best-effort；仅在缓存刷新时收录一次，避免每次请求都查库）
+            collectJinrishici(body);
             return R.success(body);
         } catch (Exception e) {
             return R.error("今日诗词获取失败");
+        }
+    }
+
+    /** 将当日推荐诗词作为"待审核"静默收录入库（仅登录用户触发） */
+    private void collectJinrishici(Object body) {
+        try {
+            if (!isAuthenticated()) {
+                return;
+            }
+            Map<String, Object> item = JinrishiciParser.toPoemMap(body);
+            if (item == null) {
+                return;
+            }
+            externalPoemImportService.collectPending(Collections.singletonList(item));
+        } catch (Exception e) {
+            log.warn("今日诗词静默收录失败: error={}", e.getMessage());
+        }
+    }
+
+    /** 当前请求是否为已登录用户 */
+    private boolean isAuthenticated() {
+        try {
+            SecurityUtil.getCurrentUserId();
+            return true;
+        } catch (Exception e) {
+            return false;
         }
     }
 

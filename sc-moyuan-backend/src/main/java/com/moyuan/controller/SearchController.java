@@ -102,7 +102,14 @@ public class SearchController {
     public R<List<Map<String, Object>>> getExternalPoems(
             @RequestParam String keyword,
             @RequestParam(defaultValue = "5") int limit) {
-        List<Map<String, Object>> results = recommendationService.getExternalPoems(keyword, limit);
+        // 仅登录用户触发静默收录，匿名访问只读不写
+        boolean collect = false;
+        try {
+            collect = SecurityUtil.getCurrentUserId() != null;
+        } catch (Exception ignored) {
+            // 未登录，不收录
+        }
+        List<Map<String, Object>> results = recommendationService.getExternalPoems(keyword, limit, collect);
         return R.success(results);
     }
 

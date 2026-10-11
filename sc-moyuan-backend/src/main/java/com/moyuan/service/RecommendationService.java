@@ -13,6 +13,6 @@ public interface RecommendationService {
     List<Map<String, Object>> getRecommendedPoems(Long userId, int limit);
     List<Map<String, Object>> getPopularPoems(int limit);
     List<Map<String, Object>> searchPoems(String keyword, Long userId, int page, int size);
-    List<Map<String, Object>> getExternalPoems(String keyword, int limit);
+    List<Map<String, Object>> getExternalPoems(String keyword, int limit, boolean collect);
     Map<String, Object> getExternalPoemDetail(String keyword);
 }

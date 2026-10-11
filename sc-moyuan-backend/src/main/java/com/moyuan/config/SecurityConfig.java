@@ -64,6 +64,8 @@ public class SecurityConfig {
                     "/api/vision/**",
                     "/api/search",
                     "/api/search/**",
+                    "/api/external-poetry",
+                    "/api/external-poetry/**",
                     "/api/ai/**",
                     "/api/poems/fix-external-poems",
                     "/uploads/**"

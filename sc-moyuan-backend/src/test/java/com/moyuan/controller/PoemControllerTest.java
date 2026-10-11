@@ -5,8 +5,10 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.moyuan.entity.Poem;
 import com.moyuan.service.DynastyService;
+import com.moyuan.service.ExternalPoemImportService;
 import com.moyuan.service.PoemService;
 import com.moyuan.service.PoetService;
+import com.moyuan.service.TokenBlacklistService;
 import com.moyuan.service.UserService;
 import com.moyuan.util.JwtUtil;
 import org.junit.jupiter.api.Test;
@@ -44,11 +46,15 @@ class PoemControllerTest {
     @MockBean
     private JwtUtil jwtUtil;
     @MockBean
+    private TokenBlacklistService tokenBlacklistService;
+    @MockBean
     private UserService userService;
     @MockBean
     private PoetService poetService;
     @MockBean
     private DynastyService dynastyService;
+    @MockBean
+    private ExternalPoemImportService externalPoemImportService;
     @MockBean
     private CacheManager cacheManager;
     @MockBean

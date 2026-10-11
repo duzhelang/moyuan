@@ -3,6 +3,7 @@ package com.moyuan.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.moyuan.entity.*;
 import com.moyuan.mapper.*;
+import com.moyuan.service.ExternalPoemImportService;
 import com.moyuan.service.RecommendationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     private final DynastyMapper dynastyMapper;
     private final UserMapper userMapper;
     private final RestTemplate restTemplate;
+    private final ExternalPoemImportService externalPoemImportService;
 
     @Value("${external.poetry.api.enabled:true}")
     private boolean externalApiEnabled;
@@ -155,7 +157,7 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         // 如果本地结果不足，从外部API获取
         if (results.size() < size && externalApiEnabled) {
-            List<Map<String, Object>> externalPoems = getExternalPoems(keyword, size - results.size());
+            List<Map<String, Object>> externalPoems = getExternalPoems(keyword, size - results.size(), userId != null);
             results.addAll(externalPoems);
         }
 
@@ -170,7 +172,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     }
 
     @Override
-    public List<Map<String, Object>> getExternalPoems(String keyword, int limit) {
+    public List<Map<String, Object>> getExternalPoems(String keyword, int limit, boolean collect) {
         List<Map<String, Object>> results = new ArrayList<>();
         if (!externalApiEnabled) {
             return results;
@@ -224,6 +226,15 @@ public class RecommendationServiceImpl implements RecommendationService {
             }
         } catch (Exception e) {
             log.error("调用外部诗词API失败: keyword={}, error={}", keyword, e.getMessage(), e);
+        }
+        // 静默收录本次拉取到的外部诗词（best-effort，任何异常都不影响接口正常返回）。
+        // 仅登录用户触发收录，避免匿名请求放大写库与同步查询开销。
+        if (collect) {
+            try {
+                externalPoemImportService.collectPending(results);
+            } catch (Exception e) {
+                log.warn("外部诗词静默收录失败: keyword={}, error={}", keyword, e.getMessage());
+            }
         }
         return results;
     }

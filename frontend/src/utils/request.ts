@@ -62,6 +62,7 @@ const PUBLIC_PATHS = [
   '/ai',
   '/rhyme',
   '/search',
+  '/external-poetry',
   '/static-pages',
   '/auth'
 ]

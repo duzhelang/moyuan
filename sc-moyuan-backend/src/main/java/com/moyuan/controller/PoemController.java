@@ -9,6 +9,7 @@ import com.moyuan.entity.Poem;
 import com.moyuan.entity.Poet;
 import com.moyuan.exception.BusinessException;
 import com.moyuan.service.DynastyService;
+import com.moyuan.service.ExternalPoemImportService;
 import com.moyuan.service.PoemService;
 import com.moyuan.service.PoetService;
 import com.moyuan.service.UserService;
@@ -39,6 +40,7 @@ public class PoemController {
     private final UserService userService;
     private final PoetService poetService;
     private final DynastyService dynastyService;
+    private final ExternalPoemImportService externalPoemImportService;
     private final CacheManager cacheManager;
     private final RestTemplate restTemplate;
 
@@ -125,93 +127,14 @@ public class PoemController {
     @PostMapping("/import-external")
     public R<Map<String, Object>> importExternalPoem(@RequestBody Map<String, String> params) {
         String title = params.get("title");
-        String content = params.get("content");
-        String author = params.get("author");
-        String dynasty = params.get("dynasty");
-
         if (title == null || title.trim().isEmpty()) {
             throw new BusinessException(ResultCode.PARAM_ERROR);
         }
-
-        Long poetId = null;
-        Long dynastyId = null;
-
-        if (dynasty != null && !dynasty.trim().isEmpty()) {
-            LambdaQueryWrapper<Dynasty> dynastyWrapper = new LambdaQueryWrapper<>();
-            dynastyWrapper.eq(Dynasty::getName, dynasty.trim()).last("LIMIT 1");
-            Dynasty dynastyEntity = dynastyService.getOne(dynastyWrapper);
-            if (dynastyEntity != null) {
-                dynastyId = dynastyEntity.getId();
-            }
-        }
-
-        if (author != null && !author.trim().isEmpty()) {
-            LambdaQueryWrapper<Poet> poetWrapper = new LambdaQueryWrapper<>();
-            poetWrapper.eq(Poet::getName, author.trim()).last("LIMIT 1");
-            Poet poet = poetService.getOne(poetWrapper);
-            if (poet != null) {
-                poetId = poet.getId();
-            } else {
-                Poet newPoet = new Poet();
-                newPoet.setName(author.trim());
-                newPoet.setDynastyId(dynastyId);
-                newPoet.setPoetType("ancient");
-                newPoet.setStatus(1);
-                poetService.save(newPoet);
-                poetId = newPoet.getId();
-                poetService.clearAllCache();
-            }
-        }
-
-        LambdaQueryWrapper<Poem> existWrapper = new LambdaQueryWrapper<>();
-        existWrapper.eq(Poem::getTitle, title.trim());
-        if (poetId != null) {
-            existWrapper.eq(Poem::getPoetId, poetId);
-        } else {
-            existWrapper.isNull(Poem::getPoetId);
-        }
-        existWrapper.last("LIMIT 1");
-        Poem existPoem = poemService.getOne(existWrapper);
-
-        if (existPoem != null) {
-            if (existPoem.getPoetId() == null && poetId != null) {
-                existPoem.setPoetId(poetId);
-                poemService.updateById(existPoem);
-            }
-            if (existPoem.getDynastyId() == null && dynastyId != null) {
-                existPoem.setDynastyId(dynastyId);
-                poemService.updateById(existPoem);
-            }
-            Map<String, Object> result = new HashMap<>();
-            result.put("id", existPoem.getId());
-            result.put("imported", false);
-            return R.success(result);
-        }
-
-        Poem newPoem = new Poem();
-        newPoem.setTitle(title.trim());
-        newPoem.setContent(content != null ? content.trim() : "");
-        newPoem.setPoetId(poetId);
-        newPoem.setDynastyId(dynastyId);
-        newPoem.setSource("external");
-
-        newPoem.setViewCount(0);
-        newPoem.setLikeCount(0);
-        newPoem.setFavoriteCount(0);
-        newPoem.setStatus(1);
-        newPoem.setIsFeatured(0);
-        newPoem.setIsOriginal(0);
-        newPoem.setPoemType("ancient");
-        newPoem.setAuditStatus(1);
-        poemService.save(newPoem);
-
-        if (cacheManager.getCache("poems") != null) {
-            cacheManager.getCache("poems").clear();
-        }
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("id", newPoem.getId());
-        result.put("imported", true);
+        Map<String, Object> result = externalPoemImportService.importExternal(
+                title,
+                params.get("content"),
+                params.get("author"),
+                params.get("dynasty"));
         return R.success(result);
     }
 

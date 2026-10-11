@@ -181,7 +181,12 @@ public class SmartSearchServiceImpl implements SmartSearchService {
         List<PoemWithScore> results = new ArrayList<>();
         for (Poem poem : poems) {
             double score = calculateScore(poem, keyword, keywords);
-            results.add(new PoemWithScore(poem, score));
+            // 过滤零相关结果：ngram 全文索引按 bi-gram 做 OR 匹配，
+            // 只要共享任意一个二字片段（如"拖雨过西楼"与"疏雨过中条"共享"雨过"）就会命中，
+            // 这类结果在标题/正文中并不真正包含关键词，评分恒为 0，必须剔除，避免出现"搜 A 出 B"的误匹配。
+            if (score > 0) {
+                results.add(new PoemWithScore(poem, score));
+            }
         }
         return results;
     }
