@@ -1,8 +1,7 @@
 # 古今诗话——墨渊
 
-> 中国古典诗词文化交流平台 | Vue 3 + Spring Boot 3 + MySQL 8.0
+> 中国古典诗词文化交流平台 | Vue 3 + Spring Boot 3 + MySQL 8.0 + Redis 7
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java](https://img.shields.io/badge/Java-17+-blue.svg)](https://www.oracle.com/java/)
 [![Vue](https://img.shields.io/badge/Vue-3.x-brightgreen.svg)](https://vuejs.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-green.svg)](https://spring.io/projects/spring-boot)
@@ -25,14 +24,19 @@
 | 技术 | 版本 | 用途 |
 |------|------|------|
 | Vue.js | 3.4+ | 前端框架 |
-| TypeScript | 5.x | 类型系统 |
+| TypeScript | 5.4 | 类型系统 |
 | Vite | 5.x | 构建工具 |
 | Pinia | 2.x | 状态管理 |
 | Vue Router | 4.x | 路由管理 |
 | Element Plus | 2.x | UI组件库 |
 | Axios | 1.x | HTTP客户端 |
-| SCSS | - | CSS预处理器 |
-| Vitest | - | 单元测试框架 |
+| SCSS (sass) | 1.71+ | CSS预处理器 |
+| Swiper | 12.x | 轮播组件 |
+| Three.js | 0.185 | 诗云星空3D可视化 |
+| ECharts / vue-echarts | 6.x / 8.x | 后台数据图表 |
+| dayjs | 1.x | 日期处理 |
+| lodash-es | 4.x | 工具函数库 |
+| Vitest + @vue/test-utils | 1.x / 2.x | 前端测试框架 |
 
 ### 后端技术栈
 
@@ -40,13 +44,15 @@
 |------|------|------|
 | Spring Boot | 3.2.5 | 应用框架 |
 | Spring Security | 6.x | 安全框架 |
+| Spring AOP | 6.x | 切面（操作日志/访问日志） |
 | MyBatis-Plus | 3.5.5 | ORM框架 |
 | MySQL | 8.0+ | 关系型数据库 |
 | Redis | 7.x | 缓存数据库 |
-| JWT (jjwt) | 0.12.5 | 身份认证 |
-| Knife4j | 4.3.0 | API文档 |
+| JWT (jjwt) | 0.12.5 | 身份认证（Access + Refresh 双 Token） |
+| Knife4j / OpenAPI3 | 4.3.0 | API文档 |
 | Druid | 1.2.20 | 数据库连接池 |
-| Lombok | 1.18.30 | 代码简化 |
+| Pinyin4j | 2.5.1 | 诗词拼音搜索 |
+| Lombok | 1.18.34 | 代码简化 |
 | Maven | 3.8+ | 项目构建 |
 | JUnit 5 + Mockito | 5.10.x | 后端测试框架 |
 | H2 | 2.x | 测试内存数据库 |
@@ -68,9 +74,9 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                      用户层 (User Layer)                      │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │
-│  │  PC浏览器 │  │ 移动浏览器│  │   小程序  │  │  APP端   │    │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘    │
+│  ┌──────────────┐  ┌──────────────┐                        │
+│  │  PC 浏览器    │  │  移动浏览器   │                        │
+│  └──────────────┘  └──────────────┘                        │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -135,21 +141,36 @@
 | **论坛模块** | 用户发帖、评论互动、精选推荐、投稿上传 | ✅ 已实现 |
 | **用户模块** | 用户注册、登录认证、个人中心、收藏管理 | ✅ 已实现 |
 | **管理模块** | 系统管理、用户管理、内容管理、数据统计、操作日志 | ✅ 已实现 |
-| **AI模块** | AI诗词问答（多模型切换）、看图写诗、智能分析 | ✅ 已实现 |
+| **AI模块** | AI诗词问答（多模型切换）、看图写诗、智能分析、AI对对联、藏头诗、平仄格律校验、飞花令/诗词接龙、古籍OCR识文 | ✅ 已实现 |
 | **搜索模块** | 全文搜索、诗人搜索、诗词搜索、帖子搜索 | ✅ 已实现 |
 | **文件模块** | 文件上传、图片管理 | ✅ 已实现 |
 | **浏览历史模块** | 记录用户浏览历史、查看历史记录 | ✅ 已实现 |
 | **诗话视野模块** | 诗词文化文章浏览、详情展示、点赞 | ✅ 已实现 |
 | **首页导航模块** | 首页导航菜单管理（作品/流派/朝代） | ✅ 已实现 |
 | **精选诗人模块** | 精选诗人展示和管理 | ✅ 已实现 |
+| **诗云星空模块** | 3D 星云可视化浏览诗人与诗作（Three.js） | ✅ 已实现 |
+| **交流广场模块** | 用户交流广场页面 | ✅ 已实现 |
+| **报修中心模块** | 提交报修工单、工单详情与评论 | ✅ 已实现 |
+| **诗词评分模块** | 诗词评分/打分 | ✅ 已实现 |
+| **韵脚查询模块** | 平水韵韵部、韵脚查询（数据库优先 + AI 兜底落库） | ✅ 已实现 |
+| **诗人认证与投稿模块** | 诗人认证申请、内容建议、草稿管理 | ✅ 已实现 |
+| **静态页面模块** | 关于我们/用户协议等静态页面 + 联系我们 | ✅ 已实现 |
+| **外部诗词模块** | 后端代理外部诗源（poetrydb / 今日诗词） | ✅ 已实现 |
 
 ### AI功能特性
 
-- **多模型支持**：智谱AI、DeepSeek、Kimi、NVIDIA NIM
+- **多模型支持**：智谱AI、DeepSeek、Kimi、小米MiMo、OpenRouter（统一适配层 `AiModelRegistry` + `OpenAiCompatibleAdapter`）
+- **模块绑定**：通过 `ai_module_config` 将业务模块（chat/poet_chat/poetry_chat/write_poem/analyze/couple 等）绑定到具体模型，可独立切换
 - **智能问答**：诗词相关问题解答
 - **看图写诗**：基于图片生成诗词（视觉模型）
+- **古籍识文（OCR）**：图片文字识别
 - **智能分析**：诗词内容分析解读
-- **模型管理**：管理员可配置和切换AI模型
+- **AI 对对联**：输入上联生成下联（遵循平仄规则）
+- **藏头诗**：输入藏头字生成藏头诗（五言/七言）
+- **平仄格律校验**：AI 逐句标注平仄、判定合律并识别平水韵韵部
+- **飞花令 / 诗词接龙**：按令字检索名句、以句末字接龙
+- **模型管理**：管理员可配置、切换 AI 模型及模块绑定
+- **AI 内容审核**：AI 生成内容入库审核
 
 ### 推荐算法
 
@@ -165,18 +186,18 @@
 
 | 环境 | 版本要求 | 说明 |
 |------|----------|------|
-| JDK | 17+ | 推荐 Java 17/21 LTS |
+| JDK | 17+ | 推荐 Java 21 LTS（父 pom 指定 21） |
 | Node.js | 18+ | LTS版本 |
 | MySQL | 8.0+ | 主数据库 |
-| Redis | 7.x | 缓存数据库 |
+| Redis | 7.x | 缓存数据库（默认 database 5） |
 | Maven | 3.8+ | 项目构建 |
-| pnpm | 最新稳定版 | 推荐pnpm |
+| npm | 随 Node.js 附带 | 前端包管理（仓库使用 package-lock.json） |
 
 ### 1. 克隆项目
 
 ```bash
-git clone https://github.com/your-username/SC_MoYuan2.git
-cd SC_MoYuan2
+git clone https://github.com/your-username/moyuan.git
+cd moyuan
 ```
 
 ### 2. 数据库初始化
@@ -189,23 +210,34 @@ cd sc-moyuan-backend
 mysql -u root -p < src/main/resources/db/init.sql
 ```
 
-> **说明**：`init.sql` 是全量合并版脚本（v3.0），包含数据库创建、全部28张表建表语句、初始数据（13个朝代、8个分类、1个诗人、11首诗词、2个测试用户、4个AI模型、6位精选诗人、24条首页导航）。
+> **说明**：`init.sql` 是全量合并版脚本（v3.2），包含数据库创建、全部 **29 张表**建表语句及基础种子数据（13 个朝代、74 个诗词分类、14 位诗人、23 首诗词、3 个测试用户、29 条 AI 模型、6 条 AI 模块配置、6 位精选诗人、7 条论坛示例帖、24 条首页导航）。详见 [数据库初始化说明文档](sc-moyuan-backend/src/main/resources/db/数据库初始化说明文档.md)。
 
 ### 3. 后端配置
 
-编辑 `sc-moyuan-backend/src/main/resources/application.yml`，修改数据库连接信息：
+编辑 `sc-moyuan-backend/src/main/resources/application.yml`（开发环境 Redis 配置在 `application-dev.yml`），按需通过环境变量覆盖：
 
 ```yaml
+server:
+  port: 8085                # 后端服务端口
+
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/moyuan?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
-    username: your_username
-    password: your_password
-  
-  redis:
-    host: localhost
-    port: 6379
+    url: jdbc:mysql://localhost:3306/moyuan?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: ${MYSQL_PASSWORD:root}   # 建议用环境变量覆盖
+
+# 开发环境（application-dev.yml）
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 5
 ```
+
+> **敏感配置**：AI 模型密钥、第三方诗词 API（接口盒子）凭证等放在
+> `sc-moyuan-backend/src/main/resources/secrets/application-secrets.yml`（该目录已被 `.gitignore` 忽略，请勿提交）。
+> 也支持通过环境变量覆盖：`MYSQL_PASSWORD`、`JWT_SECRET`、`APIHZ_ID`、`APIHZ_KEY`、`CORS_ALLOWED_ORIGINS` 等。
 
 ### 4. 启动后端服务
 
@@ -236,74 +268,92 @@ mvn test
 cd frontend
 
 # 安装依赖
-pnpm install
+npm install
 
 # 启动开发服务器
-pnpm dev
+npm run dev
 ```
 
-前端服务启动后，访问 http://localhost:5173 查看效果。
+前端服务启动后，访问 http://localhost:5173 查看效果（前端通过 Vite 代理将 `/api`、`/uploads` 转发到后端 `http://localhost:8085`，可用环境变量 `VITE_BACKEND_URL` 覆盖）。
 
 ### 6. 默认账号
 
 | 角色 | 用户名 | 密码 |
 |------|--------|------|
-| 管理员 | admin | admin123 |
-| 测试用户 | testuser | test123 |
+| 管理员 | admin | admin |
+| 测试用户 | test | test123 |
+| 文本用户 | text | test123 |
 
 ## 项目结构
 
 ```
-SC_MoYuan2_/
+moyuan-master2/
 ├── frontend/                    # Vue 3 前端项目
 │   ├── src/
-│   │   ├── api/                 # API接口定义
-│   │   ├── assets/              # 静态资源
+│   │   ├── api/                 # API 接口定义（modules/ 按业务模块拆分，含单元测试）
+│   │   ├── assets/styles/       # 设计系统（variables/mixins/global/ink-background/original.css）
 │   │   ├── components/          # 公共组件
-│   │   │   ├── business/        # 业务组件
-│   │   │   ├── common/          # 通用组件
-│   │   │   └── home/            # 首页子组件（HomeCarousel/ForumPreview等）
-│   │   ├── composables/         # 组合式函数
+│   │   │   ├── business/        # 业务组件（PoemCard/PoetCard/ForumPost 等）
+│   │   │   ├── common/          # 通用组件（AppHeader/AppFooter/ImageUpload 等）
+│   │   │   └── home/            # 首页子组件（HomeCarousel/ForumPreview/AncientPoemSelection/ContemporaryPoems）
+│   │   ├── composables/         # 组合式函数（useAuth/usePoem/useParticles 等）
 │   │   ├── data/                # 静态数据（JSON）
+│   │   ├── directives/          # 自定义指令（permission）
 │   │   ├── layouts/             # 布局组件
-│   │   ├── router/              # 路由配置
-│   │   ├── stores/              # 状态管理
+│   │   ├── router/              # 路由配置（index/guards）
+│   │   ├── stores/              # 状态管理（Pinia）
+│   │   ├── test/                # 测试初始化
 │   │   ├── types/               # 类型定义
-│   │   ├── utils/               # 工具函数
+│   │   ├── utils/               # 工具函数（request/format/validate/storage 等）
 │   │   └── views/               # 页面组件
-│   ├── public/                  # 公共资源
+│   │       ├── home/ poem/ poet/ forum/ vision/       # 首页/诗词/诗人/论坛/诗话视野
+│   │       ├── poetry-cloud/    # 诗云星空（Three.js）
+│   │       ├── communicate/     # 交流广场
+│   │       ├── repair/          # 报修中心
+│   │       ├── static/ contact/ # 静态页面/联系我们
+│   │       ├── user/            # 登录/注册/个人中心/用户主页
+│   │       └── admin/           # 后台管理页面
+│   ├── public/                  # 公共资源（img/、fonts/、js/）
+│   ├── .env.development         # 开发环境变量
 │   ├── package.json             # 前端依赖配置
-│   ├── tsconfig.json            # TypeScript配置
-│   ├── vite.config.ts           # Vite配置
-│   └── README.md                # 前端说明文档
+│   ├── vite.config.ts           # Vite 配置（含 /api、/uploads 代理）
+│   └── vitest.config.ts         # 测试配置
 ├── sc-moyuan-backend/           # Spring Boot 后端项目
 │   ├── src/
 │   │   ├── main/
 │   │   │   ├── java/com/moyuan/
-│   │   │   │   ├── config/      # 配置类
+│   │   │   │   ├── ai/          # AI 模型适配层（Adapter/Registry）
+│   │   │   │   ├── aspect/      # 切面（操作日志/访问日志）
+│   │   │   │   ├── common/      # 统一响应（R）、ResultCode、分页
+│   │   │   │   ├── config/      # 配置类（Security/CORS/Swagger/MyBatis-Plus/Redis 等）
 │   │   │   │   ├── controller/  # 控制器层
-│   │   │   │   ├── service/     # 服务层
-│   │   │   │   ├── mapper/      # Mapper层
+│   │   │   │   ├── dto/         # 请求/响应对象
 │   │   │   │   ├── entity/      # 实体类
-│   │   │   │   ├── dto/         # 数据传输对象
-│   │   │   │   ├── security/    # 安全相关
-│   │   │   │   └── util/        # 工具类
+│   │   │   │   ├── enums/       # 枚举
+│   │   │   │   ├── exception/   # 业务异常与全局异常处理
+│   │   │   │   ├── mapper/      # Mapper 层
+│   │   │   │   ├── security/    # 安全相关（JWT 过滤器/UserDetailsService）
+│   │   │   │   ├── service/     # 服务层（接口 + impl）
+│   │   │   │   ├── task/        # 定时任务
+│   │   │   │   └── util/        # 工具类（JwtUtil/PinyinUtil/WatermarkUtil 等）
 │   │   │   └── resources/
-│   │   │       ├── application.yml
-│   │   │       └── db/init.sql  # 数据库初始化脚本
-│   │   └── test/                # 测试代码
-│   └── pom.xml                  # Maven配置
-├── docs/                        # 项目文档
-│   ├── architecture/            # 架构设计
-│   ├── standards/               # 技术规范
-│   ├── constraints/             # 约束条件
-│   ├── database/                # 数据库文档
-│   ├── api/                     # API文档
-│   ├── business/                # 业务文档
-│   └── guides/                  # 开发指南
-├── scripts/                     # 脚本文件
-├── .gitignore                   # Git忽略文件
-├── pom.xml                      # Maven父项目配置
+│   │   │       ├── application.yml           # 主配置
+│   │   │       ├── application-dev.yml       # 开发环境配置
+│   │   │       ├── db/init.sql               # 数据库初始化脚本（+ 说明文档）
+│   │   │       ├── mapper/StatsMapper.xml    # 自定义 SQL
+│   │   │       └── secrets/                  # 敏感配置（已 gitignore）
+│   │   └── test/                # 测试代码（H2）
+│   └── pom.xml                  # Maven 配置
+├── docs/                        # 项目文档（通过 .git/info/exclude 排除，本地可访问）
+│   ├── architecture/ standards/ constraints/
+│   ├── database/                # 表结构文档 + migrations/ 迁移脚本
+│   ├── api/ business/ guides/   # API/业务/开发指南
+│   ├── diagrams/ verification/ reports/ ...
+├── scripts/                     # 辅助脚本（测试、数据修复、哈希校验等）
+├── .github/workflows/test.yml   # CI 测试工作流
+├── .trae/                       # 项目文档与规则（团队协作配置）
+├── .gitignore                   # Git 忽略文件
+├── pom.xml                      # Maven 父项目配置
 ├── start.bat                    # 启动脚本
 ├── init-db.bat                  # 数据库初始化脚本
 └── README.md                    # 本文件
@@ -315,29 +365,40 @@ SC_MoYuan2_/
 
 | 模块 | 路径前缀 | 说明 |
 |------|----------|------|
-| 认证模块 | `/api/auth` | 用户注册、登录 |
+| 认证模块 | `/api/auth` | 用户注册、登录、刷新 Token |
 | 用户模块 | `/api/users` | 用户信息管理 |
-| 诗词模块 | `/api/poems` | 诗词CRUD、搜索、点赞、收藏 |
+| 诗词模块 | `/api/poems` | 诗词 CRUD、搜索、点赞、收藏、随机/每日 |
+| 诗词评分 | `/api/poems/{poemId}/ratings` | 诗词评分、AI 评分 |
+| 诗词内容缓存 | `/api/poem-content` | 诗词内容缓存读写 |
 | 诗人模块 | `/api/poets` | 诗人列表、详情、推荐 |
 | 朝代模块 | `/api/dynasties` | 朝代列表、详情 |
 | 分类模块 | `/api/categories` | 分类列表、详情 |
 | 论坛模块 | `/api/forum` | 帖子、评论管理 |
-| 精选诗人 | `/api/poet-featured` | 精选诗人展示 |
+| 精选诗人 | `/api/poet-featured` | 精选诗人展示与管理 |
 | 首页导航 | `/api/home-navigation` | 导航菜单管理 |
 | 诗话视野 | `/api/vision` | 文章浏览、点赞 |
-| 搜索模块 | `/api/search` | 全局搜索 |
+| 搜索模块 | `/api/search` | 全局搜索（诗词/诗人/帖子，拼音 + 全文） |
 | 文件模块 | `/api/files` | 文件上传 |
 | 浏览历史 | `/api/history` | 浏览历史管理 |
-| AI模块 | `/api/ai` | AI问答、看图写诗、智能分析 |
-| 管理员模块 | `/api/admin` | 管理员专属接口 |
-| AI模型配置 | `/api/admin/ai-models` | AI模型管理 |
+| 韵脚查询 | `/api/rhyme` | 韵部、韵脚查询 |
+| 报修模块 | `/api/repair/orders` | 报修工单、评论、关闭、满意度 |
+| 诗人认证 | `/api/poet-profile` | 诗人认证申请与资料 |
+| 诗人建议 | `/api/poet-suggestions` | 诗人内容建议提交 |
+| 诗人草稿 | `/api/poet-drafts` | 诗人内容草稿提交 |
+| 静态页面 | `/api/static-pages` | 静态页面（关于我们/用户协议等） |
+| 外部诗词代理 | `/api/external-poetry` | poetrydb / 今日诗词代理 |
+| AI模块 | `/api/ai` | AI 问答、看图写诗、OCR、智能分析、内容填充 |
+| 管理员模块 | `/api/admin` | 管理员专属接口（审核/统计等） |
+| AI模型配置 | `/api/admin/ai-models` | AI 模型与模块绑定管理 |
 
 ### 统一响应格式
 
+后端统一使用 `R<T>` 包装，`code` 为**字符串**类型：
+
 ```json
 {
-  "code": 200,
-  "message": "操作成功",
+  "code": "200",
+  "message": "success",
   "data": {}
 }
 ```
@@ -348,15 +409,23 @@ SC_MoYuan2_/
 |--------|------|
 | 200 | 操作成功 |
 | 400 | 请求参数错误 |
-| 401 | 未授权 |
-| 403 | 禁止访问 |
+| 401 | 未登录或 Token 已过期 |
+| 403 | 没有操作权限 |
 | 404 | 资源不存在 |
+| 409 | 数据冲突 |
 | 500 | 服务器内部错误 |
 | 1001 | 用户不存在 |
-| 1002 | 用户已存在 |
-| 1003 | 密码错误 |
-| 2001 | 诗词不存在 |
-| 3001 | 帖子不存在 |
+| 1002 | 用户名已存在 |
+| 1003 | 邮箱已存在 |
+| 1004 | 密码错误 |
+| 1005 | 账号已被禁用 |
+| 2001 | 帖子不存在 |
+| 2002 | 评论不存在 |
+| 3001 | 诗词不存在 |
+| 3002 | 诗人不存在 |
+| 4001 | 该分类下存在子分类 |
+| 5001~5004 | 点赞/收藏状态冲突（已点赞/未点赞/已收藏/未收藏） |
+| 6001~6003 | 报修工单相关（不存在/已关闭/无权限） |
 
 ### API文档访问
 
@@ -383,23 +452,25 @@ SC_MoYuan2_/
 | 10 | user_history | 用户浏览历史表 | 100万+ |
 | 11 | operation_log | 操作日志表 | 1000万+ |
 | 12 | ai_model | AI模型配置表 | <100 |
-| 12.1 | ai_module_config | AI模块配置表 | <10 |
-| 13 | poet_featured | 精选诗人卡片表 | <100 |
-| 14 | home_navigation | 首页导航数据表 | <100 |
-| 15 | vision_article | 诗话视野文章表 | 100+ |
-| 16 | visit_log | 访问日志表 | 1000万+ |
-| 17 | file_metadata | 文件元数据表 | 100万+ |
-| 18 | ai_image_record | AI生成图片记录表 | 10万+ |
-| 19 | poet_profile | 认证诗人资料表 | 1万+ |
-| 20 | poem_rating | 诗词评分表 | 100万+ |
-| 21 | poem_content_cache | 诗词内容缓存表 | 10万+ |
-| 22 | poet_suggestion | 诗人内容建议表 | 1万+ |
-| 23 | ai_generated_content | AI生成内容审核表 | 10万+ |
-| 24 | rhyme | 韵部表 | 2000+ |
-| 25 | poet_draft | 诗人内容草稿表 | 1万+ |
-| 26 | static_page | 静态页面表 | <100 |
-| 27 | repair_order | 报修工单表 | 1万+ |
-| 28 | repair_comment | 报修评论表 | 10万+ |
+| 13 | ai_module_config | AI模块配置表 | <10 |
+| 14 | poet_featured | 精选诗人卡片表 | <100 |
+| 15 | home_navigation | 首页导航数据表 | <100 |
+| 16 | vision_article | 诗话视野文章表 | 100+ |
+| 17 | visit_log | 访问日志表 | 1000万+ |
+| 18 | file_metadata | 文件元数据表 | 100万+ |
+| 19 | ai_image_record | AI生成图片记录表 | 10万+ |
+| 20 | poet_profile | 认证诗人资料表 | 1万+ |
+| 21 | poem_rating | 诗词评分表 | 100万+ |
+| 22 | poem_content_cache | 诗词内容缓存表 | 10万+ |
+| 23 | poet_suggestion | 诗人内容建议表 | 1万+ |
+| 24 | ai_generated_content | AI生成内容审核表 | 10万+ |
+| 25 | rhyme | 韵部表 | 2000+ |
+| 26 | poet_draft | 诗人内容草稿表 | 1万+ |
+| 27 | static_page | 静态页面表 | <100 |
+| 28 | repair_order | 报修工单表 | 1万+ |
+| 29 | repair_comment | 报修评论表 | 10万+ |
+
+> 完整建表语句与种子数据见 [init.sql](sc-moyuan-backend/src/main/resources/db/init.sql)；数据库变更迁移脚本见 `docs/database/migrations/`。
 
 ### ER关系图
 
@@ -431,11 +502,33 @@ user ──┬── forum_post（user_id FK）
        │
        ├── user_history（多态：target_type → poem/post）
        │
+       ├── poem_rating（user_id + poem_id，诗词评分）
+       │
+       ├── poet_profile（用户认证为诗人的资料，user_id FK）
+       │
+       ├── poet_suggestion（诗人内容建议，user_id FK）
+       │
+       ├── poet_draft（诗人内容草稿，user_id FK）
+       │
+       ├── repair_order（报修工单，user_id FK）
+       │       │
+       │       ▼ repair_comment（order_id FK，工单评论）
+       │
        └── operation_log（user_id FK，可为NULL）
 
-ai_model（独立配置表，无外键关联）
+ai_model（独立配置表）── ai_module_config（module_code → model_id，模块绑定，无强外键）
+
+ai_generated_content（AI 生成内容审核，target_type + target_id）
+
+file_metadata / ai_image_record（文件与 AI 图片记录）
+
+poem_content_cache（诗词内容缓存，poem_id 关联）
+
+rhyme（韵部表，独立）
 
 home_navigation（独立配置表，link_id 关联 poem/category/dynasty）
+
+static_page（静态页面表，独立）
 
 vision_article（独立文章表，无外键关联）
 
@@ -454,13 +547,13 @@ visit_log（独立日志表，user_id FK 可为NULL）
 
 ```bash
 cd frontend
-pnpm install
+npm install
 ```
 
 #### 启动开发服务器
 
 ```bash
-pnpm dev
+npm run dev
 ```
 
 访问 http://localhost:5173
@@ -468,27 +561,27 @@ pnpm dev
 #### 代码检查
 
 ```bash
-# 类型检查
-pnpm type-check
+# 类型检查（vue-tsc）
+npm run type-check
 
-# 代码规范检查
-pnpm lint
-
-# 自动修复
-pnpm lint:fix
+# 代码规范检查（ESLint，含自动修复）
+npm run lint
 ```
 
 #### 运行测试
 
 ```bash
-# 运行所有测试
-pnpm test
+# 运行测试（watch 模式）
+npm run test
+
+# 单次运行全部测试
+npm run test:run
 
 # 运行测试并生成覆盖率报告
-pnpm test:coverage
+npm run test:coverage
 
-# 运行测试UI界面
-pnpm test:ui
+# 运行测试 UI 界面
+npm run test:ui
 ```
 
 ### 后端开发
@@ -508,9 +601,6 @@ mvn test
 
 # 运行特定测试类
 mvn test -Dtest=CategoryControllerTest
-
-# 运行测试并生成覆盖率报告
-mvn test jacoco:report
 ```
 
 #### 启动应用
@@ -599,8 +689,10 @@ Controller层 → Service层 → Mapper层 → 数据库
 
 ```bash
 cd frontend
-pnpm build
+npm run build
 ```
+
+构建产物输出到 `frontend/dist/`。
 
 #### 部署到Nginx
 
@@ -615,9 +707,14 @@ server {
     }
     
     location /api {
-        proxy_pass http://localhost:8080;
+        proxy_pass http://localhost:8085;   # 后端端口 8085
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location /uploads {
+        proxy_pass http://localhost:8085;   # 上传文件静态资源
+        proxy_set_header Host $host;
     }
 }
 ```
@@ -634,15 +731,15 @@ mvn clean package -DskipTests
 #### 运行应用
 
 ```bash
-java -jar target/sc-moyuan-backend.jar --spring.profiles.active=prod
+java -jar target/moyuan-backend-1.0.0.jar --spring.profiles.active=prod
 ```
 
 #### 使用Docker部署
 
 ```dockerfile
 FROM openjdk:17-slim
-COPY target/sc-moyuan-backend.jar app.jar
-EXPOSE 8081
+COPY target/moyuan-backend-1.0.0.jar app.jar
+EXPOSE 8085
 ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
 
@@ -707,8 +804,9 @@ describe('formatNumber', () => {
 #### 测试示例
 
 ```java
-// Controller单元测试
-@WebMvcTest(CategoryController.class)
+// Controller 切片测试
+@WebMvcTest(value = CategoryController.class, properties = "app.mapper-scan-enabled=false")
+@AutoConfigureMockMvc(addFilters = false)   // 关闭 Security 过滤器
 class CategoryControllerTest {
 
     @Autowired
@@ -716,6 +814,12 @@ class CategoryControllerTest {
 
     @MockBean
     private CategoryService categoryService;
+
+    @MockBean
+    private UserService userService;
+
+    @MockBean
+    private JwtUtil jwtUtil;
 
     @Test
     void getAllCategories_返回分类列表() throws Exception {
@@ -727,6 +831,8 @@ class CategoryControllerTest {
     }
 }
 ```
+
+> 说明：Controller 切片测试需设置 `properties = "app.mapper-scan-enabled=false"` 以禁用 MyBatis Mapper 扫描，并用 `@AutoConfigureMockMvc(addFilters = false)` 关闭 Security 过滤器；统一响应 `code` 虽为字符串（`"200"`），断言时可直接写 `value(200)`。
 
 ### 测试覆盖率目标
 
@@ -802,10 +908,10 @@ class CategoryControllerTest {
 ### 开发流程
 
 1. **Fork项目**：在GitHub上Fork项目到自己的仓库
-2. **克隆代码**：`git clone https://github.com/your-username/SC_MoYuan2.git`
+2. **克隆代码**：`git clone https://github.com/your-username/moyuan.git`
 3. **创建分支**：`git checkout -b feature/your-feature`
 4. **提交代码**：`git commit -m 'feat: 添加新功能'`
-5. **推送分支**：git push origin feature/your-feature`
+5. **推送分支**：`git push origin feature/your-feature`
 6. **创建Pull Request**：在GitHub上创建PR
 
 ### 提交规范
@@ -872,13 +978,27 @@ mysql -u root -p < sc-moyuan-backend/src/main/resources/db/init.sql
 
 ### Q: 如何切换AI模型？
 
-A: 管理员可以在后台管理页面配置AI模型：
-1. 访问管理后台
-2. 进入AI模型管理
-3. 添加或编辑模型配置
+A: 管理员可以在后台管理页面配置 AI 模型：
+1. 访问管理后台 → AI模型管理
+2. 添加或编辑模型配置（供应商、`model_id`、API Key 等）
+3. 如需按业务模块指定模型，配置模块绑定（`ai_module_config`，如 chat/write_poem/analyze 等）
 4. 设置默认模型
 
+> 提示：实际调用优先走「模块绑定」（`ai_module_config.model_id`）；未绑定某模块时会回退到默认模型。模型 API Key 请配置在 `secrets/application-secrets.yml`，切勿提交到仓库。
+
 ## 更新日志
+
+### v1.7.0 (2026-09 ~ 2026-10)
+- ✅ 新增「诗云星空」3D 可视化页面（Three.js，诗人为中心 + 诗作环绕的层级布局）
+- ✅ 新增报修中心模块（工单提交/详情/评论/关闭/满意度 + 后台报修管理）
+- ✅ 新增诗词评分模块（含 AI 评分）与诗词内容缓存表
+- ✅ 新增韵脚查询模块（韵部/韵脚查询）
+- ✅ 新增诗人认证、内容建议、草稿提交及后台审核（草稿/建议/认证三 Tab）
+- ✅ 新增静态页面（关于我们/用户协议等）与「联系我们」页面
+- ✅ 新增外部诗词后端代理（poetrydb / 今日诗词），替代前端直连
+- ✅ AI 能力模块化：新增 `ai_module_config` 模块绑定与 AI 内容审核
+- ✅ 全站视觉统一为墨渊棕金色系（覆写 Element Plus 主色变量），新增水墨背景
+- ✅ `init.sql` 升级至 v3.2（29 张表）
 
 ### v1.6.0 (2026-06-26)
 - ✅ 前端首页重构（3933行 → 819行，减少79%）
@@ -954,7 +1074,7 @@ A: 管理员可以在后台管理页面配置AI模型：
 - ✅ 新增管理系统后台（控制台、用户管理、诗词管理、分类管理、朝代管理、诗人管理、帖子管理）
 - ✅ 新增管理员API接口（AdminApiController）
 - ✅ 新增管理员路由和权限守卫
-- ✅ 新增默认管理员账号（admin / admin123）
+- ✅ 新增默认管理员账号（admin / admin）
 - ✅ 更新安全配置，admin路径要求ADMIN角色
 
 ### v1.0.0 (2026-05-25)
@@ -996,7 +1116,7 @@ A: 管理员可以在后台管理页面配置AI模型：
 
 ## 许可证
 
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
+仓库当前未包含独立的 `LICENSE` 文件；如需开源授权，请补充 `LICENSE` 文件并明确许可证类型。
 
 ## 联系方式
 
@@ -1010,6 +1130,6 @@ A: 管理员可以在后台管理页面配置AI模型：
 
 ---
 
-**文档版本**：v2.3
-**最后更新**：2026-10-12
+**文档版本**：v2.5
+**最后更新**：2026-10-14
 **维护人员**：墨渊开发团队

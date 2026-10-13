@@ -1,13 +1,23 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { searchPoemsWithRecommend, getRecommendedPoems } from '@/api/modules/external-poetry'
 import type { PoemSearchResult } from '@/api/modules/external-poetry'
+import { useUserStore } from '@/stores/user'
 import PoetryDetailDialog from '@/components/business/PoetryDetailDialog.vue'
+import { usePoemCardNavigation } from '@/composables/usePoemCardNavigation'
 import ancientPoemsData from '@/data/home-ancient-poems.json'
 
-const router = useRouter()
+const userStore = useUserStore()
+
+// 卡片点击导航：本地命中跳 /poem/:id，未命中弹窗兜底（同时阻止冒泡，避免触发面板焦点切换）
+const {
+  poetryDialogVisible,
+  poetryDialogTitle,
+  poetryDialogAuthor,
+  openPoemDetail,
+  openStaticPoemDetail
+} = usePoemCardNavigation()
 
 interface PoemCard {
   date: string
@@ -60,6 +70,11 @@ const showRecommendedPoems = async () => {
   }
 }
 
+// 「为您推荐」推荐依据：登录用户走用户画像匹配 + 兴趣标签建模，未登录回退全站热度排序
+const recommendBasis = computed(() =>
+  userStore.isLoggedIn ? '用户画像匹配 + 兴趣标签建模' : '全站热度排序（浏览量 · 点赞量）'
+)
+
 const showDefaultPoems = () => {
   poemSearchMode.value = 'default'
   poemSearchKeyword.value = ''
@@ -71,124 +86,121 @@ const clearPoemSearch = () => {
   poemSearchResults.value = []
   poemSearchMode.value = 'default'
 }
-
-const poetryDialogVisible = ref(false)
-const poetryDialogTitle = ref('')
-const poetryDialogAuthor = ref('')
-
-const openPoemDetail = (poem: PoemSearchResult) => {
-  if (poem.source === 'local' && poem.id) {
-    router.push(`/poem/${poem.id}`)
-  } else {
-    poetryDialogTitle.value = poem.title
-    poetryDialogAuthor.value = poem.author || ''
-    poetryDialogVisible.value = true
-  }
-}
 </script>
 
 <template>
   <div class="poem_selection_left">
-    <h2 class="luntan_section_title">古诗词推选</h2>
-    <div class="luntan_jx">
-      <div class="luntan_jx_title">
-        <span @click="showDefaultPoems" :class="{ active: poemSearchMode === 'default' }">历史的印痕</span>
-        <span @click="showRecommendedPoems" :class="{ active: poemSearchMode === 'recommend' }" class="recommend_btn">为您推荐</span>
-      </div>
-      <div class="poem_search_bar">
-        <input
-          v-model="poemSearchKeyword"
-          class="poem_search_input"
-          placeholder="搜索古诗词..."
-          @keyup.enter="handlePoemSearch"
-        />
-        <button class="poem_search_btn" @click="handlePoemSearch" :disabled="poemSearchLoading">
-          {{ poemSearchLoading ? '搜索中...' : '搜索' }}
-        </button>
-        <button v-if="poemSearchMode === 'search'" class="poem_search_clear" @click="clearPoemSearch">清除</button>
-      </div>
-      <div class="luntan_jx_scroll">
-        <template v-if="poemSearchMode === 'default'">
-          <div
-            v-for="(poem, idx) in ancientPoems"
-            :key="'ancient-' + idx"
-            class="poem_card"
-          >
-            <div class="poem_card_img">
-              <img :src="asset(poem.image ?? '')" :alt="poem.title || '诗词配图'">
-              <div class="poem_card_img_overlay"></div>
-            </div>
-            <div class="poem_card_body">
-              <div v-if="poem.title" class="poem_title">{{ poem.title }}</div>
-              <div class="poem_meta">【{{ poem.date }}】{{ poem.author }}</div>
-              <div class="poem_lines">
-                <div v-for="(line, li) in poem.content.split('\n')" :key="li" class="poem_line">{{ line }}</div>
-              </div>
-            </div>
-          </div>
-        </template>
-
-        <template v-if="poemSearchMode === 'search'">
-          <div v-if="poemSearchLoading" class="poem_search_status">
-            正在搜索...
-          </div>
-          <div v-else-if="poemSearchResults.length === 0" class="poem_search_status">
-            未找到相关诗词
-          </div>
-          <template v-else>
+    <div class="panel-content">
+      <h2 class="luntan_section_title">古诗词推选</h2>
+      <div class="luntan_jx">
+        <div class="luntan_jx_title">
+          <el-tooltip content="基于编辑精选经典名篇语料库" placement="bottom" :show-after="80" popper-class="moyuan-poem-tip">
+            <span @click="showDefaultPoems" :class="{ active: poemSearchMode === 'default' }">历史的印痕</span>
+          </el-tooltip>
+          <el-tooltip :content="recommendBasis" placement="bottom" :show-after="80" popper-class="moyuan-poem-tip">
+            <span @click="showRecommendedPoems" :class="{ active: poemSearchMode === 'recommend' }" class="recommend_btn">为您推荐</span>
+          </el-tooltip>
+        </div>
+        <div class="poem_search_bar">
+          <input
+            v-model="poemSearchKeyword"
+            class="poem_search_input"
+            placeholder="搜索古诗词..."
+            @keyup.enter="handlePoemSearch"
+          />
+          <button class="poem_search_btn" @click="handlePoemSearch" :disabled="poemSearchLoading">
+            {{ poemSearchLoading ? '搜索中...' : '搜索' }}
+          </button>
+          <button v-if="poemSearchMode === 'search'" class="poem_search_clear" @click="clearPoemSearch">清除</button>
+        </div>
+        <div class="luntan_jx_scroll">
+          <template v-if="poemSearchMode === 'default'">
             <div
-              v-for="(poem, idx) in poemSearchResults"
-              :key="'search-' + idx"
-              class="poem_card poem_search_card"
-              @click="openPoemDetail(poem)"
+              v-for="(poem, idx) in ancientPoems"
+              :key="'ancient-' + idx"
+              class="poem_card"
+              @click.stop="openStaticPoemDetail(poem.title || '', poem.author, poem.content)"
             >
+              <div class="poem_card_img">
+                <img :src="asset(poem.image ?? '')" :alt="poem.title || '诗词配图'">
+                <div class="poem_card_img_overlay"></div>
+              </div>
               <div class="poem_card_body">
-                <div class="poem_title">{{ poem.title }}</div>
-                <div class="poem_meta">
-                  <span v-if="poem.dynasty">【{{ poem.dynasty }}】</span>
-                  <span v-if="poem.author">{{ poem.author }}</span>
-                  <span v-if="poem.source === 'external'" class="poem_source_tag">古诗库</span>
-                </div>
+                <div v-if="poem.title" class="poem_title">{{ poem.title }}</div>
+                <div class="poem_meta">【{{ poem.date }}】{{ poem.author }}</div>
                 <div class="poem_lines">
                   <div v-for="(line, li) in poem.content.split('\n')" :key="li" class="poem_line">{{ line }}</div>
-                </div>
-                <div v-if="poem.recommendReason" class="poem_recommend_reason">
-                  <span class="recommend_icon">&#128161;</span> {{ poem.recommendReason }}
                 </div>
               </div>
             </div>
           </template>
-        </template>
 
-        <template v-if="poemSearchMode === 'recommend'">
-          <div v-if="recommendedPoems.length === 0" class="poem_search_status">
-            暂无推荐，多浏览诗词会更精准哦~
-          </div>
-          <template v-else>
-            <div
-              v-for="(poem, idx) in recommendedPoems"
-              :key="'recommend-' + idx"
-              class="poem_card poem_recommend_card"
-              @click="openPoemDetail(poem)"
-            >
-              <div class="poem_card_body">
-                <div class="poem_title">{{ poem.title }}</div>
-                <div class="poem_meta">
-                  <span v-if="poem.dynasty">【{{ poem.dynasty }}】</span>
-                  <span v-if="poem.author">{{ poem.author }}</span>
-                </div>
-                <div class="poem_lines">
-                  <div v-for="(line, li) in poem.content.split('\n')" :key="li" class="poem_line">{{ line }}</div>
-                </div>
-                <div v-if="poem.recommendReason" class="poem_recommend_reason">
-                  <span class="recommend_icon">&#128161;</span> {{ poem.recommendReason }}
+          <template v-if="poemSearchMode === 'search'">
+            <div v-if="poemSearchLoading" class="poem_search_status">
+              正在搜索...
+            </div>
+            <div v-else-if="poemSearchResults.length === 0" class="poem_search_status">
+              未找到相关诗词
+            </div>
+            <template v-else>
+              <div
+                v-for="(poem, idx) in poemSearchResults"
+                :key="'search-' + idx"
+                class="poem_card poem_search_card"
+                @click.stop="openPoemDetail(poem)"
+              >
+                <div class="poem_card_body">
+                  <div class="poem_title">{{ poem.title }}</div>
+                  <div class="poem_meta">
+                    <span v-if="poem.dynasty">【{{ poem.dynasty }}】</span>
+                    <span v-if="poem.author">{{ poem.author }}</span>
+                    <span v-if="poem.source === 'external'" class="poem_source_tag">古诗库</span>
+                  </div>
+                  <div class="poem_lines">
+                    <div v-for="(line, li) in poem.content.split('\n')" :key="li" class="poem_line">{{ line }}</div>
+                  </div>
+                  <div v-if="poem.recommendReason" class="poem_recommend_reason">
+                    <span class="recommend_icon">&#128161;</span> {{ poem.recommendReason }}
+                  </div>
                 </div>
               </div>
-            </div>
+            </template>
           </template>
-        </template>
+
+          <template v-if="poemSearchMode === 'recommend'">
+            <div v-if="recommendedPoems.length === 0" class="poem_search_status">
+              暂无推荐，多浏览诗词会更精准哦~
+            </div>
+            <template v-else>
+              <div
+                v-for="(poem, idx) in recommendedPoems"
+                :key="'recommend-' + idx"
+                class="poem_card poem_recommend_card"
+                @click.stop="openPoemDetail(poem)"
+              >
+                <div class="poem_card_body">
+                  <div class="poem_title">{{ poem.title }}</div>
+                  <div class="poem_meta">
+                    <span v-if="poem.dynasty">【{{ poem.dynasty }}】</span>
+                    <span v-if="poem.author">{{ poem.author }}</span>
+                  </div>
+                  <div class="poem_lines">
+                    <div v-for="(line, li) in poem.content.split('\n')" :key="li" class="poem_line">{{ line }}</div>
+                  </div>
+                  <div v-if="poem.recommendReason" class="poem_recommend_reason">
+                    <span class="recommend_icon">&#128161;</span> {{ poem.recommendReason }}
+                  </div>
+                </div>
+              </div>
+            </template>
+          </template>
+        </div>
       </div>
     </div>
+    <button type="button" class="panel-spine" aria-label="展开「古诗词推选」">
+      <span class="panel-spine-title">古诗词推选</span>
+      <span class="panel-spine-icon">❯</span>
+    </button>
   </div>
 
   <PoetryDetailDialog
@@ -199,14 +211,8 @@ const openPoemDetail = (poem: PoemSearchResult) => {
 </template>
 
 <style scoped>
-.poem_selection_left {
-  flex: 1;
-  min-width: 0;
-  overflow: visible;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
+/* 面板骨架布局（.poem_selection_left / .panel-content / .panel-spine）统一在
+   home-styles.scss 中维护，避免两处样式互相覆盖。此处只保留内容层内部样式。 */
 
 .luntan_section_title {
   font-family: cursive;
@@ -224,8 +230,9 @@ const openPoemDetail = (poem: PoemSearchResult) => {
   margin: 0;
   padding: 20px;
   box-sizing: border-box;
-  overflow: visible;
-  min-height: 500px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   background: linear-gradient(135deg, rgba(139, 69, 19, 0.08), rgba(210, 105, 30, 0.12));
   border: 1px solid rgba(139, 69, 19, 0.15);
 }
@@ -340,9 +347,20 @@ const openPoemDetail = (poem: PoemSearchResult) => {
 .luntan_jx_scroll {
   display: flex;
   flex-wrap: wrap;
+  align-content: flex-start;
   gap: 16px;
-  max-height: 450px;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
   overflow-y: auto;
+}
+
+/* 窄屏下两栏改为上下堆叠，此时给滚动区固定高度以保留滚动条 */
+@media (max-width: 768px) {
+  .luntan_jx_scroll {
+    flex: none;
+    max-height: 462px;
+  }
 }
 
 .luntan_jx_scroll::-webkit-scrollbar {
@@ -372,6 +390,7 @@ const openPoemDetail = (poem: PoemSearchResult) => {
   position: relative;
   z-index: 1;
   box-shadow: 0 2px 12px rgba(139, 69, 19, 0.08);
+  cursor: pointer;
 }
 
 .poem_card::before {
@@ -519,5 +538,26 @@ const openPoemDetail = (poem: PoemSearchResult) => {
 
 .recommend_icon {
   margin-right: 4px;
+}
+
+</style>
+
+<style>
+/* Element Plus 悬浮提示：墨渊铜金质感 */
+.moyuan-poem-tip.el-popper {
+  background: linear-gradient(135deg, #8B4513, #a2591f) !important;
+  border: 1px solid rgba(255, 248, 238, 0.28) !important;
+  color: #fff8ee !important;
+  font-family: "Noto Serif SC", "STSong", "SimSun", serif !important;
+  font-size: 13px !important;
+  letter-spacing: 2px;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 20px rgba(139, 69, 19, 0.3) !important;
+  padding: 7px 14px !important;
+}
+
+.moyuan-poem-tip.el-popper .el-popper__arrow::before {
+  background: #8B4513 !important;
+  border: 1px solid rgba(255, 248, 238, 0.28) !important;
 }
 </style>

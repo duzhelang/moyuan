@@ -1,104 +1,125 @@
 <template>
   <div class="poem_selection_right">
-    <h2 class="luntan_section_title">当代·精选</h2>
-    <div class="luntan_ddjx contemporary_container">
-      <div class="luntan_jx_title contemporary_title">时代画像</div>
-      <div class="contemporary_scroll">
-        <div
-          v-for="(poem, idx) in paginatedContemporaryPoems"
-          :key="'contemporary-' + ((contemporaryPage - 1) * contemporaryPageSize + idx)"
-          class="contemporary_card"
-        >
-          <div class="contemporary_card_img">
-            <img :src="asset(poem.image ?? '')" :alt="poem.title || '诗词配图'">
-          </div>
-          <div class="contemporary_card_body">
-            <div class="contemporary_card_date">{{ poem.date }}</div>
-            <div class="contemporary_card_content">
-              <div class="contemporary_card_title">{{ poem.title || '&nbsp;' }}</div>
-              <p>{{ poem.content }}</p>
-            </div>
-            <div class="contemporary_card_footer">
-              <span class="contemporary_card_author">{{ poem.author }}</span>
-              <div class="contemporary_card_actions">
-                <button
-                  class="contemporary_action_btn"
-                  :class="{ active: poemLikeStates[poemKey(idx)] }"
-                  @click="handlePoemLike(poemKey(idx))"
-                >
-                  <span class="action_icon">&#10084;</span>
-                  <span class="action_count">{{ poemLikeCounts[poemKey(idx)] || '' }}</span>
-                </button>
-                <button
-                  class="contemporary_action_btn"
-                  :class="{ active: poemFavoriteStates[poemKey(idx)] }"
-                  @click="handlePoemFavorite(poemKey(idx))"
-                >
-                  <span class="action_icon">&#9733;</span>
-                </button>
-                <button
-                  class="contemporary_action_btn"
-                  @click="togglePoemComments(poemKey(idx), 2)"
-                >
-                  <span class="action_icon">&#128172;</span>
-                  <span class="action_count">{{ commentTotals[poemKey(idx)] || '' }}</span>
-                </button>
+    <div class="panel-content">
+      <h2 class="luntan_section_title">当代·精选</h2>
+      <div class="luntan_ddjx contemporary_container">
+        <div class="luntan_jx_title contemporary_title">时代画像</div>
+        <div class="contemporary_scroll">
+          <div
+            v-for="(poem, idx) in paginatedContemporaryPoems"
+            :key="'contemporary-' + ((contemporaryPage - 1) * contemporaryPageSize + idx)"
+            class="contemporary_card"
+            @click.stop="handleContemporaryCardClick($event, poem)"
+          >
+            <div class="contemporary_card_main">
+              <div class="contemporary_card_img">
+                <img :src="asset(poem.image ?? '')" :alt="poem.title || '诗词配图'">
               </div>
-            </div>
-          </div>
-          <div class="contemporary_comment_section" v-if="expandedPoemIdx === poemKey(idx)">
-            <div class="contemporary_comment_input_bar" v-if="userStore.isLoggedIn">
-              <input
-                v-model="commentInputs[poemKey(idx)]"
-                class="contemporary_comment_input"
-                placeholder="写下你的想法..."
-                @keyup.enter="handleSubmitPoemComment(poemKey(idx), 2)"
-              />
-              <button
-                class="contemporary_comment_submit"
-                @click="handleSubmitPoemComment(poemKey(idx), 2)"
-                :disabled="submittingComment[poemKey(idx)]"
-              >
-                {{ submittingComment[poemKey(idx)] ? '...' : '发送' }}
-              </button>
-            </div>
-            <div class="contemporary_comment_login" v-else @click="router.push('/user/login')">
-              <span>登录后参与讨论</span>
-            </div>
-            <div class="contemporary_comment_list" v-if="poemComments[poemKey(idx)]?.length">
-              <div
-                v-for="comment in poemComments[poemKey(idx)]"
-                :key="comment.id"
-                class="contemporary_comment_item"
-              >
-                <div class="contemporary_comment_author">{{ comment.username }}</div>
-                <div class="contemporary_comment_text">{{ comment.content }}</div>
-                <div class="contemporary_comment_footer">
-                  <span class="contemporary_comment_time">{{ formatDate(comment.createTime) }}</span>
-                  <button class="contemporary_comment_like" @click="handlePoemCommentLike(comment)">
-                    &#128077; {{ comment.likeCount || '' }}
-                  </button>
+              <div class="contemporary_card_body">
+                <div class="contemporary_card_header">
+                  <div class="contemporary_card_title">{{ poem.title || '&nbsp;' }}</div>
+                  <div class="contemporary_card_date">{{ poem.date }}</div>
+                </div>
+                <div class="contemporary_card_content">
+                  <div
+                    v-for="(line, li) in poemLines(poem.content)"
+                    :key="li"
+                    class="contemporary_poem_line"
+                  >{{ line }}</div>
+                </div>
+                <div class="contemporary_card_footer">
+                  <span class="contemporary_card_author">{{ poem.author }}</span>
+                  <div class="contemporary_card_actions">
+                    <button
+                      class="contemporary_action_btn"
+                      :class="{ active: poemLikeStates[poemKey(idx)] }"
+                      @click="handlePoemLike(poemKey(idx))"
+                    >
+                      <span class="action_icon">&#10084;</span>
+                      <span class="action_count">{{ poemLikeCounts[poemKey(idx)] || '' }}</span>
+                    </button>
+                    <button
+                      class="contemporary_action_btn"
+                      :class="{ active: poemFavoriteStates[poemKey(idx)] }"
+                      @click="handlePoemFavorite(poemKey(idx))"
+                    >
+                      <span class="action_icon">&#9733;</span>
+                    </button>
+                    <button
+                      class="contemporary_action_btn"
+                      @click="togglePoemComments(poemKey(idx), 2)"
+                    >
+                      <span class="action_icon">&#128172;</span>
+                      <span class="action_count">{{ commentTotals[poemKey(idx)] || '' }}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-            <div class="contemporary_comment_empty" v-else-if="commentTotals[poemKey(idx)] === 0">
-              <span>暂无评论，来发表第一条评论吧</span>
+            <div class="contemporary_comment_section" v-if="expandedPoemIdx === poemKey(idx)">
+              <div class="contemporary_comment_input_bar" v-if="userStore.isLoggedIn">
+                <input
+                  v-model="commentInputs[poemKey(idx)]"
+                  class="contemporary_comment_input"
+                  placeholder="写下你的想法..."
+                  @keyup.enter="handleSubmitPoemComment(poemKey(idx), 2)"
+                />
+                <button
+                  class="contemporary_comment_submit"
+                  @click="handleSubmitPoemComment(poemKey(idx), 2)"
+                  :disabled="submittingComment[poemKey(idx)]"
+                >
+                  {{ submittingComment[poemKey(idx)] ? '...' : '发送' }}
+                </button>
+              </div>
+              <div class="contemporary_comment_login" v-else @click="router.push('/user/login')">
+                <span>登录后参与讨论</span>
+              </div>
+              <div class="contemporary_comment_list" v-if="poemComments[poemKey(idx)]?.length">
+                <div
+                  v-for="comment in poemComments[poemKey(idx)]"
+                  :key="comment.id"
+                  class="contemporary_comment_item"
+                >
+                  <div class="contemporary_comment_author">{{ comment.username }}</div>
+                  <div class="contemporary_comment_text">{{ comment.content }}</div>
+                  <div class="contemporary_comment_footer">
+                    <span class="contemporary_comment_time">{{ formatDate(comment.createTime) }}</span>
+                    <button class="contemporary_comment_like" @click="handlePoemCommentLike(comment)">
+                      &#128077; {{ comment.likeCount || '' }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="contemporary_comment_empty" v-else-if="commentTotals[poemKey(idx)] === 0">
+                <span>暂无评论，来发表第一条评论吧</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <div class="contemporary_pagination" v-if="contemporaryTotal > contemporaryPageSize">
-        <el-pagination
-          size="small"
-          layout="prev, pager, next"
-          :total="contemporaryTotal"
-          :page-size="contemporaryPageSize"
-          :current-page="contemporaryPage"
-          @current-change="handleContemporaryPageChange"
-        />
+        <div class="contemporary_pagination" v-if="contemporaryTotal > contemporaryPageSize">
+          <el-pagination
+            size="small"
+            layout="prev, pager, next"
+            :total="contemporaryTotal"
+            :page-size="contemporaryPageSize"
+            :current-page="contemporaryPage"
+            @current-change="handleContemporaryPageChange"
+          />
+        </div>
       </div>
     </div>
+    <button type="button" class="panel-spine" aria-label="展开「当代·精选」">
+      <span class="panel-spine-title">当代·精选</span>
+      <span class="panel-spine-icon">❯</span>
+    </button>
   </div>
+
+  <PoetryDetailDialog
+    v-model:visible="poetryDialogVisible"
+    :title="poetryDialogTitle"
+    :author="poetryDialogAuthor"
+  />
 </template>
 
 <script setup lang="ts">
@@ -109,6 +130,8 @@ import { useUserStore } from '@/stores/user'
 import { likePoem, favoritePoem } from '@/api/modules/poem'
 import { getComments, createComment, likeComment } from '@/api/modules/forum'
 import type { Comment } from '@/types/model'
+import PoetryDetailDialog from '@/components/business/PoetryDetailDialog.vue'
+import { usePoemCardNavigation } from '@/composables/usePoemCardNavigation'
 import contemporaryPoemsData from '@/data/home-contemporary-poems.json'
 
 interface PoemCard {
@@ -122,9 +145,36 @@ interface PoemCard {
 const router = useRouter()
 const userStore = useUserStore()
 
+// 卡片点击导航：本地命中跳 /poem/:id，未命中弹窗兜底（同时阻止冒泡，避免触发面板焦点切换）
+const {
+  poetryDialogVisible,
+  poetryDialogTitle,
+  poetryDialogAuthor,
+  openStaticPoemDetail
+} = usePoemCardNavigation()
+
+// 当代卡片主体点击跳详情：点赞/收藏/评论等交互元素及评论区不触发跳转
+const handleContemporaryCardClick = (e: MouseEvent, poem: PoemCard) => {
+  const el = e.target as HTMLElement
+  if (el.closest('button, a, input, textarea, select')) return
+  if (el.closest('.contemporary_comment_section')) return
+  openStaticPoemDetail(poem.title || '', poem.author, poem.content)
+}
+
 const contemporaryPoems: PoemCard[] = contemporaryPoemsData
 
 const asset = (path: string) => path
+
+// 将诗句正文按句读切分，两句一行为一组，形成对句排版
+const poemLines = (content: string): string[] => {
+  if (!content) return []
+  const sentences = content.match(/[^，。！？；、]+[，。！？；、]?/g) ?? []
+  const lines: string[] = []
+  for (let i = 0; i < sentences.length; i += 2) {
+    lines.push((sentences[i] + (sentences[i + 1] ?? '')).trim())
+  }
+  return lines
+}
 
 const expandedPoemIdx = ref<string | null>(null)
 const poemComments = ref<Record<string, Comment[]>>({})
@@ -249,6 +299,9 @@ const handlePoemCommentLike = async (comment: Comment) => {
 .contemporary_container {
   background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
   border: 1px solid #dee2e6 !important;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .contemporary_title {
@@ -263,6 +316,22 @@ const handlePoemCommentLike = async (comment: Comment) => {
   flex-direction: column;
   gap: 12px;
   padding: 5px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.contemporary_scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.contemporary_scroll::-webkit-scrollbar-thumb {
+  background: rgba(108, 117, 125, 0.35);
+  border-radius: 3px;
+}
+
+.contemporary_scroll::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .contemporary_pagination {
@@ -273,12 +342,16 @@ const handlePoemCommentLike = async (comment: Comment) => {
 
 .contemporary_card {
   display: flex;
+  flex-direction: column;
   background: #fff;
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid #e9ecef;
   transition: all 0.3s ease;
   position: relative;
+  /* 滚动区是纵向 flex 容器，卡片必须禁止收缩，否则会被压扁导致内部文字互相遮挡 */
+  flex-shrink: 0;
+  cursor: pointer;
 }
 
 .contemporary_card:hover {
@@ -286,12 +359,17 @@ const handlePoemCommentLike = async (comment: Comment) => {
   transform: translateY(-2px);
 }
 
+.contemporary_card_main {
+  display: flex;
+  align-items: stretch;
+}
+
 .contemporary_card_img {
-  width: 120px;
-  height: 120px;
+  width: 140px;
+  min-height: 140px;
   flex-shrink: 0;
   overflow: hidden;
-  border-radius: 10px 0 0 10px;
+  border-radius: 10px 0 0 0;
 }
 
 .contemporary_card_img img {
@@ -307,43 +385,53 @@ const handlePoemCommentLike = async (comment: Comment) => {
 
 .contemporary_card_body {
   flex: 1;
-  padding: 12px 16px;
+  padding: 14px 18px;
   display: flex;
   flex-direction: column;
   min-width: 0;
   position: relative;
 }
 
+.contemporary_card_header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
 .contemporary_card_date {
-  position: absolute;
-  top: 8px;
-  right: 12px;
+  flex-shrink: 0;
   font-size: 12px;
   color: #868e96;
+  white-space: nowrap;
 }
 
 .contemporary_card_content {
   flex: 1;
   margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.contemporary_card_content p {
-  font-size: 14px;
-  color: #495057;
-  line-height: 1.6;
-  margin: 0;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-  line-clamp: 4;
-  overflow: hidden;
+.contemporary_poem_line {
+  font-size: 16px;
+  color: #3d4348;
+  line-height: 1.8;
+  letter-spacing: 1px;
+  word-break: break-word;
 }
 
 .contemporary_card_title {
-  font-size: 15px;
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
   font-weight: 600;
   color: #212529;
-  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .contemporary_card_footer {

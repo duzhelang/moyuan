@@ -91,8 +91,9 @@ const pickRandomItems = () => {
   recentlyShownIds.value = new Set(visibleItems.value.map(i => i.id))
 }
 
-const getNextItem = (currentIndex: number): NavigationItem => {
-  const currentVisibleIds = new Set(visibleItems.value.map(v => v.id))
+const getNextItem = (currentIndex: number): NavigationItem | undefined => {
+  // 过滤空槽位，避免对 undefined 读取 id（数据为空或条目数不足时会出现空槽）
+  const currentVisibleIds = new Set(visibleItems.value.filter(Boolean).map(v => v.id))
   const excludeIds = new Set([...currentVisibleIds, ...recentlyShownIds.value])
 
   const freshCandidates = allItems.value.filter(item => !excludeIds.has(item.id))
@@ -139,7 +140,8 @@ const waveSwitch = (direction: 'left' | 'right' | 'random' = 'random', fast = fa
       breathing.value[idx] = true
       setTimeout(() => {
         const newItem = getNextItem(idx)
-        visibleItems.value[idx] = newItem
+        // 无可用候选时保持原卡片，避免写入 undefined 造成空槽
+        if (newItem) visibleItems.value[idx] = newItem
         setTimeout(() => {
           breathing.value[idx] = false
           if (step === order.length - 1) {
@@ -165,7 +167,8 @@ const fadeSwitch = (direction: 'left' | 'right' | 'random' = 'random', fast = fa
       fading.value[idx] = true
       setTimeout(() => {
         const newItem = getNextItem(idx)
-        visibleItems.value[idx] = newItem
+        // 无可用候选时保持原卡片，避免写入 undefined 造成空槽
+        if (newItem) visibleItems.value[idx] = newItem
         setTimeout(() => {
           fading.value[idx] = false
           if (step === order.length - 1) {
@@ -191,7 +194,8 @@ const slideSwitch = (direction: 'left' | 'right' | 'random' = 'random', fast = f
       sliding.value[idx] = true
       setTimeout(() => {
         const newItem = getNextItem(idx)
-        visibleItems.value[idx] = newItem
+        // 无可用候选时保持原卡片，避免写入 undefined 造成空槽
+        if (newItem) visibleItems.value[idx] = newItem
         setTimeout(() => {
           sliding.value[idx] = false
           if (step === order.length - 1) {
@@ -437,7 +441,8 @@ onUnmounted(() => {
 .nav-card {
   width: 295px;
   min-width: 295px;
-  height: 200px;
+  /* 高度需容纳 图片150px + 标题 + 副标题一行，原 200px 会把副标题底部裁掉 */
+  height: 212px;
   text-align: center;
   overflow: hidden;
   cursor: pointer;
@@ -532,6 +537,7 @@ onUnmounted(() => {
 }
 
 .nav-card:hover li {
+  /* 悬浮标题恢复为站点原有蓝色（原 .nav-card:hover li 的 #409eff），去掉光晕 */
   color: #409eff;
 }
 
@@ -539,10 +545,16 @@ onUnmounted(() => {
   font-size: 14px;
   color: #666;
   margin-top: 4px;
+  /* 副标题强制单行，超出用省略号，避免长句换行撑高后被卡片裁切 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: color 0.3s ease;
 }
 
 .nav-card:hover p {
-  color: #333;
+  /* 悬浮时副标题同步变蓝，与标题保持一致 */
+  color: #409eff;
+  font-weight: 700;
 }
 </style>

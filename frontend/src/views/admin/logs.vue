@@ -33,7 +33,14 @@ const fetchData = async () => {
       params.endTime = dateRange.value[1]
     }
     const res = await getAdminLogs(params)
-    tableData.value = res.data.records
+    // 后端已拆分 method 与 uri；历史数据的 method 为「请求方法 + URI」拼接串，此处兼容处理
+    tableData.value = (res.data.records || []).map((item: any) => {
+      if (!item.uri && item.method && item.method.includes(' ')) {
+        const [httpMethod, ...uriParts] = String(item.method).split(' ')
+        return { ...item, httpMethod, uri: uriParts.join(' ') }
+      }
+      return { ...item, httpMethod: item.method || '', uri: item.uri || '' }
+    })
     total.value = res.data.total
   } catch (error) {
     console.error('获取操作日志失败', error)
@@ -97,9 +104,9 @@ onMounted(fetchData)
                 <span class="expand-label">返回结果：</span>
                 <pre class="expand-value">{{ row.result }}</pre>
               </div>
-              <div v-if="row.error" class="expand-item">
+              <div v-if="row.errorMsg" class="expand-item">
                 <span class="expand-label">错误信息：</span>
-                <pre class="expand-value error-text">{{ row.error }}</pre>
+                <pre class="expand-value error-text">{{ row.errorMsg }}</pre>
               </div>
             </div>
           </template>
@@ -107,7 +114,7 @@ onMounted(fetchData)
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column label="请求方法" width="100">
           <template #default="{ row }">
-            <el-tag :type="methodTagType(row.method)" size="small">{{ row.method }}</el-tag>
+            <el-tag :type="methodTagType(row.httpMethod)" size="small">{{ row.httpMethod }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="uri" label="URI" min-width="200" show-overflow-tooltip />
@@ -121,7 +128,7 @@ onMounted(fetchData)
         </el-table-column>
         <el-table-column label="状态" width="80">
           <template #default="{ row }">
-            <el-tag :type="row.error ? 'danger' : 'success'" size="small">{{ row.error ? '失败' : '成功' }}</el-tag>
+            <el-tag :type="row.status === 0 ? 'danger' : 'success'" size="small">{{ row.status === 0 ? '失败' : '成功' }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="操作时间" width="170" />

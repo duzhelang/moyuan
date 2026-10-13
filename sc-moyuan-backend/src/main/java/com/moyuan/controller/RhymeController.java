@@ -6,10 +6,12 @@ import com.moyuan.service.RhymeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Slf4j
 @Tag(name = "韵脚查询接口")
 @RestController
 @RequestMapping("/api/rhyme")
@@ -25,8 +27,13 @@ public class RhymeController {
             return R.error("400", "请输入要查询的汉字");
         }
         String ch = character.trim().substring(0, 1);
-        List<Rhyme> results = rhymeService.queryByCharacter(ch);
-        return R.success(results);
+        try {
+            List<Rhyme> results = rhymeService.queryByCharacter(ch);
+            return R.success(results);
+        } catch (Exception e) {
+            log.error("查询韵脚失败：character={}", ch, e);
+            return R.error("500", "查询韵脚失败，请稍后重试");
+        }
     }
 
     @Operation(summary = "按韵部查询同韵字")
@@ -35,7 +42,13 @@ public class RhymeController {
         if (group == null || group.trim().isEmpty()) {
             return R.error("400", "请输入韵部名称");
         }
-        List<Rhyme> results = rhymeService.queryByRhymeGroup(group.trim());
-        return R.success(results);
+        String name = group.trim();
+        try {
+            List<Rhyme> results = rhymeService.queryByRhymeGroup(name);
+            return R.success(results);
+        } catch (Exception e) {
+            log.error("查询韵部失败：group={}", name, e);
+            return R.error("500", "查询韵部失败，请稍后重试");
+        }
     }
 }

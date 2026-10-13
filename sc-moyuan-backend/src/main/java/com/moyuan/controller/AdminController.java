@@ -812,8 +812,10 @@ public class AdminController {
             @RequestParam(required = false) String endTime) {
         LambdaQueryWrapper<OperationLog> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(keyword)) {
-            wrapper.like(OperationLog::getOperation, keyword).or()
-                    .like(OperationLog::getMethod, keyword);
+            wrapper.and(w -> w.like(OperationLog::getOperation, keyword)
+                    .or().like(OperationLog::getMethod, keyword)
+                    .or().like(OperationLog::getUri, keyword)
+                    .or().like(OperationLog::getUsername, keyword));
         }
         if (StringUtils.hasText(startTime)) {
             wrapper.ge(OperationLog::getCreateTime, LocalDateTime.parse(startTime, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));

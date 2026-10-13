@@ -13,7 +13,9 @@ public class OperationLog {
     private String username;
     private String operation;
     private String method;
+    private String uri;
     private String params;
+    private String result;
     private String ip;
     private Integer duration;
     private Integer status;

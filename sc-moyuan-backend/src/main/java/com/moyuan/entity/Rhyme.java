@@ -12,6 +12,7 @@ public class Rhyme {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    @TableField(value = "`character`")
     private String character;
 
     private String rhymeGroup;

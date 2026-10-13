@@ -1,6 +1,6 @@
 -- ============================================================
--- 版本：v3.0（全量合并版）
--- 日期：2026-06-01
+-- 版本：v3.2（全量合并版）
+-- 日期：2026-09-04
 -- 说明：全量合并所有表结构和初始数据，删除过渡迁移脚本
 --       所有建表使用 IF NOT EXISTS，数据使用 INSERT IGNORE
 -- ============================================================
@@ -889,6 +889,7 @@ CREATE TABLE IF NOT EXISTS `rhyme` (
   `sort_order` INT NOT NULL DEFAULT 0 COMMENT '排序顺序',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_rhyme_char_group_tone` (`character`, `rhyme_group`, `tone_type`),
   KEY `idx_rhyme_character` (`character`),
   KEY `idx_rhyme_group` (`rhyme_group`),
   KEY `idx_rhyme_tone` (`tone_type`)

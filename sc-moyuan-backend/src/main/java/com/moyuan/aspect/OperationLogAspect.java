@@ -31,6 +31,9 @@ public class OperationLogAspect {
             "password", "oldPassword", "newPassword", "token", "secret"
     );
 
+    /** 返回结果落库的最大长度，超出部分截断，避免大响应撑爆日志表 */
+    private static final int MAX_RESULT_LENGTH = 2000;
+
     private final OperationLogMapper operationLogMapper;
     private final ObjectMapper objectMapper;
 
@@ -46,7 +49,8 @@ public class OperationLogAspect {
             ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
             if (attributes != null) {
                 HttpServletRequest request = attributes.getRequest();
-                operationLog.setMethod(request.getMethod() + " " + request.getRequestURI());
+                operationLog.setMethod(request.getMethod());
+                operationLog.setUri(request.getRequestURI());
                 operationLog.setIp(request.getRemoteAddr());
             }
 
@@ -61,6 +65,7 @@ public class OperationLogAspect {
 
             Object result = joinPoint.proceed();
             operationLog.setStatus(1);
+            operationLog.setResult(toJson(result));
             return result;
         } catch (Throwable e) {
             operationLog.setStatus(0);
@@ -73,6 +78,20 @@ public class OperationLogAspect {
             } catch (Exception e) {
                 log.error("保存操作日志失败", e);
             }
+        }
+    }
+
+    private String toJson(Object obj) {
+        if (obj == null) {
+            return null;
+        }
+        try {
+            String json = objectMapper.writeValueAsString(obj);
+            return json.length() > MAX_RESULT_LENGTH
+                    ? json.substring(0, MAX_RESULT_LENGTH) + "...(已截断)"
+                    : json;
+        } catch (Exception e) {
+            return "[序列化失败]";
         }
     }
 

@@ -186,6 +186,35 @@ const sortOptions = [
   { value: 'likes', label: '最多点赞' }
 ]
 
+// 流派分类 → 代表诗人：外部诗词库只按「标题/正文/作者」关键词匹配，
+// 直接用流派名（如「婉约派」）搜不到内容，故改用该流派的代表诗人作为搜索关键词
+const GENRE_REPRESENTATIVE_POETS: Record<string, string[]> = {
+  婉约派: ['李清照', '柳永', '秦观', '晏殊'],
+  豪放派: ['苏轼', '辛弃疾'],
+  山水田园诗派: ['王维', '孟浩然'],
+  边塞诗派: ['王昌龄', '岑参', '高适'],
+  新乐府运动: ['白居易', '元稹'],
+  江西诗派: ['黄庭坚', '陈师道'],
+  花间词派: ['温庭筠', '韦庄'],
+  桐城派: ['方苞', '姚鼐']
+}
+
+/** 按多个关键词依次外部搜索，并按「标题+作者」去重合并结果 */
+const searchExternalByKeywords = async (keywords: string[], limitPerKeyword = 20): Promise<PoemSearchResult[]> => {
+  const merged: PoemSearchResult[] = []
+  const seen = new Set<string>()
+  for (const keyword of keywords) {
+    const part = await searchApihzPoems(keyword, limitPerKeyword)
+    for (const item of part) {
+      const key = `${item.title}|${item.author || ''}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      merged.push(item)
+    }
+  }
+  return merged
+}
+
 const fetchPoems = async () => {
   loading.value = true
   externalPoemResults.value = []
@@ -251,10 +280,15 @@ const fetchPoems = async () => {
             externalSearching.value = false
           }
         }
-      } else if (result.suggestExternal && filters.value.categoryId) {
-        const category = categories.value.find(c => c.id === filters.value.categoryId)
-        if (category) {
-          const cacheKey = `external_search_category_${filters.value.categoryId}`
+      } else if (result.total === 0 && !filters.value.keyword && (filters.value.categoryId || filters.value.dynastyId)) {
+        // 本地无对应分类/朝代的诗词：分类（含流派）与朝代统一走外部兜底（不依赖后端 suggestExternal 标记）
+        const isCategory = !!filters.value.categoryId
+        const filterId = filters.value.categoryId ?? filters.value.dynastyId
+        const filterName = isCategory
+          ? categories.value.find(c => c.id === filterId)?.name
+          : dynasties.value.find(d => d.id === filterId)?.name
+        if (filterName) {
+          const cacheKey = `external_search_${isCategory ? 'category' : 'dynasty'}_${filterId}`
           const cachedResults = getCache<PoemSearchResult[]>(cacheKey)
           
           if (cachedResults && cachedResults.length > 0) {
@@ -263,7 +297,7 @@ const fetchPoems = async () => {
           } else {
             try {
               await ElMessageBox.confirm(
-                `本地没有"${category.name}"分类的诗词，是否进行全网搜索？（搜索时间较长）`,
+                `本地没有"${filterName}"${isCategory ? '分类' : '朝代'}的诗词，是否进行全网搜索？（搜索时间较长）`,
                 '提示',
                 {
                   confirmButtonText: '全网搜索',
@@ -272,7 +306,9 @@ const fetchPoems = async () => {
                 }
               )
               externalSearching.value = true
-              externalPoemResults.value = await searchApihzPoems(category.name, 20)
+              // 流派名在外部库搜不到内容，改用该流派的代表诗人作为关键词
+              const keywords = (isCategory && GENRE_REPRESENTATIVE_POETS[filterName]) || [filterName]
+              externalPoemResults.value = await searchExternalByKeywords(keywords, 20)
               
               if (externalPoemResults.value.length > 0) {
                 setCache(cacheKey, externalPoemResults.value, 24 * 60 * 60 * 1000)
@@ -1197,7 +1233,7 @@ const getFormattedVerses = (content: string) => {
   return lines.slice(0, 3).map(line => line.trim())
 }
 
-onMounted(() => {
+onMounted(async () => {
   const query = route.query
   if (query.tab === 'modern') {
     activeTab.value = 'modern'
@@ -1246,7 +1282,8 @@ onMounted(() => {
   if (query.hasCertifiedPoet !== undefined) {
     modernFilters.value.hasCertifiedPoet = query.hasCertifiedPoet === 'true'
   }
-  fetchFilters()
+  // 先等筛选条件（朝代/分类名称）就绪，空分类/朝代的「全网搜索」兜底需要用到名称
+  await fetchFilters()
   fetchPoems()
   initSearchData()
 

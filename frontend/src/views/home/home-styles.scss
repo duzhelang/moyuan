@@ -651,34 +651,230 @@ html {
   gap: 20px;
 }
 
+/* ========== 古诗推选 / 当代精选：焦点显示（可放大/收起、左右互换） ==========
+   布局要点：
+   1) 容器为定高 flex 行，高度由 --poem-panel-h 提供（JS 依据右侧「当代·精选」自然高度测量一次），
+      这样宽度变化时容器高度恒定，不会因文字重排而抖动；
+   2) 每个面板由「内容层 .panel-content」+「收起骨架条 .panel-spine」组成，收起时内容层淡出、
+      骨架条淡入；
+   3) 宽度用 flex-grow 过渡，聚焦侧 7.3 : 收起侧 1 ≈ 88% : 12%。 */
 .poem_selection_container {
+  --poem-panel-h: 640px;
   display: flex;
+  align-items: stretch;
+  justify-content: center;
   width: 90%;
   margin: 30px auto 0;
   gap: 30px;
   padding: 0;
   box-sizing: border-box;
+  /* 等宽态：高度由右侧「当代·精选」的内容自然撑起（左面板 contain: size 不参与撑高），
+     此时 JS 直接读取容器高度即可得到真实值，无需对面板做任何样式手术。
+     聚焦态：改读 --poem-panel-h 固定值，避免宽度过渡时高度跟着文字重排抖动。 */
+  height: auto;
+  perspective: 1400px;
   overflow: visible;
   z-index: 1;
-  justify-content: center;
 }
 
-.poem_selection_left {
-  flex: 1;
-  min-width: 0;
-  overflow: visible;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.poem_selection_container.focus-left,
+.poem_selection_container.focus-right {
+  height: var(--poem-panel-h);
 }
 
+.poem_selection_left,
 .poem_selection_right {
-  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
   min-width: 0;
-  overflow: visible;
+  min-height: 0;
+  /* 不设 height:100%：等宽态容器高度为 auto，百分比高度会失效，叠加左面板
+     contain:size 会导致其高度塌陷为 0；改用容器已有的 align-items:stretch 拉伸等高 */
+  overflow: hidden;
+  border-radius: 18px;
+  transition:
+    flex-grow 620ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 620ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 620ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 420ms ease;
+}
+
+/* 左面板内容不参与容器高度计算：否则左侧卡片总高（自动换行堆叠）会远大于右侧，
+   容器高度就被左侧撑爆；尺寸包含后由右侧决定容器高度，左面板再被拉伸等高 */
+.poem_selection_left {
+  contain: size;
+}
+
+/* 内容层：标题 + 卡片区，垂直撑满。用 flex 撑满而非 height:100%，
+   否则测量自然高度时百分比会解析成容器定高、导致高度被锁死 */
+.panel-content {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  transition:
+    opacity 300ms ease,
+    transform 480ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 300ms ease;
+}
+
+/* 收起帘幕：快速盖住宽度变化引起的文字重排 */
+.poem_selection_left::after,
+.poem_selection_right::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  border-radius: inherit;
+  background: linear-gradient(180deg, #fdf6ec 0%, #f3e3cd 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 240ms ease;
+}
+
+/* 收起骨架条：竖排标题 + 展开箭头 + 点阵网格 */
+.panel-spine {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin: 0;
+  padding: 24px 0;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.94);
+  transition:
+    opacity 300ms ease 100ms,
+    transform 460ms cubic-bezier(0.22, 1, 0.36, 1) 100ms;
+  background-color: #fdf6ec;
+  background-image:
+    radial-gradient(rgba(139, 69, 19, 0.14) 1px, transparent 1px),
+    linear-gradient(180deg, #fdf6ec 0%, #f3e3cd 100%);
+  background-size: 14px 14px, 100% 100%;
+}
+
+.panel-spine-title {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-family: "Noto Serif SC", "SourceHanSerifSC", "STSong", "SimSun", serif;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 8px;
+  color: #8B4513;
+  text-shadow: 0 1px 2px rgba(139, 69, 19, 0.2);
+}
+
+.panel-spine-icon {
+  font-size: 18px;
+  color: rgba(139, 69, 19, 0.6);
+  transition: transform 300ms ease;
+}
+
+.poem_selection_left .panel-spine-icon {
+  transform: rotate(180deg);
+}
+
+.panel-spine:hover .panel-spine-icon {
+  color: #8B4513;
+}
+
+/* ---- 焦点态：左聚焦 ---- */
+.poem_selection_container.focus-left .poem_selection_left {
+  flex-grow: 7.3;
+  z-index: 3;
+  transform: translateY(-4px);
+  box-shadow: 0 26px 64px rgba(139, 69, 19, 0.22);
+}
+
+.poem_selection_container.focus-left .poem_selection_right {
+  flex-grow: 1;
+  min-width: 96px;
+  filter: saturate(0.6) brightness(0.97);
+  transform: rotateY(-6deg);
+}
+
+/* ---- 焦点态：右聚焦 ---- */
+.poem_selection_container.focus-right .poem_selection_right {
+  flex-grow: 7.3;
+  z-index: 3;
+  transform: translateY(-4px);
+  box-shadow: 0 26px 64px rgba(59, 74, 90, 0.22);
+}
+
+.poem_selection_container.focus-right .poem_selection_left {
+  flex-grow: 1;
+  min-width: 96px;
+  filter: saturate(0.6) brightness(0.97);
+  transform: rotateY(6deg);
+}
+
+/* 收起侧：内容层退场 + 帘幕升起 + 骨架条进场 */
+.poem_selection_container.focus-left .poem_selection_right .panel-content,
+.poem_selection_container.focus-right .poem_selection_left .panel-content {
+  opacity: 0;
+  transform: scale(0.96);
+  filter: blur(3px);
+  pointer-events: none;
+}
+
+.poem_selection_container.focus-left .poem_selection_right::after,
+.poem_selection_container.focus-right .poem_selection_left::after {
+  opacity: 1;
+}
+
+.poem_selection_container.focus-left .poem_selection_right .panel-spine,
+.poem_selection_container.focus-right .poem_selection_left .panel-spine {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+}
+
+/* 聚焦侧内容错峰淡入，形成层次感 */
+.poem_selection_container.focus-left .poem_selection_left .panel-content,
+.poem_selection_container.focus-right .poem_selection_right .panel-content {
+  animation: panelContentIn 520ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+}
+
+@keyframes panelContentIn {
+  from { opacity: 0.35; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* 降低动效偏好：去掉位移、透视与循环动画，仅保留淡入淡出 */
+@media (prefers-reduced-motion: reduce) {
+  .poem_selection_container {
+    perspective: none;
+  }
+  .poem_selection_left,
+  .poem_selection_right,
+  .panel-content,
+  .panel-spine {
+    transition-duration: 200ms !important;
+    transform: none !important;
+  }
+  .poem_selection_container.focus-left .poem_selection_left .panel-content,
+  .poem_selection_container.focus-right .poem_selection_right .panel-content,
+  .luntan_jx::before,
+  .luntan_ddjx::before {
+    animation: none !important;
+  }
+  .poem_selection_container.focus-left .poem_selection_left .luntan_jx::before,
+  .poem_selection_container.focus-right .poem_selection_right .luntan_ddjx::before {
+    opacity: 1;
+  }
 }
 
 .jxh_left {
@@ -1416,16 +1612,58 @@ html {
   margin-top: 12px;
 }
 
-.ai-extra-features {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
+.ai-extra-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 24px;
   padding-top: 18px;
   border-top: 1px dotted #d9cebf;
 }
 
+/* 功能卡统一排在一行，超出部分横向滚动（配合左右箭头切换） */
+.ai-extra-features {
+  display: flex;
+  flex: 1;
+  flex-wrap: nowrap;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  padding-bottom: 6px;
+}
+
+/* 横向滚动条：与页面棕金调统一 */
+.ai-extra-features::-webkit-scrollbar {
+  height: 6px;
+}
+
+.ai-extra-features::-webkit-scrollbar-thumb {
+  background: #d9cebf;
+  border-radius: 3px;
+}
+
+.ai-extra-arrow {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid #d9cebf;
+  background: #fdfaf5;
+  color: #8b7355;
+  font-size: 1.4em;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.ai-extra-arrow:hover {
+  border-color: #b8860b;
+  color: #b8860b;
+  background: #f5eed8;
+}
+
 .ai-extra-card {
+  flex: 0 0 200px;
   background: #fdfaf5;
   border-radius: 14px;
   border: 1px solid #d9cebf;
@@ -1464,6 +1702,17 @@ html {
   border-color: #b8860b;
   background: linear-gradient(135deg, #fdfaf5, #f5eed8);
   box-shadow: 0 4px 18px rgba(44, 36, 22, 0.12);
+}
+
+/* 征集有趣功能：虚框 + 金色标题，与已上线功能区分 */
+.ai-extra-card--collect {
+  border-style: dashed;
+  border-color: #c8b89a;
+  background: linear-gradient(135deg, #fdfaf5, #f7f1e3);
+}
+
+.ai-extra-card--collect .ai-extra-title {
+  color: #b8860b;
 }
 
 .ai-extra-panel {
@@ -1549,6 +1798,271 @@ html {
 
 .rhyme-search-input input:focus {
   border-color: #b8860b;
+}
+
+/* 查询按钮：固定宽度避免状态切换时按钮抖动 */
+.rhyme-query-btn {
+  min-width: 96px;
+  justify-content: center;
+}
+
+/* 按钮内小转圈（06 按钮加载）：随按钮文字色，禁用态仍可见 */
+.rhyme-btn-spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(245, 236, 215, 0.35);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: rhyme-spin 0.8s linear infinite;
+}
+
+/* 结果区转圈（01 旋转加载）：进度不可知，不显示百分比 */
+.rhyme-loading {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dotted #d9cebf;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #8b7355;
+  font-size: 0.9em;
+}
+
+.rhyme-spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid rgba(184, 134, 11, 0.2);
+  border-top-color: #b8860b;
+  border-radius: 50%;
+  animation: rhyme-spin 0.8s linear infinite;
+}
+
+@keyframes rhyme-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* AI 小工具生成按钮：固定宽度避免状态切换（生成中/已完成）时按钮抖动 */
+.ai-tool-btn {
+  min-width: 130px;
+  justify-content: center;
+}
+
+/* 结果区文字（配合 01 旋转加载） */
+.rhyme-loading-text {
+  font-size: 0.9em;
+}
+
+/* 藏头诗结果：每句首字（藏头字）高亮 */
+.acrostic-result-card {
+  margin-top: 16px;
+}
+
+.acrostic-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.acrostic-line {
+  font-family: 'STKaiti', 'KaiTi', 'Ma Shan Zheng', 'Noto Serif SC', serif;
+  font-size: 1.15em;
+  color: #2c2416;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+.acrostic-head {
+  color: #b8860b;
+  font-weight: 700;
+}
+
+/* ===== 平仄格律校验 ===== */
+.meter-textarea {
+  width: 100%;
+  min-height: 96px;
+  border: 1px solid #d9cebf;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-family: 'STKaiti', 'KaiTi', 'Noto Serif SC', 'STSong', 'SimSun', 'Songti SC', serif;
+  font-size: 1em;
+  line-height: 1.9;
+  letter-spacing: 0.05em;
+  color: #2c2416;
+  background: #fff;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.meter-textarea:focus {
+  border-color: #b8860b;
+  box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.12);
+}
+
+.meter-textarea::placeholder {
+  color: #c4b8a8;
+}
+
+/* 校验按钮容器：右对齐 */
+.meter-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.meter-result-card {
+  margin-top: 16px;
+}
+
+.meter-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+/* 合律判定徽标 */
+.meter-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 12px;
+  border-radius: 20px;
+  font-size: 0.85em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.meter-badge.is-valid {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #c8e6c9;
+}
+
+.meter-badge.is-invalid {
+  background: #fce4ec;
+  color: #c62828;
+  border: 1px solid #f8bbd0;
+}
+
+.meter-format {
+  font-size: 0.9em;
+  color: #5a4a3a;
+}
+
+.meter-rhyme {
+  font-size: 0.9em;
+  color: #b8860b;
+}
+
+/* 逐句平仄 */
+.meter-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.meter-line {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(184, 134, 11, 0.04);
+  border: 1px solid rgba(217, 206, 191, 0.7);
+}
+
+.meter-line-text {
+  font-family: 'STKaiti', 'KaiTi', 'Noto Serif SC', 'STSong', 'SimSun', 'Songti SC', serif;
+  font-size: 1.1em;
+  color: #2c2416;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+.meter-line-tone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.meter-tone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 0.85em;
+  font-family: 'STSong', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+}
+
+.meter-tone.is-ping {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #c8e6c9;
+}
+
+.meter-tone.is-ze {
+  background: #fce4ec;
+  color: #c62828;
+  border: 1px solid #f8bbd0;
+}
+
+.meter-rhyme-tag {
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(184, 134, 11, 0.12);
+  color: #b8860b;
+  font-size: 0.75em;
+  letter-spacing: 0.04em;
+}
+
+.meter-line-note {
+  margin-top: 6px;
+  font-size: 0.85em;
+  color: #8b7355;
+  line-height: 1.6;
+}
+
+.meter-summary {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dotted #d9cebf;
+  font-family: 'STSong', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  font-size: 0.95em;
+  color: #5c4a3a;
+  line-height: 1.9;
+  letter-spacing: 0.03em;
+}
+
+/* AI 未按 JSON 返回时的原始文本兜底 */
+.meter-raw {
+  white-space: pre-wrap;
+  font-family: 'STSong', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  font-size: 0.95em;
+  color: #5c4a3a;
+  line-height: 1.9;
+}
+
+/* ===== 飞花令 / 诗词接龙 ===== */
+.feihua-result-card {
+  margin-top: 16px;
+}
+
+.feihua-line {
+  font-family: 'STKaiti', 'KaiTi', 'Ma Shan Zheng', 'Noto Serif SC', serif;
+  font-size: 1.05em;
+  color: #2c2416;
+  letter-spacing: 0.06em;
+  line-height: 1.9;
+  padding: 6px 0;
+  border-bottom: 1px dotted #e6dccb;
+}
+
+.feihua-line:last-child {
+  border-bottom: none;
 }
 
 .rhyme-results {
@@ -1738,8 +2252,37 @@ html {
   margin: 0;
   padding: 20px;
   box-sizing: border-box;
-  overflow: visible;
-  min-height: 500px;
+  overflow: hidden;
+  min-height: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 聚焦侧内层卡片的呼吸光晕描边 */
+.luntan_jx::before,
+.luntan_ddjx::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 480ms ease 180ms;
+  box-shadow:
+    inset 0 0 0 1px rgba(217, 160, 91, 0.55),
+    inset 0 0 26px rgba(217, 160, 91, 0.22);
+}
+
+.poem_selection_container.focus-left .poem_selection_left .luntan_jx::before,
+.poem_selection_container.focus-right .poem_selection_right .luntan_ddjx::before {
+  opacity: 1;
+  animation: panelBreath 3.6s ease-in-out infinite;
+}
+
+@keyframes panelBreath {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
 }
 
 .luntan_jx {
@@ -1768,6 +2311,9 @@ html {
   display: flex;
   align-items: baseline;
   gap: 16px;
+  /* 面板内层空间不足时，禁止标题被压缩：否则高度小于文字行高，
+     叠加 overflow:hidden 会裁掉标题下半截，看起来像被下方卡片压住 */
+  flex-shrink: 0;
 }
 
 .luntan_jx_title span {
