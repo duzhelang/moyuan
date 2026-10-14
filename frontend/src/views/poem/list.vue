@@ -13,7 +13,7 @@ import { getPoetList } from '@/api/modules/poet'
 import { getCache, setCache } from '@/utils/storage'
 import { searchApihzPoems, getApihzPoetryDetail } from '@/api/modules/external-poetry'
 import type { PoemSearchResult } from '@/api/modules/external-poetry'
-import { searchPoetryByTitle, searchPoetryByAuthor, getRandomPoetry, type PoetryDbPoem } from '@/api/modules/external-poetry'
+import { getForeignPoetry, type PoetryDbPoem } from '@/api/modules/external-poetry'
 import { getAiModuleConfig, chat, type AiModuleConfig } from '@/api/modules/ai'
 import { smartSearch, getSearchSuggestions, getHotSearches, getSearchHistory, clearSearchHistory } from '@/api/modules/search'
 import type { SmartSearchResult } from '@/api/modules/search'
@@ -89,6 +89,8 @@ const foreignFilters = ref({
 const foreignPoemList = ref<ForeignPoem[]>([])
 const foreignTotal = ref(0)
 const foreignLoading = ref(false)
+// 外文检索耗时较久提示（加载超过 5 秒时置为 true）
+const foreignSlowHint = ref(false)
 
 const currentPage = ref(1)
 const pageSize = ref(preferencesStore.userPreferences.pageSize || 10)
@@ -155,6 +157,17 @@ const activeKnowledgePanels = ref<string[]>([])
 const expandedKnowledgePanels = ref<string[]>([])
 
 const contentCache = ref<Map<string, string>>(new Map())
+
+// 切换诗词时重置「背景知识」三个面板的状态，避免沿用上一首诗已加载的内容（loaded 守卫会阻止重新加载）
+const resetKnowledgeState = () => {
+  backgroundKnowledge.value = {
+    dynastyPoetry: { content: '', loading: false, loaded: false },
+    literarySchool: { content: '', loading: false, loaded: false },
+    historicalContext: { content: '', loading: false, loaded: false }
+  }
+  activeKnowledgePanels.value = []
+  expandedKnowledgePanels.value = []
+}
 
 const activePanel = ref<'annotation' | 'appreciation' | 'background' | null>(null)
 const showEnlargedContent = ref(false)
@@ -343,15 +356,17 @@ const fetchPoems = async () => {
 
 const fetchForeignPoems = async () => {
   foreignLoading.value = true
+  foreignSlowHint.value = false
+  // 加载超过 5 秒仍未返回时，展示"耗时较久"提示
+  const slowTimer = window.setTimeout(() => {
+    foreignSlowHint.value = true
+  }, 5000)
   try {
-    let results: PoetryDbPoem[] = []
-    if (foreignFilters.value.keyword) {
-      results = await searchPoetryByTitle(foreignFilters.value.keyword)
-    } else if (foreignFilters.value.author) {
-      results = await searchPoetryByAuthor(foreignFilters.value.author)
-    } else {
-      results = await getRandomPoetry(20)
-    }
+    const results = await getForeignPoetry({
+      keyword: foreignFilters.value.keyword || undefined,
+      author: foreignFilters.value.author || undefined,
+      count: 20
+    })
     foreignPoemList.value = results.map((poem: PoetryDbPoem, index: number) => ({
       id: `foreign_${index}`,
       title: poem.title,
@@ -365,6 +380,8 @@ const fetchForeignPoems = async () => {
   } catch (error) {
     ElMessage.error('获取外文诗词失败')
   } finally {
+    clearTimeout(slowTimer)
+    foreignSlowHint.value = false
     foreignLoading.value = false
   }
 }
@@ -389,6 +406,7 @@ const openPoemDetail = async (poem: PoemSearchResult) => {
     backgroundContent.value = ''
     activePanel.value = null
     showEnlargedContent.value = false
+    resetKnowledgeState()
 
     const exists = poemHistory.value.find(h => h.title === poem.title)
     if (!exists) {
@@ -1021,10 +1039,16 @@ const fetchFilters = async () => {
 }
 
 const handleTabChange = (tab: string | number | boolean | undefined) => {
-  activeTab.value = tab as 'classical' | 'modern' | 'foreign'
-  currentPage.value = 1
-  syncFiltersToUrl()
-  fetchPoems()
+  const target = tab as 'classical' | 'modern' | 'foreign'
+  activeTab.value = target
+  // 切换页签时整页刷新并跳转到对应页签，避免保留旧页签的筛选条件与已展开的诗词详情面板
+  const query: Record<string, string> = {}
+  if (target === 'modern') {
+    query.tab = 'modern'
+  } else if (target === 'foreign') {
+    query.tab = 'foreign'
+  }
+  window.location.href = router.resolve({ path: route.path, query }).href
 }
 
 const handleFilterChange = () => {
@@ -1150,6 +1174,7 @@ const translateEnglishPoem = async (poem: any): Promise<string> => {
 
 const openForeignPoemDetail = async (poem: any) => {
   externalDetailLoading.value = true
+  resetKnowledgeState()
   selectedExternalPoem.value = {
     title: poem.title,
     content: poem.content,
@@ -1780,7 +1805,7 @@ const handleClearHistory = async () => {
         <el-tag v-else-if="searchLevel === 'pinyin'" type="info" size="small" class="search-level-tag">拼音匹配</el-tag>
       </div>
 
-      <div class="poem-grid" v-loading="loading || foreignLoading" v-if="(loading || foreignLoading || poems.length > 0 || (!externalSearching && externalPoemResults.length === 0)) && !selectedExternalPoem">
+      <div class="poem-grid" v-loading="loading || foreignLoading" :element-loading-text="foreignSlowHint ? '检索耗时较久，请耐心等待…' : ''" v-if="(loading || foreignLoading || poems.length > 0 || (!externalSearching && externalPoemResults.length === 0)) && !selectedExternalPoem">
         <el-empty v-if="!loading && !foreignLoading && !externalSearching && poems.length === 0 && externalPoemResults.length === 0" description="暂无诗词" />
 
         <div

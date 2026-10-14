@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { HomeFilled, Document, UserFilled, Reading, ChatDotRound, Notebook, EditPen, Search, Star } from '@element-plus/icons-vue'
+import { HomeFilled, Document, UserFilled, Reading, ChatDotRound, Notebook, EditPen, Search, Star, MagicStick } from '@element-plus/icons-vue'
 import LoginDropdown from './LoginDropdown.vue'
 
 const props = defineProps<{
@@ -63,6 +63,10 @@ defineExpose({ searchInputRef })
         <li @click="router.push('/poetry-cloud')">
           <el-icon><Star /></el-icon>
           <span>诗云</span>
+        </li>
+        <li @click="router.push('/ai-chat')">
+          <el-icon><MagicStick /></el-icon>
+          <span>诗阁</span>
         </li>
         <li @click="router.push('/communicate')">
           <el-icon><ChatDotRound /></el-icon>

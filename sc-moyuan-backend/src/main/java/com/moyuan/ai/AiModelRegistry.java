@@ -144,6 +144,20 @@ public class AiModelRegistry {
         return adapter.chat(message, model, effectivePrompt);
     }
 
+    /**
+     * 按模块流式对话：复用 {@link #getModelByModuleCode} 按 {@code ai_module_config} 解析模型，
+     * {@code moduleCode} 为空时回退默认模型（与 {@link #chatByModule} 一致）。
+     * 系统提示词由调用方在 {@code messages} 中以 system 角色自行携带，此处不再覆写。
+     */
+    public void streamByModule(List<Map<String, Object>> messages, String moduleCode,
+                               Double temperature, Integer maxTokens, StreamCallback callback) {
+        AiModel model = (moduleCode == null || moduleCode.isEmpty())
+                ? getDefaultModel()
+                : getModelByModuleCode(moduleCode);
+        AiModelAdapter adapter = getAdapter(model.getProvider());
+        adapter.streamChat(messages, model, temperature, maxTokens, callback);
+    }
+
     public String visionByModule(String prompt, String base64Image, String moduleCode, String visionModelName, String systemPrompt) {
         AiModel model = getModelByModuleCode(moduleCode);
         AiModuleConfig config = getModuleConfig(moduleCode);

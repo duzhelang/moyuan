@@ -12,6 +12,8 @@ public class Poem {
     private Long id;
     private String title;
     private String content;
+    /** 作者名（外文诗直接存；其它诗词用 poet_id） */
+    private String author;
     private Long poetId;
     private Long dynastyId;
     private Long categoryId;

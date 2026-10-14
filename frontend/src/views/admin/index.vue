@@ -24,7 +24,8 @@ const adminMenus = [
       { path: '/admin/dynasties', name: 'AdminDynasties', icon: 'Clock', label: '朝代管理' },
       { path: '/admin/poets', name: 'AdminPoets', icon: 'EditPen', label: '诗人管理' },
       { path: '/admin/poet-featured', name: 'AdminPoetFeatured', icon: 'Star', label: '精选诗人管理' },
-      { path: '/admin/home-navigation', name: 'AdminHomeNavigation', icon: 'Guide', label: '首页导航管理' }
+      { path: '/admin/home-navigation', name: 'AdminHomeNavigation', icon: 'Guide', label: '首页导航管理' },
+      { path: '/admin/vision-articles', name: 'AdminVisionArticles', icon: 'Notebook', label: '诗话视野管理' }
     ]
   },
   {
@@ -49,13 +50,7 @@ const adminMenus = [
       { path: '/admin/poem-audit', name: 'PoemAudit', icon: 'Reading', label: '诗词审核' },
       { path: '/admin/poet-profiles', name: 'PoetProfiles', icon: 'User', label: '诗人认证审核' },
       { path: '/admin/poet-suggestions', name: 'AdminPoetSuggestions', icon: 'Checked', label: '诗人内容审核' },
-      { path: '/admin/ai-contents', name: 'AdminAiContents', icon: 'MagicStick', label: 'AI内容审核' }
-    ]
-  },
-  {
-    label: '评论管理',
-    icon: 'ChatDotSquare',
-    children: [
+      { path: '/admin/ai-contents', name: 'AdminAiContents', icon: 'MagicStick', label: 'AI内容审核' },
       { path: '/admin/comments', name: 'Comments', icon: 'ChatLineSquare', label: '评论管理' }
     ]
   },
@@ -64,7 +59,9 @@ const adminMenus = [
     icon: 'Setting',
     children: [
       { path: '/admin/logs', name: 'AdminLogs', icon: 'Document', label: '操作日志' },
-      { path: '/admin/static-pages', name: 'AdminStaticPages', icon: 'Document', label: '静态页面管理' }
+      { path: '/admin/static-pages', name: 'AdminStaticPages', icon: 'Document', label: '静态页面管理' },
+      { path: '/admin/files', name: 'AdminFiles', icon: 'FolderOpened', label: '文件管理' },
+      { path: '/admin/cache', name: 'AdminCache', icon: 'Refresh', label: '缓存管理' }
     ]
   }
 ]

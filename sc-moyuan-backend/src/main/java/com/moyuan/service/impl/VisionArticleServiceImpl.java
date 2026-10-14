@@ -63,4 +63,22 @@ public class VisionArticleServiceImpl extends ServiceImpl<VisionArticleMapper, V
                 .eq(VisionArticle::getId, id)
                 .setSql("like_count = like_count + 1"));
     }
+
+    @Override
+    public IPage<VisionArticle> getAdminArticleList(int pageNum, int pageSize, Integer status, String category, String keyword) {
+        // 管理端查询含草稿，不限定 status=1
+        LambdaQueryWrapper<VisionArticle> wrapper = new LambdaQueryWrapper<>();
+        if (status != null) {
+            wrapper.eq(VisionArticle::getStatus, status);
+        }
+        if (StringUtils.hasText(category)) {
+            wrapper.eq(VisionArticle::getCategory, category);
+        }
+        if (StringUtils.hasText(keyword)) {
+            wrapper.and(w -> w.like(VisionArticle::getTitle, keyword)
+                    .or().like(VisionArticle::getAuthor, keyword));
+        }
+        wrapper.orderByAsc(VisionArticle::getSortOrder).orderByDesc(VisionArticle::getCreateTime);
+        return visionArticleMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
+    }
 }

@@ -256,3 +256,27 @@ export function getAdminRepairComments(id: number) {
 export function getRepairStats() {
   return request.get<Record<string, number>>('/admin/repairs/stats')
 }
+
+export function clearPoetCache() {
+  return request.post<string>('/admin/cache/clear-poets')
+}
+
+export function clearAllCache() {
+  return request.post<string>('/admin/cache/clear-all')
+}
+
+export function getAdminFiles(params: { page?: number; size?: number; fileType?: string; keyword?: string; status?: number | null }) {
+  return request.get<{ records: any[]; total: number }>('/admin/files', { params })
+}
+
+export function getFileStorageStats() {
+  return request.get<any>('/admin/files/stats')
+}
+
+export function cleanOrphanFiles() {
+  return request.post<any>('/admin/files/clean-orphans')
+}
+
+export function deleteAdminFile(id: number) {
+  return request.delete<void>(`/admin/files/${id}`)
+}

@@ -2046,23 +2046,9 @@ html {
   line-height: 1.9;
 }
 
-/* ===== 飞花令 / 诗词接龙 ===== */
-.feihua-result-card {
-  margin-top: 16px;
-}
-
-.feihua-line {
-  font-family: 'STKaiti', 'KaiTi', 'Ma Shan Zheng', 'Noto Serif SC', serif;
-  font-size: 1.05em;
-  color: #2c2416;
-  letter-spacing: 0.06em;
-  line-height: 1.9;
-  padding: 6px 0;
-  border-bottom: 1px dotted #e6dccb;
-}
-
-.feihua-line:last-child {
-  border-bottom: none;
+/* ===== 首页内嵌游戏小窗口 ===== */
+.game-mini-wrapper {
+  padding: 16px;
 }
 
 .rhyme-results {

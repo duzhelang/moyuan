@@ -1,6 +1,7 @@
 package com.moyuan.service.impl;
 
 import com.moyuan.ai.AiModelRegistry;
+import com.moyuan.ai.StreamCallback;
 import com.moyuan.exception.BusinessException;
 import com.moyuan.common.ResultCode;
 import com.moyuan.service.AiService;
@@ -11,6 +12,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.Base64;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -61,6 +64,12 @@ public class AiServiceImpl implements AiService {
             return aiModelRegistry.chatByModule(message, moduleCode, CHAT_SYSTEM_PROMPT);
         }
         return aiModelRegistry.chat(message, model, CHAT_SYSTEM_PROMPT);
+    }
+
+    @Override
+    public void streamChat(List<Map<String, Object>> messages, String moduleCode,
+                           Double temperature, Integer maxTokens, StreamCallback callback) {
+        aiModelRegistry.streamByModule(messages, moduleCode, temperature, maxTokens, callback);
     }
 
     @Override

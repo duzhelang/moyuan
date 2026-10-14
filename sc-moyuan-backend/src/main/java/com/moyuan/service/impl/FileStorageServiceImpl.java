@@ -1,6 +1,8 @@
 package com.moyuan.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.moyuan.entity.FileMetadata;
 import com.moyuan.exception.BusinessException;
@@ -12,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
@@ -23,7 +26,13 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -271,6 +280,134 @@ public class FileStorageServiceImpl extends ServiceImpl<FileMetadataMapper, File
     public FileMetadata getFileInfo(String fileKey) {
         return fileMetadataMapper.selectOne(
                 new LambdaQueryWrapper<FileMetadata>().eq(FileMetadata::getFileKey, fileKey));
+    }
+
+    @Override
+    public IPage<FileMetadata> listFiles(int page, int size, String fileType, String keyword, Integer status) {
+        LambdaQueryWrapper<FileMetadata> wrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.hasText(fileType)) {
+            wrapper.eq(FileMetadata::getFileType, fileType);
+        }
+        if (status != null) {
+            wrapper.eq(FileMetadata::getStatus, status);
+        }
+        if (StringUtils.hasText(keyword)) {
+            wrapper.and(w -> w.like(FileMetadata::getOriginalName, keyword)
+                    .or().like(FileMetadata::getFileKey, keyword));
+        }
+        wrapper.orderByDesc(FileMetadata::getCreateTime);
+        return fileMetadataMapper.selectPage(new Page<>(page, size), wrapper);
+    }
+
+    @Override
+    public Map<String, Object> getStorageStats() {
+        List<FileMetadata> allFiles = fileMetadataMapper.selectList(null);
+
+        long totalCount = allFiles.size();
+        long totalSize = allFiles.stream()
+                .mapToLong(f -> f.getSize() == null ? 0L : f.getSize())
+                .sum();
+
+        // 按文件类型分组统计数量与占用
+        Map<String, long[]> grouped = new LinkedHashMap<>();
+        for (FileMetadata f : allFiles) {
+            String type = StringUtils.hasText(f.getFileType()) ? f.getFileType() : "unknown";
+            long[] arr = grouped.computeIfAbsent(type, k -> new long[2]);
+            arr[0] += 1;
+            arr[1] += f.getSize() == null ? 0L : f.getSize();
+        }
+        List<Map<String, Object>> typeStats = new ArrayList<>();
+        for (Map.Entry<String, long[]> entry : grouped.entrySet()) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("fileType", entry.getKey());
+            item.put("count", entry.getValue()[0]);
+            item.put("size", entry.getValue()[1]);
+            typeStats.add(item);
+        }
+
+        // 统计“DB有记录但物理文件缺失”的异常数量（只统计不删除）
+        long missingCount = 0;
+        for (FileMetadata f : allFiles) {
+            if (!StringUtils.hasText(f.getFileKey())) {
+                continue;
+            }
+            File physical = new File(uploadDir + File.separator + f.getFileKey());
+            if (!physical.exists() || !physical.isFile()) {
+                missingCount++;
+            }
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("totalCount", totalCount);
+        result.put("totalSize", totalSize);
+        result.put("missingCount", missingCount);
+        result.put("typeStats", typeStats);
+        return result;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> cleanOrphanFiles() {
+        File rootDir = new File(uploadDir);
+        if (!rootDir.exists() || !rootDir.isDirectory()) {
+            Map<String, Object> empty = new LinkedHashMap<>();
+            empty.put("deletedCount", 0);
+            empty.put("freedSize", 0L);
+            return empty;
+        }
+
+        // 数据库中的全部 fileKey 集合
+        Set<String> dbKeys = new HashSet<>();
+        for (FileMetadata f : fileMetadataMapper.selectList(null)) {
+            if (StringUtils.hasText(f.getFileKey())) {
+                dbKeys.add(f.getFileKey().replace("\\", "/"));
+            }
+        }
+
+        int deletedCount = 0;
+        long freedSize = 0L;
+        // 规范化根目录路径，便于计算相对路径
+        String rootPath = rootDir.getAbsolutePath();
+        List<File> allPhysicalFiles = new ArrayList<>();
+        collectFiles(rootDir, allPhysicalFiles);
+        for (File file : allPhysicalFiles) {
+            String relative = file.getAbsolutePath()
+                    .substring(rootPath.length() + 1)
+                    .replace("\\", "/");
+            if (dbKeys.contains(relative)) {
+                continue;
+            }
+            long fileSize = file.length();
+            if (file.delete()) {
+                deletedCount++;
+                freedSize += fileSize;
+                log.info("清理孤儿文件：{}，释放 {} 字节", relative, fileSize);
+            } else {
+                log.warn("孤儿文件删除失败：{}", relative);
+            }
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("deletedCount", deletedCount);
+        result.put("freedSize", freedSize);
+        return result;
+    }
+
+    /**
+     * 递归收集目录下的全部普通文件
+     */
+    private void collectFiles(File dir, List<File> collector) {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File child : children) {
+            if (child.isDirectory()) {
+                collectFiles(child, collector);
+            } else if (child.isFile()) {
+                collector.add(child);
+            }
+        }
     }
 
     /**

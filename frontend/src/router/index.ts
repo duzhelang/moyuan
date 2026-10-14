@@ -56,6 +56,24 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '诗云星空', hideHeader: true }
       },
       {
+        path: 'ai-chat',
+        name: 'AiChat',
+        component: () => import('@/views/ai-chat/index.vue'),
+        meta: { title: '诗阁' }
+      },
+      {
+        path: 'game/feihua',
+        name: 'GameFeihua',
+        component: () => import('@/views/game/feihua.vue'),
+        meta: { title: '飞花令', hideHeader: true }
+      },
+      {
+        path: 'game/chain',
+        name: 'GameChain',
+        component: () => import('@/views/game/chain.vue'),
+        meta: { title: '诗词接龙', hideHeader: true }
+      },
+      {
         path: 'forum',
         name: 'Forum',
         component: () => import('@/views/forum/list.vue'),
@@ -228,10 +246,10 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '诗词审核', requiresAuth: true, requiresAdmin: true }
       },
       {
-        path: 'poet-suggestions',
-        name: 'PoetSuggestions',
-        component: () => import('@/views/admin/poet-suggestions.vue'),
-        meta: { title: '诗人审核', requiresAuth: true, requiresAdmin: true }
+        path: 'poet-profiles',
+        name: 'PoetProfiles',
+        component: () => import('@/views/admin/poet-profiles.vue'),
+        meta: { title: '诗人认证审核', requiresAuth: true, requiresAdmin: true }
       },
       {
         path: 'comments',
@@ -262,6 +280,24 @@ const routes: RouteRecordRaw[] = [
         name: 'AdminStaticPages',
         component: () => import('@/views/admin/static-pages.vue'),
         meta: { title: '静态页面管理', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'files',
+        name: 'AdminFiles',
+        component: () => import('@/views/admin/files.vue'),
+        meta: { title: '文件管理', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'cache',
+        name: 'AdminCache',
+        component: () => import('@/views/admin/cache.vue'),
+        meta: { title: '缓存管理', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'vision-articles',
+        name: 'AdminVisionArticles',
+        component: () => import('@/views/admin/vision.vue'),
+        meta: { title: '诗话视野管理', requiresAuth: true, requiresAdmin: true }
       }
     ]
   },

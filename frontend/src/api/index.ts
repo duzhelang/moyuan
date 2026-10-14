@@ -46,6 +46,7 @@ export {
 export * from './modules/file'
 export * from './modules/history'
 export * as adminAiModelApi from './modules/admin-ai-model'
+export * as adminVisionApi from './modules/admin-vision'
 export * from './modules/visionArticle'
 export * as externalPoetryApi from './modules/external-poetry'
 export * from './modules/static-page'

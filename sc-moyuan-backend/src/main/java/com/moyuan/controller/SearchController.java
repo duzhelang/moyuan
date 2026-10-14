@@ -40,6 +40,8 @@ public class SearchController {
 
         LambdaQueryWrapper<Poem> poemWrapper = new LambdaQueryWrapper<>();
         poemWrapper.eq(Poem::getStatus, 1)
+                // 外文诗不进入全局搜索的诗词结果
+                .ne(Poem::getPoemType, "foreign")
                 .and(w -> w.like(Poem::getTitle, keyword).or().like(Poem::getContent, keyword))
                 .last("LIMIT 10");
         result.put("poems", poemMapper.selectList(poemWrapper));

@@ -1,8 +1,11 @@
 package com.moyuan.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.moyuan.entity.FileMetadata;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Map;
 
 /**
  * 文件存储服务接口
@@ -52,4 +55,31 @@ public interface FileStorageService extends IService<FileMetadata> {
      * @return 文件元数据
      */
     FileMetadata getFileInfo(String fileKey);
+
+    /**
+     * 管理端分页查询文件列表
+     *
+     * @param page     页码
+     * @param size     每页大小
+     * @param fileType 文件类型筛选（可选）
+     * @param keyword  关键字（匹配原始文件名或fileKey，可选）
+     * @param status   状态筛选（可选）
+     * @return 分页结果
+     */
+    IPage<FileMetadata> listFiles(int page, int size, String fileType, String keyword, Integer status);
+
+    /**
+     * 获取存储统计信息：总文件数、总占用字节、按类型分组统计，
+     * 以及“数据库有记录但物理文件缺失”的异常数量（只统计不删除）
+     *
+     * @return 统计信息
+     */
+    Map<String, Object> getStorageStats();
+
+    /**
+     * 清理孤儿文件：扫描物理上传目录，删除磁盘存在但数据库无记录的文件
+     *
+     * @return 删除数量与释放字节
+     */
+    Map<String, Object> cleanOrphanFiles();
 }

@@ -37,7 +37,7 @@ public class OperationLogAspect {
     private final OperationLogMapper operationLogMapper;
     private final ObjectMapper objectMapper;
 
-    @Pointcut("execution(* com.moyuan.controller.*.*(..))")
+    @Pointcut("execution(* com.moyuan.controller.*.*(..)) && !@annotation(com.moyuan.annotation.SkipOperationLog)")
     public void controllerPointcut() {}
 
     @Around("controllerPointcut()")

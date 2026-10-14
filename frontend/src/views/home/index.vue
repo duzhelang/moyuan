@@ -16,6 +16,7 @@ import HomeNavigation from '@/components/business/HomeNavigation.vue'
 import DailyPoetry from '@/components/business/DailyPoetry.vue'
 import QrCodeLink from '@/components/common/QrCodeLink.vue'
 import HomeNavBar from '@/components/business/HomeNavBar.vue'
+import GameMiniPanel from '@/components/game/GameMiniPanel.vue'
 import { HomeCarousel, ForumPreview, AncientPoemSelection, ContemporaryPoems } from '@/components/home'
 import homePoetryData from '@/data/home-poetry-library.json'
 
@@ -56,7 +57,20 @@ const analyzeInput = ref('')
 const analyzeResult = ref('')
 const analyzeLoading = ref(false)
 
-const activeExtraPanel = ref<'rhyme' | 'couplet' | 'ocr' | 'acrostic' | 'meter' | 'feihua' | null>(null)
+const activeExtraPanel = ref<'rhyme' | 'couplet' | 'ocr' | 'acrostic' | 'meter' | null>(null)
+
+// 游戏入口（飞花令 / 诗词接龙）：游客展开小窗口，登录用户跳转独立游戏页
+const miniPanelType = ref<'feihua' | 'chain' | null>(null)
+
+const onGameCardClick = (type: 'feihua' | 'chain') => {
+  if (userStore.isLoggedIn) {
+    miniPanelType.value = null
+    router.push(type === 'feihua' ? '/game/feihua' : '/game/chain')
+  } else {
+    activeExtraPanel.value = null
+    miniPanelType.value = miniPanelType.value === type ? null : type
+  }
+}
 
 // 「诗境 AI」下方功能卡横向滚动容器（配合左右箭头切换）
 const extraScrollRef = ref<HTMLElement | null>(null)
@@ -350,40 +364,6 @@ const handleMeterCheck = async () => {
     ElMessage.error('校验失败，请稍后重试')
   } finally {
     meterLoading.value = false
-  }
-}
-
-// ===== 飞花令 / 诗词接龙 =====
-const feihuaMode = ref<'keyword' | 'chain'>('keyword')
-const feihuaInput = ref('')
-const feihuaLoading = ref(false)
-const feihuaResult = ref('')
-const feihuaLines = computed(() =>
-  feihuaResult.value.split('\n').map((line) => line.trim()).filter(Boolean)
-)
-const feihuaBtnText = computed(() => (feihuaMode.value === 'keyword' ? '玩飞花令' : '接下一句'))
-
-const handleFeihua = async () => {
-  const input = feihuaInput.value.trim()
-  if (!input) {
-    ElMessage.warning(feihuaMode.value === 'keyword' ? '请输入令字' : '请输入上一句')
-    return
-  }
-  feihuaLoading.value = true
-  feihuaResult.value = ''
-  try {
-    const prompt = feihuaMode.value === 'keyword'
-      ? `请以「${input}」为令字，列出 10 句含有该字的古诗词名句。\n要求：只引用确有其篇的真实名句，严禁杜撰；每句一行，格式为「诗句 —— 作者《篇名》」，不要编号、不要解释、不要多余符号。`
-      : `请以古诗词名句接龙：上一句为「${input}」。请以该句最后一个汉字为首字，接出下一句古诗词名句。\n要求：只引用确有其篇的真实名句，严禁杜撰；共输出 2 行，第 1 行为接龙句（首字须与上一句末字相同），第 2 行为「—— 作者《篇名》」，不要其他解释。`
-    const res = await chat({ message: prompt, moduleCode: 'chat' })
-    feihuaResult.value = res.data.reply || ''
-    if (!feihuaResult.value.trim()) {
-      ElMessage.info('AI 未返回内容，请重试')
-    }
-  } catch {
-    ElMessage.error('查询失败，请稍后重试')
-  } finally {
-    feihuaLoading.value = false
   }
 }
 
@@ -1083,10 +1063,15 @@ onActivated(() => {
             <div class="ai-extra-title">平仄校验</div>
             <div class="ai-extra-desc">校验诗句平仄与押韵</div>
           </div>
-          <div class="ai-extra-card" :class="{ active: activeExtraPanel === 'feihua' }" @click="activeExtraPanel = activeExtraPanel === 'feihua' ? null : 'feihua'">
+          <div class="ai-extra-card" :class="{ active: miniPanelType === 'feihua' }" @click="onGameCardClick('feihua')">
             <div class="ai-extra-icon">🌺</div>
             <div class="ai-extra-title">飞花令</div>
-            <div class="ai-extra-desc">行令对诗，诗词接龙</div>
+            <div class="ai-extra-desc">行令对诗，多重玩法</div>
+          </div>
+          <div class="ai-extra-card" :class="{ active: miniPanelType === 'chain' }" @click="onGameCardClick('chain')">
+            <div class="ai-extra-icon">🔗</div>
+            <div class="ai-extra-title">诗词接龙</div>
+            <div class="ai-extra-desc">首尾相接，人机对句</div>
           </div>
           <div class="ai-extra-card">
             <div class="ai-extra-icon">✒️</div>
@@ -1105,6 +1090,10 @@ onActivated(() => {
           </div>
         </div>
         <button class="ai-extra-arrow ai-extra-arrow--right" type="button" aria-label="下一组功能" @click="scrollExtra(1)">›</button>
+      </div>
+
+      <div v-if="miniPanelType" class="ai-extra-panel game-mini-wrapper">
+        <GameMiniPanel :key="miniPanelType" :type="miniPanelType" @close="miniPanelType = null" />
       </div>
 
       <div v-if="activeExtraPanel === 'rhyme'" class="ai-extra-panel">
@@ -1267,36 +1256,6 @@ onActivated(() => {
           <div v-if="meterResult.summary" class="meter-summary">{{ meterResult.summary }}</div>
         </div>
         <div v-else-if="meterRaw" class="ai-result-card meter-raw">{{ meterRaw }}</div>
-      </div>
-
-      <div v-if="activeExtraPanel === 'feihua'" class="ai-extra-panel">
-        <div class="ai-extra-panel-header">
-          <span class="ai-extra-panel-title">🌺 飞花令 / 接龙</span>
-          <button class="ai-extra-panel-close" @click="activeExtraPanel = null">&times;</button>
-        </div>
-        <div class="rhyme-search-type" style="margin-bottom:10px;">
-          <button class="rhyme-type-btn" :class="{ active: feihuaMode === 'keyword' }" @click="feihuaMode = 'keyword'">飞花令</button>
-          <button class="rhyme-type-btn" :class="{ active: feihuaMode === 'chain' }" @click="feihuaMode = 'chain'">诗词接龙</button>
-        </div>
-        <div class="couplet-input-area">
-          <input
-            v-model="feihuaInput"
-            :placeholder="feihuaMode === 'keyword' ? '输入一个令字，如：月' : '输入上一句，如：举头望明月'"
-            maxlength="30"
-            @keyup.enter="handleFeihua"
-          />
-          <button class="ai-btn-primary ai-tool-btn" :disabled="feihuaLoading" @click="handleFeihua">
-            <span v-if="feihuaLoading" class="rhyme-btn-spinner"></span>
-            {{ feihuaLoading ? '思考中...' : feihuaBtnText }}
-          </button>
-        </div>
-        <div v-if="feihuaLoading" class="rhyme-loading">
-          <span class="rhyme-spinner"></span>
-          <span class="rhyme-loading-text">AI 正在检索诗句，请稍候…</span>
-        </div>
-        <div v-else-if="feihuaLines.length" class="ai-result-card feihua-result-card">
-          <div v-for="(line, idx) in feihuaLines" :key="idx" class="feihua-line">{{ line }}</div>
-        </div>
       </div>
 
       <div v-if="activeExtraPanel === 'ocr'" class="ai-extra-panel">

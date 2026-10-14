@@ -93,6 +93,21 @@ export async function getRandomPoetry(count: number = 1): Promise<PoetryDbPoem[]
 }
 
 /**
+ * 获取外文诗词列表（后端先读库，库空则实时兜底 PoetryDB，兜底不落库）
+ */
+export async function getForeignPoetry(
+  params: { keyword?: string; author?: string; count?: number } = {}
+): Promise<PoetryDbPoem[]> {
+  try {
+    const response = await request.get('/external-poetry/foreign', { params })
+    return Array.isArray(response.data) ? response.data : []
+  } catch (error) {
+    console.error('获取外文诗词失败:', error)
+    return []
+  }
+}
+
+/**
  * 按标题和作者组合搜索（后端代理）
  */
 export async function searchPoetry(title: string, author: string): Promise<PoetryDbPoem[]> {

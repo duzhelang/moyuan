@@ -67,6 +67,8 @@ public class SecurityConfig {
                     "/api/external-poetry",
                     "/api/external-poetry/**",
                     "/api/ai/**",
+                    "/api/game",
+                    "/api/game/**",
                     "/api/poems/fix-external-poems",
                     "/uploads/**"
                 ).permitAll()

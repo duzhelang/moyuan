@@ -64,6 +64,7 @@ const PUBLIC_PATHS = [
   '/search',
   '/external-poetry',
   '/static-pages',
+  '/game',
   '/auth'
 ]
 

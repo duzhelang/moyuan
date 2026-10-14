@@ -1,22 +1,29 @@
 package com.moyuan.controller;
 
 import com.moyuan.common.R;
+import com.moyuan.entity.Poem;
 import com.moyuan.service.ExternalPoemImportService;
+import com.moyuan.service.PoemService;
 import com.moyuan.util.JinrishiciParser;
 import com.moyuan.util.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -35,6 +42,7 @@ public class ExternalPoetryController {
 
     private final RestTemplate restTemplate;
     private final ExternalPoemImportService externalPoemImportService;
+    private final PoemService poemService;
 
     private static final String POETRYDB_BASE = "https://poetrydb.org";
     private static final String JINRISHICI_URL = "https://v2.jinrishici.com/one.json";
@@ -92,6 +100,57 @@ public class ExternalPoetryController {
         } catch (Exception e) {
             return R.error("PoetryDB组合搜索失败");
         }
+    }
+
+    @Operation(summary = "外文诗词列表-先读库，库空则实时兜底（兜底不落库）")
+    @GetMapping("/foreign")
+    public R<List<Object>> foreign(@RequestParam(required = false) String keyword,
+                                   @RequestParam(required = false) String author,
+                                   @RequestParam(defaultValue = "20") int count) {
+        // 1) 先读库：命中已入库的外文诗（poem_type='foreign'）
+        List<Poem> dbPoems = poemService.listForeignPoems(keyword, author, count);
+        if (!dbPoems.isEmpty()) {
+            List<Object> list = new ArrayList<>(dbPoems.size());
+            for (Poem p : dbPoems) {
+                list.add(toPoetryDbItem(p.getTitle(), p.getAuthor(), p.getContent()));
+            }
+            return R.success(list);
+        }
+
+        // 2) 库空：复用 PoetryDB 实时兜底，仅返回不落库
+        String suffix;
+        if (StringUtils.hasText(keyword)) {
+            suffix = "/title/" + urlEncode(keyword);
+        } else if (StringUtils.hasText(author)) {
+            suffix = "/author/" + urlEncode(author);
+        } else {
+            suffix = "/random/" + count;
+        }
+        try {
+            // 使用 URI 直接传入，避免 RestTemplate 对已编码的 %20 再次转义
+            Object body = restTemplate.getForObject(URI.create(POETRYDB_BASE + suffix), Object.class);
+            return R.success(asList(body));
+        } catch (Exception e) {
+            return R.error("外文诗词获取失败");
+        }
+    }
+
+    /** 将库内外文诗映射为与 PoetryDB 同形的结构，供前端复用 */
+    private Map<String, Object> toPoetryDbItem(String title, String author, String content) {
+        List<String> lines = StringUtils.hasText(content)
+                ? Arrays.asList(content.split("\n", -1))
+                : Collections.emptyList();
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("title", title);
+        item.put("author", author);
+        item.put("lines", lines);
+        item.put("linecount", String.valueOf(lines.size()));
+        return item;
+    }
+
+    /** PoetryDB 路径参数编码：空格必须编码为 %20（URLEncoder 默认用 +，PoetryDB 不识别 +） */
+    private static String urlEncode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
     @Operation(summary = "今日诗词代理-获取推荐中文古诗词")

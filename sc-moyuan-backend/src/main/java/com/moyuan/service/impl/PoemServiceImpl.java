@@ -51,6 +51,8 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
     public IPage<Poem> getPoemList(int pageNum, int pageSize, Long dynastyId, Long poetId, Long categoryId, String keyword) {
         LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Poem::getStatus, 1);
+        // 外文诗（poem_type='foreign'）不进入古籍诗词列表
+        wrapper.ne(Poem::getPoemType, "foreign");
         if (dynastyId != null) wrapper.eq(Poem::getDynastyId, dynastyId);
         if (poetId != null) wrapper.eq(Poem::getPoetId, poetId);
         if (categoryId != null) wrapper.eq(Poem::getCategoryId, categoryId);
@@ -64,6 +66,8 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
     @Override
     public IPage<Poem> getAdminPoemList(int pageNum, int pageSize, String keyword, Integer auditStatus) {
         LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
+        // 外文诗不在后台诗词列表中展示
+        wrapper.ne(Poem::getPoemType, "foreign");
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w.like(Poem::getTitle, keyword).or()
                     .like(Poem::getContent, keyword));
@@ -82,6 +86,8 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
         LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Poem::getStatus, 1);
         wrapper.eq(Poem::getDynastyId, 13);
+        // 现代创作页签仅展示现代诗，排除古籍与外文诗
+        wrapper.eq(Poem::getPoemType, "modern");
         if (isOriginal != null) {
             wrapper.eq(Poem::getIsOriginal, isOriginal ? 1 : 0);
         }
@@ -165,9 +171,26 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
             return new Page<>(pageNum, pageSize);
         }
         IPage<Poem> page = poemMapper.selectPage(new Page<>(pageNum, pageSize),
-                new LambdaQueryWrapper<Poem>().in(Poem::getId, poemIds).eq(Poem::getStatus, 1));
+                new LambdaQueryWrapper<Poem>().in(Poem::getId, poemIds).eq(Poem::getStatus, 1)
+                        .ne(Poem::getPoemType, "foreign"));
         populatePoetAndDynasty(page.getRecords());
         return page;
+    }
+
+    @Override
+    public List<Poem> listForeignPoems(String keyword, String author, int limit) {
+        LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Poem::getPoemType, "foreign");
+        wrapper.eq(Poem::getStatus, 1);
+        if (StringUtils.hasText(keyword)) {
+            wrapper.like(Poem::getTitle, keyword);
+        }
+        if (StringUtils.hasText(author)) {
+            wrapper.like(Poem::getAuthor, author);
+        }
+        wrapper.orderByAsc(Poem::getId);
+        wrapper.last("LIMIT " + Math.max(1, limit));
+        return poemMapper.selectList(wrapper);
     }
 
     private void populatePoetAndDynasty(List<Poem> poems) {
