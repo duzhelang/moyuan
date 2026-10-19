@@ -168,7 +168,7 @@ class PoemControllerTest {
         page.setRecords(Collections.singletonList(poem));
         page.setTotal(1);
 
-        when(poemService.getModernPoems(anyInt(), anyInt(), any(), any(), any())).thenReturn(page);
+        when(poemService.getModernPoems(anyInt(), anyInt(), any(), any(), any(), any())).thenReturn(page);
 
         mockMvc.perform(get("/api/poems/modern/page")
                         .param("pageNum", "1")

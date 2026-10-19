@@ -82,12 +82,16 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
     }
 
     @Override
-    public IPage<Poem> getModernPoems(int pageNum, int pageSize, Boolean isOriginal, Boolean hasCertifiedPoet, String sortBy) {
+    public IPage<Poem> getModernPoems(int pageNum, int pageSize, Boolean isOriginal, Boolean hasCertifiedPoet, String sortBy, String keyword) {
         LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Poem::getStatus, 1);
         wrapper.eq(Poem::getDynastyId, 13);
         // 现代创作页签仅展示现代诗，排除古籍与外文诗
         wrapper.eq(Poem::getPoemType, "modern");
+        // 可选关键字：按标题或正文模糊匹配（首页时代画像据此解析已入库现代诗的真实 id）
+        if (StringUtils.hasText(keyword)) {
+            wrapper.and(w -> w.like(Poem::getTitle, keyword).or().like(Poem::getContent, keyword));
+        }
         if (isOriginal != null) {
             wrapper.eq(Poem::getIsOriginal, isOriginal ? 1 : 0);
         }
@@ -116,6 +120,20 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
                 .eq(Poem::getId, id)
                 .setSql("view_count = view_count + 1"));
         poem.setViewCount(poem.getViewCount() + 1);
+        // 回填诗人姓名/头像与朝代名称，供详情页「诗人简介」展示
+        if (poem.getPoetId() != null) {
+            Poet poet = poetMapper.selectById(poem.getPoetId());
+            if (poet != null) {
+                poem.setPoetName(poet.getName());
+                poem.setPoetAvatar(poet.getAvatar());
+            }
+        }
+        if (poem.getDynastyId() != null) {
+            Dynasty dynasty = dynastyMapper.selectById(poem.getDynastyId());
+            if (dynasty != null) {
+                poem.setDynastyName(dynasty.getName());
+            }
+        }
         return poem;
     }
 

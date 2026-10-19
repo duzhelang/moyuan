@@ -18,6 +18,7 @@ import QrCodeLink from '@/components/common/QrCodeLink.vue'
 import HomeNavBar from '@/components/business/HomeNavBar.vue'
 import GameMiniPanel from '@/components/game/GameMiniPanel.vue'
 import { HomeCarousel, ForumPreview, AncientPoemSelection, ContemporaryPoems } from '@/components/home'
+import UserMenuDropdown from '@/components/common/UserMenuDropdown.vue'
 import homePoetryData from '@/data/home-poetry-library.json'
 
 const NAV_ANIMATION_KEY = 'home_nav_animation_config'
@@ -555,36 +556,6 @@ const handleAnalyzePoem = async () => {
 
 
 
-const handleLogout = () => {
-  try {
-    userStore.logout()
-    ElMessage.success('已退出登录')
-    router.push('/')
-  } catch {
-    ElMessage.error('退出失败')
-  }
-}
-
-const handleUserCommand = (command: string) => {
-  switch (command) {
-    case 'profile':
-      router.push('/user/profile')
-      break
-    case 'favorites':
-      router.push('/user/profile?tab=favorites')
-      break
-    case 'history':
-      router.push('/user/profile?tab=history')
-      break
-    case 'admin':
-      router.push('/admin/dashboard')
-      break
-    case 'logout':
-      handleLogout()
-      break
-  }
-}
-
 const onNavSearch = (payload: { query: string; type: 'internal' | 'external' }) => {
   if (!payload.query) {
     ElMessage.warning('请输入搜索内容')
@@ -839,23 +810,7 @@ onActivated(() => {
         <QrCodeLink text="了解我们" qrImage="/img/wechat_qr.jpg" alt="扫一扫查看" />
         <QrCodeLink text="联系我们" qrImage="/img/wechat_qr.jpg" alt="扫一扫联系" />
         <template v-if="userStore.isLoggedIn && userStore.userInfo">
-          <el-dropdown trigger="click" @command="handleUserCommand">
-            <div class="top-user-info">
-              <el-avatar :src="userStore.avatar" :size="28">
-                {{ userStore.username?.charAt(0)?.toUpperCase() }}
-              </el-avatar>
-              <span class="top-user-name">{{ userStore.userInfo?.nickname || userStore.username }}</span>
-            </div>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item command="profile">个人中心</el-dropdown-item>
-                <el-dropdown-item command="favorites">我的收藏</el-dropdown-item>
-                <el-dropdown-item command="history">浏览历史</el-dropdown-item>
-                <el-dropdown-item v-if="userStore.userInfo?.role === 'admin'" command="admin">后台管理</el-dropdown-item>
-                <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
+          <UserMenuDropdown :size="28" />
         </template>
         <template v-else>
           <router-link to="/user/login" class="top-link top-link-login">登录</router-link>

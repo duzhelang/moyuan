@@ -73,11 +73,124 @@ public class AdminController {
             stats.put("dynastyCount", dynastyCount);
             stats.put("poetCount", poetCount);
             stats.put("postCount", postCount);
+
+            // 各统计卡片悬浮说明明细（key 与前端 statCards 的 key 一一对应；无明细的卡片前端不弹面板）
+            stats.put("details", buildStatDetails());
             return R.success(stats);
         } catch (Exception e) {
             log.error("获取统计数据失败", e);
             return R.error("获取统计数据失败");
         }
+    }
+
+    /** 控制台统计卡片悬浮说明明细：按各卡片可拆分的维度聚合 */
+    private Map<String, Object> buildStatDetails() {
+        Map<String, Object> details = new LinkedHashMap<>();
+
+        // 用户总数：按角色 / 按诗人认证状态
+        details.put("userCount", Map.of(
+                "groups", List.of(
+                        group("按角色", List.of(
+                                row("管理员", userService.count(new LambdaQueryWrapper<User>()
+                                        .eq(User::getRole, "admin")), "#8a5a2b"),
+                                row("普通用户", userService.count(new LambdaQueryWrapper<User>()
+                                        .eq(User::getRole, "user")), "#3d7fb5"))),
+                        group("按诗人认证", List.of(
+                                row("已认证", userService.count(new LambdaQueryWrapper<User>()
+                                        .eq(User::getPoetVerified, 1)), "#3f9c5a"),
+                                row("认证中", userService.count(new LambdaQueryWrapper<User>()
+                                        .eq(User::getPoetVerified, 2)), "#c08a3e"),
+                                row("未认证", userService.count(new LambdaQueryWrapper<User>()
+                                        .eq(User::getPoetVerified, 0)), "#9a8058")))),
+                "tip", "统计 user 表全部账号，含已禁用账号"));
+
+        // 诗词总数：按类型 / 按状态
+        long classical = poemService.count(new LambdaQueryWrapper<Poem>()
+                .ne(Poem::getPoemType, "modern").ne(Poem::getPoemType, "foreign"));
+        long modern = poemService.count(new LambdaQueryWrapper<Poem>().eq(Poem::getPoemType, "modern"));
+        long foreign = poemService.count(new LambdaQueryWrapper<Poem>().eq(Poem::getPoemType, "foreign"));
+        long published = poemService.count(new LambdaQueryWrapper<Poem>().eq(Poem::getStatus, 1));
+        long unpublished = poemService.count(new LambdaQueryWrapper<Poem>().ne(Poem::getStatus, 1));
+        long pendingAudit = poemService.count(new LambdaQueryWrapper<Poem>().eq(Poem::getAuditStatus, 0));
+        long rejected = poemService.count(new LambdaQueryWrapper<Poem>().eq(Poem::getAuditStatus, 2));
+        long publishedList = poemService.count(new LambdaQueryWrapper<Poem>()
+                .eq(Poem::getStatus, 1).ne(Poem::getPoemType, "foreign"));
+        details.put("poemCount", Map.of(
+                "groups", List.of(
+                        group("按类型", List.of(
+                                row("古籍诗词", classical, "#8a5a2b"),
+                                row("现代创作", modern, "#3d7fb5"),
+                                row("外文诗词", foreign, "#7a6ea8"))),
+                        group("按状态", "待审核 " + pendingAudit + " · 已拒绝 " + rejected, List.of(
+                                row("已发布", published, "#3f9c5a"),
+                                row("未发布", unpublished, "#c08a3e")))),
+                "tip", "诗云与古籍诗文列表仅展示「已发布且非外文」" + publishedList + " 首"));
+
+        // 分类总数：按层级 / 按状态
+        details.put("categoryCount", Map.of(
+                "groups", List.of(
+                        group("按层级", List.of(
+                                row("顶级分类", categoryService.count(new LambdaQueryWrapper<Category>()
+                                        .eq(Category::getParentId, 0L)), "#8a5a2b"),
+                                row("子分类", categoryService.count(new LambdaQueryWrapper<Category>()
+                                        .gt(Category::getParentId, 0L)), "#3d7fb5"))),
+                        group("按状态", List.of(
+                                row("正常", categoryService.count(new LambdaQueryWrapper<Category>()
+                                        .eq(Category::getStatus, 1)), "#3f9c5a"),
+                                row("禁用", categoryService.count(new LambdaQueryWrapper<Category>()
+                                        .eq(Category::getStatus, 0)), "#9a8058"))))));
+
+        // 诗人总数：按启用状态
+        details.put("poetCount", Map.of(
+                "groups", List.of(
+                        group("按状态", List.of(
+                                row("正常", poetService.count(new LambdaQueryWrapper<Poet>()
+                                        .eq(Poet::getStatus, 1)), "#3f9c5a"),
+                                row("禁用", poetService.count(new LambdaQueryWrapper<Poet>()
+                                        .eq(Poet::getStatus, 0)), "#9a8058"))))));
+
+        // 帖子总数：按状态 / 运营标记
+        details.put("postCount", Map.of(
+                "groups", List.of(
+                        group("按状态", List.of(
+                                row("已发布", forumPostService.count(new LambdaQueryWrapper<ForumPost>()
+                                        .eq(ForumPost::getStatus, 1)), "#3f9c5a"),
+                                row("草稿", forumPostService.count(new LambdaQueryWrapper<ForumPost>()
+                                        .eq(ForumPost::getStatus, 0)), "#9a8058"),
+                                row("已关闭", forumPostService.count(new LambdaQueryWrapper<ForumPost>()
+                                        .eq(ForumPost::getStatus, 2)), "#c08a3e"))),
+                        group("运营标记", List.of(
+                                row("精选", forumPostService.count(new LambdaQueryWrapper<ForumPost>()
+                                        .eq(ForumPost::getIsFeatured, 1)), "#c9a45c"),
+                                row("置顶", forumPostService.count(new LambdaQueryWrapper<ForumPost>()
+                                        .eq(ForumPost::getIsTop, 1)), "#7a6ea8"))))));
+
+        return details;
+    }
+
+    /** 明细分组（无补充说明行） */
+    private Map<String, Object> group(String title, List<Map<String, Object>> rows) {
+        return group(title, null, rows);
+    }
+
+    /** 明细分组（可带补充说明行，如审核结论） */
+    private Map<String, Object> group(String title, String sub, List<Map<String, Object>> rows) {
+        Map<String, Object> g = new LinkedHashMap<>();
+        g.put("title", title);
+        g.put("rows", rows);
+        if (sub != null) {
+            g.put("sub", sub);
+        }
+        return g;
+    }
+
+    /** 明细条目 */
+    private Map<String, Object> row(String name, long value, String color) {
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("name", name);
+        r.put("value", value);
+        r.put("color", color);
+        return r;
     }
 
     @Operation(summary = "获取统计趋势")
@@ -383,6 +496,12 @@ public class AdminController {
     public R<Void> deletePoet(@PathVariable Long id) {
         poetService.removeById(id);
         return R.success();
+    }
+
+    @Operation(summary = "刷新诗人头像（按最新规则回填缺失/地区错配的预设头像，保留真实肖像）")
+    @PostMapping("/poets/refresh-avatars")
+    public R<Integer> refreshPoetAvatars() {
+        return R.success(poetService.refreshAvatars());
     }
 
     // ========== 精选诗人管理 ==========

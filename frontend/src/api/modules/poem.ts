@@ -10,7 +10,7 @@ export function getPoemById(id: number) {
   return request.get<Poem>(`/poems/${id}`)
 }
 
-export function getModernPoems(params?: { pageNum?: number; pageSize?: number; isOriginal?: boolean; hasCertifiedPoet?: boolean; sortBy?: string }) {
+export function getModernPoems(params?: { pageNum?: number; pageSize?: number; isOriginal?: boolean; hasCertifiedPoet?: boolean; sortBy?: string; keyword?: string }) {
   return request.get<PageResult<Poem>>('/poems/modern/page', { params })
 }
 

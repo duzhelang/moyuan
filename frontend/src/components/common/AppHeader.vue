@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
+import UserMenuDropdown from '@/components/common/UserMenuDropdown.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -79,35 +80,6 @@ const goToCreatePoem = () => {
   mobileMenuVisible.value = false
   router.push('/poem/create')
 }
-
-const handleUserCommand = (command: string) => {
-  switch (command) {
-    case 'profile':
-      router.push('/user/profile')
-      break
-    case 'favorites':
-      router.push('/user/profile?tab=favorites')
-      break
-    case 'posts':
-      router.push('/user/profile?tab=posts')
-      break
-    case 'history':
-      router.push('/user/profile?tab=history')
-      break
-    case 'repair':
-      router.push('/repair')
-      break
-    case 'createPoem':
-      router.push('/poem/create')
-      break
-    case 'admin':
-      router.push('/admin/dashboard')
-      break
-    case 'logout':
-      handleLogout()
-      break
-  }
-}
 </script>
 
 <template>
@@ -139,56 +111,7 @@ const handleUserCommand = (command: string) => {
         <div class="divider"></div>
         <div class="user-actions">
           <template v-if="userStore.isLoggedIn && userStore.userInfo">
-            <el-dropdown trigger="click" teleported @command="handleUserCommand">
-              <div class="user-info">
-                <el-avatar 
-                  :src="userStore.avatar" 
-                  :size="32"
-                  class="user-avatar"
-                >
-                  {{ userStore.username?.charAt(0)?.toUpperCase() }}
-                </el-avatar>
-                <span class="user-nickname">
-                  {{ userStore.userInfo?.nickname || userStore.userInfo?.username || '用户' }}
-                </span>
-              </div>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="profile">
-                    <el-icon><User /></el-icon>
-                    个人中心
-                  </el-dropdown-item>
-                  <el-dropdown-item command="favorites">
-                    <el-icon><Star /></el-icon>
-                    我的收藏
-                  </el-dropdown-item>
-                  <el-dropdown-item command="posts">
-                    <el-icon><Document /></el-icon>
-                    我的帖子
-                  </el-dropdown-item>
-                  <el-dropdown-item command="history">
-                    <el-icon><Clock /></el-icon>
-                    浏览历史
-                  </el-dropdown-item>
-                  <el-dropdown-item command="repair">
-                    <el-icon><Tickets /></el-icon>
-                    报修中心
-                  </el-dropdown-item>
-                  <el-dropdown-item command="createPoem">
-                    <el-icon><Edit /></el-icon>
-                    发布新诗
-                  </el-dropdown-item>
-                  <el-dropdown-item v-if="userStore.userInfo?.role === 'admin'" divided command="admin">
-                    <el-icon><Setting /></el-icon>
-                    后台管理
-                  </el-dropdown-item>
-                  <el-dropdown-item divided command="logout">
-                    <el-icon><SwitchButton /></el-icon>
-                    退出登录
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
+            <UserMenuDropdown />
           </template>
           <template v-else>
             <el-button type="primary" link @click="goToLogin" class="login-btn">登录</el-button>
@@ -436,43 +359,6 @@ const handleUserCommand = (command: string) => {
     background: rgba(255, 255, 255, 0.15);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
   }
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 20px;
-  transition: all 0.3s ease;
-  
-  &:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-    transform: scale(1.02);
-  }
-}
-
-.user-avatar {
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  
-  &:hover {
-    border-color: #ffd700;
-    box-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
-    transform: scale(1.05);
-  }
-}
-
-.user-nickname {
-  color: #f0e6d3;
-  font-size: 14px;
-  max-width: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .login-btn {

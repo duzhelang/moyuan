@@ -94,6 +94,7 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     SealKeyword: typeof import('./components/game/SealKeyword.vue')['default']
     SkillChips: typeof import('./components/ai-chat/SkillChips.vue')['default']
+    UserMenuDropdown: typeof import('./components/common/UserMenuDropdown.vue')['default']
     VerdictBanner: typeof import('./components/game/VerdictBanner.vue')['default']
     VoiceInputButton: typeof import('./components/game/VoiceInputButton.vue')['default']
   }

@@ -24,9 +24,11 @@ defineProps<{
 .qr-text {
   color: whitesmoke;
   font-size: 18px;
-  padding: 4px 12px;
+  padding: 4px 14px;
+  border-radius: 4px;
+  /* 不加底色框，仅靠文字阴影提升可读性 */
   transition: all 0.3s ease;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  text-shadow: 1px 1px 3px #000, 0 0 6px rgba(0, 0, 0, 0.8);
 }
 
 .qr-popup {
@@ -53,8 +55,9 @@ defineProps<{
 }
 
 .qr-code-link:hover .qr-text {
-  font-size: 19px;
-  text-shadow: 0 0 10px white;
+  color: #ffd700;
+  /* 悬停同样不加底色框，仅金色文字 + 光晕 */
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
 }
 
 .qr-code-link:hover .qr-popup {

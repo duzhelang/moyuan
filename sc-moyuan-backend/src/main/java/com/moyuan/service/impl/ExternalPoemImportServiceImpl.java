@@ -8,6 +8,7 @@ import com.moyuan.service.DynastyService;
 import com.moyuan.service.ExternalPoemImportService;
 import com.moyuan.service.PoemService;
 import com.moyuan.service.PoetService;
+import com.moyuan.util.PoetDefaultAvatar;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.CacheManager;
@@ -225,6 +226,8 @@ public class ExternalPoemImportServiceImpl implements ExternalPoemImportService 
         newPoet.setDynastyId(dynastyId);
         newPoet.setPoetType(POET_TYPE_ANCIENT);
         newPoet.setStatus(createStatus);
+        // 与其它建号入口保持一致，自动建号时即智能分配预设头像
+        newPoet.setAvatar(PoetDefaultAvatar.getAvatar(newPoet));
         poetService.save(newPoet);
         if (createStatus == STATUS_PUBLISHED) {
             poetService.clearAllCache();

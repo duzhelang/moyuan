@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getAdminPoets, createAdminPoet, updateAdminPoet, deleteAdminPoet } from '@/api/modules/admin'
+import { getAdminPoets, createAdminPoet, updateAdminPoet, deleteAdminPoet, refreshPoetAvatars } from '@/api/modules/admin'
 import { getDynastyList } from '@/api/modules/dynasty'
 import ImageUpload from '@/components/common/ImageUpload.vue'
 
@@ -143,6 +143,22 @@ const loadPoetsForAvatar = async () => {
   }
 }
 
+// 刷新诗人头像：回填缺失/错配的预设头像（保留已上传的真实肖像）
+const refreshingAvatars = ref(false)
+const handleRefreshAvatars = async () => {
+  refreshingAvatars.value = true
+  try {
+    const res = await refreshPoetAvatars()
+    ElMessage.success(`头像刷新完成，更新 ${res.data} 条`)
+    fetchData()
+    loadPoetsForAvatar()
+  } catch (error) {
+    console.error('刷新诗人头像失败', error)
+  } finally {
+    refreshingAvatars.value = false
+  }
+}
+
 onMounted(() => {
   fetchData()
   fetchDynasties()
@@ -160,6 +176,7 @@ onMounted(() => {
           <span>诗人列表</span>
           <div>
             <el-button size="small" @click="openBatchAvatarUpload">批量上传头像</el-button>
+            <el-button size="small" :loading="refreshingAvatars" @click="handleRefreshAvatars">刷新头像</el-button>
             <el-button type="primary" size="small" @click="handleAdd">新增诗人</el-button>
           </div>
         </div>

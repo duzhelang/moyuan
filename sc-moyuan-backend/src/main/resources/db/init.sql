@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS `poet` (
   `evaluation` TEXT DEFAULT NULL COMMENT '历史评价',
   `anecdotes` TEXT DEFAULT NULL COMMENT '轶事典故',
   `avatar` VARCHAR(255) DEFAULT NULL COMMENT '头像URL',
-  `poet_type` VARCHAR(20) DEFAULT 'ancient' COMMENT '诗人类型：ancient-古籍，modern-现代',
+  `poet_type` VARCHAR(20) DEFAULT 'ancient' COMMENT '诗人类型：ancient-古籍，modern-现代，foreign-外国',
   `style` VARCHAR(32) DEFAULT NULL COMMENT '诗人流派/风格，如：豪放派、婉约派、浪漫主义',
   `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -629,7 +629,9 @@ INSERT IGNORE INTO `ai_module_config` (`module_code`, `module_name`, `require_vi
 ('poetry_chat', '诗词AI助手', 0, 2, '诗词鉴赏与解析助手，专门回答关于诗词的问题，包括译文注释、鉴赏赏析、创作背景、历史文化背景等', '你是一个文化渊博的大学者，精通古今中外诗歌知识。回答要求：1.语言简洁精炼，避免冗余；2.使用通俗易懂的中文；3.重点突出，条理清晰；4.不要使用markdown格式，直接输出纯文本；{styleHint}', 300, 'concise', 120, 0),
 ('write_poem', '看图写诗', 1, 1, '古典诗词创作大师，擅长捕捉画面意境并转化为诗词意象，精通五言七言律诗绝句及各词牌创作', '你是一位古典诗词创作大师，擅长捕捉画面意境并转化为诗词意象。请根据图片内容创作一首诗词，讲究格律严谨、意象优美、情景交融。', 300, 'balanced', 300, 1),
 ('analyze', '诗词鉴赏分析', 0, 2, '诗词学术研究专家，从意境营造、修辞手法、情感表达、历史背景、艺术特色等多维度深入解读诗词', '你是诗词学术研究专家，请从意境营造、修辞手法、情感表达、历史背景、艺术特色等多维度深入解读诗词，分析鞭辟入里、引经据典，兼顾学术严谨与通俗易懂。', 500, 'detailed', 500, 1),
-('couplet', 'AI对对联', 0, 2, '对联艺术大师，深谙平仄声律、词性对仗、意境相承之道', '你是对联艺术大师，深谙平仄声律、词性对仗、意境相承之道。请根据上联创作工整合律的下联，对仗精巧、意境深远。', 100, 'concise', 100, 0);
+('couplet', 'AI对对联', 0, 2, '对联艺术大师，深谙平仄声律、词性对仗、意境相承之道', '你是对联艺术大师，深谙平仄声律、词性对仗、意境相承之道。请根据上联创作工整合律的下联，对仗精巧、意境深远。', 100, 'concise', 100, 0),
+-- AI诗词评分（诗词详情页 AI 评分专用，model_id=4 即 DeepSeek）
+('rating', 'AI诗词评分', 0, 4, '诗词评分专家，从意境营造、格律音韵、修辞手法、情感表达、语言凝练等维度综合评价诗词并给出分数', '你是诗词评审专家，请从意境营造、格律音韵、修辞手法、情感表达、语言凝练等维度对诗词进行专业评价，分析简洁到位；末尾另起一行给出评分（格式：评分：X.X，满分5分）。', 500, 'detailed', 500, 1);
 
 -- ============================================================
 -- 初始数据：测试用户

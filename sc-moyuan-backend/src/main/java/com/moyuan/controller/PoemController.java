@@ -100,8 +100,9 @@ public class PoemController {
             @RequestParam(defaultValue = "10") int pageSize,
             @RequestParam(required = false) Boolean isOriginal,
             @RequestParam(required = false) Boolean hasCertifiedPoet,
-            @RequestParam(required = false, defaultValue = "latest") String sortBy) {
-        IPage<Poem> page = poemService.getModernPoems(pageNum, pageSize, isOriginal, hasCertifiedPoet, sortBy);
+            @RequestParam(required = false, defaultValue = "latest") String sortBy,
+            @RequestParam(required = false) String keyword) {
+        IPage<Poem> page = poemService.getModernPoems(pageNum, pageSize, isOriginal, hasCertifiedPoet, sortBy, keyword);
         Map<String, Object> result = new HashMap<>();
         result.put("list", page.getRecords());
         result.put("total", page.getTotal());

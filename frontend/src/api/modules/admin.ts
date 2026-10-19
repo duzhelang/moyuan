@@ -85,6 +85,11 @@ export function deleteAdminPoet(id: number) {
   return request.delete<void>(`/admin/poets/${id}`)
 }
 
+/** 刷新诗人头像：按最新规则回填缺失/地区错配的预设头像，保留真实肖像 */
+export function refreshPoetAvatars() {
+  return request.post<number>('/admin/poets/refresh-avatars')
+}
+
 export function getAdminForumPosts(params: { page?: number; size?: number; keyword?: string }) {
   return request.get<{ records: any[]; total: number }>('/admin/forum-posts', { params })
 }

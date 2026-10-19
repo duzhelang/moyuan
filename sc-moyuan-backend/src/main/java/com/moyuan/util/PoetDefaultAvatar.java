@@ -75,7 +75,6 @@ public class PoetDefaultAvatar {
     public static String getAvatar(Poet poet) {
         String name = poet.getName();
         String poetType = poet.getPoetType();
-        Long dynastyId = poet.getDynastyId();
 
         // 第0级：精确流派匹配（基于 poet.style 字段，优先级最高）
         String style = poet.getStyle();
@@ -89,9 +88,8 @@ public class PoetDefaultAvatar {
         // 判断性别
         boolean isFemale = FEMALE_POETS.contains(name);
 
-        // 判断是否西方诗人
-        boolean isWestern = WESTERN_POETS.contains(name)
-                || (dynastyId == null && !"modern".equals(poetType));
+        // 判断是否西方（外国）诗人：仅按名单与 poet_type='foreign' 判定
+        boolean isWestern = isWestern(poet);
 
         // 判断时期
         boolean isModern = "modern".equals(poetType);
@@ -146,6 +144,37 @@ public class PoetDefaultAvatar {
                 .flatMap(List::stream)
                 .toList();
         return randomPick(all);
+    }
+
+    /**
+     * 是否西方（外国）诗人。
+     * 只按「姓名名单」或「poet_type='foreign'」判定，不再用 dynastyId 缺失做启发式判定，
+     * 避免把「无朝代归属的中国诗人」误判为西方诗人、被配成西方面孔。
+     */
+    public static boolean isWestern(Poet poet) {
+        return WESTERN_POETS.contains(poet.getName()) || "foreign".equals(poet.getPoetType());
+    }
+
+    /**
+     * 修复存量头像：仅在「当前头像为空」或「预设头像地区与诗人不匹配」时才重新分配；
+     * 已配置真实肖像（如 /img/cd_suolue_*.jpg、外部图片链接）时保持原样，避免覆盖真实图片。
+     *
+     * @return 需要写入的新头像路径；返回 null 表示无需改动
+     */
+    public static String reassignIfNeeded(Poet poet) {
+        String current = poet.getAvatar();
+        if (current == null || current.isBlank()) {
+            return getAvatar(poet);
+        }
+        // 非预设头像池（真实肖像 / 外部链接）一律保留
+        if (!current.contains(AVATAR_PATH)) {
+            return null;
+        }
+        boolean presetWestern = current.contains("/avatar_west_");
+        if (presetWestern != isWestern(poet)) {
+            return getAvatar(poet);
+        }
+        return null;
     }
 
     private static String randomPick(List<String> list) {

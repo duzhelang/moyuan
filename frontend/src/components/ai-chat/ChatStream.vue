@@ -1,8 +1,23 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useUserStore } from '@/stores/user'
 import type { ChatMessage } from '@/composables/useAiChat'
 import type { AiPersona } from '@/configs/ai-chat/personas'
 import type { AiSkill } from '@/configs/ai-chat/skills'
+
+const userStore = useUserStore()
+
+/** AI 侧统一使用的可爱卡通头像 */
+const AI_AVATAR = '/img/ai_chat_avatar.jpg'
+
+/** 用户头像缺失时的兜底字符（昵称/用户名首字母） */
+const userInitial = computed(
+  () => (userStore.userInfo?.nickname || userStore.userInfo?.username || '我').charAt(0).toUpperCase()
+)
+
+/** 判断某行是否为 AI（assistant）发言 */
+const isAssistantRow = (m: { kind: string; role?: 'user' | 'assistant' }) =>
+  m.kind !== 'text' || m.role === 'assistant'
 
 const props = defineProps<{
   messages: ChatMessage[]
@@ -150,7 +165,12 @@ onMounted(scrollToBottom)
         class="chat-row"
         :class="m.kind === 'text' ? m.role : 'assistant'"
       >
-        <div class="chat-bubble" :class="{ 'is-assistant': m.kind !== 'text' || m.role === 'assistant' }">
+        <div class="chat-avatar" :class="isAssistantRow(m) ? 'is-ai' : 'is-user'">
+          <img v-if="isAssistantRow(m)" :src="AI_AVATAR" alt="AI 头像" />
+          <img v-else-if="userStore.avatar" :src="userStore.avatar" alt="用户头像" />
+          <span v-else class="chat-avatar-fallback">{{ userInitial }}</span>
+        </div>
+        <div class="chat-bubble" :class="{ 'is-assistant': isAssistantRow(m) }">
           <template v-if="m.kind === 'text'">
             <p class="chat-text">{{ m.content }}</p>
           </template>
@@ -192,6 +212,9 @@ onMounted(scrollToBottom)
       </div>
 
       <div v-if="loading" class="chat-row assistant">
+        <div class="chat-avatar is-ai">
+          <img :src="AI_AVATAR" alt="AI 头像" />
+        </div>
         <div class="chat-bubble is-assistant chat-loading">
           <span class="chat-loading-spinner"></span>
           <span class="chat-loading-text">墨渊正在提笔…</span>
@@ -269,14 +292,64 @@ onMounted(scrollToBottom)
 
 .chat-row {
   display: flex;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .chat-row.user {
   justify-content: flex-end;
 }
 
+/* 用户行：头像置于气泡右侧 */
+.chat-row.user .chat-avatar {
+  order: 2;
+}
+
 .chat-row.assistant {
   justify-content: flex-start;
+}
+
+/* 头像 */
+.chat-avatar {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* AI 头像：墨渊棕金描边 + 柔和光晕 */
+.chat-avatar.is-ai {
+  border: 2px solid rgba(201, 160, 99, 0.75);
+  background: #fffcf7;
+  box-shadow: 0 0 8px rgba(139, 69, 19, 0.25);
+}
+
+/* 用户头像：沿用全站统一的金色描边与光晕 */
+.chat-avatar.is-user {
+  border: 2px solid rgba(255, 215, 0, 0.55);
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(120, 80, 20, 0.28));
+  box-shadow:
+    0 0 10px rgba(255, 215, 0, 0.45),
+    0 0 20px rgba(255, 215, 0, 0.2),
+    inset 0 0 6px rgba(255, 215, 0, 0.25);
+}
+
+.chat-avatar-fallback {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffd700;
+  text-shadow: 0 0 6px rgba(255, 215, 0, 0.5);
 }
 
 .chat-bubble {

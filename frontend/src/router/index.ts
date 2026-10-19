@@ -264,6 +264,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'AI模型管理', requiresAuth: true, requiresAdmin: true }
       },
       {
+        path: 'ai-config',
+        name: 'AdminAiConfig',
+        component: () => import('@/views/admin/ai-config.vue'),
+        meta: { title: 'AI功能配置', requiresAuth: true, requiresAdmin: true }
+      },
+      {
         path: 'home-navigation',
         name: 'AdminHomeNavigation',
         component: () => import('@/views/admin/home-navigation.vue'),

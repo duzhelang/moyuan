@@ -327,8 +327,8 @@ public class SmartSearchServiceImpl implements SmartSearchService {
     private LambdaQueryWrapper<Poem> buildPoemWrapper(Long dynastyId, Long categoryId, Long poetId, Set<Long> poetNameIds) {
         LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Poem::getStatus, STATUS_ACTIVE);
-        // 外文诗（poem_type='foreign'）不参与古籍智能检索
-        wrapper.ne(Poem::getPoemType, "foreign");
+        // 古籍诗文列表仅展示古典诗词（poem_type='classical'），严格排除现代诗（modern）与外文诗（foreign）
+        wrapper.eq(Poem::getPoemType, "classical");
         if (dynastyId != null) wrapper.eq(Poem::getDynastyId, dynastyId);
         if (poetId != null && !poetNameIds.isEmpty()) {
             wrapper.and(w -> w.eq(Poem::getPoetId, poetId).or().in(Poem::getPoetId, poetNameIds));

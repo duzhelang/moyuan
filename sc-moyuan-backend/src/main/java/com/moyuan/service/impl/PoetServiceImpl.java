@@ -63,8 +63,12 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
             wrapper.eq(Poet::getPoetType, "ancient");
         } else if ("modern".equals(poetType)) {
             wrapper.eq(Poet::getPoetType, "modern");
+        } else if ("foreign".equals(poetType)) {
+            wrapper.eq(Poet::getPoetType, "foreign");
         }
-        wrapper.orderByDesc(Poet::getCreateTime);
+        // 排序规则：按创建时间升序，新收录/自动建号的诗人排在列表末尾（旧 id 优先），
+        // 同一时间再按主键升序保证分页顺序稳定
+        wrapper.orderByAsc(Poet::getCreateTime).orderByAsc(Poet::getId);
         IPage<Poet> page = poetMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
         page.getRecords().forEach(poet -> {
             if (poet.getDynastyId() != null) {
@@ -209,5 +213,25 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
             cacheManager.getCache("poets").clear();
             log.info("诗人缓存已清除");
         }
+    }
+
+    @Override
+    public int refreshAvatars() {
+        List<Poet> poets = poetMapper.selectList(
+                new LambdaQueryWrapper<Poet>().eq(Poet::getStatus, 1));
+        int updated = 0;
+        for (Poet poet : poets) {
+            String target = PoetDefaultAvatar.reassignIfNeeded(poet);
+            if (target != null && !target.equals(poet.getAvatar())) {
+                poet.setAvatar(target);
+                poetMapper.updateById(poet);
+                updated++;
+            }
+        }
+        if (updated > 0) {
+            clearAllCache();
+        }
+        log.info("诗人头像回填完成，更新 {} 条", updated);
+        return updated;
     }
 }

@@ -6,12 +6,12 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.moyuan.entity.Poem;
 import com.moyuan.entity.PoemRating;
 import com.moyuan.mapper.PoemRatingMapper;
+import com.moyuan.service.AiModelConfigService;
 import com.moyuan.service.AiService;
 import com.moyuan.service.PoemRatingService;
 import com.moyuan.service.PoemService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,11 +28,12 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class PoemRatingServiceImpl extends ServiceImpl<PoemRatingMapper, PoemRating> implements PoemRatingService {
 
+    /** 诗词 AI 评分的模块编码：独立模块，便于在后台「AI功能配置」单独调整模型与提示词 */
+    private static final String RATING_MODULE_CODE = "rating";
+
     private final PoemService poemService;
     private final AiService aiService;
-
-    @Value("${ai.default-model:zhipu}")
-    private String defaultAiModel;
+    private final AiModelConfigService aiModelConfigService;
 
     @Override
     @Transactional
@@ -76,15 +77,18 @@ public class PoemRatingServiceImpl extends ServiceImpl<PoemRatingMapper, PoemRat
             throw new RuntimeException("诗词不存在");
         }
 
-        String analysis = aiService.analyzePoem(poem.getContent(), defaultAiModel);
+        // 走模块绑定（analyze），不再写死模型；后台「AI 模型管理 → 模块配置」可直接调整
+        String analysis = aiService.analyzePoem(poem.getContent(), null, RATING_MODULE_CODE);
         BigDecimal score = parseAiScore(analysis);
         String summary = generateSummary(analysis);
         String cleanedAnalysis = cleanSpecialSymbols(analysis);
+        // 记录实际生效的模型名，便于前端展示与问题排查
+        String actualModel = aiModelConfigService.resolveModelName(null, RATING_MODULE_CODE, null);
 
         PoemRating existing = getAiRating(poemId);
         if (existing != null) {
             existing.setScore(score);
-            existing.setAiModel(defaultAiModel);
+            existing.setAiModel(actualModel);
             existing.setAiSummary(summary);
             existing.setAiAnalysis(cleanedAnalysis);
             updateById(existing);
@@ -94,7 +98,7 @@ public class PoemRatingServiceImpl extends ServiceImpl<PoemRatingMapper, PoemRat
             rating.setUserId(null);
             rating.setScore(score);
             rating.setRatingType(2);
-            rating.setAiModel(defaultAiModel);
+            rating.setAiModel(actualModel);
             rating.setAiSummary(summary);
             rating.setAiAnalysis(cleanedAnalysis);
             save(rating);

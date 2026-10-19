@@ -50,6 +50,8 @@ const fetchPoets = async () => {
       params.poetType = 'ancient'
     } else if (activeTab.value === 'modern') {
       params.poetType = 'modern'
+    } else if (activeTab.value === 'foreign') {
+      params.poetType = 'foreign'
     }
     const res = await getPoetList(params)
     poets.value = res.data.list
@@ -179,6 +181,7 @@ onMounted(() => {
         <el-radio-group v-model="activeTab" @change="handleTabChange">
           <el-radio-button value="ancient">古籍诗人</el-radio-button>
           <el-radio-button value="modern">现代诗人</el-radio-button>
+          <el-radio-button value="foreign">外国诗人</el-radio-button>
           <el-radio-button value="all">全部</el-radio-button>
         </el-radio-group>
       </div>
@@ -186,7 +189,7 @@ onMounted(() => {
       <div class="filter-section">
         <el-card class="filter-card">
           <div class="filter-row">
-            <div class="filter-item">
+            <div class="filter-item" v-if="activeTab !== 'foreign'">
               <label>朝代：</label>
               <el-select
                 v-model="filters.dynastyId"

@@ -595,7 +595,7 @@ onMounted(async () => {
             <div class="info-card-body">
               <div v-if="poem.poetId" class="poet-brief-content">
                 <div class="poet-brief-meta">
-                  <el-avatar :size="48">{{ poem.poetName?.charAt(0) }}</el-avatar>
+                  <el-avatar :size="48" :src="poem.poetAvatar">{{ poem.poetName?.charAt(0) }}</el-avatar>
                   <div class="poet-brief-info">
                     <span class="poet-brief-name">{{ poem.poetName }}</span>
                     <span class="poet-brief-dynasty" v-if="poem.dynastyName">{{ poem.dynastyName }}</span>

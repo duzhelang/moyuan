@@ -27,6 +27,7 @@ export interface Poem {
   categoryName?: string
   poetId?: number
   poetName?: string
+  poetAvatar?: string
   translation?: string
   appreciation?: string
   background?: string

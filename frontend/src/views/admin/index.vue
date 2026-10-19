@@ -40,7 +40,8 @@ const adminMenus = [
     label: 'AI功能',
     icon: 'Cpu',
     children: [
-      { path: '/admin/ai-models', name: 'AdminAiModels', icon: 'Cpu', label: 'AI模型管理' }
+      { path: '/admin/ai-models', name: 'AdminAiModels', icon: 'Cpu', label: 'AI模型管理' },
+      { path: '/admin/ai-config', name: 'AdminAiConfig', icon: 'Setting', label: 'AI功能配置' }
     ]
   },
   {

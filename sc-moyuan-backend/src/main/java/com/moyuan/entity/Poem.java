@@ -38,6 +38,8 @@ public class Poem {
     @TableField(exist = false)
     private String dynastyName;
     @TableField(exist = false)
+    private String poetAvatar;
+    @TableField(exist = false)
     private String categoryName;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

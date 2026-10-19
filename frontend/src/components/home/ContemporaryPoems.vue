@@ -127,7 +127,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { likePoem, favoritePoem } from '@/api/modules/poem'
+import { likePoem, favoritePoem, getModernPoems } from '@/api/modules/poem'
 import { getComments, createComment, likeComment } from '@/api/modules/forum'
 import type { Comment } from '@/types/model'
 import PoetryDetailDialog from '@/components/business/PoetryDetailDialog.vue'
@@ -154,10 +154,25 @@ const {
 } = usePoemCardNavigation()
 
 // 当代卡片主体点击跳详情：点赞/收藏/评论等交互元素及评论区不触发跳转
-const handleContemporaryCardClick = (e: MouseEvent, poem: PoemCard) => {
+const handleContemporaryCardClick = async (e: MouseEvent, poem: PoemCard) => {
   const el = e.target as HTMLElement
   if (el.closest('button, a, input, textarea, select')) return
   if (el.closest('.contemporary_comment_section')) return
+  // 时代画像独立转跳逻辑：静态数据无 id，改为按「标题优先、无标题取正文前 12 字」关键字
+  // 查询已入库的现代诗（poem_type='modern'）解析出真实 id，直接进入详情页
+  const keyword = (poem.title || poem.content.slice(0, 12)).trim()
+  if (keyword) {
+    try {
+      const res = await getModernPoems({ pageNum: 1, pageSize: 5, keyword })
+      const matched = res.data.list.find(p => p.id)
+      if (matched) {
+        router.push(`/poem/${matched.id}`)
+        return
+      }
+    } catch {
+      // 查询异常时走弹窗兜底
+    }
+  }
   openStaticPoemDetail(poem.title || '', poem.author, poem.content)
 }
 
