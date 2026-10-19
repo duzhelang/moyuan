@@ -25,7 +25,8 @@ const adminMenus = [
       { path: '/admin/poets', name: 'AdminPoets', icon: 'EditPen', label: '诗人管理' },
       { path: '/admin/poet-featured', name: 'AdminPoetFeatured', icon: 'Star', label: '精选诗人管理' },
       { path: '/admin/home-navigation', name: 'AdminHomeNavigation', icon: 'Guide', label: '首页导航管理' },
-      { path: '/admin/vision-articles', name: 'AdminVisionArticles', icon: 'Notebook', label: '诗话视野管理' }
+      { path: '/admin/vision-articles', name: 'AdminVisionArticles', icon: 'Notebook', label: '诗话视野管理' },
+      { path: '/admin/system-knowledge', name: 'AdminSystemKnowledge', icon: 'Collection', label: '系统知识库' }
     ]
   },
   {

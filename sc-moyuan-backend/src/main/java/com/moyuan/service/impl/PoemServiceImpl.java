@@ -64,7 +64,7 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
     }
 
     @Override
-    public IPage<Poem> getAdminPoemList(int pageNum, int pageSize, String keyword, Integer auditStatus) {
+    public IPage<Poem> getAdminPoemList(int pageNum, int pageSize, String keyword, Integer auditStatus, String sort) {
         LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
         // 外文诗不在后台诗词列表中展示
         wrapper.ne(Poem::getPoemType, "foreign");
@@ -75,7 +75,12 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
         if (auditStatus != null) {
             wrapper.eq(Poem::getAuditStatus, auditStatus);
         }
-        wrapper.orderByDesc(Poem::getCreateTime);
+        // 按创建时间排序，asc 为正序（最早在前），desc 为倒序（最新在前）
+        if ("asc".equalsIgnoreCase(sort)) {
+            wrapper.orderByAsc(Poem::getCreateTime).orderByAsc(Poem::getId);
+        } else {
+            wrapper.orderByDesc(Poem::getCreateTime).orderByDesc(Poem::getId);
+        }
         IPage<Poem> page = poemMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
         populatePoetAndDynasty(page.getRecords());
         return page;

@@ -15,6 +15,7 @@ import PoetCard from '@/components/business/PoetCard.vue'
 import HomeNavigation from '@/components/business/HomeNavigation.vue'
 import DailyPoetry from '@/components/business/DailyPoetry.vue'
 import QrCodeLink from '@/components/common/QrCodeLink.vue'
+import LoginPrompt from '@/components/common/LoginPrompt.vue'
 import HomeNavBar from '@/components/business/HomeNavBar.vue'
 import GameMiniPanel from '@/components/game/GameMiniPanel.vue'
 import { HomeCarousel, ForumPreview, AncientPoemSelection, ContemporaryPoems } from '@/components/home'
@@ -26,6 +27,16 @@ const NAV_ANIMATION_KEY = 'home_nav_animation_config'
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+
+// AI 功能登录门禁：未登录时弹出提示并引导登录，不发起请求
+const loginPromptVisible = ref(false)
+const ensureLogin = (): boolean => {
+  if (!userStore.isLoggedIn) {
+    loginPromptVisible.value = true
+    return false
+  }
+  return true
+}
 
 const hotPosts = ref<ForumPost[]>([])
 
@@ -138,6 +149,7 @@ const clearOcrImage = () => {
 }
 
 const handleOcrRecognize = async () => {
+  if (!ensureLogin()) return
   if (!ocrFile.value) {
     ElMessage.warning('请先上传图片')
     return
@@ -209,6 +221,7 @@ const loadRandomPoem = () => {
 loadRandomPoem()
 
 const handleCoupletMatch = async (upperCouplet?: string) => {
+  if (!ensureLogin()) return
   const input = upperCouplet || coupletInput.value.trim()
   if (!input) {
     ElMessage.warning('请输入上联')
@@ -248,6 +261,7 @@ const acrosticLines = computed(() =>
 )
 
 const handleAcrosticGenerate = async (chars?: string) => {
+  if (!ensureLogin()) return
   const input = (chars ?? acrosticInput.value).trim()
   if (!input) {
     ElMessage.warning('请输入藏头字')
@@ -329,6 +343,7 @@ const meterRenderLines = computed(() =>
 )
 
 const handleMeterCheck = async () => {
+  if (!ensureLogin()) return
   const input = meterInput.value.trim()
   if (!input) {
     ElMessage.warning('请输入要校验的诗句')
@@ -518,6 +533,7 @@ const clearImage = () => {
 }
 
 const handleWritePoem = async () => {
+  if (!ensureLogin()) return
   if (!imageFile.value) {
     ElMessage.warning('请先上传图片')
     return
@@ -538,6 +554,7 @@ const handleWritePoem = async () => {
 }
 
 const handleAnalyzePoem = async () => {
+  if (!ensureLogin()) return
   if (!analyzeInput.value.trim()) {
     ElMessage.warning('请输入要分析的诗句')
     return
@@ -1294,6 +1311,7 @@ onActivated(() => {
         <ContemporaryPoems />
       </div>
     </div>
+    <LoginPrompt v-model:visible="loginPromptVisible" message="AI 功能需要登录后才能使用" />
   </div>
 
 

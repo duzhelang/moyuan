@@ -141,7 +141,8 @@
 | **论坛模块** | 用户发帖、评论互动、精选推荐、投稿上传 | ✅ 已实现 |
 | **用户模块** | 用户注册、登录认证、个人中心、收藏管理 | ✅ 已实现 |
 | **管理模块** | 系统管理、用户管理、内容管理、数据统计、操作日志 | ✅ 已实现 |
-| **AI模块** | AI诗词问答（多模型切换）、看图写诗、智能分析、AI对对联、藏头诗、平仄格律校验、飞花令/诗词接龙、古籍OCR识文 | ✅ 已实现 |
+| **AI模块** | AI诗词问答（多模型切换）、看图写诗、智能分析、AI对对联、藏头诗、平仄格律校验、古籍OCR识文 | ✅ 已实现 |
+| **AI 对话页「诗宝阁」** | 角色化统一对话入口（6 角色 × 10 能力），非流式 + SSE 流式问答 | ✅ 已实现 |
 | **搜索模块** | 全文搜索、诗人搜索、诗词搜索、帖子搜索 | ✅ 已实现 |
 | **文件模块** | 文件上传、图片管理 | ✅ 已实现 |
 | **浏览历史模块** | 记录用户浏览历史、查看历史记录 | ✅ 已实现 |
@@ -155,20 +156,22 @@
 | **韵脚查询模块** | 平水韵韵部、韵脚查询（数据库优先 + AI 兜底落库） | ✅ 已实现 |
 | **诗人认证与投稿模块** | 诗人认证申请、内容建议、草稿管理 | ✅ 已实现 |
 | **静态页面模块** | 关于我们/用户协议等静态页面 + 联系我们 | ✅ 已实现 |
-| **外部诗词模块** | 后端代理外部诗源（poetrydb / 今日诗词） | ✅ 已实现 |
+| **外部诗词模块** | 后端代理外部诗源（poetrydb / 今日诗词 / 外文诗词先读库后兜底） | ✅ 已实现 |
+| **游戏模块** | 飞花令 / 诗词接龙独立对局（三模式三难度、回合计时、三级真实性校验链、游客模式） | ✅ 已实现 |
 
 ### AI功能特性
 
 - **多模型支持**：智谱AI、DeepSeek、Kimi、小米MiMo、OpenRouter（统一适配层 `AiModelRegistry` + `OpenAiCompatibleAdapter`）
-- **模块绑定**：通过 `ai_module_config` 将业务模块（chat/poet_chat/poetry_chat/write_poem/analyze/couple 等）绑定到具体模型，可独立切换
-- **智能问答**：诗词相关问题解答
+- **模块绑定**：通过 `ai_module_config` 将业务模块（chat/poet_chat/poetry_chat/write_poem/analyze/couple 及游戏模块 feihua_gen_ancient/feihua_gen_normal/feihua_gen_super/feihua_verify/feihua_topic/chain_generate 等）绑定到具体模型，可独立切换
+- **智能问答**：诗词相关问题解答（`POST /api/ai/chat` 非流式 / `POST /api/ai/chat/stream` SSE 流式）
+- **AI 对话页「诗宝阁」**：角色化统一对话入口（6 角色 × 10 能力），复用 `POST /api/ai/chat`（阶段一）/ `POST /api/ai/chat/stream`（阶段二 SSE 流式）
 - **看图写诗**：基于图片生成诗词（视觉模型）
 - **古籍识文（OCR）**：图片文字识别
 - **智能分析**：诗词内容分析解读
 - **AI 对对联**：输入上联生成下联（遵循平仄规则）
 - **藏头诗**：输入藏头字生成藏头诗（五言/七言）
 - **平仄格律校验**：AI 逐句标注平仄、判定合律并识别平水韵韵部
-- **飞花令 / 诗词接龙**：按令字检索名句、以句末字接龙
+- **飞花令 / 诗词接龙**：独立游戏模块（`/api/game`，飞花令按令字检索名句、接龙以句末字衔接；游客仅存 Redis、登录用户落库）
 - **模型管理**：管理员可配置、切换 AI 模型及模块绑定
 - **AI 内容审核**：AI 生成内容入库审核
 
@@ -210,7 +213,7 @@ cd sc-moyuan-backend
 mysql -u root -p < src/main/resources/db/init.sql
 ```
 
-> **说明**：`init.sql` 是全量合并版脚本（v3.2），包含数据库创建、全部 **29 张表**建表语句及基础种子数据（13 个朝代、74 个诗词分类、14 位诗人、23 首诗词、3 个测试用户、29 条 AI 模型、6 条 AI 模块配置、6 位精选诗人、7 条论坛示例帖、24 条首页导航）。详见 [数据库初始化说明文档](sc-moyuan-backend/src/main/resources/db/数据库初始化说明文档.md)。
+> **说明**：`init.sql` 是全量合并版脚本（v3.4），包含数据库创建、全部 **31 张表**建表语句及基础种子数据（13 个朝代、74 个诗词分类、13 位诗人、43 首诗词（含 20 首外文诗）、3 个测试用户、29 条 AI 模型、14 条 AI 模块配置、6 位精选诗人、7 条论坛示例帖、10 篇诗话视野文章、24 条首页导航）。详见 [数据库初始化说明文档](sc-moyuan-backend/src/main/resources/db/数据库初始化说明文档.md)。
 
 ### 3. 后端配置
 
@@ -349,7 +352,7 @@ moyuan-master2/
 │   ├── database/                # 表结构文档 + migrations/ 迁移脚本
 │   ├── api/ business/ guides/   # API/业务/开发指南
 │   ├── diagrams/ verification/ reports/ ...
-├── scripts/                     # 辅助脚本（测试、数据修复、哈希校验等）
+├── scripts/                     # 一次性脚本目录（执行后即清理，不作长期留存）
 ├── .github/workflows/test.yml   # CI 测试工作流
 ├── .trae/                       # 项目文档与规则（团队协作配置）
 ├── .gitignore                   # Git 忽略文件
@@ -470,7 +473,7 @@ moyuan-master2/
 | 28 | repair_order | 报修工单表 | 1万+ |
 | 29 | repair_comment | 报修评论表 | 10万+ |
 
-> 完整建表语句与种子数据见 [init.sql](sc-moyuan-backend/src/main/resources/db/init.sql)；数据库变更迁移脚本见 `docs/database/migrations/`。
+> 完整建表语句与种子数据见 [init.sql](sc-moyuan-backend/src/main/resources/db/init.sql)（数据库权威定义）；增量迁移脚本为过渡性文件，参照 `docs/database/migrations/` 规范执行后，结构变更需合并进 `init.sql` 并清理脚本。
 
 ### ER关系图
 
@@ -988,6 +991,29 @@ A: 管理员可以在后台管理页面配置 AI 模型：
 
 ## 更新日志
 
+### v1.11.1 (2026-10-19)
+- ✅ 修复诗人详情页「诗词作品」点击行为：原先误用外部诗词弹窗 `PoetryDetailDialog`（仅按标题查接口盒子，多数诗词只返回正文、赏析类字段为空且易命中同名他人作品），现改为本地库诗词直接 `router.push('/poem/{id}')` 跳转诗词详情页，与 `composables/usePoemCardNavigation.ts` 的统一导航规则一致；该页不再引入 `PoetryDetailDialog`
+- ✅ 诗词详情页 AI 评价卡片不再暴露底层模型名称，统一展示为品牌名「云砚墨知」
+- ✅ AI 对话页全站文案更名：原「诗阁」统一更名为「诗宝阁」（首页导航栏、路由页面标题、后台模块说明与相关文档同步；路由 `/ai-chat` 与后端接口保持不变）
+
+### v1.11.0 (2026-10)
+- ✅ 新增「诗宝阁」阶段二后端流式接口 `POST /api/ai/chat/stream`（SSE，`text/event-stream`）：`SseEmitter` + JDK `HttpClient` 逐行解析上游；链路 `AiController.chatStream` → `AiService.streamChat` → `AiModelRegistry.streamByModule` → 适配器 `streamChat`
+- ✅ 新增 `@SkipOperationLog` 注解，排除流式接口的操作日志与访问日志切面，避免 `SseEmitter` 序列化失败
+- ✅ 新增「飞花令 / 诗词接龙」独立游戏模块（后端 `/api/game/**`）：飞花令（古制严格/标准/超级三模式、easy/medium/hard 三难度）、诗词接龙（首字衔接）；回合计时与超时判定、每回合 2 次重试、累计 3 错判负、三级真实性校验链（本地 ngram 全文检索 → 外部 APIHZ → LLM 兜底）；游客对局仅存 Redis，登录用户对局与有效诗句落 `game_record` / `game_sentence`
+- ✅ 游戏模块接口加入 `SecurityConfig` 与前端 `PUBLIC_PATHS` 白名单，支持游客匿名对局
+
+### v1.10.0 (2026-10)
+- ✅ 游戏模块计时规则细化：作答请求体新增 `activeSeconds` 上报字段，超时改为后端按上报有效时长判定（`activeSeconds >= 35`），前端计时改为「监测 5 秒 / 计时 30 秒 / 缓冲 5 秒」三子态且打字即暂停
+
+### v1.9.0 (2026-10)
+- ✅ 外文诗词入库：`poem` 表新增 `author` 列，一次性写入 20 首公有领域英文名篇（`poem_type='foreign'`，`source='PoetryDB'`，已合并至 `db/init.sql`）
+- ✅ 新增 `GET /api/external-poetry/foreign`：外文诗词「先读库、库空才实时兜底」（兜底结果不落库）
+- ✅ 外文诗隔离：诗词列表 / 后台诗词列表 / 全局搜索 / 古籍智能检索 / 收藏列表均排除 `poem_type='foreign'`
+- ✅ 诗词列表页外文页签加载超过 5 秒时，在过场动画上提示「检索耗时较久，请耐心等待…」
+
+### v1.8.0 (2026-10)
+- ✅ 新增「诗宝阁」AI 对话页（`/ai-chat`）：角色化统一对话入口，6 角色 × 10 能力（命题作诗/集句成诗/藏头诗/润色入律/平仄校验/意象典故/诗话点评/飞花令/诗词接龙/群贤论诗）；阶段一复用 `POST /api/ai/chat`（moduleCode=chat）非流式接口，会话按角色分存 localStorage，首页导航栏新增「诗宝阁」入口（原首页 AI 工具入口保持不变，两处并存）
+
 ### v1.7.0 (2026-09 ~ 2026-10)
 - ✅ 新增「诗云星空」3D 可视化页面（Three.js，诗人为中心 + 诗作环绕的层级布局）
 - ✅ 新增报修中心模块（工单提交/详情/评论/关闭/满意度 + 后台报修管理）
@@ -1130,6 +1156,6 @@ A: 管理员可以在后台管理页面配置 AI 模型：
 
 ---
 
-**文档版本**：v2.5
-**最后更新**：2026-10-14
+**文档版本**：v2.9
+**最后更新**：2026-10-19（修复诗人详情页「诗词作品」点击改为跳转诗词详情页）
 **维护人员**：墨渊开发团队

@@ -1,20 +1,22 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePoemStore } from '@/stores/poem'
 import { useUserStore } from '@/stores/user'
+import { useAiChatStore } from '@/stores/aiChat'
 import { ElMessage } from 'element-plus'
 import type { Comment, PoemRatingsData } from '@/types/model'
 import { likePoem, favoritePoem, getPoemRatings, ratePoem, requestAiRating, regenerateAiRating, getCurrentUserRating } from '@/api/modules/poem'
 import { getComments, createComment, likeComment } from '@/api/modules/forum'
 import { addHistory } from '@/api/modules/history'
-import { getAiModuleConfig, type AiModuleConfig, fillAiContent, getFillStatus, previewAiContent, submitForReview } from '@/api/modules/ai'
+import { fillAiContent, getFillStatus, previewAiContent, submitForReview } from '@/api/modules/ai'
 import LoginPrompt from '@/components/common/LoginPrompt.vue'
 
 const route = useRoute()
 const router = useRouter()
 const poemStore = usePoemStore()
 const userStore = useUserStore()
+const aiChatStore = useAiChatStore()
 
 const loading = ref(false)
 const poem = computed(() => poemStore.currentPoem)
@@ -48,18 +50,6 @@ const previewField = ref('')
 const previewContent = ref('')
 const submittingReview = ref(false)
 
-interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: number
-}
-const aiChatVisible = ref(false)
-const aiChatMessages = ref<ChatMessage[]>([])
-const aiChatInput = ref('')
-const aiChatLoading = ref(false)
-const aiChatContainerRef = ref<HTMLElement | null>(null)
-const aiConfig = ref<AiModuleConfig | null>(null)
-
 const poemSentences = computed(() => {
   if (!poem.value?.content) return []
   return poem.value.content
@@ -82,6 +72,16 @@ const fetchPoem = async () => {
   loading.value = true
   try {
     await poemStore.fetchPoemDetail(poemId.value)
+    const loaded = poem.value
+    if (loaded?.id) {
+      aiChatStore.setContext({
+        type: 'poem',
+        id: loaded.id,
+        name: loaded.title,
+        author: loaded.poetName,
+        content: loaded.content
+      })
+    }
     // 浏览历史接口需要登录态，游客调用会返回 401 并触发误跳登录页，故仅登录后记录
     if (userStore.isLoggedIn) {
       addHistory(route.params.id as unknown as number, 1).catch(() => {})
@@ -302,6 +302,7 @@ onUnmounted(() => {
     clearInterval(aiPollTimer.value)
     aiPollTimer.value = null
   }
+  aiChatStore.clearContext()
 })
 
 const handleRequestAiRating = async () => {
@@ -382,126 +383,6 @@ const handleCommentPageChange = (page: number) => {
 
 const openExternalLink = (url: string) => {
   window.open(url, '_blank', 'noopener,noreferrer')
-}
-
-const scrollToAiChatBottom = () => {
-  nextTick(() => {
-    if (aiChatContainerRef.value) {
-      aiChatContainerRef.value.scrollTop = aiChatContainerRef.value.scrollHeight
-    }
-  })
-}
-
-const fetchAiConfig = async (showPrompt: boolean = false) => {
-  if (!userStore.isLoggedIn) {
-    if (showPrompt) {
-      loginPromptVisible.value = true
-    }
-    return
-  }
-  try {
-    const res = await getAiModuleConfig('chat')
-    aiConfig.value = res.data
-  } catch {
-    console.error('获取AI配置失败')
-  }
-}
-
-const buildAiPrompt = (userMessage: string, isFirst: boolean = false) => {
-  const poemTitle = poem.value?.title || '这首诗'
-  const poemContent = poem.value?.content || ''
-  const config = aiConfig.value
-
-  let systemConstraint = ''
-  if (config?.promptTemplate) {
-    const maxLength = isFirst ? (config.firstResponseLength || 80) : (config.maxLength || 200)
-    const styleHint = isFirst
-      ? `这是首次提问，请用2-3句话简要概括即可，不超过${config.firstResponseLength || 80}字`
-      : `根据问题复杂度适当展开，但不超过${maxLength}字`
-
-    systemConstraint = config.promptTemplate
-      .replace(/\{poetName\}/g, poem.value?.poetName || '')
-      .replace(/\{poemTitle\}/g, poemTitle)
-      .replace(/\{poemContent\}/g, poemContent)
-      .replace(/\{maxLength\}/g, String(maxLength))
-      .replace(/\{styleHint\}/g, styleHint)
-
-    if (!systemConstraint.includes(poemTitle)) {
-      systemConstraint += `\n\n当前诗词：《${poemTitle}》\n诗词内容：${poemContent}`
-    }
-  } else {
-    systemConstraint = `你是一位文化渊博的大学者，精通古今中外诗歌知识。你正在为用户赏析诗歌《${poemTitle}》。
-
-诗词内容：
-${poemContent}
-
-回答要求：
-1. 语言简洁精炼，避免冗余
-2. 使用通俗易懂的中文
-3. 重点突出，条理清晰
-4. 不要使用markdown格式，直接输出纯文本
-${isFirst ? '5. 这是首次提问，请用2-3句话简要概括即可' : '5. 根据问题复杂度适当展开，但不超过200字'}`
-  }
-
-  return `【系统设定】${systemConstraint}\n\n【用户问题】${userMessage}`
-}
-
-const sendAiChatMessage = async (message?: string, isFirst: boolean = false) => {
-  const msg = message || aiChatInput.value.trim()
-  if (!msg || aiChatLoading.value) return
-
-  if (!userStore.isLoggedIn) {
-    loginPromptVisible.value = true
-    return
-  }
-
-  if (!aiConfig.value) {
-    await fetchAiConfig(false)
-  }
-
-  aiChatMessages.value.push({
-    role: 'user',
-    content: msg,
-    timestamp: Date.now()
-  })
-  aiChatInput.value = ''
-  aiChatLoading.value = true
-  scrollToAiChatBottom()
-
-  try {
-    const { chat } = await import('@/api/modules/ai')
-    const prompt = buildAiPrompt(msg, isFirst)
-    const res = await chat({ message: prompt, moduleCode: 'chat' })
-    aiChatMessages.value.push({
-      role: 'assistant',
-      content: res.data.reply || '抱歉，暂时无法回答',
-      timestamp: Date.now()
-    })
-  } catch {
-    aiChatMessages.value.push({
-      role: 'assistant',
-      content: 'AI服务暂时不可用，请稍后重试',
-      timestamp: Date.now()
-    })
-  } finally {
-    aiChatLoading.value = false
-    scrollToAiChatBottom()
-  }
-}
-
-const handleAiChatKeydown = (e: Event | KeyboardEvent) => {
-  if ((e as KeyboardEvent).key === 'Enter' && !(e as KeyboardEvent).shiftKey) {
-    e.preventDefault()
-    sendAiChatMessage()
-  }
-}
-
-const toggleAiChat = () => {
-  aiChatVisible.value = !aiChatVisible.value
-  if (aiChatVisible.value && userStore.isLoggedIn && aiChatMessages.value.length === 0) {
-    fetchAiConfig()
-    sendAiChatMessage('请简要介绍一下这首诗', true)
-  }
 }
 
 onMounted(async () => {
@@ -647,7 +528,7 @@ onMounted(async () => {
               <div v-else class="info-empty">
                 <p class="empty-hint">创作背景尚待考证，欢迎补充</p>
                 <div class="ai-fill-actions">
-                  <el-button type="primary" size="small" plain @click="sendAiChatMessage('请介绍一下这首诗的创作背景')">
+                  <el-button type="primary" size="small" plain @click="aiChatStore.open()">
                     <el-icon><MagicStick /></el-icon>
                     请求AI分析
                   </el-button>
@@ -703,7 +584,7 @@ onMounted(async () => {
               <div v-else class="info-empty">
                 <p class="empty-hint">赏析内容待整理，期待您的见解</p>
                 <div class="ai-fill-actions">
-                  <el-button type="primary" size="small" plain @click="sendAiChatMessage('请对这首诗进行翻译赏析')">
+                  <el-button type="primary" size="small" plain @click="aiChatStore.open()">
                     <el-icon><MagicStick /></el-icon>
                     请求AI翻译赏析
                   </el-button>
@@ -781,7 +662,7 @@ onMounted(async () => {
                   <el-icon><Cpu /></el-icon>
                   AI 评价
                 </span>
-                <span class="ai-model">{{ ratingsData.aiRating.aiModel || '未知模型' }}</span>
+                <span class="ai-model">云砚墨知</span>
               </div>
             </template>
             <div class="ai-rating-content">
@@ -964,65 +845,6 @@ onMounted(async () => {
         </div>
       </div>
     </div>
-
-    <div class="ai-float-btn" @click="toggleAiChat" :class="{ active: aiChatVisible }">
-      <el-icon :size="24"><MagicStick /></el-icon>
-    </div>
-
-    <Teleport to="body">
-      <Transition name="ai-chat-slide">
-        <div v-if="aiChatVisible" class="ai-chat-dialog">
-          <div class="ai-chat-header">
-            <div class="ai-chat-title">
-              <el-icon><MagicStick /></el-icon>
-              <span>AI诗词助手</span>
-            </div>
-            <el-icon class="ai-chat-close" @click="aiChatVisible = false"><Close /></el-icon>
-          </div>
-          <div class="ai-chat-messages" ref="aiChatContainerRef">
-            <div
-              v-for="(msg, index) in aiChatMessages"
-              :key="index"
-              :class="['chat-message', msg.role]"
-            >
-              <div class="message-avatar">
-                <el-avatar :size="32" v-if="msg.role === 'user'">我</el-avatar>
-                <el-avatar :size="32" v-else class="ai-avatar">AI</el-avatar>
-              </div>
-              <div class="message-body">
-                <div class="message-content">{{ msg.content }}</div>
-              </div>
-            </div>
-            <div v-if="aiChatLoading" class="chat-message assistant">
-              <div class="message-avatar">
-                <el-avatar :size="32" class="ai-avatar">AI</el-avatar>
-              </div>
-              <div class="message-body">
-                <div class="message-content loading">思考中...</div>
-              </div>
-            </div>
-          </div>
-          <div class="ai-chat-input">
-            <el-input
-              v-model="aiChatInput"
-              type="textarea"
-              :rows="2"
-              placeholder="输入问题，按Enter发送..."
-              @keydown="handleAiChatKeydown"
-              :disabled="aiChatLoading"
-            />
-            <el-button
-              type="primary"
-              @click="sendAiChatMessage()"
-              :loading="aiChatLoading"
-              :disabled="!aiChatInput.trim()"
-            >
-              <el-icon><Promotion /></el-icon>
-            </el-button>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
 
     <LoginPrompt
       v-model:visible="loginPromptVisible"
@@ -1984,208 +1806,6 @@ onMounted(async () => {
     line-height: $line-height-loose;
     margin: 0;
   }
-}
-
-.ai-float-btn {
-  position: fixed;
-  right: 30px;
-  bottom: 30px;
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, $accent-color 0%, $primary-color 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 1000;
-  box-shadow: 0 4px 15px rgba($primary-color, 0.35);
-  transition: all $transition-fast;
-
-  .el-icon {
-    color: white;
-    font-size: 24px;
-  }
-
-  &:hover {
-    transform: scale(1.1);
-    box-shadow: 0 6px 20px rgba($primary-color, 0.45);
-  }
-
-  &.active {
-    background: linear-gradient(135deg, $primary-color 0%, $primary-700 100%);
-  }
-}
-
-.ai-chat-dialog {
-  position: fixed;
-  right: 90px;
-  bottom: 90px;
-  width: 380px;
-  height: 500px;
-  background: $surface-primary;
-  border: 1px solid rgba($border-color-bronze, 0.5);
-  border-radius: $border-radius-lg;
-  box-shadow: $box-shadow-xl;
-  display: flex;
-  flex-direction: column;
-  z-index: 1001;
-  overflow: hidden;
-}
-
-.ai-chat-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: $spacing-md $spacing-lg;
-  background: linear-gradient(135deg, $primary-color 0%, $primary-700 100%);
-  color: white;
-
-  .ai-chat-title {
-    display: flex;
-    align-items: center;
-    gap: $spacing-sm;
-    font-size: $font-size-base;
-    font-weight: 600;
-  }
-
-  .ai-chat-close {
-    cursor: pointer;
-    font-size: 18px;
-    opacity: 0.8;
-    transition: opacity $transition-fast;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-}
-
-.ai-chat-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: $spacing-md;
-  @include scrollbar;
-
-  .chat-message {
-    display: flex;
-    gap: $spacing-sm;
-    margin-bottom: $spacing-md;
-    align-items: flex-start;
-    animation: fadeIn 0.3s ease;
-
-    &.user {
-      flex-direction: row-reverse;
-
-      .message-content {
-        background: linear-gradient(135deg, $primary-400 0%, $primary-color 100%);
-        color: white;
-        border-radius: 18px 18px 4px 18px;
-      }
-    }
-
-    &.assistant {
-      .message-content {
-        background: $surface-secondary;
-        color: $text-color;
-        border-radius: 18px 18px 18px 4px;
-      }
-    }
-  }
-
-  .message-avatar {
-    flex-shrink: 0;
-
-    .ai-avatar {
-      background: linear-gradient(135deg, $accent-color 0%, $primary-color 100%);
-      color: white;
-      font-size: 11px;
-      font-weight: 600;
-      box-shadow: 0 2px 8px rgba($primary-color, 0.3);
-    }
-  }
-
-  .message-body {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .message-content {
-    font-size: 13px;
-    line-height: 1.6;
-    padding: 10px 14px;
-    word-break: break-word;
-
-    &.loading {
-      color: $text-color-secondary;
-      font-style: italic;
-    }
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.ai-chat-input {
-  padding: $spacing-md;
-  border-top: 1px solid rgba($border-color-bronze, 0.4);
-  display: flex;
-  gap: $spacing-sm;
-  align-items: flex-end;
-  background: linear-gradient(to bottom, $surface-primary, $surface-secondary);
-
-  .el-textarea {
-    flex: 1;
-
-    @include el-comment-input;
-
-    :deep(.el-textarea__inner) {
-      border-radius: $comment-input-radius;
-      padding: $comment-input-padding;
-      background-color: $background-color-light;
-      border: 1px solid rgba($border-color-bronze, 0.7);
-      box-shadow: none;
-    }
-
-    :deep(.el-textarea__inner:focus) {
-      border-color: $primary-color;
-      box-shadow: $input-focus-ring;
-    }
-  }
-
-  .el-button {
-    border-radius: 20px;
-    padding: 10px 24px;
-    font-weight: 500;
-    background: linear-gradient(135deg, $primary-400 0%, $primary-color 100%);
-    border: none;
-    color: #fff;
-    box-shadow: 0 2px 8px rgba($primary-color, 0.3);
-
-    &:hover {
-      background: linear-gradient(135deg, $primary-400 0%, $primary-600 100%);
-      box-shadow: 0 4px 12px rgba($primary-color, 0.4);
-    }
-  }
-}
-
-.ai-chat-slide-enter-active,
-.ai-chat-slide-leave-active {
-  transition: all 0.3s ease;
-}
-
-.ai-chat-slide-enter-from,
-.ai-chat-slide-leave-to {
-  opacity: 0;
-  transform: translateY(20px) scale(0.95);
 }
 
 /* ============================================================

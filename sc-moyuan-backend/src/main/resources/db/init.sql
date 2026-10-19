@@ -1,10 +1,12 @@
 -- ============================================================
--- 版本：v3.3（全量合并版）
--- 日期：2026-10-14
+-- 版本：v3.4（全量合并版）
+-- 日期：2026-10-20
 -- 说明：全量合并所有表结构和初始数据，删除过渡迁移脚本
 --       所有建表使用 IF NOT EXISTS，数据使用 INSERT IGNORE
 --       v3.3：poem 表新增 author 列；新增 20 首外文诗词初始数据
 --             （poem_type='foreign'，合并自 migration_012_foreign_poems.sql）
+--       v3.4：poet_featured 表补齐两个唯一键 uk_poet_featured_poet / uk_poet_featured_name
+--             （合并自 migration_005_poet_featured_unique.sql，原遗漏未并入）
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS `moyuan` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -283,6 +285,8 @@ CREATE TABLE IF NOT EXISTS `poet_featured` (
   `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_poet_featured_poet` (`poet_id`),
+  UNIQUE KEY `uk_poet_featured_name` (`name`),
   KEY `idx_poet_featured_status` (`status`),
   KEY `idx_poet_featured_sort` (`sort_order`),
   KEY `idx_poet_featured_show` (`is_show`)
@@ -632,6 +636,14 @@ INSERT IGNORE INTO `ai_module_config` (`module_code`, `module_name`, `require_vi
 ('couplet', 'AI对对联', 0, 2, '对联艺术大师，深谙平仄声律、词性对仗、意境相承之道', '你是对联艺术大师，深谙平仄声律、词性对仗、意境相承之道。请根据上联创作工整合律的下联，对仗精巧、意境深远。', 100, 'concise', 100, 0),
 -- AI诗词评分（诗词详情页 AI 评分专用，model_id=4 即 DeepSeek）
 ('rating', 'AI诗词评分', 0, 4, '诗词评分专家，从意境营造、格律音韵、修辞手法、情感表达、语言凝练等维度综合评价诗词并给出分数', '你是诗词评审专家，请从意境营造、格律音韵、修辞手法、情感表达、语言凝练等维度对诗词进行专业评价，分析简洁到位；末尾另起一行给出评分（格式：评分：X.X，满分5分）。', 500, 'detailed', 500, 1);
+
+-- 系统用法助手（供全站 AI 小助手查阅系统用法后作答）
+-- 统一默认规则：用 INSERT ... SELECT 绑定「后台设定的默认模型」（ai_model.is_default=1），不写死具体供应商
+INSERT IGNORE INTO `ai_module_config` (`module_code`, `module_name`, `require_vision`, `model_id`, `description`, `prompt_template`, `max_response_length`, `response_style`, `first_response_length`, `enable_markdown`)
+SELECT 'system_chat', '系统用法助手', 0, m.`id`, '墨渊系统使用说明助手，只回答本系统页面、玩法、入口、规则等用法问题', '你是「墨渊」的系统用法小助理，只依据【系统资料】回答本系统相关问题（页面在哪、玩法怎么玩、功能怎么用、规则是什么）。\n规则：\n1) 只依据【系统资料】作答，资料中没有的内容直接回答「我暂时没有这方面信息」，禁止编造页面、入口或功能；\n2) 不要回答诗词内容、诗人介绍、诗词赏析类问题，遇到这类问题提示用户切换「诗词助理」；\n3) 回答简洁，先给结论再给步骤，不超过{maxLength}字；\n4) 不使用 markdown 格式，直接输出纯文本；\n5) 涉及可体验的功能时，可在回答末尾另起一行输出 [[路由]] 标记（路由必须取自【系统资料】中给出的 route），前端会渲染成可点击入口。', 300, 'concise', 120, 0
+FROM `ai_model` m
+WHERE m.`is_default` = 1 AND m.`is_enabled` = 1
+LIMIT 1;
 
 -- ============================================================
 -- 初始数据：测试用户
@@ -1328,7 +1340,7 @@ VALUES
 
 -- ============================================================
 -- 初始数据：外文诗词（20 首公有领域英文名篇，poem_type='foreign'）
--- 说明：与 docs/database/migrations/migration_012_foreign_poems.sql 保持一致；
+-- 说明：外文诗词数据由迁移脚本 migration_012_foreign_poems.sql 合并至本文件，该迁移脚本已清理；
 --       一次性固定数据，后续不再新增外文诗。
 --       显式主键 id=9001~9020 保证幂等；poet_id/dynasty_id/category_id 均为 NULL。
 --       source='PoetryDB'（不可用 'external'，避免被 fix-external-poems 误捞）。
@@ -1354,3 +1366,58 @@ INSERT IGNORE INTO `poem` (`id`, `title`, `content`, `author`, `source`, `status
 (9018, 'To Helen', 'Helen, thy beauty is to me\n  Like those Nicean barks of yore,\nThat gently, o''er a perfumed sea,\n  The weary, wayworn wanderer bore\n  To his own native shore.\n\nOn desperate seas long wont to roam,\n  Thy hyacinth hair, thy classic face,\nThy Naiad airs have brought me home\n  To the glory that was Greece,\nTo the grandeur that was Rome.\n\nLo! in yon brilliant window niche,\n  How statue-like I see thee stand,\n  The agate lamp within thy hand!\nAh, Psyche, from the regions which\n  Are Holy Land!', 'Edgar Allan Poe', 'PoetryDB', 1, 'foreign'),
 (9019, 'Ode to the West Wind', 'O wild West Wind, thou breath of Autumn''s being,\nThou, from whose unseen presence the leaves dead\nAre driven, like ghosts from an enchanter fleeing,\n\nYellow, and black, and pale, and hectic red,\nPestilence-stricken multitudes: O thou,\nWho chariotest to their dark wintry bed\n\nThe winged seeds, where they lie cold and low,\nEach like a corpse within its grave, until\nThine azure sister of the Spring shall blow\n\nHer clarion o''er the dreaming earth, and fill\n(Driving sweet buds like flocks to feed in air)\nWith living hues and odours plain and hill:\n\nWild Spirit, which art moving everywhere;\nDestroyer and preserver; hear, oh, hear!\n\nThou on whose stream, mid the steep sky''s commotion,\nLoose clouds like earth''s decaying leaves are shed,\nShook from the tangled boughs of Heaven and Ocean,\n\nAngels of rain and lightning: there are spread\nOn the blue surface of thine aery surge,\nLike the bright hair uplifted from the head\n\nOf some fierce Maenad, even from the dim verge\nOf the horizon to the zenith''s height,\nThe locks of the approaching storm. Thou dirge\n\nOf the dying year, to which this closing night\nWill be the dome of a vast sepulchre,\nVaulted with all thy congregated might\n\nOf vapours, from whose solid atmosphere\nBlack rain, and fire, and hail will burst: oh, hear!\n\nThou who didst waken from his summer dreams\nThe blue Mediterranean, where he lay,\nLulled by the coil of his crystalline streams,\n\nBeside a pumice isle in Baiae''s bay,\nAnd saw in sleep old palaces and towers\nQuivering within the wave''s intenser day,\n\nAll overgrown with azure moss and flowers\nSo sweet, the sense faints picturing them! Thou\nFor whose path the Atlantic''s level powers\n\nCleave themselves into chasms, while far below\nThe sea-blooms and the oozy woods which wear\nThe sapless foliage of the ocean, know\n\nThy voice, and suddenly grow gray with fear,\nAnd tremble and despoil themselves: oh, hear!\n\nIf I were a dead leaf thou mightest bear;\nIf I were a swift cloud to fly with thee;\nA wave to pant beneath thy power, and share\n\nThe impulse of thy strength, only less free\nThan thou, O uncontrollable! If even\nI were as in my boyhood, and could be\n\nThe comrade of thy wanderings over Heaven,\nAs then, when to outstrip thy skiey speed\nScarce seemed a vision; I would ne''er have striven\n\nAs thus with thee in prayer in my sore need.\nOh, lift me as a wave, a leaf, a cloud!\nI fall upon the thorns of life! I bleed!\n\nA heavy weight of hours has chained and bowed\nOne too like thee: tameless, and swift, and proud.\n\nMake me thy lyre, even as the forest is:\nWhat if my leaves are falling like its own!\nThe tumult of thy mighty harmonies\n\nWill take from both a deep, autumnal tone,\nSweet though in sadness. Be thou, Spirit fierce,\nMy spirit! Be thou me, impetuous one!\n\nDrive my dead thoughts over the universe\nLike withered leaves to quicken a new birth!\nAnd, by the incantation of this verse,\n\nScatter, as from an unextinguished hearth\nAshes and sparks, my words among mankind!\nBe through my lips to unawakened earth\n\nThe trumpet of a prophecy! O, Wind,\nIf Winter comes, can Spring be far behind?', 'Percy Bysshe Shelley', 'PoetryDB', 1, 'foreign'),
 (9020, 'The Sick Rose', 'O rose, thou art sick!\n  The invisible worm,\nThat flies in the night,\n  In the howling storm,\n\nHas found out thy bed\n  Of crimson joy,\nAnd his dark secret love\n  Does thy life destroy.', 'William Blake', 'PoetryDB', 1, 'foreign');
+
+-- ============================================================
+-- 29. 系统知识库表（供 AI 小助手查阅系统用法）
+-- 说明：供全站 AI 小助手（system_chat 模块）查阅系统页面、玩法、入口与规则后作答。
+--       code 为条目标识（英文点号格式），route 只填真实存在的前端路由。
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `system_knowledge` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `code` VARCHAR(64) NOT NULL COMMENT '条目标识，如 play.feihualing',
+  `title` VARCHAR(100) NOT NULL COMMENT '标题',
+  `category` VARCHAR(32) NOT NULL COMMENT '分类：play-玩法 / page-页面 / feature-功能 / account-账号',
+  `keywords` VARCHAR(500) DEFAULT NULL COMMENT '关键词，英文逗号分隔',
+  `aliases` VARCHAR(500) DEFAULT NULL COMMENT '同义词/别名，英文逗号分隔',
+  `body` VARCHAR(1000) NOT NULL COMMENT '正文说明（简洁，不超过 300 字）',
+  `steps` TEXT DEFAULT NULL COMMENT '步骤，每行一条，换行符分隔',
+  `faq` TEXT DEFAULT NULL COMMENT 'FAQ 的 JSON 数组文本',
+  `route` VARCHAR(200) DEFAULT NULL COMMENT '关联前端路由，如 /game/feihua',
+  `is_show` TINYINT NOT NULL DEFAULT 1 COMMENT '是否启用：0-停用，1-启用',
+  `sort_order` INT NOT NULL DEFAULT 0 COMMENT '排序',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_system_knowledge_code` (`code`),
+  KEY `idx_system_knowledge_category` (`category`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统知识库表（供 AI 小助手查阅系统用法）';
+
+-- ============================================================
+-- 初始数据：系统知识库条目（24 条，供 system_chat 模块检索）
+-- ============================================================
+INSERT IGNORE INTO `system_knowledge` (`code`, `title`, `category`, `keywords`, `aliases`, `body`, `steps`, `faq`, `route`, `is_show`, `sort_order`) VALUES
+('play.feihualing', '飞花令', 'play', '飞花令,对诗,令字,行酒令,诗词游戏,怎么玩', '花令,飞花令游戏', '飞花令是与 AI 对句的诗词游戏，你每回合说出一句含指定「令字」的真实古诗词名句，AI 轮流接句，接不上或超时即判负。入口在首页 AI 小工具区的「飞花令」卡片，登录用户点击后进入对局页。有古制严格、标准版、超级飞花令三种模式与三档难度可选。现代诗不参与本游戏。', '选择模式与难度\n设定令字（如「花」）\n每回合提交一句含令字的古诗词，单回合限时 30 秒\n与 AI 交替接句，AI 接不上或你超时判负', '[{"q":"飞花令怎么玩","a":"每回合提交一句含指定令字的真实古诗词名句，与 AI 交替接句，AI 接不上或你超时则对方判负。","aliases":["怎么玩飞花令","飞花令规则"]},{"q":"在哪里能玩飞花令","a":"首页 AI 小工具区有「飞花令」卡片，登录用户点击进入对局页。","aliases":["飞花令入口"]},{"q":"飞花令有几种模式","a":"有古制严格、标准版、超级飞花令三种模式，难度分简单、中等、困难三档。","aliases":["飞花令模式"]}]', '/game/feihua', 1, 10),
+('play.chain', '诗词接龙', 'play', '诗词接龙,接龙,接句,首尾相接,诗词游戏', '接龙游戏,诗龙', '诗词接龙由 AI 起句，你接出的诗句首字须与上一句末字相同，再交给 AI 接，交替进行；一方接不上即判负。入口在首页 AI 小工具区的「诗词接龙」卡片，登录后进入对局页。开局可限定朝代范围，起句、AI 接句与你的作答都会在该朝代内校验。现代诗不参与本游戏。', '选择朝代范围（默认中国古典诗词不限朝代）\nAI 给出起句，你接出首字等于上句末字的真实古诗名句\n与 AI 交替接句\n接不上或超时判负，链长即有效句数', '[{"q":"诗词接龙怎么玩","a":"AI 起句后，你接的诗句首字要和上一句末字相同，AI 再接，交替进行，接不上的一方判负。","aliases":["接龙怎么玩","接龙规则"]},{"q":"接龙可以限定朝代吗","a":"可以，开局选择具体朝代后，起句、AI 接句与你的作答都会限定在该朝代内校验。","aliases":["接龙朝代"]}]', '/game/chain', 1, 20),
+('play.poetry-cloud', '诗云星空', 'play', '诗云,星空,3D,诗词星图,可视化', '诗云,诗云星空图', '诗云是用 3D 星空展示古诗数据的可视化页面，每位诗人是一颗星，其诗作环绕分布，可缩放旋转浏览。点击诗人星可查看诗人信息与代表作品，点击诗作节点可查看诗词详情。页面底部「配色实验室」可切换配色方案并调节光晕、连线、亮度等显示效果。', '进入诗云页面\n拖动旋转、滚轮缩放浏览星图\n点击诗人星查看诗人信息与作品\n点击诗作节点查看诗词详情', '[{"q":"诗云是什么","a":"诗云是把古诗词数据做成 3D 星空的页面，诗人是星、诗作围绕其分布，可交互浏览。","aliases":["诗云星空是什么"]},{"q":"诗云怎么用","a":"拖动旋转、滚轮缩放浏览星图，点击诗人或诗作节点查看详情。","aliases":["诗云使用方法"]}]', '/poetry-cloud', 1, 30),
+('play.bao-ge', '诗宝阁AI对话', 'play', '诗宝阁,AI对话,创作,鉴赏,平仄校验,藏头诗', '诗阁,诗宝阁', '诗宝阁是统一的 AI 对话页面，AI 以不同角色与能力帮你完成命题作诗、集句成诗、藏头诗、润色入律、平仄校验、意象典故、诗话点评、飞花令、诗词接龙等任务。可在左侧选择角色与能力后直接对话，会话按角色分别保存在本地。入口在顶部导航的「诗宝阁」。', '打开诗宝阁页面\n选择角色与能力\n输入你的需求并发送\n查看 AI 返回的文本、藏头高亮或平仄标注结果', '[{"q":"诗宝阁是什么","a":"诗宝阁是 AI 对话页面，AI 分角色和能力，可帮你作诗、鉴赏、校验平仄、玩飞花令等。","aliases":["诗阁是什么","诗宝阁在哪"]},{"q":"诗宝阁和首页的AI工具有什么区别","a":"诗宝阁是统一的角色化对话入口，首页 AI 小工具区保留看图写诗、藏头诗、飞花令等快捷入口，两处并存。","aliases":["诗宝阁区别"]}]', '/ai-chat', 1, 40),
+('play.acrostic', '藏头诗', 'play', '藏头诗,藏头,写诗,五言,七言', '藏头', '藏头诗功能可输入 2 至 8 个藏头字并选择五言或七言，由 AI 生成每句首字依次对应藏头字的诗作。入口在首页 AI 小工具区，诗宝阁「诗仙·创作」角色下也提供藏头诗能力。生成结果会高亮每句首字。', '打开首页 AI 小工具区或诗宝阁\n输入 2 至 8 个藏头字\n选择五言或七言\n点击生成，查看首字高亮的藏头诗', '[{"q":"藏头诗怎么用","a":"输入 2 到 8 个藏头字并选择五言或七言，AI 会生成每句首字依次对应藏头字的诗。","aliases":["藏头诗怎么玩","在哪里写藏头诗"]}]', '/', 1, 50),
+('play.tone-check', '平仄格律校验', 'play', '平仄,格律,校验,平水韵,绝句,律诗', '平仄校验,格律校验', '平仄格律校验可粘贴一首绝句或律诗，由 AI 逐句标注平仄、判定是否合律，并识别所属平水韵韵部并给出评价。入口在首页 AI 小工具区，诗宝阁「格律·校正」角色下也提供平仄校验与润色入律能力。', '打开首页 AI 小工具区或诗宝阁\n粘贴一首绝句或律诗\n点击校验，查看逐句平仄标注与合律判定', '[{"q":"平仄怎么校验","a":"粘贴一首绝句或律诗，AI 会逐句标注平仄、判断是否合律并识别所属韵部。","aliases":["平仄校验怎么用","格律校验在哪"]}]', '/', 1, 60),
+('play.write-poem', '看图写诗', 'play', '看图写诗,配诗,图片作诗,AI写诗', '配诗,图片写诗', '看图写诗支持上传一张图片，由 AI 根据画面意境创作一首古典诗词。入口在首页 AI 小工具区。生成的是古典诗词，现代诗不参与本功能。', '打开首页 AI 小工具区\n上传一张图片\n等待 AI 根据画面生成诗词', '[{"q":"看图写诗怎么用","a":"在首页 AI 小工具区上传一张图片，AI 会根据画面意境为你创作一首古诗词。","aliases":["看图写诗怎么玩"]}]', '/', 1, 70),
+('play.ocr', '古籍识文', 'play', '古籍识文,OCR,识别文字,碑帖,书法', '古籍OCR,识文', '古籍识文支持上传古诗词图片、书法作品或碑帖，由 AI 识别其中的文字内容并尽量保留原文结构。入口在首页 AI 小工具区。', '打开首页 AI 小工具区\n上传古籍、书法或碑帖图片\n查看 AI 识别出的文字内容', '[{"q":"古籍识文怎么用","a":"在首页 AI 小工具区上传古诗词、书法或碑帖图片，AI 会识别其中的文字。","aliases":["识文怎么用","OCR怎么用"]}]', '/', 1, 80),
+('play.rating', '诗词AI评分', 'play', 'AI评分,诗词评分,评分,打分', 'AI打分,诗词打分', '诗词详情页提供 AI 评分，由 AI 从意境、格律、修辞、情感、用词等维度评价诗词并给出分数。进入任意诗词详情页即可查看或请求 AI 评分，用户本人也可以手动给诗词评分。', '打开任意诗词详情页\n查看已有评分或请求 AI 评分\n查看 AI 给出的评价与分数', '[{"q":"AI评分在哪里","a":"在诗词详情页可以查看或请求 AI 评分，AI 会多维度评价并给出分数。","aliases":["诗词评分在哪","怎么给诗打分"]}]', '/poem/:id', 1, 90),
+('page.home', '首页', 'page', '首页,主页,导航,入口', '主页', '首页是站点的总入口，聚合了今日诗词、古诗精赏、当代精选、诗话视野、精选诗人等板块，并提供通往诗云、交流广场、诗宝阁的导航。首页还设有 AI 小工具区，可快捷使用看图写诗、藏头诗、飞花令等玩法。', '打开站点默认进入首页\n通过顶部导航切换各板块\n在 AI 小工具区使用各类玩法', '[{"q":"首页有哪些内容","a":"首页聚合了今日诗词、古诗精赏、当代精选、诗话视野、精选诗人等板块，还有 AI 小工具区。","aliases":["主页有什么"]}]', '/', 1, 110),
+('page.search', '寻章摘句', 'page', '寻章摘句,搜索,检索,找诗,诗词列表', '诗词列表,搜索页', '寻章摘句即诗词列表页，支持按朝代、分类、诗人筛选，也能用关键词搜索诗词；题库只含古诗，现代诗单独成页。全局搜索能力内嵌在首页与诗词列表页中，没有单独的搜索页。未登录用户也能浏览与搜索。', '进入诗词列表页\n通过筛选项或关键词查找诗词\n点开卡片查看诗词详情', '[{"q":"寻章摘句在哪里","a":"寻章摘句就是诗词列表页，可在顶部导航进入，支持筛选与关键词搜索。","aliases":["在哪里找诗","诗词列表在哪"]},{"q":"怎么搜索诗词","a":"在诗词列表页输入关键词即可搜索，也可按朝代、分类、诗人筛选。","aliases":["诗词搜索怎么用"]}]', '/poem', 1, 120),
+('page.forum', '诗汇论坛', 'page', '论坛,诗汇论坛,发帖,讨论,交流', '论坛', '诗汇论坛是诗词交流社区，登录后可发布新帖，浏览帖子、评论与点赞。帖子列表支持置顶与精华展示，帖子详情页可查看正文与多级评论。', '进入诗汇论坛\n浏览帖子列表或搜索\n登录后点击发布新帖\n在帖子详情中评论、点赞', '[{"q":"论坛在哪里","a":"在顶部导航进入诗汇论坛，可浏览帖子、发帖、评论与点赞。","aliases":["诗汇论坛在哪","论坛入口"]},{"q":"论坛怎么发帖","a":"登录后进入诗汇论坛，点击发布新帖，编辑标题与内容后提交。","aliases":["怎么发帖"]}]', '/forum', 1, 130),
+('page.vision', '诗话视野', 'page', '诗话视野,文章,阅读,专栏,视野', '视野,文章列表', '诗话视野是文章专栏，展示诗词相关文章列表，支持分类筛选与分页浏览，点击文章可查看详情并点赞。首页也有诗话视野板块展示文章。', '进入诗话视野列表\n按分类筛选或翻页浏览\n点开文章查看详情并点赞', '[{"q":"诗话视野是什么","a":"诗话视野是诗词文章专栏，可浏览文章列表、查看详情并点赞。","aliases":["诗话视野在哪"]}]', '/vision', 1, 140),
+('page.profile', '个人中心', 'page', '个人中心,我的,资料,收藏,历史,认证', '个人主页,我的页面', '个人中心可查看与修改个人资料、上传头像、修改密码，并查看我的收藏、我的点赞、我的帖子和浏览历史。诗人认证申请也从个人中心提交。需要登录后进入。', '登录后进入个人中心\n修改资料、头像或密码\n查看收藏、点赞、帖子与浏览历史\n需要时提交诗人认证申请', '[{"q":"个人中心在哪里","a":"登录后可从用户菜单进入个人中心，管理资料、收藏、历史并提交诗人认证。","aliases":["个人中心在哪","我的在哪"]}]', '/user/profile', 1, 150),
+('page.repair', '报修中心', 'page', '报修,反馈,工单,故障,问题反馈', '报修,反馈中心', '报修中心用于提交报修工单，可填写标题、描述、分类与优先级，提交后查看我的报修列表与详情、添加反馈评论、关闭工单并提交满意度评价。需要登录后进入。', '登录后进入报修中心\n点击提交报修并填写工单信息\n在列表中查看工单详情与进度\n添加评论、关闭工单并评价', '[{"q":"怎么报修","a":"登录后进入报修中心，点击提交报修，填写标题、描述、分类与优先级后提交。","aliases":["报修在哪里","反馈问题"]}]', '/repair', 1, 160),
+('feature.search', '智能检索', 'feature', '搜索,检索,找诗,搜诗人,关键字', '智能搜索,全文搜索', '智能检索支持按关键词搜索诗词、诗人与帖子，首页与诗词列表页内嵌了搜索入口。搜索会记录你的历史，登录后还会根据兴趣给出推荐。', '在首页或诗词列表页输入关键词\n查看匹配的诗词、诗人或帖子\n点开结果查看详情', '[{"q":"怎么搜索","a":"在首页或诗词列表页的搜索框输入关键词，即可搜索诗词、诗人与帖子。","aliases":["怎么搜诗","搜索在哪"]}]', '/poem', 1, 210),
+('feature.favorite', '收藏', 'feature', '收藏,我的收藏,喜欢,书架', '我的收藏', '收藏功能可把喜欢的诗词加入收藏，登录后在个人中心的「我的收藏」中查看。诗词卡片上提供收藏按钮。', '登录后打开诗词\n点击收藏按钮\n在个人中心查看我的收藏', '[{"q":"怎么收藏诗词","a":"登录后在诗词卡片上点击收藏按钮，即可在个人中心的我的收藏中查看。","aliases":["收藏在哪看"]}]', '/user/profile', 1, 220),
+('feature.history', '浏览历史', 'feature', '浏览历史,历史记录,最近看过', '历史记录', '浏览历史记录你访问过的诗词与诗人，登录后可在个人中心查看，也支持清空。历史通过服务端接口保存，不存放在本地。', '登录后浏览诗词或诗人\n在个人中心查看浏览历史\n需要时清空历史记录', '[{"q":"浏览历史在哪","a":"登录后在个人中心可以查看浏览历史，并支持清空。","aliases":["历史记录在哪"]}]', '/user/profile', 1, 230),
+('feature.publish-poem', '发布新诗', 'feature', '发布新诗,投稿,写诗,原创,发布作品', '投稿,发布作品', '发布新诗可提交你自己创作的诗词，支持标记为原创作品。提交后需经过审核才会公开展示。需要登录后进入。', '登录后进入发布新诗页面\n填写标题与正文，可标记原创\n提交后等待审核通过', '[{"q":"怎么发布自己的诗","a":"登录后进入发布新诗页面，填写内容并提交，通过审核后即可展示。","aliases":["怎么投稿","发布作品"]}]', '/poem/create', 1, 240),
+('feature.comment', '评论与互动', 'feature', '评论,点赞,互动,回复', '评论,互动', '在诗词、帖子与文章详情页可以对内容点赞与评论，论坛评论支持多级回复。评论需要有账号登录。', '打开诗词、帖子或文章详情\n点击点赞或发表评论\n在论坛可对评论进行回复', '[{"q":"怎么评论","a":"在诗词、帖子或文章详情页可以直接发表评论与点赞，论坛评论支持多级回复。","aliases":["怎么点赞评论"]}]', '/forum', 1, 250),
+('feature.poet-cert', '诗人认证', 'feature', '诗人认证,认证,成为诗人,诗人标识', '认证诗人,诗人身份', '诗人认证可让你申请成为认证诗人，提交笔名、简介、擅长体裁等资料，由管理员审核，通过后获得诗人标识并在用户主页展示。认证申请从个人中心提交，需要登录。', '登录后进入个人中心\n提交诗人认证申请并填写资料\n等待管理员审核\n通过后在用户主页展示认证状态', '[{"q":"怎么成为认证诗人","a":"登录后在个人中心提交诗人认证申请，填写资料，通过管理员审核后即获得诗人标识。","aliases":["诗人认证怎么申请","怎么认证诗人"]}]', '/user/profile', 1, 260),
+('account.login', '注册与登录', 'account', '注册,登录,账号,密码', '登录,注册', '注册时需要填写用户名、密码和邮箱，登录使用用户名与密码。登录后可享受收藏、发布、评论等完整功能。注册成功会直接登录。', '进入登录页\n没有账号时切换到注册并填写信息\n登录成功后使用完整功能', '[{"q":"怎么注册账号","a":"在注册页填写用户名、密码和邮箱即可注册，注册成功会直接登录。","aliases":["注册在哪","怎么注册"]},{"q":"怎么登录","a":"在登录页输入用户名和密码即可登录。","aliases":["登录在哪"]}]', '/user/login', 1, 310),
+('account.guest-limit', '游客与登录用户的权限差异', 'account', '游客,未登录,权限,差异,登录', '游客权限', '未登录的游客可以浏览诗词、诗人、帖子与文章，也能在首页直接体验飞花令、诗词接龙等小工具（对局仅临时保存）。发布诗词、发帖、评论、点赞、收藏、报修、诗人认证等操作需要登录后才能使用。', '未登录时浏览诗词等公开内容\n登录后解锁发布、评论、收藏等操作', '[{"q":"不登录能用吗","a":"不登录可以浏览诗词、诗人、帖子与文章，也能在首页体验飞花令等小工具；发布、评论、收藏等需要登录。","aliases":["游客能做什么","未登录能干嘛"]}]', NULL, 1, 320),
+('account.ai-login', 'AI功能需要登录', 'account', 'AI功能,登录,权限,使用条件', 'AI需要登录', 'AI 相关功能需要登录后才能使用，包括看图写诗、古籍识文、AI 评分以及诗宝阁对话等。首页的飞花令、诗词接龙小工具游客可在首页直接体验。', '登录账号\n进入 AI 功能入口\n正常使用 AI 能力', '[{"q":"AI功能要登录吗","a":"需要登录后使用，包括看图写诗、古籍识文、AI 评分与诗宝阁对话等；游客可在首页直接体验飞花令、诗词接龙小工具。","aliases":["用AI要登录吗"]}]', NULL, 1, 330);

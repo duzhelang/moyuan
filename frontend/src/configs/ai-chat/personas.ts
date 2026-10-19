@@ -1,5 +1,5 @@
 /**
- * 「诗阁」AI 对话页 —— 角色（Persona）常量
+ * 「诗宝阁」AI 对话页 —— 角色（Persona）常量
  *
  * 角色决定「谁在说话」（身份与语气），与能力（Skill）正交组合。
  * 阶段一：后端 POST /api/ai/chat 恒前置自身 CHAT_SYSTEM_PROMPT，

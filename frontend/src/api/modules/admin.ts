@@ -21,7 +21,7 @@ export function deleteUser(id: number) {
   return request.delete<void>(`/admin/users/${id}`)
 }
 
-export function getAdminPoems(params: { page?: number; size?: number; keyword?: string; auditStatus?: number }) {
+export function getAdminPoems(params: { page?: number; size?: number; keyword?: string; auditStatus?: number; sort?: string }) {
   return request.get<{ records: any[]; total: number }>('/admin/poems', { params })
 }
 
@@ -69,7 +69,7 @@ export function deleteAdminDynasty(id: number) {
   return request.delete<void>(`/admin/dynasties/${id}`)
 }
 
-export function getAdminPoets(params: { page?: number; size?: number }) {
+export function getAdminPoets(params: { page?: number; size?: number; keyword?: string; sort?: string }) {
   return request.get<{ records: any[]; total: number }>('/admin/poets', { params })
 }
 

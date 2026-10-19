@@ -9,14 +9,15 @@ import { getAiModuleConfig, type AiModuleConfig, fillAiContent, getFillStatus, p
 import { savePoetDraft } from '@/api/modules/poet-draft'
 import { getExternalPoems, type PoemSearchResult } from '@/api/modules/external-poetry'
 import { importExternalPoem, fixExternalPoems } from '@/api/modules/poem'
-import PoetryDetailDialog from '@/components/business/PoetryDetailDialog.vue'
 import LoginPrompt from '@/components/common/LoginPrompt.vue'
 import { useUserStore } from '@/stores/user'
+import { useAiChatStore } from '@/stores/aiChat'
 import { useParticles } from '@/composables/useParticles'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const aiChatStore = useAiChatStore()
 
 const particleCanvasRef = ref<HTMLCanvasElement | null>(null)
 useParticles(particleCanvasRef, {
@@ -72,10 +73,6 @@ const draftSaving = ref(false)
 const isMusicPlaying = ref(false)
 let audioElement: HTMLAudioElement | null = null
 
-const poetryDialogVisible = ref(false)
-const selectedPoemTitle = ref('')
-const selectedPoemAuthor = ref('')
-
 const suggestionDialogVisible = ref(false)
 const suggestionSection = ref('')
 const suggestionContent = ref('')
@@ -97,31 +94,12 @@ const poetNameFontSize = ref(38)
 const relatedExpanded = ref(false)
 const floatBtnsBottom = ref(80)
 
-const chatDraggable = ref(false)
-const chatPos = ref({ x: 0, y: 0 })
-const chatDragging = ref(false)
-const chatDragOffset = ref({ x: 0, y: 0 })
-
-interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: number
-}
-const chatMessages = ref<ChatMessage[]>([])
-const chatInput = ref('')
-const chatLoading = ref(false)
-const chatContainerRef = ref<HTMLElement | null>(null)
-const enlargedMessageIndex = ref<number | null>(null)
-
-const toggleMessageEnlarge = (index: number) => {
-  enlargedMessageIndex.value = enlargedMessageIndex.value === index ? null : index
-}
 const aiConfig = ref<AiModuleConfig | null>(null)
 
+// 本地库诗词直接跳转诗词详情页，与站内统一导航规则保持一致
 const openPoetryDetail = (poem: Poem) => {
-  selectedPoemTitle.value = poem.title
-  selectedPoemAuthor.value = poet.value?.name || ''
-  poetryDialogVisible.value = true
+  if (!poem.id) return
+  router.push(`/poem/${poem.id}`)
 }
 
 const sectionContentMap: Record<string, { title: string; field: keyof Poet }> = {
@@ -411,10 +389,12 @@ const fetchPoet = async () => {
     const res = await getPoetById(poetId.value)
     poet.value = res.data
     fetchAiConfig()
+    if (res.data.id) {
+      aiChatStore.setContext({ type: 'poet', id: res.data.id, name: res.data.name })
+    }
     if (res.data.dynastyId) {
       fetchRelatedPoets(res.data.dynastyId)
     }
-    initAiChat()
     if (!res.data.influence) {
       generateAiFeatures()
     }
@@ -756,14 +736,6 @@ const goToRelatedPoet = (id: number) => {
   router.push(`/poet/${id}`)
 }
 
-const scrollToChatBottom = () => {
-  nextTick(() => {
-    if (chatContainerRef.value) {
-      chatContainerRef.value.scrollTop = chatContainerRef.value.scrollHeight
-    }
-  })
-}
-
 const fetchAiConfig = async (showPrompt: boolean = false) => {
   if (!userStore.isLoggedIn) {
     if (showPrompt) {
@@ -776,78 +748,6 @@ const fetchAiConfig = async (showPrompt: boolean = false) => {
     aiConfig.value = res.data
   } catch {
     console.error('获取AI配置失败')
-  }
-}
-
-const buildPrompt = (userMessage: string, isFirst: boolean = false) => {
-  const poetName = poet.value?.name || '该诗人'
-  const config = aiConfig.value
-
-  let systemConstraint = ''
-  if (config?.promptTemplate) {
-    const maxLength = isFirst ? (config.firstResponseLength || 80) : (config.maxLength || 150)
-    const styleHint = isFirst
-      ? `这是首次提问，请用2-3句话简要概括即可，不超过${config.firstResponseLength || 80}字`
-      : `根据问题复杂度适当展开，但不超过${maxLength}字`
-
-    systemConstraint = config.promptTemplate
-      .replace(/\{poetName\}/g, poetName)
-      .replace(/\{maxLength\}/g, String(maxLength))
-      .replace(/\{styleHint\}/g, styleHint)
-  } else {
-    systemConstraint = `你是一个古典诗词文化助手，正在为用户介绍诗人${poetName}。
-回答要求：
-1. 语言简洁精炼，避免冗余
-2. 使用通俗易懂的中文
-3. 重点突出，条理清晰
-4. 不要使用markdown格式，直接输出纯文本
-${isFirst ? '5. 这是首次提问，请用2-3句话简要概括即可' : '5. 根据问题复杂度适当展开，但不超过150字'}`
-  }
-
-  return `【系统设定】${systemConstraint}\n\n【用户问题】${userMessage}`
-}
-
-const sendChatMessage = async (message?: string, isFirst: boolean = false) => {
-  const msg = message || chatInput.value.trim()
-  if (!msg || chatLoading.value) return
-
-  if (!userStore.isLoggedIn) {
-    loginPromptVisible.value = true
-    return
-  }
-
-  if (!aiConfig.value) {
-    await fetchAiConfig(false)
-  }
-
-  chatMessages.value.push({
-    role: 'user',
-    content: msg,
-    timestamp: Date.now()
-  })
-  chatInput.value = ''
-  chatLoading.value = true
-  scrollToChatBottom()
-
-  try {
-    const { chat } = await import('@/api/modules/ai')
-    const prompt = buildPrompt(msg, isFirst)
-    const res = await chat({ message: prompt, moduleCode: 'poet_chat' })
-    chatMessages.value.push({
-      role: 'assistant',
-      content: res.data.reply || '抱歉，暂时无法回答',
-      timestamp: Date.now()
-    })
-  } catch {
-    chatMessages.value.push({
-      role: 'assistant',
-      content: 'AI服务暂时不可用，请稍后重试',
-      timestamp: Date.now()
-    })
-  } finally {
-    chatLoading.value = false
-    scrollToChatBottom()
-    saveChatCache()
   }
 }
 
@@ -894,71 +794,6 @@ const adjustPoetNameFontSize = () => {
   })
 }
 
-const CHAT_CACHE_KEY = 'poet_chat_cache'
-const CHAT_CACHE_DURATION = 60 * 60 * 1000
-
-const getChatCacheKey = () => {
-  return `${CHAT_CACHE_KEY}_${poetId.value}`
-}
-
-const loadChatCache = () => {
-  try {
-    const cacheKey = getChatCacheKey()
-    const cached = localStorage.getItem(cacheKey)
-    if (!cached) return false
-    
-    const data = JSON.parse(cached)
-    const now = Date.now()
-    
-    if (now - data.timestamp > CHAT_CACHE_DURATION) {
-      localStorage.removeItem(cacheKey)
-      return false
-    }
-    
-    if (data.messages && data.messages.length > 0) {
-      chatMessages.value = data.messages
-      return true
-    }
-    return false
-  } catch {
-    return false
-  }
-}
-
-const saveChatCache = () => {
-  try {
-    const cacheKey = getChatCacheKey()
-    const data = {
-      messages: chatMessages.value,
-      timestamp: Date.now()
-    }
-    localStorage.setItem(cacheKey, JSON.stringify(data))
-  } catch (error) {
-    console.error('保存聊天缓存失败:', error)
-  }
-}
-
-const chatStarted = ref(false)
-
-const initAiChat = () => {
-  if (!userStore.isLoggedIn) return
-  if (chatMessages.value.length === 0) {
-    const hasCache = loadChatCache()
-    if (hasCache) {
-      chatStarted.value = true
-    }
-  }
-}
-
-const startAiChat = () => {
-  if (!userStore.isLoggedIn) {
-    loginPromptVisible.value = true
-    return
-  }
-  chatStarted.value = true
-  sendChatMessage(`${poet.value?.name}是谁`, true)
-}
-
 const handleGenerateAiFeatures = () => {
   if (!userStore.isLoggedIn) {
     loginPromptVisible.value = true
@@ -988,76 +823,6 @@ const generateAiFeatures = async () => {
   }
 }
 
-const readChatMessage = (text: string, id: string) => {
-  if (isReading.value && currentReadingId.value === id) {
-    stopReading()
-    return
-  }
-  if (isReading.value) stopReading()
-
-  speechUtterance = new SpeechSynthesisUtterance(text)
-  speechUtterance.lang = 'zh-CN'
-  speechUtterance.rate = 0.9
-  speechUtterance.onend = () => {
-    isReading.value = false
-    currentReadingId.value = null
-  }
-  speechUtterance.onerror = () => {
-    isReading.value = false
-    currentReadingId.value = null
-  }
-  window.speechSynthesis.speak(speechUtterance)
-  isReading.value = true
-  currentReadingId.value = id
-}
-
-const handleChatKeydown = (e: Event | KeyboardEvent) => {
-  if ((e as KeyboardEvent).key === 'Enter' && !(e as KeyboardEvent).shiftKey) {
-    e.preventDefault()
-    sendChatMessage()
-  }
-}
-
-const startChatDrag = (e: MouseEvent) => {
-  const panel = document.querySelector('.panel-ai-chat') as HTMLElement
-  if (!panel) return
-
-  if (!chatDraggable.value) {
-    const rect = panel.getBoundingClientRect()
-    chatPos.value = { x: rect.left, y: rect.top }
-    chatDraggable.value = true
-  }
-
-  chatDragging.value = true
-  chatDragOffset.value = {
-    x: e.clientX - chatPos.value.x,
-    y: e.clientY - chatPos.value.y
-  }
-  document.addEventListener('mousemove', onChatDrag)
-  document.addEventListener('mouseup', stopChatDrag)
-}
-
-const onChatDrag = (e: MouseEvent) => {
-  if (!chatDragging.value) return
-  const panel = document.querySelector('.panel-ai-chat') as HTMLElement
-  const newX = e.clientX - chatDragOffset.value.x
-  const newY = e.clientY - chatDragOffset.value.y
-  const panelWidth = panel ? panel.offsetWidth : 400
-  const panelHeight = panel ? panel.offsetHeight : 420
-  const maxX = window.innerWidth - panelWidth
-  const maxY = window.innerHeight - panelHeight
-  chatPos.value = {
-    x: Math.max(0, Math.min(newX, maxX)),
-    y: Math.max(0, Math.min(newY, maxY))
-  }
-}
-
-const stopChatDrag = () => {
-  chatDragging.value = false
-  document.removeEventListener('mousemove', onChatDrag)
-  document.removeEventListener('mouseup', stopChatDrag)
-}
-
 watch(() => route.params.id, (newId) => {
   if (newId) {
     aiFeatures.value = ''
@@ -1081,7 +846,7 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
   window.removeEventListener('resize', adjustPoetNameFontSize)
-  stopChatDrag()
+  aiChatStore.clearContext()
   stopReading()
   if (audioElement) {
     audioElement.pause()
@@ -1461,87 +1226,6 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-
-      <div
-        class="floating-panel panel-ai-chat"
-        :class="{ 'chat-dragging': chatDragging }"
-        :style="chatDraggable ? { position: 'fixed', left: chatPos.x + 'px', top: chatPos.y + 'px', zIndex: 1000 } : {}"
-      >
-        <div class="panel-header chat-drag-handle" @mousedown="startChatDrag">
-          <div class="header-left">
-            <el-icon><MagicStick /></el-icon>
-            <span>AI对话</span>
-          </div>
-          <el-tooltip :content="chatDraggable ? '固定位置' : '拖拽移动'" placement="top">
-            <el-icon class="drag-toggle" @click.stop="chatDraggable = !chatDraggable">
-              <Rank v-if="chatDraggable" /><MoreFilled v-else />
-            </el-icon>
-          </el-tooltip>
-        </div>
-        <div class="ai-chat-messages" ref="chatContainerRef">
-          <template v-if="chatStarted || chatMessages.length > 0">
-            <div
-              v-for="(msg, index) in chatMessages"
-              :key="index"
-              :class="['chat-message', msg.role]"
-            >
-              <div class="message-avatar">
-                <el-avatar :size="28" v-if="msg.role === 'user'">我</el-avatar>
-                <el-avatar :size="28" v-else class="ai-avatar">AI</el-avatar>
-              </div>
-              <div class="message-body">
-                <div 
-                  class="message-content" 
-                  :class="{ 'enlarged': enlargedMessageIndex === index }"
-                  @click="toggleMessageEnlarge(index)"
-                >{{ msg.content }}</div>
-                <div v-if="msg.role === 'assistant'" class="message-actions">
-                  <el-icon
-                    :class="{ 'speaking': currentReadingId === `chat-${index}` }"
-                    @click="readChatMessage(msg.content, `chat-${index}`)"
-                    title="朗读"
-                  >
-                    <VideoPause v-if="currentReadingId === `chat-${index}`" /><Headset v-else />
-                  </el-icon>
-                </div>
-              </div>
-            </div>
-            <div v-if="chatLoading" class="chat-message assistant">
-              <div class="message-avatar">
-                <el-avatar :size="28" class="ai-avatar">AI</el-avatar>
-              </div>
-              <div class="message-body">
-                <div class="message-content loading">思考中...</div>
-              </div>
-            </div>
-          </template>
-          <div v-else class="chat-welcome">
-            <div class="welcome-icon">
-              <el-icon><MagicStick /></el-icon>
-            </div>
-            <p class="welcome-text">与AI助手对话，了解{{ poet?.name || '诗人' }}的故事</p>
-            <el-button type="primary" @click="startAiChat" :loading="chatLoading">
-              <el-icon><Promotion /></el-icon>
-              开始对话
-            </el-button>
-          </div>
-        </div>
-        <div class="ai-chat-input">
-          <el-input
-            v-model="chatInput"
-            type="textarea"
-            :rows="2"
-            placeholder="输入问题，按Enter发送..."
-            @keydown="handleChatKeydown"
-            :disabled="chatLoading"
-          />
-          <el-tooltip content="发送消息" placement="top">
-            <el-button type="primary" @click="sendChatMessage()" :loading="chatLoading" :disabled="!chatInput.trim()">
-              <el-icon><Promotion /></el-icon>
-            </el-button>
-          </el-tooltip>
-        </div>
-      </div>
     </div>
 
     <Teleport to="body">
@@ -1573,12 +1257,6 @@ onUnmounted(() => {
         </div>
       </Transition>
     </Teleport>
-
-    <PoetryDetailDialog
-      v-model:visible="poetryDialogVisible"
-      :title="selectedPoemTitle"
-      :author="selectedPoemAuthor"
-    />
 
     <el-dialog
       v-model="featuresDetailVisible"
@@ -2484,39 +2162,6 @@ onUnmounted(() => {
     -webkit-backdrop-filter: blur(10px);
     border: 1px solid $border-color;
   }
-
-  &.panel-ai-chat {
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid $border-color;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 420px;
-    max-height: calc(100vh - 55px - 240px);
-
-    .panel-header {
-      background: linear-gradient(135deg, rgba(#667eea, 0.08) 0%, rgba(#764ba2, 0.08) 100%);
-      cursor: default;
-      padding: $spacing-md;
-
-      .header-left {
-        .el-icon {
-          font-size: 18px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          -webkit-background-clip: text;
-          background-clip: text;
-          -webkit-text-fill-color: transparent;
-        }
-
-        span {
-          font-size: $font-size-base;
-          font-weight: 600;
-        }
-      }
-    }
-  }
 }
 
 .panel-header {
@@ -2690,195 +2335,6 @@ onUnmounted(() => {
   display: flex;
   justify-content: center;
   padding: $spacing-sm 0;
-}
-
-.panel-ai-chat .ai-chat-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: $spacing-sm $spacing-md;
-  min-height: 150px;
-  @include scrollbar;
-}
-
-.chat-welcome {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  min-height: 200px;
-  gap: $spacing-md;
-  text-align: center;
-
-  .welcome-icon {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, rgba(#667eea, 0.15) 0%, rgba(#764ba2, 0.15) 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    .el-icon {
-      font-size: 28px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-  }
-
-  .welcome-text {
-    font-size: $font-size-sm;
-    color: $text-color-secondary;
-    margin: 0;
-    line-height: 1.6;
-  }
-
-  .el-button {
-    border-radius: 20px;
-    padding: 10px 24px;
-    font-weight: 500;
-    background: linear-gradient(135deg, $primary-color 0%, color.adjust($primary-color, $lightness: -10%) 100%);
-    border: none;
-    box-shadow: 0 2px 8px rgba($primary-color, 0.3);
-
-    &:hover {
-      box-shadow: 0 4px 12px rgba($primary-color, 0.4);
-    }
-  }
-}
-
-.chat-message {
-  display: flex;
-  gap: $spacing-sm;
-  margin-bottom: $spacing-md;
-  align-items: flex-start;
-  animation: fadeIn 0.3s ease;
-
-  &.user {
-    flex-direction: row-reverse;
-
-    .message-content {
-      background: linear-gradient(135deg, $primary-color 0%, color.adjust($primary-color, $lightness: -10%) 100%);
-      color: white;
-      border-radius: 18px 18px 4px 18px;
-    }
-  }
-
-  &.assistant {
-    .message-content {
-      background: #f4f4f5;
-      color: $text-color;
-      border-radius: 18px 18px 18px 4px;
-    }
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.message-avatar {
-  flex-shrink: 0;
-
-  .ai-avatar {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    font-size: 11px;
-    font-weight: 600;
-    box-shadow: 0 2px 8px rgba(#667eea, 0.3);
-  }
-}
-
-.message-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.message-content {
-  font-size: 13px;
-  line-height: 1.6;
-  padding: 10px 14px;
-  word-break: break-word;
-  cursor: pointer;
-  transition: all 0.3s ease;
-
-  &.enlarged {
-    font-size: 16px;
-    line-height: 1.8;
-    background: rgba($primary-color, 0.05);
-    border-radius: 12px;
-    padding: 14px 18px;
-  }
-
-  &.loading {
-    color: $text-color-secondary;
-    font-style: italic;
-    cursor: default;
-  }
-}
-
-.message-actions {
-  display: flex;
-  gap: $spacing-sm;
-  margin-top: $spacing-xs;
-  padding-left: $spacing-sm;
-
-  .el-icon {
-    font-size: 14px;
-    cursor: pointer;
-    color: $text-color-light;
-    transition: color $transition-fast;
-
-    &:hover {
-      color: $primary-color;
-    }
-
-    &.speaking {
-      color: $primary-color;
-    }
-  }
-}
-
-.panel-ai-chat .ai-chat-input {
-  padding: $spacing-md;
-  border-top: 1px solid $border-color;
-  display: flex;
-  gap: $spacing-sm;
-  align-items: flex-end;
-  background: linear-gradient(to bottom, #fafafa, #f5f5f5);
-
-  .el-textarea {
-    flex: 1;
-
-    @include el-comment-input;
-
-    :deep(.el-textarea__inner) {
-      border-radius: $comment-input-radius;
-      padding: $comment-input-padding;
-    }
-  }
-
-  .el-button {
-    border-radius: 20px;
-    padding: 10px 24px;
-    font-weight: 500;
-    background: linear-gradient(135deg, $primary-color 0%, color.adjust($primary-color, $lightness: -10%) 100%);
-    border: none;
-    box-shadow: 0 2px 8px rgba($primary-color, 0.3);
-
-    &:hover {
-      box-shadow: 0 4px 12px rgba($primary-color, 0.4);
-    }
-  }
 }
 
 .edit-overlay {
@@ -3088,36 +2544,6 @@ onUnmounted(() => {
     
     &:first-child {
       margin-top: 0;
-    }
-  }
-}
-
-.panel-ai-chat {
-  &.chat-dragging {
-    opacity: 0.9;
-    box-shadow: $box-shadow-lg;
-  }
-
-  .chat-drag-handle {
-    cursor: move;
-    user-select: none;
-
-    &:hover {
-      background: rgba(0, 0, 0, 0.04);
-    }
-  }
-
-  .drag-toggle {
-    font-size: 16px;
-    color: $text-color-secondary;
-    cursor: pointer;
-    transition: all $transition-fast;
-    padding: 4px;
-    border-radius: $border-radius-sm;
-
-    &:hover {
-      color: $primary-color;
-      background: rgba($primary-color, 0.1);
     }
   }
 }

@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { usePoemStore } from '@/stores/poem'
 import { useUserStore } from '@/stores/user'
 import { usePreferencesStore } from '@/stores/preferences'
+import { useAiChatStore } from '@/stores/aiChat'
 import type { Dynasty, Category, Poem, Poet } from '@/types/model'
 import { getDynastyList } from '@/api/modules/dynasty'
 import { getCategoryList } from '@/api/modules/category'
@@ -26,6 +27,7 @@ const route = useRoute()
 const poemStore = usePoemStore()
 const userStore = useUserStore()
 const preferencesStore = usePreferencesStore()
+const aiChatStore = useAiChatStore()
 
 const particleCanvasRef = ref<HTMLCanvasElement | null>(null)
 useParticles(particleCanvasRef, {
@@ -172,20 +174,8 @@ const resetKnowledgeState = () => {
 const activePanel = ref<'annotation' | 'appreciation' | 'background' | null>(null)
 const showEnlargedContent = ref(false)
 
-interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: number
-}
-
-const aiChatVisible = ref(false)
-const aiChatMessages = ref<ChatMessage[]>([])
-const aiChatInput = ref('')
-const aiChatLoading = ref(false)
-const aiChatContainerRef = ref<HTMLElement | null>(null)
 const aiConfig = ref<AiModuleConfig | null>(null)
 const loginPromptVisible = ref(false)
-let aiChatInitialized = false
 
 const resources = [
   { name: '古诗文网', url: 'https://www.gushiwen.org', desc: '经典古诗文鉴赏' },
@@ -399,8 +389,6 @@ const openPoemDetail = async (poem: PoemSearchResult) => {
     explainedLineIdxs.value = new Set()
     lineExplanations.value = new Map()
     lineExplaining.value = new Set()
-    aiChatMessages.value = []
-    aiChatInitialized = false
     annotationContent.value = ''
     appreciationContent.value = ''
     backgroundContent.value = ''
@@ -427,6 +415,15 @@ const openPoemDetail = async (poem: PoemSearchResult) => {
       externalPoemDetail.value = null
     } finally {
       externalDetailLoading.value = false
+    }
+
+    if (externalPoemDetail.value) {
+      aiChatStore.setContext({
+        type: 'poem',
+        name: selectedExternalPoem.value?.title || poem.title,
+        author: selectedExternalPoem.value?.author || poem.author,
+        content: parsePoemContent(externalPoemDetail.value.content || '').join('\n')
+      })
     }
   }
 }
@@ -846,120 +843,6 @@ const toggleKnowledgeExpand = (panel: string) => {
   }
 }
 
-const buildAiPrompt = (userMessage: string, isFirst: boolean = false) => {
-  const poemTitle = selectedExternalPoem.value?.title || '该诗词'
-  const poemAuthor = selectedExternalPoem.value?.author || ''
-  const poemContent = poemSentences.value.join('')
-
-  const poemContext = `\n\n当前诗词：《${poemTitle}》${poemAuthor ? ' - ' + poemAuthor : ''}\n诗词内容：${poemContent}`
-
-  let systemConstraint = ''
-  if (aiConfig.value?.promptTemplate) {
-    const maxLength = isFirst ? (aiConfig.value.firstResponseLength || 120) : (aiConfig.value.maxLength || 300)
-    const styleHint = isFirst
-      ? `这是首次提问，请用2-3句话简要概括即可，不超过${aiConfig.value.firstResponseLength || 120}字`
-      : `根据问题复杂度适当展开，但不超过${maxLength}字`
-
-    systemConstraint = aiConfig.value.promptTemplate
-      .replace(/\{poetName\}/g, poemAuthor)
-      .replace(/\{poemTitle\}/g, poemTitle)
-      .replace(/\{poemContent\}/g, poemContent)
-      .replace(/\{maxLength\}/g, String(maxLength))
-      .replace(/\{styleHint\}/g, styleHint)
-
-    if (!systemConstraint.includes(poemTitle)) {
-      systemConstraint += poemContext
-    }
-  } else {
-    const maxLength = isFirst ? 120 : 300
-    systemConstraint = `你是一个文化渊博的大学者，精通古今中外诗歌知识。正在为用户讲解一首古诗。
-当前诗词：《${poemTitle}》${poemAuthor ? ' - ' + poemAuthor : ''}
-诗词内容：${poemContent}
-
-回答要求：
-1. 语言简洁精炼，避免冗余
-2. 使用通俗易懂的中文
-3. 重点突出，条理清晰
-4. 不要使用markdown格式，直接输出纯文本
-${isFirst ? '5. 这是首次提问，请用2-3句话简要概括即可' : '5. 根据问题复杂度适当展开，但不超过' + maxLength + '字'}`
-  }
-
-  return `【系统设定】${systemConstraint}\n\n【用户问题】${userMessage}`
-}
-
-const sendAiChatMessage = async (message?: string, isFirst: boolean = false) => {
-  const msg = message || aiChatInput.value.trim()
-  if (!msg || aiChatLoading.value) return
-
-  if (!userStore.isLoggedIn) {
-    loginPromptVisible.value = true
-    return
-  }
-
-  if (!aiConfig.value) {
-    try {
-      const res = await getAiModuleConfig('poetry_chat')
-      aiConfig.value = res.data
-    } catch {
-      console.error('获取AI配置失败')
-    }
-  }
-
-  aiChatMessages.value.push({
-    role: 'user',
-    content: msg,
-    timestamp: Date.now()
-  })
-  aiChatInput.value = ''
-  aiChatLoading.value = true
-  scrollToAiChatBottom()
-
-  try {
-    const { chat } = await import('@/api/modules/ai')
-    const prompt = buildAiPrompt(msg, isFirst)
-    const res = await chat({ message: prompt, moduleCode: 'poetry_chat' })
-    aiChatMessages.value.push({
-      role: 'assistant',
-      content: res.data.reply || '抱歉，暂时无法回答',
-      timestamp: Date.now()
-    })
-  } catch {
-    aiChatMessages.value.push({
-      role: 'assistant',
-      content: 'AI服务暂时不可用，请稍后重试',
-      timestamp: Date.now()
-    })
-  } finally {
-    aiChatLoading.value = false
-    scrollToAiChatBottom()
-  }
-}
-
-const handleAiChatKeydown = (e: Event | KeyboardEvent) => {
-  if ((e as KeyboardEvent).key === 'Enter' && !(e as KeyboardEvent).shiftKey) {
-    e.preventDefault()
-    sendAiChatMessage()
-  }
-}
-
-const scrollToAiChatBottom = () => {
-  nextTick(() => {
-    if (aiChatContainerRef.value) {
-      aiChatContainerRef.value.scrollTop = aiChatContainerRef.value.scrollHeight
-    }
-  })
-}
-
-const toggleAiChat = () => {
-  aiChatVisible.value = !aiChatVisible.value
-  if (aiChatVisible.value && !aiChatInitialized) {
-    aiChatInitialized = true
-    nextTick(() => {
-      sendAiChatMessage('请简要介绍一下这首诗', true)
-    })
-  }
-}
-
 const hasContent = (fields: string[]): boolean => {
   if (!externalPoemDetail.value) return false
   return fields.some(f => {
@@ -1213,6 +1096,12 @@ const openForeignPoemDetail = async (poem: any) => {
     content: chineseText || poem.content,
     author: poem.author
   }
+  aiChatStore.setContext({
+    type: 'poem',
+    name: poem.title,
+    author: poem.author,
+    content: parsePoemContent(externalPoemDetail.value.content || '').join('\n')
+  })
   externalDetailLoading.value = false
   externalActiveTab.value = 'translation'
   showEnlargedContent.value = false
@@ -1328,9 +1217,9 @@ onMounted(async () => {
     handleDailyPoetrySearch(String(query.keyword), String(query.searchType))
   }
 
-  // 从个人中心「AI对话」入口进入时，自动打开一首诗词的 AI 诗词助手对话
+  // 从个人中心「AI对话」入口进入时，自动打开全局 AI 小窗
   if (query.aiChat === '1') {
-    autoOpenAiChat()
+    aiChatStore.open()
   }
 })
 
@@ -1389,39 +1278,6 @@ const handleDailyPoetrySearch = async (keyword: string, searchType: string) => {
       externalSearching.value = false
     }
   }
-}
-
-const autoOpenAiChat = async () => {
-  if (aiChatVisible.value) return
-  await nextTick()
-
-  // 优先复用页面上已选中的诗词，否则从诗词库随机取一首作为对话对象
-  let poem = selectedExternalPoem.value || externalPoemResults.value[0]
-  if (!poem) {
-    const seeds = ['月', '春', '风', '花', '山水']
-    const keyword = seeds[Math.floor(Math.random() * seeds.length)]
-    const results = await searchApihzPoems(keyword, 20)
-    if (results.length === 0) {
-      ElMessage.info('暂无可对话的诗词，请稍后重试')
-      return
-    }
-    externalPoemResults.value = results
-    poem = results[0]
-  }
-
-  await openPoemDetail(poem)
-  // 诗词详情未加载成功时无法展示对话区
-  if (!externalPoemDetail.value) return
-
-  aiChatVisible.value = true
-  if (!aiChatInitialized) {
-    aiChatInitialized = true
-    await nextTick()
-    sendAiChatMessage('请简要介绍一下这首诗', true)
-  }
-
-  await nextTick()
-  document.querySelector('.ai-chat-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
 onUnmounted(() => {
@@ -2349,63 +2205,6 @@ const handleClearHistory = async () => {
                     <div class="info-card-content">
                       <p style="white-space: pre-line;">{{ getContent(['pj']) }}</p>
                     </div>
-                  </div>
-
-                  <div class="ai-chat-card">
-                    <div class="ai-chat-header" @click="toggleAiChat">
-                      <div class="ai-chat-header-left">
-                        <el-icon><MagicStick /></el-icon>
-                        <span>AI诗词助手</span>
-                      </div>
-                      <el-icon>
-                        <ArrowUp v-if="aiChatVisible" />
-                        <ArrowDown v-else />
-                      </el-icon>
-                    </div>
-
-                    <Transition name="ai-chat-slide">
-                      <div v-if="aiChatVisible" class="ai-chat-body">
-                        <div class="ai-chat-messages" ref="aiChatContainerRef">
-                          <div
-                            v-for="(msg, index) in aiChatMessages"
-                            :key="index"
-                            :class="['ai-message', msg.role]"
-                          >
-                            <div class="ai-message-avatar" v-if="msg.role === 'assistant'">AI</div>
-                            <div class="ai-message-content">{{ msg.content }}</div>
-                            <div class="ai-message-avatar" v-if="msg.role === 'user'">我</div>
-                          </div>
-                          <div v-if="aiChatLoading" class="ai-message assistant">
-                            <div class="ai-message-avatar">AI</div>
-                            <div class="ai-message-content ai-loading">
-                              <span class="loading-dot"></span>
-                              <span class="loading-dot"></span>
-                              <span class="loading-dot"></span>
-                            </div>
-                          </div>
-                        </div>
-                        <div class="ai-chat-input">
-                          <el-input
-                            v-model="aiChatInput"
-                            type="textarea"
-                            :rows="2"
-                            :autosize="{ minRows: 1, maxRows: 3 }"
-                            placeholder="输入问题，按Enter发送..."
-                            @keydown="handleAiChatKeydown"
-                            :disabled="aiChatLoading"
-                            resize="none"
-                          />
-                          <el-button
-                            class="ai-send-btn"
-                            @click="sendAiChatMessage()"
-                            :loading="aiChatLoading"
-                            :disabled="!aiChatInput.trim()"
-                          >
-                            <el-icon><Promotion /></el-icon>
-                          </el-button>
-                        </div>
-                      </div>
-                    </Transition>
                   </div>
 
                   <div class="resource-card">
@@ -3962,186 +3761,6 @@ const handleClearHistory = async () => {
   color: $text-color-light;
   margin: 0;
   font-style: italic;
-}
-
-.ai-chat-card {
-  background: $background-color-light;
-  border-radius: $border-radius-md;
-  border: 1px solid $border-color-light;
-}
-
-.ai-chat-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: $spacing-md $spacing-lg;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  cursor: pointer;
-  transition: all $transition-fast;
-
-  &:hover {
-    opacity: 0.9;
-  }
-}
-
-.ai-chat-header-left {
-  display: flex;
-  align-items: center;
-  gap: $spacing-sm;
-  color: #fff;
-  font-weight: 600;
-}
-
-.ai-chat-slide-enter-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  max-height: 500px;
-  overflow: hidden;
-}
-
-.ai-chat-slide-leave-active {
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
-}
-
-.ai-chat-slide-enter-from,
-.ai-chat-slide-leave-to {
-  max-height: 0;
-  opacity: 0;
-}
-
-.ai-chat-body {
-  border-top: 1px solid $border-color-light;
-}
-
-.ai-chat-messages {
-  height: 250px;
-  overflow-y: auto;
-  padding: $spacing-md;
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-md;
-  @include scrollbar;
-}
-
-.ai-message {
-  display: flex;
-  gap: $spacing-sm;
-  max-width: 90%;
-
-  &.user {
-    align-self: flex-end;
-    flex-direction: row;
-
-    .ai-message-content {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #fff;
-      border-radius: $border-radius-md $border-radius-md $border-radius-sm $border-radius-md;
-    }
-  }
-
-  &.assistant {
-    align-self: flex-start;
-
-    .ai-message-content {
-      background: #f4f5f7;
-      color: $text-color;
-      border-radius: $border-radius-md $border-radius-md $border-radius-md $border-radius-sm;
-    }
-  }
-}
-
-.ai-message-avatar {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: $font-size-xs;
-  font-weight: 600;
-  margin-top: 2px;
-
-  .assistant & {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: #fff;
-  }
-
-  .user & {
-    background: $primary-color;
-    color: #fff;
-  }
-}
-
-.ai-message-content {
-  padding: $spacing-sm $spacing-md;
-  font-size: $font-size-sm;
-  line-height: 1.7;
-  word-break: break-word;
-  white-space: pre-line;
-}
-
-.ai-loading {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: $spacing-sm $spacing-lg;
-}
-
-.loading-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: $text-color-light;
-  animation: dotPulse 1.2s ease-in-out infinite;
-
-  &:nth-child(2) { animation-delay: 0.2s; }
-  &:nth-child(3) { animation-delay: 0.4s; }
-}
-
-@keyframes dotPulse {
-  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-  40% { opacity: 1; transform: scale(1); }
-}
-
-.ai-chat-input {
-  display: flex;
-  align-items: flex-end;
-  gap: $spacing-sm;
-  padding: $spacing-sm $spacing-md;
-  border-top: 1px solid $border-color-light;
-  background: rgba($primary-color, 0.01);
-
-  .el-textarea {
-    flex: 1;
-
-    @include el-comment-input;
-
-    :deep(.el-textarea__inner) {
-      border-radius: $comment-input-radius;
-      padding: $comment-input-padding;
-    }
-  }
-}
-
-.ai-send-btn {
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border-radius: $border-radius-md;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-  color: #fff;
-
-  &:hover:not(:disabled) {
-    opacity: 0.9;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
 }
 
 .resource-card {

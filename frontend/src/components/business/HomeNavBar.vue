@@ -70,7 +70,7 @@ defineExpose({ searchInputRef })
         </li>
         <li @click="router.push('/ai-chat')">
           <el-icon><MagicStick /></el-icon>
-          <span>诗阁</span>
+          <span>诗宝阁</span>
         </li>
         <li @click="router.push('/communicate')">
           <el-icon><ChatDotRound /></el-icon>

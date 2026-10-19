@@ -327,8 +327,9 @@ public class AdminController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Integer auditStatus) {
-        return R.success(poemService.getAdminPoemList(page, size, keyword, auditStatus));
+            @RequestParam(required = false) Integer auditStatus,
+            @RequestParam(required = false, defaultValue = "desc") String sort) {
+        return R.success(poemService.getAdminPoemList(page, size, keyword, auditStatus, sort));
     }
 
     @Operation(summary = "获取诗词详情")
@@ -457,12 +458,18 @@ public class AdminController {
     public R<?> listPoets(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String keyword) {
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false, defaultValue = "desc") String sort) {
         LambdaQueryWrapper<Poet> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(keyword)) {
             wrapper.like(Poet::getName, keyword);
         }
-        wrapper.orderByDesc(Poet::getCreateTime);
+        // 按创建时间排序，asc 为正序（最早在前），desc 为倒序（最新在前）
+        if ("asc".equalsIgnoreCase(sort)) {
+            wrapper.orderByAsc(Poet::getCreateTime).orderByAsc(Poet::getId);
+        } else {
+            wrapper.orderByDesc(Poet::getCreateTime).orderByDesc(Poet::getId);
+        }
         return R.success(poetService.page(new Page<>(page, size), wrapper));
     }
 

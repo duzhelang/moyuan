@@ -12,7 +12,8 @@ import {
 
 // 模块编码 → 前台应用位置说明（展示用，便于在后台直观看出「AI 在哪些功能生效」）
 const moduleUsageMap: Record<string, string> = {
-  chat: '诗阁对话 · 首页AI工具（藏头诗等） · 诗词详情AI填补 · 押韵辅助',
+  chat: '诗宝阁对话 · 首页AI工具（藏头诗等） · 诗词详情AI填补 · 押韵辅助',
+  system_chat: '全站 AI 小窗 · 网页用法助理（系统玩法/入口/规则问答）',
   poet_chat: '诗人详情页对话 · 诗人详情AI填补',
   poetry_chat: '诗词列表 译文/注释/赏析/背景 · 外部诗词详情弹窗',
   write_poem: '首页 看图写诗',

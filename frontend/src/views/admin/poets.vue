@@ -9,6 +9,8 @@ const tableData = ref<any[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
+const keyword = ref('')
+const sort = ref<'desc' | 'asc'>('desc')
 const loading = ref(false)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
@@ -34,7 +36,7 @@ const form = ref({
 const fetchData = async () => {
   loading.value = true
   try {
-    const res = await getAdminPoets({ page: page.value, size: pageSize.value })
+    const res = await getAdminPoets({ page: page.value, size: pageSize.value, keyword: keyword.value, sort: sort.value })
     tableData.value = res.data.records
     total.value = res.data.total
   } catch (error) {
@@ -97,6 +99,18 @@ const handleSave = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handleSearch = () => {
+  page.value = 1
+  fetchData()
+}
+
+// 切换正序/倒序（按创建时间），切换后回到第一页
+const toggleSort = () => {
+  sort.value = sort.value === 'desc' ? 'asc' : 'desc'
+  page.value = 1
+  fetchData()
 }
 
 const openBatchAvatarUpload = () => {
@@ -169,6 +183,20 @@ onMounted(() => {
 <template>
   <div class="page-container">
     <h2 class="page-title">诗人管理</h2>
+
+    <el-card class="search-card">
+      <el-row :gutter="16">
+        <el-col :span="8">
+          <el-input v-model="keyword" placeholder="搜索诗人姓名" clearable @keyup.enter="handleSearch" />
+        </el-col>
+        <el-col :span="4">
+          <el-button type="primary" @click="handleSearch">搜索</el-button>
+        </el-col>
+        <el-col :span="12" style="text-align: right">
+          <el-button @click="toggleSort">{{ sort === 'desc' ? '倒序 ↓' : '正序 ↑' }}</el-button>
+        </el-col>
+      </el-row>
+    </el-card>
 
     <el-card class="table-card">
       <template #header>
@@ -301,6 +329,10 @@ onMounted(() => {
 }
 .table-card {
   border-radius: 8px;
+}
+
+.search-card {
+  margin-bottom: 16px;
 }
 
 :deep(.el-dialog) {

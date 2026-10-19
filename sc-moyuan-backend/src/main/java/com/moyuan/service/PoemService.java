@@ -8,7 +8,7 @@ import java.util.List;
 
 public interface PoemService extends IService<Poem> {
     IPage<Poem> getPoemList(int pageNum, int pageSize, Long dynastyId, Long poetId, Long categoryId, String keyword);
-    IPage<Poem> getAdminPoemList(int pageNum, int pageSize, String keyword, Integer auditStatus);
+    IPage<Poem> getAdminPoemList(int pageNum, int pageSize, String keyword, Integer auditStatus, String sort);
     IPage<Poem> getModernPoems(int pageNum, int pageSize, Boolean isOriginal, Boolean hasCertifiedPoet, String sortBy, String keyword);
     /** 查询已入库的外文诗（poem_type='foreign'），按标题/作者模糊匹配，最多返回 limit 条 */
     List<Poem> listForeignPoems(String keyword, String author, int limit);

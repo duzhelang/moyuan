@@ -10,6 +10,7 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
 const keyword = ref('')
+const sort = ref<'desc' | 'asc'>('desc')
 const loading = ref(false)
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
@@ -33,7 +34,7 @@ const dynasties = ref<any[]>([])
 const fetchData = async () => {
   loading.value = true
   try {
-    const res = await getAdminPoems({ page: page.value, size: pageSize.value, keyword: keyword.value })
+    const res = await getAdminPoems({ page: page.value, size: pageSize.value, keyword: keyword.value, sort: sort.value })
     tableData.value = res.data.records
     total.value = res.data.total
   } catch (error) {
@@ -102,6 +103,13 @@ const handleSearch = () => {
   fetchData()
 }
 
+// 切换正序/倒序（按创建时间），切换后回到第一页
+const toggleSort = () => {
+  sort.value = sort.value === 'desc' ? 'asc' : 'desc'
+  page.value = 1
+  fetchData()
+}
+
 onMounted(() => {
   fetchData()
   fetchOptions()
@@ -120,7 +128,10 @@ onMounted(() => {
         <el-col :span="4">
           <el-button type="primary" @click="handleSearch">搜索</el-button>
         </el-col>
-        <el-col :span="12" style="text-align: right">
+        <el-col :span="4">
+          <el-button @click="toggleSort">{{ sort === 'desc' ? '倒序 ↓' : '正序 ↑' }}</el-button>
+        </el-col>
+        <el-col :span="8" style="text-align: right">
           <el-button type="primary" @click="handleAdd">新增诗词</el-button>
         </el-col>
       </el-row>

@@ -66,9 +66,11 @@ public class PoetServiceImpl extends ServiceImpl<PoetMapper, Poet> implements Po
         } else if ("foreign".equals(poetType)) {
             wrapper.eq(Poet::getPoetType, "foreign");
         }
-        // 排序规则：按创建时间升序，新收录/自动建号的诗人排在列表末尾（旧 id 优先），
-        // 同一时间再按主键升序保证分页顺序稳定
-        wrapper.orderByAsc(Poet::getCreateTime).orderByAsc(Poet::getId);
+        // 排序规则：有资料（有朝代归属或生平简介）的诗人优先展示，自动建号的空资料诗人排到最后；
+        // 同组内按创建时间升序（新收录靠后），再按主键升序保证分页顺序稳定。
+        // 说明：故意的「有资料」判定不含 avatar —— 自动建号已补默认头像，用头像判定会失去区分度。
+        wrapper.last("ORDER BY (CASE WHEN dynasty_id IS NOT NULL OR (biography IS NOT NULL AND biography <> '') "
+                + "THEN 0 ELSE 1 END) ASC, create_time ASC, id ASC");
         IPage<Poet> page = poetMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
         page.getRecords().forEach(poet -> {
             if (poet.getDynastyId() != null) {

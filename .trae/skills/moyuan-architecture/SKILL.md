@@ -28,13 +28,13 @@ description: "古今诗话——墨渊（SC_MoYuan2）项目的系统架构文�
 
 | 分类 | 目录 | 文档数 |
 |------|------|--------|
-| 架构概览 | [architecture/](../../docs/architecture/) | 1 个文件 |
+| 架构概览 | [architecture/](../../docs/architecture/) | 4 个文件 |
 | API文档 | [api/](../../docs/api/) | 2 个文件 |
-| 数据库 | [database/](../../docs/database/) | 1 文档 + 1 迁移脚本 |
-| 业务功能 | [business/](../../docs/business/) | 1 个文件 |
+| 数据库 | [database/](../../docs/database/) | 1 文档 + migrations/ 迁移脚本目录 |
+| 业务功能 | [business/](../../docs/business/) | 2 个文件 |
 | 技术栈约束 | [constraints/](../../docs/constraints/) | 1 个文件 |
 | 开发规范 | [standards/](../../docs/standards/) | 3 个文件 |
-| 指南 | [guides/](../../docs/guides/) | 5 个文件 |
+| 指南 | [guides/](../../docs/guides/) | 9 个文件 |
 | 迁移/实现/报告 | [migration/](../../docs/migration/) [implementation/](../../docs/implementation/) [reports/](../../docs/reports/) 等 | 若干 |
 
 ## 文档路径索引
@@ -43,7 +43,10 @@ description: "古今诗话——墨渊（SC_MoYuan2）项目的系统架构文�
 
 | 文档 | 路径 | 内容 |
 |------|------|------|
-| 系统架构 | [architecture/system-architecture.md](../../docs/architecture/system-architecture.md) | 项目概览、技术栈、模块划分（19+ 模块）、测试架构、部署架构 |
+| 系统架构 | [architecture/system-architecture.md](../../docs/architecture/system-architecture.md) | 项目概览、技术栈、模块划分（25 模块）、测试架构、部署架构 |
+| 项目分析 | [architecture/project-analysis.md](../../docs/architecture/project-analysis.md) | 整体架构、目录结构、模块职责、运行方式 |
+| 关键类与函数 | [architecture/key-classes-and-functions.md](../../docs/architecture/key-classes-and-functions.md) | 后端关键类、前端核心模块与关键调用链 |
+| 依赖关系 | [architecture/dependencies.md](../../docs/architecture/dependencies.md) | 前后端依赖、模块映射、实体-表对应、外部服务依赖 |
 
 ### API 文档
 
@@ -56,14 +59,14 @@ description: "古今诗话——墨渊（SC_MoYuan2）项目的系统架构文�
 
 | 文档 | 路径 | 内容 |
 |------|------|------|
-| 表结构 | [database/schema.md](../../docs/database/schema.md) | 29 张核心表清单、字段说明、索引、建表脚本状态 |
-| 迁移脚本 | [database/migration_002_user_history.sql](../../docs/database/migration_002_user_history.sql) | 浏览历史表迁移脚本 |
+| 表结构 | [database/schema.md](../../docs/database/schema.md) | 31 张核心表清单、字段说明、索引、建表脚本状态 |
+| 迁移脚本 | [db/init.sql](../../sc-moyuan-backend/src/main/resources/db/init.sql) | 迁移脚本属过渡性文件，执行后清理；数据库权威定义见 init.sql |
 
 ### 业务功能文档
 
 | 文档 | 路径 | 内容 |
 |------|------|------|
-| 业务模块 | [business/modules.md](../../docs/business/modules.md) | 23 大业务模块功能说明、页面组件清单 |
+| 业务模块 | [business/modules.md](../../docs/business/modules.md) | 25 大业务模块功能说明、页面组件清单 |
 | 系统工作流 | [business/system-workflow.md](../../docs/business/system-workflow.md) | 系统运行时工作流集中记录（诗人数据懒加载与头像分配等流程） |
 
 ### 技术栈约束
@@ -99,7 +102,7 @@ description: "古今诗话——墨渊（SC_MoYuan2）项目的系统架构文�
 | 智能体协作 | [reports/agent-skill-coordination-report.md](../../docs/reports/agent-skill-coordination-report.md) | 智能体与技能协作报告 |
 | 代码审查 | [review/code-review-report-2026-06-06.md](../../docs/review/code-review-report-2026-06-06.md) | 代码审查报告 |
 | 后端数据库计划 | [backend-database-plan.md](../../docs/backend-database-plan.md) | 后端数据库建设计划 |
-| ER 图 | [diagrams/数据库ER图.dot](../../docs/diagrams/数据库ER图.dot) [数据库ER图.svg](../../docs/diagrams/数据库ER图.svg) | 数据库 ER 关系图（Graphviz/SVG，全量 29 张核心表） |
+| ER 图 | [diagrams/数据库ER图.dot](../../docs/diagrams/数据库ER图.dot) [数据库ER图.svg](../../docs/diagrams/数据库ER图.svg) | 数据库 ER 关系图（Graphviz/SVG，全量 31 张核心表） |
 
 > 数据资产相关文档索引见 [moyuan-data-assets](../moyuan-data-assets/SKILL.md) 技能
 > 文档同步更新规范见 [doc-manager](../doc-manager/SKILL.md) 技能

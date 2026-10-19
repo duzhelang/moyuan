@@ -59,7 +59,7 @@ const routes: RouteRecordRaw[] = [
         path: 'ai-chat',
         name: 'AiChat',
         component: () => import('@/views/ai-chat/index.vue'),
-        meta: { title: '诗阁' }
+        meta: { title: '诗宝阁' }
       },
       {
         path: 'game/feihua',
@@ -304,6 +304,12 @@ const routes: RouteRecordRaw[] = [
         name: 'AdminVisionArticles',
         component: () => import('@/views/admin/vision.vue'),
         meta: { title: '诗话视野管理', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'system-knowledge',
+        name: 'AdminSystemKnowledge',
+        component: () => import('@/views/admin/system-knowledge.vue'),
+        meta: { title: '系统知识库', requiresAuth: true, requiresAdmin: true }
       }
     ]
   },
