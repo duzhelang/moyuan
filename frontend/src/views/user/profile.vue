@@ -382,7 +382,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="profile-page">
+  <div class="profile-page ink-bg ink-bg--4">
     <div class="container">
       <div class="page-header">
         <h1 class="page-title">个人中心</h1>
@@ -987,9 +987,8 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .profile-page {
-  padding: $spacing-xl $spacing-xl;
-  max-width: 1400px;
-  margin: 0 auto;
+  padding: $spacing-xl 0;
+  min-height: 100vh;
 }
 
 .page-header {

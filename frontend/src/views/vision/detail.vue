@@ -292,9 +292,11 @@ onUnmounted(() => {
 
     <aside class="vision-sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-header">
-        <el-icon class="collapse-btn" @click="sidebarCollapsed = !sidebarCollapsed">
-          <component :is="sidebarCollapsed ? 'Expand' : 'Fold'" />
-        </el-icon>
+        <el-tooltip :content="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'" placement="right">
+          <el-icon class="collapse-btn" @click="sidebarCollapsed = !sidebarCollapsed">
+            <component :is="sidebarCollapsed ? 'Expand' : 'Fold'" />
+          </el-icon>
+        </el-tooltip>
         <span v-show="!sidebarCollapsed" class="sidebar-title">文章目录</span>
       </div>
       <nav v-show="!sidebarCollapsed" class="sidebar-nav">
@@ -309,7 +311,7 @@ onUnmounted(() => {
       </nav>
     </aside>
 
-    <main class="vision-main" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+    <main class="vision-main">
     <div class="container" v-if="article">
       <div class="article-header">
         <div class="header-top">
@@ -513,6 +515,8 @@ onUnmounted(() => {
 .vision-detail-page {
   padding: 20px 0 60px;
   min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
 }
 
 .container {
@@ -880,14 +884,14 @@ onUnmounted(() => {
 }
 
 .vision-sidebar {
-  position: fixed;
-  left: 0;
+  position: sticky;
   top: 60px;
-  bottom: 0;
+  height: calc(100vh - 60px);
+  flex-shrink: 0;
   width: 200px;
   background: #f5f0e8;
   border-right: 1px solid #e0d6c6;
-  z-index: 100;
+  z-index: 99;
   display: flex;
   flex-direction: column;
   transition: width 0.3s ease;
@@ -913,61 +917,97 @@ onUnmounted(() => {
 
 .collapse-btn {
   cursor: pointer;
-  font-size: 18px;
+  font-size: 22px;
   color: #8b4513;
   flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
 
   &:hover {
     color: #d2691e;
+    background-color: rgba(139, 69, 19, 0.08);
   }
 }
 
 .sidebar-title {
-  font-size: 48px;
+  font-family: $font-family-title;
+  font-size: 28px;
+  font-weight: 600;
   color: #8b4513;
   white-space: nowrap;
+  padding: 4px 8px;
+  background: linear-gradient(135deg, rgba(210, 105, 30, 0.14) 0%, rgba(139, 69, 19, 0.06) 100%);
+  border: 1px solid rgba(139, 69, 19, 0.22);
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(139, 69, 19, 0.12);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.6);
+  line-height: 1.2;
 }
 
 .sidebar-nav {
   flex: 1;
   padding: 8px 0;
   overflow-y: auto;
+  @include scrollbar;
 }
 
 .nav-item {
-  display: block;
-  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
   margin: 4px 8px;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 13px;
-  color: #666;
-  transition: all 0.2s ease;
+  font-size: 18px;
+  color: #6b5b4d;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   text-decoration: none;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  position: relative;
+  transform: translateX(0);
+
+  span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   &:hover {
     color: #8b4513;
     background: rgba(139, 69, 19, 0.06);
+    transform: translateX(4px);
   }
 
   &.active {
     color: #8b4513;
-    background: rgba(139, 69, 19, 0.1);
+    background: rgba(139, 69, 19, 0.12);
     font-weight: 600;
+    transform: translateX(4px);
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 3px;
+      height: 20px;
+      background: linear-gradient(to bottom, #8b4513, rgba(139, 69, 19, 0.4));
+      border-radius: 0 2px 2px 0;
+      box-shadow: 0 0 6px rgba(139, 69, 19, 0.3);
+    }
   }
 }
 
 .vision-main {
   flex: 1;
-  margin-left: 200px;
-  transition: margin-left 0.3s ease;
-
-  &.sidebar-collapsed {
-    margin-left: 48px;
-  }
+  min-width: 0;
 
   @media (max-width: 768px) {
     margin-left: 0 !important;

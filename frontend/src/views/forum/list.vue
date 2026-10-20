@@ -10,10 +10,12 @@ const router = useRouter()
 
 const particleCanvasRef = ref<HTMLCanvasElement | null>(null)
 useParticles(particleCanvasRef, {
-  count: 60,
+  count: 80,
   colors: ['#d4af87', '#f0e4d7', '#c9a06c'],
-  opacityRange: [0.15, 0.3],
-  sizeRange: [1, 2.5]
+  opacityRange: [0.28, 0.5],
+  sizeRange: [1.5, 3],
+  connectionDistance: 160,
+  speed: 2
 })
 
 const loading = ref(false)

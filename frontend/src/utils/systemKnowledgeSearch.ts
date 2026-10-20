@@ -16,6 +16,7 @@ export interface RawKnowledgeEntry {
   steps?: string | null
   faq?: string | null
   route?: string | null
+  updateTime?: string | null
 }
 
 export interface KnowledgeFaq {
@@ -36,6 +37,8 @@ export interface KnowledgeEntry {
   steps: string[]
   faq: KnowledgeFaq[]
   route?: string
+  /** 最后更新时间，用于生成问答缓存版本号 */
+  updatedAt?: string
 }
 
 /** 命中 FAQ 的直答结果 */
@@ -93,7 +96,8 @@ export function parseEntries(list: RawKnowledgeEntry[]): KnowledgeEntry[] {
     body: item.body || '',
     steps: splitLines(item.steps),
     faq: parseFaq(item.faq),
-    route: item.route || undefined
+    route: item.route || undefined,
+    updatedAt: item.updateTime || undefined
   }))
 }
 

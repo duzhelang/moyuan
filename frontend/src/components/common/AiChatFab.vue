@@ -9,10 +9,23 @@ import { useAiChatStore } from '@/stores/aiChat'
 import { getAssistant } from '@/configs/ai-chat/assistants'
 
 const store = useAiChatStore()
-const { isOpen, profile, activeAssistant } = storeToRefs(store)
+const { isOpen, profile, activeAssistant, closedByUser, dockUsable, dockEl } = storeToRefs(store)
 
 const entry = computed(() => profile.value.entry)
-const visible = computed(() => entry.value.show && !isOpen.value && !profile.value.disabled)
+/**
+ * 画像声明了入口，或用户刚主动关闭过小窗时，都需要保留重新唤起的入口。
+ * 页内嵌入页由页面自己的折叠面板/恢复按钮承载：
+ * - 容器已注册且可见 → 不显示浮钮
+ * - 容器尚未渲染（如寻章摘句页未打开外文详情）→ 仍不显示，避免与页面面板重复
+ * - 容器存在但被响应式布局隐藏（窄屏右栏 display:none）→ 回退显示浮钮
+ */
+const visible = computed(
+  () =>
+    !isOpen.value &&
+    !profile.value.disabled &&
+    !(profile.value.dock && (dockUsable.value || !dockEl.value)) &&
+    (entry.value.show || closedByUser.value || !!dockEl.value)
+)
 
 const style = computed(() => {
   const config = entry.value

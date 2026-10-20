@@ -48,7 +48,18 @@ button {
 
 input, textarea, select {
   font-family: $font-family-input;
+  font-size: $font-size-base;
   letter-spacing: 0.5px;
+}
+
+// 全站输入框占位符统一规则：字号、字体、字重、字距全部继承输入文字本身，
+// 避免任何输入控件出现「提示字比实际输入字大/斜体」的历史遗留问题
+input::placeholder,
+textarea::placeholder {
+  color: $text-color-light;
+  font: inherit;
+  letter-spacing: inherit;
+  opacity: 1;
 }
 
 // 覆盖 Element Plus 组件库默认字体设置，统一项目输入框样式

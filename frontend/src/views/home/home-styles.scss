@@ -24,7 +24,8 @@
 .top {
   width: 100%;
   height: 50px;
-  background: url('/img/dt_3.jpg') no-repeat 0px -325px / cover;
+  /* 使用百分比定位，窄屏时按比例取同一段底纹，避免固定 -325px 偏移导致背景滑出可视区 */
+  background: url('/img/dt_3.jpg') no-repeat center 87% / cover;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1628,14 +1629,13 @@ html {
   border-top: 1px dotted #d9cebf;
 }
 
-/* 功能卡统一排在一行，超出部分横向滚动（配合左右箭头切换） */
+/* 功能卡统一排在一行，超出部分横向滚动（配合左右箭头切换与自动滑动） */
 .ai-extra-features {
   display: flex;
   flex: 1;
   flex-wrap: nowrap;
   gap: 12px;
   overflow-x: auto;
-  scroll-behavior: smooth;
   padding-bottom: 6px;
 }
 
@@ -1757,6 +1757,31 @@ html {
 
 .ai-extra-panel-close:hover {
   color: #2c2416;
+}
+
+/* 展开面板右上角操作区：完整页面入口 + 关闭 */
+.ai-extra-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-extra-panel-link {
+  background: none;
+  border: 1px solid #d9cebf;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.8em;
+  color: #8b6914;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.ai-extra-panel-link:hover {
+  border-color: #b8860b;
+  background: #f5eed8;
+  color: #b8860b;
 }
 
 .rhyme-search-bar {

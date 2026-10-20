@@ -48,6 +48,10 @@ export interface AiPageProfile {
   moduleCode: string
   /** 进入页面即展开小窗（复刻原「常驻面板」页） */
   autoOpen: boolean
+  /** 进入页面时强制收起（页内自带折叠面板的页面） */
+  collapseOnEnter?: boolean
+  /** 页内嵌入渲染：由页面注册 dock 容器承载窗口，不使用右下浮窗与入口 */
+  dock?: boolean
   /** 唤起入口 */
   entry: AiEntryConfig
   /** 欢迎语 */
@@ -79,6 +83,15 @@ const JADE_THEME: Record<string, string> = {
   '--ai-border': 'rgba(79, 179, 160, 0.45)'
 }
 
+/** 寻章摘句页紫色折叠面板主题：与「墨渊问诗」卡片同色系，展开后与卡片融为一体 */
+const PURPLE_THEME: Record<string, string> = {
+  '--ai-accent': '#667eea',
+  '--ai-accent-2': '#764ba2',
+  '--ai-bg': '#faf8ff',
+  '--ai-border': 'rgba(118, 75, 162, 0.28)',
+  '--ai-header-text': '#ffffff'
+}
+
 /** 无原入口的通用兜底画像 */
 const GENERAL_PROFILE: AiPageProfile = {
   key: 'general',
@@ -108,20 +121,21 @@ const GENERAL_PROFILE: AiPageProfile = {
 /** 各页面专属画像 */
 const PAGE_PROFILES: Array<{ match: RegExp; profile: AiPageProfile }> = [
   {
-    // 诗人详情页：原右侧浮窗列为常驻面板，这里以右上锚点复刻「右侧常驻」观感
+    // 诗人详情页：窗口常驻嵌入右侧栏「诗词特点」下方的空区（随右栏滚动）
     match: /^\/poet\/\d+$/,
     profile: {
       key: 'poet:detail',
       anchor: 'right-top',
-      offset: { dx: 40, dy: 80 },
-      size: { w: 380, h: 520 },
+      offset: { dx: 16, dy: 63 },
+      size: { w: 368, h: 420 },
       theme: DEFAULT_THEME,
       moduleCode: 'poet_chat',
       autoOpen: true,
+      dock: true,
       entry: { show: false, anchor: 'right-bottom', dx: 30, dy: 96, shape: 'circle' },
       greeting: '与 AI 助手对话，了解这位诗人的故事',
       presetQuestions: [{ text: '${poetName}是谁', assistant: 'poetry' }],
-      presetMode: 'chips',
+      presetMode: 'auto',
       defaultAssistant: 'poetry'
     }
   },
@@ -144,20 +158,22 @@ const PAGE_PROFILES: Array<{ match: RegExp; profile: AiPageProfile }> = [
     }
   },
   {
-    // 寻章摘句页：原页内对话卡改为右下胶囊入口 + 右下浮窗
+    // 寻章摘句页：AI 面板嵌入右侧栏「背景知识」卡片下方，紫色折叠区默认收起
     match: /^\/poem$/,
     profile: {
       key: 'poem:list',
       anchor: 'right-bottom',
       offset: { dx: 40, dy: 96 },
-      size: { w: 380, h: 460 },
-      theme: DEFAULT_THEME,
+      size: { w: 380, h: 420 },
+      theme: PURPLE_THEME,
       moduleCode: 'poetry_chat',
       autoOpen: false,
-      entry: { show: true, anchor: 'right-bottom', dx: 30, dy: 96, shape: 'pill', label: 'AI 助手' },
+      collapseOnEnter: true,
+      dock: true,
+      entry: { show: false, anchor: 'right-bottom', dx: 30, dy: 96, shape: 'pill', label: 'AI 助手' },
       greeting: '可以问我这首诗的译文、赏析与背景',
       presetQuestions: [{ text: '请简要介绍一下这首诗', assistant: 'poetry' }],
-      presetMode: 'auto',
+      presetMode: 'chips',
       defaultAssistant: 'poetry'
     }
   },
@@ -181,12 +197,13 @@ function isDisabledPath(path: string): boolean {
   return DISABLED_PREFIXES.some(prefix => path.startsWith(prefix))
 }
 
-/** 按当前路由路径解析画像 */
+/** 按当前路由路径解析画像（忽略 query/hash，避免带筛选参数时落回通用画像） */
 export function resolveProfile(path: string): AiPageProfile {
-  if (isDisabledPath(path)) {
+  const cleanPath = path.split('?')[0].split('#')[0]
+  if (isDisabledPath(cleanPath)) {
     return { ...GENERAL_PROFILE, key: 'disabled', disabled: true, entry: { ...GENERAL_PROFILE.entry, show: false } }
   }
-  const hit = PAGE_PROFILES.find(item => item.match.test(path))
+  const hit = PAGE_PROFILES.find(item => item.match.test(cleanPath))
   return hit ? hit.profile : GENERAL_PROFILE
 }
 

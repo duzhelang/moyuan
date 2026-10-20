@@ -7,6 +7,9 @@ export {}
 
 declare module 'vue' {
   export interface GlobalComponents {
+    AiAssistantSwitch: typeof import('./components/common/AiAssistantSwitch.vue')['default']
+    AiChatFab: typeof import('./components/common/AiChatFab.vue')['default']
+    AiChatWindow: typeof import('./components/common/AiChatWindow.vue')['default']
     AncientPoemSelection: typeof import('./components/home/AncientPoemSelection.vue')['default']
     AppFooter: typeof import('./components/common/AppFooter.vue')['default']
     AppHeader: typeof import('./components/common/AppHeader.vue')['default']

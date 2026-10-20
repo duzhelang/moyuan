@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted, onActivated, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, onActivated, onDeactivated, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getForumPostList } from '@/api/modules/forum'
 import { writePoemFromImage, analyzePoem, matchCouplet, ocrImage, chat } from '@/api/modules/ai'
@@ -15,11 +15,8 @@ import PoetCard from '@/components/business/PoetCard.vue'
 import HomeNavigation from '@/components/business/HomeNavigation.vue'
 import DailyPoetry from '@/components/business/DailyPoetry.vue'
 import QrCodeLink from '@/components/common/QrCodeLink.vue'
-import LoginPrompt from '@/components/common/LoginPrompt.vue'
 import HomeNavBar from '@/components/business/HomeNavBar.vue'
-import GameMiniPanel from '@/components/game/GameMiniPanel.vue'
 import { HomeCarousel, ForumPreview, AncientPoemSelection, ContemporaryPoems } from '@/components/home'
-import UserMenuDropdown from '@/components/common/UserMenuDropdown.vue'
 import homePoetryData from '@/data/home-poetry-library.json'
 
 const NAV_ANIMATION_KEY = 'home_nav_animation_config'
@@ -27,16 +24,6 @@ const NAV_ANIMATION_KEY = 'home_nav_animation_config'
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
-
-// AI 功能登录门禁：未登录时弹出提示并引导登录，不发起请求
-const loginPromptVisible = ref(false)
-const ensureLogin = (): boolean => {
-  if (!userStore.isLoggedIn) {
-    loginPromptVisible.value = true
-    return false
-  }
-  return true
-}
 
 const hotPosts = ref<ForumPost[]>([])
 
@@ -69,19 +56,28 @@ const analyzeInput = ref('')
 const analyzeResult = ref('')
 const analyzeLoading = ref(false)
 
-const activeExtraPanel = ref<'rhyme' | 'couplet' | 'ocr' | 'acrostic' | 'meter' | null>(null)
+type ExtraPanelKey = 'rhyme' | 'couplet' | 'ocr' | 'acrostic' | 'meter' | 'feihua'
+const activeExtraPanel = ref<ExtraPanelKey | null>(null)
 
-// 游戏入口（飞花令 / 诗词接龙）：游客展开小窗口，登录用户跳转独立游戏页
-const miniPanelType = ref<'feihua' | 'chain' | null>(null)
+/** 各功能面板对应的完整页面入口（统一跳「诗宝阁」并预选角色与能力） */
+const EXTRA_FULL_PAGE: Partial<Record<ExtraPanelKey, { path: string; query?: Record<string, string> }>> = {
+  rhyme: { path: '/ai-chat', query: { role: 'judge', skill: 'rhyme' } },
+  couplet: { path: '/ai-chat', query: { role: 'creator', skill: 'couplet' } },
+  acrostic: { path: '/ai-chat', query: { role: 'creator', skill: 'acrostic' } },
+  meter: { path: '/ai-chat', query: { role: 'judge', skill: 'tone' } },
+  feihua: { path: '/game/feihua' }
+}
 
-const onGameCardClick = (type: 'feihua' | 'chain') => {
-  if (userStore.isLoggedIn) {
-    miniPanelType.value = null
-    router.push(type === 'feihua' ? '/game/feihua' : '/game/chain')
-  } else {
-    activeExtraPanel.value = null
-    miniPanelType.value = miniPanelType.value === type ? null : type
+/** 前往当前功能面板的完整页面；飞花令按当前模式跳飞花令页或接龙页 */
+const openExtraFullPage = () => {
+  const panel = activeExtraPanel.value
+  if (!panel) return
+  if (panel === 'feihua') {
+    router.push(feihuaMode.value === 'chain' ? '/game/chain' : '/game/feihua')
+    return
   }
+  const target = EXTRA_FULL_PAGE[panel]
+  if (target) router.push(target)
 }
 
 // 「诗境 AI」下方功能卡横向滚动容器（配合左右箭头切换）
@@ -89,7 +85,74 @@ const extraScrollRef = ref<HTMLElement | null>(null)
 
 /** 横向滚动功能卡：dir 为 -1 向左、1 向右 */
 const scrollExtra = (dir: number) => {
+  pauseExtraAutoScroll(2500)
   extraScrollRef.value?.scrollBy({ left: dir * 430, behavior: 'smooth' })
+}
+
+// ===== 功能卡自动横向滑动 =====
+// 鼠标悬浮、手动滚动或展开面板时暂停，离开后恢复
+const extraAutoPaused = ref(false)
+// 每帧位移（CSS px）：浏览器在高 DPI 下会把 scrollLeft 量化到物理像素，
+// 因此不能直接累加 scrollLeft，需用独立浮点变量累计位置
+const EXTRA_AUTO_SPEED = 0.6
+let extraAutoDir = 1
+let extraAutoPos: number | null = null
+let extraAutoRaf = 0
+let extraAutoResumeTimer: ReturnType<typeof setTimeout> | null = null
+
+/** 暂停自动滑动；duration 为空表示持续暂停，否则到时间后自动恢复 */
+const pauseExtraAutoScroll = (duration?: number) => {
+  extraAutoPaused.value = true
+  extraAutoPos = null
+  if (extraAutoResumeTimer) {
+    clearTimeout(extraAutoResumeTimer)
+    extraAutoResumeTimer = null
+  }
+  if (duration) {
+    extraAutoResumeTimer = setTimeout(() => {
+      extraAutoPaused.value = false
+      extraAutoResumeTimer = null
+    }, duration)
+  }
+}
+
+const resumeExtraAutoScroll = () => {
+  extraAutoPaused.value = false
+  extraAutoPos = null
+  if (extraAutoResumeTimer) {
+    clearTimeout(extraAutoResumeTimer)
+    extraAutoResumeTimer = null
+  }
+}
+
+const startExtraAutoScroll = () => {
+  // 尊重系统「减少动效」偏好
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+  const step = () => {
+    const el = extraScrollRef.value
+    if (el && !extraAutoPaused.value && !activeExtraPanel.value) {
+      const max = el.scrollWidth - el.clientWidth
+      if (max > 0) {
+        // 首次运行或手动滚动后，从元素当前位置接管
+        if (extraAutoPos === null) extraAutoPos = el.scrollLeft
+        extraAutoPos += EXTRA_AUTO_SPEED * extraAutoDir
+        // 滑到两端后反向，形成来回缓动而非直接跳回起点
+        if (extraAutoPos >= max) {
+          extraAutoPos = max
+          extraAutoDir = -1
+        } else if (extraAutoPos <= 0) {
+          extraAutoPos = 0
+          extraAutoDir = 1
+        }
+        el.scrollLeft = extraAutoPos
+      }
+    } else {
+      // 暂停期间不同步位置，恢复后重新读取元素实际位置
+      extraAutoPos = null
+    }
+    extraAutoRaf = requestAnimationFrame(step)
+  }
+  extraAutoRaf = requestAnimationFrame(step)
 }
 
 /** 征集有趣功能：跳转到发布新帖，向社区征集想法 */
@@ -149,7 +212,6 @@ const clearOcrImage = () => {
 }
 
 const handleOcrRecognize = async () => {
-  if (!ensureLogin()) return
   if (!ocrFile.value) {
     ElMessage.warning('请先上传图片')
     return
@@ -221,7 +283,6 @@ const loadRandomPoem = () => {
 loadRandomPoem()
 
 const handleCoupletMatch = async (upperCouplet?: string) => {
-  if (!ensureLogin()) return
   const input = upperCouplet || coupletInput.value.trim()
   if (!input) {
     ElMessage.warning('请输入上联')
@@ -261,7 +322,6 @@ const acrosticLines = computed(() =>
 )
 
 const handleAcrosticGenerate = async (chars?: string) => {
-  if (!ensureLogin()) return
   const input = (chars ?? acrosticInput.value).trim()
   if (!input) {
     ElMessage.warning('请输入藏头字')
@@ -343,7 +403,6 @@ const meterRenderLines = computed(() =>
 )
 
 const handleMeterCheck = async () => {
-  if (!ensureLogin()) return
   const input = meterInput.value.trim()
   if (!input) {
     ElMessage.warning('请输入要校验的诗句')
@@ -380,6 +439,40 @@ const handleMeterCheck = async () => {
     ElMessage.error('校验失败，请稍后重试')
   } finally {
     meterLoading.value = false
+  }
+}
+
+// ===== 飞花令 / 诗词接龙 =====
+const feihuaMode = ref<'keyword' | 'chain'>('keyword')
+const feihuaInput = ref('')
+const feihuaLoading = ref(false)
+const feihuaResult = ref('')
+const feihuaLines = computed(() =>
+  feihuaResult.value.split('\n').map((line) => line.trim()).filter(Boolean)
+)
+const feihuaBtnText = computed(() => (feihuaMode.value === 'keyword' ? '玩飞花令' : '接下一句'))
+
+const handleFeihua = async () => {
+  const input = feihuaInput.value.trim()
+  if (!input) {
+    ElMessage.warning(feihuaMode.value === 'keyword' ? '请输入令字' : '请输入上一句')
+    return
+  }
+  feihuaLoading.value = true
+  feihuaResult.value = ''
+  try {
+    const prompt = feihuaMode.value === 'keyword'
+      ? `请以「${input}」为令字，列出 10 句含有该字的古诗词名句。\n要求：只引用确有其篇的真实名句，严禁杜撰；每句一行，格式为「诗句 —— 作者《篇名》」，不要编号、不要解释、不要多余符号。`
+      : `请以古诗词名句接龙：上一句为「${input}」。请以该句最后一个汉字为首字，接出下一句古诗词名句。\n要求：只引用确有其篇的真实名句，严禁杜撰；共输出 2 行，第 1 行为接龙句（首字须与上一句末字相同），第 2 行为「—— 作者《篇名》」，不要其他解释。`
+    const res = await chat({ message: prompt, moduleCode: 'chat' })
+    feihuaResult.value = res.data.reply || ''
+    if (!feihuaResult.value.trim()) {
+      ElMessage.info('AI 未返回内容，请重试')
+    }
+  } catch {
+    ElMessage.error('查询失败，请稍后重试')
+  } finally {
+    feihuaLoading.value = false
   }
 }
 
@@ -533,7 +626,6 @@ const clearImage = () => {
 }
 
 const handleWritePoem = async () => {
-  if (!ensureLogin()) return
   if (!imageFile.value) {
     ElMessage.warning('请先上传图片')
     return
@@ -554,7 +646,6 @@ const handleWritePoem = async () => {
 }
 
 const handleAnalyzePoem = async () => {
-  if (!ensureLogin()) return
   if (!analyzeInput.value.trim()) {
     ElMessage.warning('请输入要分析的诗句')
     return
@@ -572,6 +663,36 @@ const handleAnalyzePoem = async () => {
 }
 
 
+
+const handleLogout = () => {
+  try {
+    userStore.logout()
+    ElMessage.success('已退出登录')
+    router.push('/')
+  } catch {
+    ElMessage.error('退出失败')
+  }
+}
+
+const handleUserCommand = (command: string) => {
+  switch (command) {
+    case 'profile':
+      router.push('/user/profile')
+      break
+    case 'favorites':
+      router.push('/user/profile?tab=favorites')
+      break
+    case 'history':
+      router.push('/user/profile?tab=history')
+      break
+    case 'admin':
+      router.push('/admin/dashboard')
+      break
+    case 'logout':
+      handleLogout()
+      break
+  }
+}
 
 const onNavSearch = (payload: { query: string; type: 'internal' | 'external' }) => {
   if (!payload.query) {
@@ -753,6 +874,8 @@ onMounted(async () => {
   schedulePanelMeasure(400)
   window.addEventListener('keydown', handlePanelKeydown)
   window.addEventListener('resize', handlePanelResize)
+  // 功能卡自动横向滑动
+  startExtraAutoScroll()
 })
 
 const fetchVisionArticles = async () => {
@@ -778,6 +901,14 @@ onUnmounted(() => {
   if (clockTimer.value) {
     clearInterval(clockTimer.value)
     clockTimer.value = null
+  }
+  if (extraAutoRaf) {
+    cancelAnimationFrame(extraAutoRaf)
+    extraAutoRaf = 0
+  }
+  if (extraAutoResumeTimer) {
+    clearTimeout(extraAutoResumeTimer)
+    extraAutoResumeTimer = null
   }
   window.removeEventListener('scroll', handleScroll)
   window.removeEventListener('keydown', handlePanelKeydown)
@@ -810,6 +941,11 @@ watch(() => route.query.tab, (newTab) => {
 
 onActivated(() => {
   handleTabParam()
+  resumeExtraAutoScroll()
+})
+
+onDeactivated(() => {
+  pauseExtraAutoScroll()
 })
 </script>
 
@@ -827,7 +963,23 @@ onActivated(() => {
         <QrCodeLink text="了解我们" qrImage="/img/wechat_qr.jpg" alt="扫一扫查看" />
         <QrCodeLink text="联系我们" qrImage="/img/wechat_qr.jpg" alt="扫一扫联系" />
         <template v-if="userStore.isLoggedIn && userStore.userInfo">
-          <UserMenuDropdown :size="28" />
+          <el-dropdown trigger="click" @command="handleUserCommand">
+            <div class="top-user-info">
+              <el-avatar :src="userStore.avatar" :size="28">
+                {{ userStore.username?.charAt(0)?.toUpperCase() }}
+              </el-avatar>
+              <span class="top-user-name">{{ userStore.userInfo?.nickname || userStore.username }}</span>
+            </div>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="profile">个人中心</el-dropdown-item>
+                <el-dropdown-item command="favorites">我的收藏</el-dropdown-item>
+                <el-dropdown-item command="history">浏览历史</el-dropdown-item>
+                <el-dropdown-item v-if="userStore.userInfo?.role === 'admin'" command="admin">后台管理</el-dropdown-item>
+                <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </template>
         <template v-else>
           <router-link to="/user/login" class="top-link top-link-login">登录</router-link>
@@ -1007,9 +1159,14 @@ onActivated(() => {
         </div>
       </div>
 
-      <div class="ai-extra-wrap">
+      <div class="ai-extra-wrap" @mouseenter="pauseExtraAutoScroll()" @mouseleave="resumeExtraAutoScroll()">
         <button class="ai-extra-arrow ai-extra-arrow--left" type="button" aria-label="上一组功能" @click="scrollExtra(-1)">‹</button>
-        <div ref="extraScrollRef" class="ai-extra-features">
+        <div
+          ref="extraScrollRef"
+          class="ai-extra-features"
+          @wheel.passive="pauseExtraAutoScroll(2500)"
+          @touchstart.passive="pauseExtraAutoScroll(2500)"
+        >
           <div class="ai-extra-card" :class="{ active: activeExtraPanel === 'rhyme' }" @click="activeExtraPanel = activeExtraPanel === 'rhyme' ? null : 'rhyme'">
             <div class="ai-extra-icon">🎵</div>
             <div class="ai-extra-title">韵脚查询</div>
@@ -1035,15 +1192,10 @@ onActivated(() => {
             <div class="ai-extra-title">平仄校验</div>
             <div class="ai-extra-desc">校验诗句平仄与押韵</div>
           </div>
-          <div class="ai-extra-card" :class="{ active: miniPanelType === 'feihua' }" @click="onGameCardClick('feihua')">
+          <div class="ai-extra-card" :class="{ active: activeExtraPanel === 'feihua' }" @click="activeExtraPanel = activeExtraPanel === 'feihua' ? null : 'feihua'">
             <div class="ai-extra-icon">🌺</div>
             <div class="ai-extra-title">飞花令</div>
-            <div class="ai-extra-desc">行令对诗，多重玩法</div>
-          </div>
-          <div class="ai-extra-card" :class="{ active: miniPanelType === 'chain' }" @click="onGameCardClick('chain')">
-            <div class="ai-extra-icon">🔗</div>
-            <div class="ai-extra-title">诗词接龙</div>
-            <div class="ai-extra-desc">首尾相接，人机对句</div>
+            <div class="ai-extra-desc">行令对诗，诗词接龙</div>
           </div>
           <div class="ai-extra-card">
             <div class="ai-extra-icon">✒️</div>
@@ -1064,14 +1216,13 @@ onActivated(() => {
         <button class="ai-extra-arrow ai-extra-arrow--right" type="button" aria-label="下一组功能" @click="scrollExtra(1)">›</button>
       </div>
 
-      <div v-if="miniPanelType" class="ai-extra-panel game-mini-wrapper">
-        <GameMiniPanel :key="miniPanelType" :type="miniPanelType" @close="miniPanelType = null" />
-      </div>
-
       <div v-if="activeExtraPanel === 'rhyme'" class="ai-extra-panel">
         <div class="ai-extra-panel-header">
           <span class="ai-extra-panel-title">🎵 韵脚查询</span>
-          <button class="ai-extra-panel-close" @click="activeExtraPanel = null">&times;</button>
+          <div class="ai-extra-panel-actions">
+            <button class="ai-extra-panel-link" type="button" @click="openExtraFullPage">前往完整页面 ›</button>
+            <button class="ai-extra-panel-close" @click="activeExtraPanel = null">&times;</button>
+          </div>
         </div>
         <div class="rhyme-search-bar">
           <div class="rhyme-search-type">
@@ -1117,7 +1268,10 @@ onActivated(() => {
       <div v-if="activeExtraPanel === 'couplet'" class="ai-extra-panel">
         <div class="ai-extra-panel-header">
           <span class="ai-extra-panel-title">🏮 AI 对对联</span>
-          <button class="ai-extra-panel-close" @click="activeExtraPanel = null">&times;</button>
+          <div class="ai-extra-panel-actions">
+            <button class="ai-extra-panel-link" type="button" @click="openExtraFullPage">前往完整页面 ›</button>
+            <button class="ai-extra-panel-close" @click="activeExtraPanel = null">&times;</button>
+          </div>
         </div>
         <div class="couplet-example-tags">
           <span class="couplet-example-label">示例上联：</span>
@@ -1145,7 +1299,10 @@ onActivated(() => {
       <div v-if="activeExtraPanel === 'acrostic'" class="ai-extra-panel">
         <div class="ai-extra-panel-header">
           <span class="ai-extra-panel-title">🖋️ 藏头诗</span>
-          <button class="ai-extra-panel-close" @click="activeExtraPanel = null">&times;</button>
+          <div class="ai-extra-panel-actions">
+            <button class="ai-extra-panel-link" type="button" @click="openExtraFullPage">前往完整页面 ›</button>
+            <button class="ai-extra-panel-close" @click="activeExtraPanel = null">&times;</button>
+          </div>
         </div>
         <div class="couplet-example-tags">
           <span class="couplet-example-label">示例藏头字：</span>
@@ -1183,7 +1340,10 @@ onActivated(() => {
       <div v-if="activeExtraPanel === 'meter'" class="ai-extra-panel">
         <div class="ai-extra-panel-header">
           <span class="ai-extra-panel-title">🧭 平仄校验</span>
-          <button class="ai-extra-panel-close" @click="activeExtraPanel = null">&times;</button>
+          <div class="ai-extra-panel-actions">
+            <button class="ai-extra-panel-link" type="button" @click="openExtraFullPage">前往完整页面 ›</button>
+            <button class="ai-extra-panel-close" @click="activeExtraPanel = null">&times;</button>
+          </div>
         </div>
         <p class="ai-explore-hint" style="margin-bottom:12px;">粘贴一首绝句/律诗（每句一行），AI 校验平仄、押韵与格律</p>
         <textarea
@@ -1228,6 +1388,39 @@ onActivated(() => {
           <div v-if="meterResult.summary" class="meter-summary">{{ meterResult.summary }}</div>
         </div>
         <div v-else-if="meterRaw" class="ai-result-card meter-raw">{{ meterRaw }}</div>
+      </div>
+
+      <div v-if="activeExtraPanel === 'feihua'" class="ai-extra-panel">
+        <div class="ai-extra-panel-header">
+          <span class="ai-extra-panel-title">🌺 飞花令 / 接龙</span>
+          <div class="ai-extra-panel-actions">
+            <button class="ai-extra-panel-link" type="button" @click="openExtraFullPage">前往完整页面 ›</button>
+            <button class="ai-extra-panel-close" @click="activeExtraPanel = null">&times;</button>
+          </div>
+        </div>
+        <div class="rhyme-search-type" style="margin-bottom:10px;">
+          <button class="rhyme-type-btn" :class="{ active: feihuaMode === 'keyword' }" @click="feihuaMode = 'keyword'">飞花令</button>
+          <button class="rhyme-type-btn" :class="{ active: feihuaMode === 'chain' }" @click="feihuaMode = 'chain'">诗词接龙</button>
+        </div>
+        <div class="couplet-input-area">
+          <input
+            v-model="feihuaInput"
+            :placeholder="feihuaMode === 'keyword' ? '输入一个令字，如：月' : '输入上一句，如：举头望明月'"
+            maxlength="30"
+            @keyup.enter="handleFeihua"
+          />
+          <button class="ai-btn-primary ai-tool-btn" :disabled="feihuaLoading" @click="handleFeihua">
+            <span v-if="feihuaLoading" class="rhyme-btn-spinner"></span>
+            {{ feihuaLoading ? '思考中...' : feihuaBtnText }}
+          </button>
+        </div>
+        <div v-if="feihuaLoading" class="rhyme-loading">
+          <span class="rhyme-spinner"></span>
+          <span class="rhyme-loading-text">AI 正在检索诗句，请稍候…</span>
+        </div>
+        <div v-else-if="feihuaLines.length" class="ai-result-card feihua-result-card">
+          <div v-for="(line, idx) in feihuaLines" :key="idx" class="feihua-line">{{ line }}</div>
+        </div>
       </div>
 
       <div v-if="activeExtraPanel === 'ocr'" class="ai-extra-panel">
@@ -1311,7 +1504,6 @@ onActivated(() => {
         <ContemporaryPoems />
       </div>
     </div>
-    <LoginPrompt v-model:visible="loginPromptVisible" message="AI 功能需要登录后才能使用" />
   </div>
 
 

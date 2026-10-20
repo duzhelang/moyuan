@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { usePoemStore } from '@/stores/poem'
@@ -28,6 +28,24 @@ const poemStore = usePoemStore()
 const userStore = useUserStore()
 const preferencesStore = usePreferencesStore()
 const aiChatStore = useAiChatStore()
+/** 紫色折叠面板内的 AI 窗口嵌入容器（背景知识卡片下方） */
+const poemAiDockRef = ref<HTMLElement | null>(null)
+/** 拖动脱离后隐藏紫色卡片；窗口关闭或最小化时恢复 */
+const aiDetached = computed(() => aiChatStore.detached && aiChatStore.isOpen)
+/** 容器随外文诗词详情条件渲染，出现/消失时同步注册，避免停留在本页时仍显示右下浮钮 */
+watch(
+  poemAiDockRef,
+  el => aiChatStore.registerDock(el),
+  { immediate: true, flush: 'post' }
+)
+/** 面板展开状态与全局小窗同源，保证关闭按钮与折叠条一致 */
+const aiPanelOpen = computed(() => aiChatStore.isOpen)
+
+/** 折叠条点击：展开走统一登录门禁，收起仅隐藏窗口并保留会话 */
+function toggleAiPanel() {
+  if (aiChatStore.isOpen) aiChatStore.hide()
+  else aiChatStore.open()
+}
 
 const particleCanvasRef = ref<HTMLCanvasElement | null>(null)
 useParticles(particleCanvasRef, {
@@ -1281,6 +1299,7 @@ const handleDailyPoetrySearch = async (keyword: string, searchType: string) => {
 }
 
 onUnmounted(() => {
+  aiChatStore.registerDock(null)
   window.removeEventListener('scroll', handleSearchScroll, true)
   window.removeEventListener('resize', handleSearchScroll)
 })
@@ -2149,6 +2168,26 @@ const handleClearHistory = async () => {
                           </div>
                         </Transition>
                       </div>
+                    </div>
+                  </div>
+
+                  <!-- 紫色折叠 AI 面板：默认收起，点击展开后在卡片下方嵌入全局 AI 小窗 -->
+                  <div v-show="!aiDetached" class="ai-fold-panel" :class="{ expanded: aiPanelOpen }">
+                    <div class="ai-fold-header" @click="toggleAiPanel">
+                      <div class="ai-fold-head-left">
+                        <el-icon class="ai-fold-icon"><ChatDotRound /></el-icon>
+                        <div class="ai-fold-titles">
+                          <span class="ai-fold-title">墨渊问诗</span>
+                          <span class="ai-fold-sub">AI 助手 · 译文、赏析与背景答疑</span>
+                        </div>
+                      </div>
+                      <el-icon class="ai-fold-arrow" :class="{ rotated: aiPanelOpen }">
+                        <ArrowDown />
+                      </el-icon>
+                    </div>
+                    <!-- 始终占位：窗口未打开时无内容、不占高度，打开后由卡片内部就地撑开 -->
+                    <div class="ai-fold-body">
+                      <div ref="poemAiDockRef" class="poem-ai-dock"></div>
                     </div>
                   </div>
 
@@ -3584,6 +3623,101 @@ const handleClearHistory = async () => {
   grid-column: 2;
   grid-row: 1 / 3;
   @include scrollbar;
+}
+
+/* 紫色折叠 AI 面板：默认收起，展开后在背景知识卡片下方承载对话窗 */
+.ai-fold-panel {
+  border-radius: $border-radius-md;
+  border: 1px solid rgba(118, 75, 162, 0.28);
+  background: #faf8ff;
+  overflow: hidden;
+  transition: box-shadow $transition-fast;
+
+  &.expanded {
+    box-shadow: 0 6px 20px rgba(118, 75, 162, 0.18);
+    /* 展开后下方衔接对话窗，去掉底部圆角避免出现接缝 */
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+}
+
+.ai-fold-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-sm;
+  padding: $spacing-md $spacing-lg;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #ffffff;
+  cursor: pointer;
+  user-select: none;
+  transition: filter $transition-fast;
+
+  &:hover {
+    filter: brightness(1.06);
+  }
+}
+
+.ai-fold-head-left {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  min-width: 0;
+}
+
+.ai-fold-icon {
+  font-size: 18px;
+}
+
+.ai-fold-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ai-fold-title {
+  font-size: $font-size-base;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.ai-fold-sub {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.ai-fold-arrow {
+  font-size: 14px;
+  transition: transform $transition-fast;
+
+  &.rotated {
+    transform: rotate(180deg);
+  }
+}
+
+/* 展开后在卡片内部就地撑开，AI 窗口作为卡片正文，不改变页面滚动位置 */
+.ai-fold-body {
+  padding: 0;
+}
+
+.poem-ai-dock {
+  width: 100%;
+}
+
+.ai-fold-panel.expanded .poem-ai-dock {
+  border-top: 1px solid rgba(118, 75, 162, 0.16);
+}
+
+/* 去掉独立浮窗的边框与圆角，与紫色卡片连成一体 */
+.poem-ai-dock :deep(.ai-chat-window.docked) {
+  border: none;
+  border-radius: 0 0 12px 12px;
+  background: transparent;
+}
+
+.poem-ai-dock :deep(.ai-window-header) {
+  border-radius: 0;
 }
 
 .info-card {

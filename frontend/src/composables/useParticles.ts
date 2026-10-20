@@ -16,6 +16,7 @@ interface ParticleOptions {
   opacityRange?: [number, number]
   sizeRange?: [number, number]
   connectionDistance?: number
+  speed?: number
 }
 
 export function useParticles(canvasRef: Ref<HTMLCanvasElement | null>, options: ParticleOptions = {}) {
@@ -24,7 +25,8 @@ export function useParticles(canvasRef: Ref<HTMLCanvasElement | null>, options: 
     colors = ['#d4af87', '#f0e4d7', '#c9a06c'],
     opacityRange = [0.25, 0.45],
     sizeRange = [1.5, 3],
-    connectionDistance = 150
+    connectionDistance = 150,
+    speed = 1
   } = options
 
   const prefersReducedMotion = typeof window !== 'undefined'
@@ -44,8 +46,8 @@ export function useParticles(canvasRef: Ref<HTMLCanvasElement | null>, options: 
       result.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
-        vx: (Math.random() - 0.5) * 0.5,
-        vy: (Math.random() - 0.5) * 0.5,
+        vx: (Math.random() - 0.5) * 0.5 * speed,
+        vy: (Math.random() - 0.5) * 0.5 * speed,
         size: Math.random() * sizeRange[1] + sizeRange[0],
         opacity: Math.random() * (opacityRange[1] - opacityRange[0]) + opacityRange[0],
         color: colors[Math.floor(Math.random() * colors.length)]

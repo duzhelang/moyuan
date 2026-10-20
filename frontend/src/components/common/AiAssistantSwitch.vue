@@ -3,6 +3,7 @@
  * AI 小窗内的助理切换按钮组
  * 两个可爱头像 + 悬浮提示，点击切换；当前助理高亮
  */
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { AI_ASSISTANTS } from '@/configs/ai-chat/assistants'
 import type { AssistantId } from '@/configs/ai-chat/assistants'
 
@@ -20,6 +21,34 @@ const handleSelect = (id: AssistantId) => {
   if (id === props.modelValue) return
   emit('update:modelValue', id)
 }
+
+/** 首次展开与切换助理时，让未选中的那个头像自动弹一次能力提示 */
+const autoTipId = ref<AssistantId | null>(null)
+let tipTimer: ReturnType<typeof setTimeout> | undefined
+
+function flashOtherTip() {
+  const other = AI_ASSISTANTS.find(item => item.id !== props.modelValue)
+  autoTipId.value = other ? other.id : null
+  if (tipTimer) clearTimeout(tipTimer)
+  if (autoTipId.value) {
+    tipTimer = setTimeout(() => {
+      autoTipId.value = null
+    }, 3600)
+  }
+}
+
+onMounted(flashOtherTip)
+
+watch(
+  () => props.modelValue,
+  () => {
+    nextTick(flashOtherTip)
+  }
+)
+
+onUnmounted(() => {
+  if (tipTimer) clearTimeout(tipTimer)
+})
 </script>
 
 <template>
@@ -29,7 +58,7 @@ const handleSelect = (id: AssistantId) => {
       :key="item.id"
       type="button"
       class="assistant-btn"
-      :class="{ active: item.id === modelValue }"
+      :class="{ active: item.id === modelValue, 'tip-force': item.id === autoTipId }"
       :aria-label="item.name"
       @click="handleSelect(item.id)"
     >
@@ -80,9 +109,9 @@ const handleSelect = (id: AssistantId) => {
 
 .assistant-tip {
   position: absolute;
-  top: calc(100% + 8px);
+  bottom: calc(100% + 8px);
   left: 50%;
-  transform: translateX(-50%) translateY(-4px);
+  transform: translateX(-50%) translateY(4px);
   white-space: nowrap;
   padding: 5px 10px;
   border-radius: 6px;
@@ -96,7 +125,8 @@ const handleSelect = (id: AssistantId) => {
   z-index: 20;
 }
 
-.assistant-btn:hover .assistant-tip {
+.assistant-btn:hover .assistant-tip,
+.assistant-btn.tip-force .assistant-tip {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }

@@ -275,12 +275,6 @@ textarea:hover {
   opacity: 0.95;
 }
 
-textarea::placeholder {
-  color: rgba(100, 100, 100, 1);
-  font-size: 25px;
-  opacity: 0.8;
-}
-
 .sousuo form input::-webkit-input-placeholder {
   color: rgba(250, 250, 250, 1);
   font-size: 20px;
@@ -2677,18 +2671,6 @@ textarea:hover {
   opacity: 0.9;
 }
 
-textarea::-webkit-textarea-placeholder {
-  color: #999;
-  font-size: 14px;
-  font-style: italic;
-}
-
-input::-webkit-input-placeholder {
-  color: #000000;
-  font-size: 14px;
-  font-style: italic;
-}
-
 /* ========== fenye.css ========== */
 body,
 html {
@@ -3089,35 +3071,6 @@ a:hover {
 
 textarea:hover {
   opacity: 0.8;
-}
-
-textarea::-webkit-input-placeholder {
-  font-size: 25px;
-}
-
-textarea::-moz-placeholder {
-  color: aqua;
-  font-size: 25px;
-}
-
-textarea:-ms-input-placeholder {
-  color: aqua;
-  font-size: 25px;
-}
-
-textarea::-ms-input-placeholder {
-  color: aqua;
-  font-size: 25px;
-}
-
-textarea::placeholder {
-  color: aqua;
-  font-size: 25px;
-}
-
-input::-webkit-input-placeholder {
-  color: rgba(250, 250, 250, 1);
-  font-size: 20px;
 }
 
 input:hover {

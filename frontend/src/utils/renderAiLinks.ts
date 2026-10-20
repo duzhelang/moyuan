@@ -23,8 +23,13 @@ export function isAllowedRoute(route: string, allowedRoutes: string[]): boolean 
  * 解析回答文本
  * @param content AI 回答原文
  * @param allowedRoutes 白名单路由集合（通常取知识库条目的 route 汇总）
+ * @param routeTitles 路由对应的知识条目标题，用于生成「前往「飞花令」」这类可读文案
  */
-export function renderAiLinks(content: string, allowedRoutes: string[] = []): AiSegment[] {
+export function renderAiLinks(
+  content: string,
+  allowedRoutes: string[] = [],
+  routeTitles: Record<string, string> = {}
+): AiSegment[] {
   if (!content) return []
   const segments: AiSegment[] = []
   let lastIndex = 0
@@ -37,7 +42,8 @@ export function renderAiLinks(content: string, allowedRoutes: string[] = []): Ai
       segments.push({ type: 'text', text: content.slice(lastIndex, match.index) })
     }
     if (isAllowedRoute(route, allowedRoutes)) {
-      segments.push({ type: 'link', text: '点击去体验', route })
+      const title = routeTitles[route]
+      segments.push({ type: 'link', text: title ? `前往「${title}」` : '点击去体验', route })
     } else {
       // 非法路由不渲染成链接，原样丢弃标记
       segments.push({ type: 'text', text: route })

@@ -7,6 +7,8 @@
 --             （poem_type='foreign'，合并自 migration_012_foreign_poems.sql）
 --       v3.4：poet_featured 表补齐两个唯一键 uk_poet_featured_poet / uk_poet_featured_name
 --             （合并自 migration_005_poet_featured_unique.sql，原遗漏未并入）
+--       同一版本另含：system_knowledge 表（系统知识库，24 条种子数据）
+--             与 system_chat 模块配置（网页用法助理，绑定默认模型）
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS `moyuan` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

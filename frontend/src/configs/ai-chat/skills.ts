@@ -114,6 +114,36 @@ export const SKILLS: AiSkill[] = [
       + '"summary":"总体格律评价，1-2 句"}'
   },
   {
+    id: 'rhyme',
+    name: '韵脚查询',
+    desc: '查询汉字所属韵部与同韵字',
+    icon: '🎵',
+    roleIds: ['judge'],
+    placeholder: '输入汉字或韵部，如：风 / 东',
+    render: 'text',
+    buildPrompt: (input) =>
+      `请查询「${input}」在《平水韵》中的归属：\n`
+      + '1. 若输入为汉字，说明它所属的平水韵韵部（如 上平一东）与声调；\n'
+      + '2. 若输入为韵部名称，列出该韵部的常用字；\n'
+      + '3. 可附带 2-3 句以该韵部押韵的经典诗句作为示例；\n'
+      + '4. 韵部归属必须准确，不确定处如实说明，不得杜撰。'
+  },
+  {
+    id: 'couplet',
+    name: '对对联',
+    desc: '上联出题，AI 对下联',
+    icon: '🏮',
+    roleIds: ['creator'],
+    placeholder: '输入上联，如：春风得意马蹄疾',
+    render: 'text',
+    buildPrompt: (input) =>
+      `请为下面的上联对出下联：\n${input}\n\n`
+      + '要求：\n'
+      + '1. 下联与上联字数相等、词性相对、平仄相谐；\n'
+      + '2. 意境连贯、语气统一，避免生硬拼凑；\n'
+      + '3. 先给出下联正文，再用一句话说明对仗思路。'
+  },
+  {
     id: 'imagery',
     name: '意象典故',
     desc: '解读意象与典故流变',

@@ -142,7 +142,8 @@
 | **用户模块** | 用户注册、登录认证、个人中心、收藏管理 | ✅ 已实现 |
 | **管理模块** | 系统管理、用户管理、内容管理、数据统计、操作日志 | ✅ 已实现 |
 | **AI模块** | AI诗词问答（多模型切换）、看图写诗、智能分析、AI对对联、藏头诗、平仄格律校验、古籍OCR识文 | ✅ 已实现 |
-| **AI 对话页「诗宝阁」** | 角色化统一对话入口（6 角色 × 10 能力），非流式 + SSE 流式问答 | ✅ 已实现 |
+| **AI 对话页「诗宝阁」** | 角色化统一对话入口（6 角色 × 12 能力），非流式 + SSE 流式问答 | ✅ 已实现 |
+| **全局 AI 小窗** | 全站悬浮问答入口，诗词助理 / 网页用法助理双角色，接入系统知识库 | ✅ 已实现 |
 | **搜索模块** | 全文搜索、诗人搜索、诗词搜索、帖子搜索 | ✅ 已实现 |
 | **文件模块** | 文件上传、图片管理 | ✅ 已实现 |
 | **浏览历史模块** | 记录用户浏览历史、查看历史记录 | ✅ 已实现 |
@@ -162,9 +163,10 @@
 ### AI功能特性
 
 - **多模型支持**：智谱AI、DeepSeek、Kimi、小米MiMo、OpenRouter（统一适配层 `AiModelRegistry` + `OpenAiCompatibleAdapter`）
-- **模块绑定**：通过 `ai_module_config` 将业务模块（chat/poet_chat/poetry_chat/write_poem/analyze/couple 及游戏模块 feihua_gen_ancient/feihua_gen_normal/feihua_gen_super/feihua_verify/feihua_topic/chain_generate 等）绑定到具体模型，可独立切换
+- **模块绑定**：通过 `ai_module_config` 将业务模块（chat/poet_chat/poetry_chat/write_poem/analyze/couple、system_chat 及游戏模块 feihua_gen_ancient/feihua_gen_normal/feihua_gen_super/feihua_verify/feihua_topic/chain_generate 等）绑定到具体模型，可独立切换
 - **智能问答**：诗词相关问题解答（`POST /api/ai/chat` 非流式 / `POST /api/ai/chat/stream` SSE 流式）
-- **AI 对话页「诗宝阁」**：角色化统一对话入口（6 角色 × 10 能力），复用 `POST /api/ai/chat`（阶段一）/ `POST /api/ai/chat/stream`（阶段二 SSE 流式）
+- **AI 对话页「诗宝阁」**：角色化统一对话入口（6 角色 × 12 能力），复用 `POST /api/ai/chat`（阶段一）/ `POST /api/ai/chat/stream`（阶段二 SSE 流式）
+- **全局 AI 小窗**：全站页面可唤起，内置「诗词助理」与「网页用法助理」；后者走 `system_chat` 模块并检索 `system_knowledge` 系统知识库，支持 FAQ 直答与页面跳转入口
 - **看图写诗**：基于图片生成诗词（视觉模型）
 - **古籍识文（OCR）**：图片文字识别
 - **智能分析**：诗词内容分析解读
@@ -213,7 +215,7 @@ cd sc-moyuan-backend
 mysql -u root -p < src/main/resources/db/init.sql
 ```
 
-> **说明**：`init.sql` 是全量合并版脚本（v3.4），包含数据库创建、全部 **31 张表**建表语句及基础种子数据（13 个朝代、74 个诗词分类、13 位诗人、43 首诗词（含 20 首外文诗）、3 个测试用户、29 条 AI 模型、14 条 AI 模块配置、6 位精选诗人、7 条论坛示例帖、10 篇诗话视野文章、24 条首页导航）。详见 [数据库初始化说明文档](sc-moyuan-backend/src/main/resources/db/数据库初始化说明文档.md)。
+> **说明**：`init.sql` 是全量合并版脚本（v3.4），包含数据库创建、全部 **32 张表**建表语句及基础种子数据（13 个朝代、74 个诗词分类、13 位诗人、43 首诗词（含 20 首外文诗）、3 个测试用户、29 条 AI 模型、13 条 AI 模块配置、6 位精选诗人、7 条论坛示例帖、10 篇诗话视野文章、24 条首页导航、24 条系统知识库）。详见 [数据库初始化说明文档](sc-moyuan-backend/src/main/resources/db/数据库初始化说明文档.md)。
 
 ### 3. 后端配置
 
@@ -472,6 +474,9 @@ moyuan-master2/
 | 27 | static_page | 静态页面表 | <100 |
 | 28 | repair_order | 报修工单表 | 1万+ |
 | 29 | repair_comment | 报修评论表 | 10万+ |
+| 30 | game_record | 游戏对局记录表（飞花令/诗词接龙） | 10万+ |
+| 31 | game_sentence | 游戏有效诗句表 | 100万+ |
+| 32 | system_knowledge | 系统知识库表（网页用法助理） | <100 |
 
 > 完整建表语句与种子数据见 [init.sql](sc-moyuan-backend/src/main/resources/db/init.sql)（数据库权威定义）；增量迁移脚本为过渡性文件，参照 `docs/database/migrations/` 规范执行后，结构变更需合并进 `init.sql` 并清理脚本。
 
@@ -536,6 +541,12 @@ static_page（静态页面表，独立）
 vision_article（独立文章表，无外键关联）
 
 visit_log（独立日志表，user_id FK 可为NULL）
+
+game_record（游戏对局，user_id FK 可为NULL，游客对局仅存 Redis）
+  │
+  ▼ game_sentence（game_id 关联，对局有效诗句）
+
+system_knowledge（系统知识库，独立配置表）
 ```
 
 ### 详细表结构
@@ -991,6 +1002,14 @@ A: 管理员可以在后台管理页面配置 AI 模型：
 
 ## 更新日志
 
+### v1.12.0 (2026-10-21)
+- ✅ 全局 AI 小窗升级为双助理：诗词助理（内容类问答）+「网页用法助理」（站内玩法/入口/规则），各用独立头像与悬浮提示，首次展开或切换助理时自动弹出功能提示
+- ✅ 网页用法助理接入系统知识库：新增 `system_knowledge` 表与 `system_chat` 模块，先做意图分流（系统类问题走知识库 FAQ 直答，内容类问题跳过知识库），跳转入口由前端按命中条目的 `route` 生成
+- ✅ 新增公开知识库接口 `GET /api/system-knowledge` 与后台管理接口 `/api/admin/system-knowledge`
+- ✅ 安全收紧：`/api/ai/**` 移除匿名放行，未登录访问返回 401
+- ✅ 后台新增「缓存管理」「文件管理」「系统知识库」页面，对应 `/api/admin/cache/**`、`/api/admin/files/**` 接口
+- ✅ 诗宝阁能力扩充至 6 角色 × 12 能力；数据库业务表由 31 张增至 32 张（新增 `game_record`、`game_sentence`、`system_knowledge`）
+
 ### v1.11.1 (2026-10-19)
 - ✅ 修复诗人详情页「诗词作品」点击行为：原先误用外部诗词弹窗 `PoetryDetailDialog`（仅按标题查接口盒子，多数诗词只返回正文、赏析类字段为空且易命中同名他人作品），现改为本地库诗词直接 `router.push('/poem/{id}')` 跳转诗词详情页，与 `composables/usePoemCardNavigation.ts` 的统一导航规则一致；该页不再引入 `PoetryDetailDialog`
 - ✅ 诗词详情页 AI 评价卡片不再暴露底层模型名称，统一展示为品牌名「云砚墨知」
@@ -1156,6 +1175,6 @@ A: 管理员可以在后台管理页面配置 AI 模型：
 
 ---
 
-**文档版本**：v2.9
-**最后更新**：2026-10-19（修复诗人详情页「诗词作品」点击改为跳转诗词详情页）
+**文档版本**：v2.10
+**最后更新**：2026-10-21（同步全局 AI 小窗双助理与系统知识库、数据库 32 张表、诗宝阁 12 能力）
 **维护人员**：墨渊开发团队

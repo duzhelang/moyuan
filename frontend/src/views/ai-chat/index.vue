@@ -56,6 +56,8 @@ onMounted(() => {
   <div class="ai-chat-page">
     <div class="ai-chat-header">
       <div class="ai-chat-header-title">
+        <span class="ai-chat-page-title">诗宝阁</span>
+        <span class="ai-chat-header-divider"></span>
         <span class="ai-chat-header-icon">{{ persona.icon }}</span>
         <span class="ai-chat-header-name">{{ persona.name }}</span>
         <span class="ai-chat-header-sub">{{ persona.subtitle }}</span>
@@ -66,7 +68,7 @@ onMounted(() => {
     <div class="ai-chat-body">
       <RoleSidebar :personas="personas" :active-id="roleId" @select="switchRole" />
 
-      <div class="ai-chat-main">
+      <div class="ai-chat-main ink-bg ink-bg--4">
         <ChatStream
           :messages="messages"
           :loading="loading"
@@ -93,7 +95,9 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .ai-chat-page {
-  height: calc(100vh - 76px);
+  /* 顶部导航为 fixed 定位（55px），需留出同等高度，避免页头被遮挡、按钮无法点击 */
+  margin-top: 55px;
+  height: calc(100vh - 55px);
   min-height: 520px;
   display: flex;
   flex-direction: column;
@@ -108,9 +112,8 @@ onMounted(() => {
   gap: 12px;
   padding: 12px 20px;
   border-bottom: 1px solid #d4c5a9;
-  background: url('/img/dt_0_0.jpg');
-  background-size: cover;
-  background-position: 0 -320px;
+  /* 改用宣纸渐变色，避免与固定导航的山水底图在同一视口内重复堆叠 */
+  background: linear-gradient(180deg, #fdf8f0 0%, #f3e7d3 100%);
 }
 
 .ai-chat-header-title {
@@ -118,6 +121,23 @@ onMounted(() => {
   align-items: baseline;
   gap: 10px;
   min-width: 0;
+}
+
+.ai-chat-page-title {
+  flex-shrink: 0;
+  font-family: 'KaiTi', 'STKaiti', 'Noto Serif SC', serif;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #6b4c2a;
+}
+
+.ai-chat-header-divider {
+  flex-shrink: 0;
+  align-self: center;
+  width: 1px;
+  height: 18px;
+  background: rgba(107, 76, 42, 0.3);
 }
 
 .ai-chat-header-icon {
@@ -130,13 +150,12 @@ onMounted(() => {
   font-family: 'KaiTi', 'STKaiti', 'Noto Serif SC', serif;
   font-size: 20px;
   font-weight: 700;
-  color: #ffe8c4;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  color: #8b5a2b;
 }
 
 .ai-chat-header-sub {
   font-size: 13px;
-  color: rgba(255, 236, 210, 0.75);
+  color: #9a8367;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -145,10 +164,10 @@ onMounted(() => {
 .ai-chat-new-btn {
   flex-shrink: 0;
   padding: 7px 16px;
-  border: 1px solid rgba(255, 232, 196, 0.7);
+  border: 1px solid rgba(139, 69, 19, 0.45);
   border-radius: 999px;
-  background: rgba(139, 69, 19, 0.35);
-  color: #ffe8c4;
+  background: rgba(139, 69, 19, 0.08);
+  color: #7a4a20;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -156,7 +175,8 @@ onMounted(() => {
 }
 
 .ai-chat-new-btn:hover {
-  background: rgba(179, 74, 49, 0.6);
+  background: #8b4513;
+  border-color: #8b4513;
   color: #fff;
 }
 
@@ -167,10 +187,30 @@ onMounted(() => {
 }
 
 .ai-chat-main {
+  position: relative;
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
+}
+
+/* 右侧配景：取松山图中的远山云雾，只在右缘渐显，与左侧竹影形成「竹 + 远岫」搭配 */
+.ai-chat-main::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: url('/img/bg_ink_5.jpg') center top / cover no-repeat;
+  opacity: 0.5;
+  -webkit-mask-image: linear-gradient(to left, #000 0%, rgba(0, 0, 0, 0.35) 32%, transparent 58%);
+  mask-image: linear-gradient(to left, #000 0%, rgba(0, 0, 0, 0.35) 32%, transparent 58%);
+}
+
+/* 对话流与输入区置于底纹之上 */
+.ai-chat-main > * {
+  position: relative;
+  z-index: 1;
 }
 
 .ai-chat-footer {
@@ -185,7 +225,7 @@ onMounted(() => {
 @media (max-width: 768px) {
   .ai-chat-page {
     height: auto;
-    min-height: calc(100vh - 76px);
+    min-height: calc(100vh - 55px);
   }
 
   .ai-chat-body {

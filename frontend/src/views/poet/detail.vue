@@ -18,6 +18,10 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const aiChatStore = useAiChatStore()
+/** AI 面板在右侧栏的嵌入容器（诗词特点卡片下方） */
+const poetAiDockRef = ref<HTMLElement | null>(null)
+/** 面板展开状态：关闭后在嵌入位提供恢复入口 */
+const aiChatOpen = computed(() => aiChatStore.isOpen)
 
 const particleCanvasRef = ref<HTMLCanvasElement | null>(null)
 useParticles(particleCanvasRef, {
@@ -834,6 +838,8 @@ watch(() => route.params.id, (newId) => {
 
 onMounted(async () => {
   changeFontSize(fontSizeLevel.value)
+  // 注册页内 AI 面板容器，窗口会 Teleport 到「诗词特点」下方
+  aiChatStore.registerDock(poetAiDockRef.value)
   await fetchPoet()
   loadFillStatus()
   fetchPoems()
@@ -846,6 +852,7 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
   window.removeEventListener('resize', adjustPoetNameFontSize)
+  aiChatStore.registerDock(null)
   aiChatStore.clearContext()
   stopReading()
   if (audioElement) {
@@ -1226,6 +1233,13 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
+
+      <!-- AI 面板嵌入位：诗词特点下方的空区，窗口由全局组件 Teleport 到此 -->
+      <div ref="poetAiDockRef" class="poet-ai-dock"></div>
+      <button v-if="!aiChatOpen" class="poet-ai-entry" @click="aiChatStore.open()">
+        <el-icon><ChatDotRound /></el-icon>
+        展开 AI 助手
+      </button>
     </div>
 
     <Teleport to="body">
@@ -2075,13 +2089,43 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: $spacing-md;
-  overflow: hidden;
+  /* 折叠卡圈展开后内容会变高，右栏需可向下滚动，不能裁切 */
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: $spacing-xs $spacing-md;
   max-height: calc(100vh - 55px);
   @include scrollbar;
 
   @include responsive(lg) {
     display: none;
+  }
+}
+
+/* 右栏内的 AI 面板嵌入位 */
+.poet-ai-dock {
+  width: 100%;
+}
+
+/* 面板关闭后的恢复入口 */
+.poet-ai-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: $spacing-sm $spacing-md;
+  border-radius: $border-radius-md;
+  border: 1px solid rgba($primary-color, 0.25);
+  background: rgba(255, 255, 255, 0.85);
+  color: $primary-color;
+  font-size: $font-size-sm;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    background: rgba($primary-color, 0.08);
+    box-shadow: $box-shadow-md;
   }
 }
 

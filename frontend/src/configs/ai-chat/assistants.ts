@@ -15,6 +15,8 @@ export interface AiAssistant {
   avatar: string
   /** 鼠标悬浮提示文案 */
   tip: string
+  /** 切换助理后主动展示的能力介绍（首次切换到该助理时出现在对话流中） */
+  intro: string
   /** 绑定的 AI 模块编码；为 null 表示沿用当前页面画像的模块码 */
   moduleCode: string | null
 }
@@ -74,6 +76,7 @@ export const AI_ASSISTANTS: AiAssistant[] = [
     name: '诗词助理',
     avatar: POETRY_AVATAR,
     tip: '问我诗词：诗人、诗句、赏析',
+    intro: '我是诗词助理，可以聊诗人的故事、诗句的赏析、作品的译文与创作背景。想了解哪首诗，直接问我就好。',
     moduleCode: null
   },
   {
@@ -81,6 +84,7 @@ export const AI_ASSISTANTS: AiAssistant[] = [
     name: '网页用法助理',
     avatar: SYSTEM_AVATAR,
     tip: '问我用法：玩法、入口、怎么用',
+    intro: '我是网页用法助理，可以告诉你站内玩法怎么参与、功能入口在哪里、页面怎么用。找不到入口时问我就行。',
     moduleCode: 'system_chat'
   }
 ]
