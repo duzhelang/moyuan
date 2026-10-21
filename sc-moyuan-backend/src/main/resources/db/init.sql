@@ -567,7 +567,7 @@ INSERT IGNORE INTO `ai_model` (`name`, `display_name`, `provider`, `model_type`,
 ('zhipu-flash', '智谱GLM-4.7-Flash', 'zhipu', 'text', 'https://open.bigmodel.cn/api/paas/v4/chat/completions', '1a0d9529e8b64c88bffb00cdfba77b44.3ZkEwG4Kvsanf6Qb', 'glm-4.7-flash', NULL, 1024, 1, 1, 2),
 ('zhipu-glm4-flash', '智谱GLM-4-Flash', 'zhipu', 'text', 'https://open.bigmodel.cn/api/paas/v4/chat/completions', 'your-zhipu-api-key', 'glm-4-flash', NULL, 1024, 1, 0, 28),
 -- DeepSeek
-('deepseek', 'DeepSeek-V4-Flash', 'deepseek', 'text', 'https://api.deepseek.com/v1/chat/completions', 'your-deepseek-api-key', 'deepseek-v4-flash', NULL, 1024, 1, 0, 3),
+('deepseek', 'DeepSeek-默认', 'deepseek', 'both', 'https://api.deepseek.com/v1/chat/completions', 'your-deepseek-api-key', 'deepseek-chat', 'deepseek-flash', 1024, 1, 0, 3),
 ('deepseek-v3', 'DeepSeek-V3', 'deepseek', 'text', 'https://api.deepseek.com/v1/chat/completions', 'your-deepseek-api-key', 'deepseek-v3', NULL, 1024, 0, 0, 4),
 -- Kimi
 ('kimi', 'Kimi', 'kimi', 'text', 'https://api.moonshot.cn/v1/chat/completions', 'your-kimi-api-key', 'moonshot-v1-8k', NULL, 1024, 0, 0, 5),
@@ -633,7 +633,7 @@ INSERT IGNORE INTO `ai_module_config` (`module_code`, `module_name`, `require_vi
 ('chat', 'AI诗词问答', 0, 2, '资深诗词文化顾问，精通先秦至近现代诗词典籍，擅长诗词鉴赏、创作指导、诗人生平解读、格律讲解及诗词推荐', '你是一个古典诗词文化助手。回答要求：1.语言简洁精炼，避免冗余；2.使用通俗易懂的中文；3.重点突出，条理清晰；4.不要使用markdown格式，直接输出纯文本；5.根据问题复杂度适当展开，但不超过{maxLength}字', 200, 'concise', 100, 0),
 ('poet_chat', '诗人对话', 0, 2, '诗人介绍助手，专门回答关于诗人的问题', '你是一个古典诗词文化助手，正在为用户介绍诗人{poetName}。回答要求：1.语言简洁精炼，避免冗余；2.使用通俗易懂的中文；3.重点突出，条理清晰；4.不要使用markdown格式，直接输出纯文本；{styleHint}', 150, 'concise', 80, 0),
 ('poetry_chat', '诗词AI助手', 0, 2, '诗词鉴赏与解析助手，专门回答关于诗词的问题，包括译文注释、鉴赏赏析、创作背景、历史文化背景等', '你是一个文化渊博的大学者，精通古今中外诗歌知识。回答要求：1.语言简洁精炼，避免冗余；2.使用通俗易懂的中文；3.重点突出，条理清晰；4.不要使用markdown格式，直接输出纯文本；{styleHint}', 300, 'concise', 120, 0),
-('write_poem', '看图写诗', 1, 1, '古典诗词创作大师，擅长捕捉画面意境并转化为诗词意象，精通五言七言律诗绝句及各词牌创作', '你是一位古典诗词创作大师，擅长捕捉画面意境并转化为诗词意象。请根据图片内容创作一首诗词，讲究格律严谨、意象优美、情景交融。', 300, 'balanced', 300, 1),
+('write_poem', '看图写诗', 1, 3, '古典诗词创作大师，擅长捕捉画面意境并转化为诗词意象，精通五言七言律诗绝句及各词牌创作', '你是一位古典诗词创作大师，擅长捕捉画面意境并转化为诗词意象。请根据图片内容创作一首诗词，讲究格律严谨、意象优美、情景交融。', 300, 'balanced', 300, 1),
 ('analyze', '诗词鉴赏分析', 0, 2, '诗词学术研究专家，从意境营造、修辞手法、情感表达、历史背景、艺术特色等多维度深入解读诗词', '你是诗词学术研究专家，请从意境营造、修辞手法、情感表达、历史背景、艺术特色等多维度深入解读诗词，分析鞭辟入里、引经据典，兼顾学术严谨与通俗易懂。', 500, 'detailed', 500, 1),
 ('couplet', 'AI对对联', 0, 2, '对联艺术大师，深谙平仄声律、词性对仗、意境相承之道', '你是对联艺术大师，深谙平仄声律、词性对仗、意境相承之道。请根据上联创作工整合律的下联，对仗精巧、意境深远。', 100, 'concise', 100, 0),
 -- AI诗词评分（诗词详情页 AI 评分专用，model_id=4 即 DeepSeek）
