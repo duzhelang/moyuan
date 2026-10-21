@@ -43,7 +43,7 @@ const loadAnimationConfig = () => {
 const navBarRef = ref<InstanceType<typeof HomeNavBar> | null>(null)
 
 const aiModel = ref('zhipu')
-const visionModel = ref('glm-4.6v-flash')
+// 视觉模型不再由前端指定，统一由后台模块绑定配置（ai_model.vision_model_id）决定
 
 const activeAiTab = ref<'poem' | 'analyze' | 'explore'>('poem')
 
@@ -219,7 +219,7 @@ const handleOcrRecognize = async () => {
   ocrLoading.value = true
   ocrResult.value = ''
   try {
-    const res = await ocrImage(ocrFile.value, aiModel.value, visionModel.value, 'ocr')
+    const res = await ocrImage(ocrFile.value, aiModel.value, undefined, 'ocr')
     ocrResult.value = res.data.text
   } catch {
     ocrResult.value = '抱歉，AI服务暂时不可用，请稍后重试。'
@@ -633,8 +633,8 @@ const handleWritePoem = async () => {
   poemLoading.value = true
   poemResult.value = ''
   try {
-    console.log('开始调用看图写诗, model:', aiModel.value, 'visionModel:', visionModel.value)
-    const res = await writePoemFromImage(imageFile.value, aiModel.value, visionModel.value, 'write_poem')
+    console.log('开始调用看图写诗, model:', aiModel.value)
+    const res = await writePoemFromImage(imageFile.value, aiModel.value, undefined, 'write_poem')
     console.log('看图写诗响应:', res)
     poemResult.value = res.data.poem
   } catch (error) {
