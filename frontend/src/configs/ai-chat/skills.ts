@@ -169,10 +169,10 @@ export const SKILLS: AiSkill[] = [
   {
     id: 'feihua',
     name: '飞花令',
-    desc: '按令字列举含字名句',
+    desc: '设令字对句，逐句判定',
     icon: '🌸',
     roleIds: ['friend'],
-    placeholder: '输入令字，如：花',
+    placeholder: '输入一个汉字作为令字，如：花',
     render: 'text',
     buildPrompt: (input) =>
       `请以「${input}」为令字，列出含该字的真实诗词名句。`

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAiChat } from '@/composables/useAiChat'
 import type { AiSkill } from '@/configs/ai-chat/skills'
 import RoleSidebar from '@/components/ai-chat/RoleSidebar.vue'
@@ -9,6 +9,7 @@ import SkillChips from '@/components/ai-chat/SkillChips.vue'
 import ChatInput from '@/components/ai-chat/ChatInput.vue'
 
 const route = useRoute()
+const router = useRouter()
 
 const {
   personas,
@@ -20,6 +21,7 @@ const {
   messages,
   input,
   loading,
+  feihuaKeyword,
   switchRole,
   newSession,
   toggleSkill,
@@ -34,13 +36,36 @@ const recommendedSkills = computed<AiSkill[]>(() =>
     .filter((s): s is AiSkill => !!s)
 )
 
-/** 输入框占位：选中能力时用能力的提示语 */
-const placeholder = computed(
-  () => activeSkill.value?.placeholder ?? '输入你的问题，Enter 发送 / Shift+Enter 换行'
-)
+/** 输入框占位：选中能力时用能力的提示语；飞花令随对局阶段切换 */
+const placeholder = computed(() => {
+  const skill = activeSkill.value
+  if (skill?.id === 'feihua') {
+    return feihuaKeyword.value
+      ? `输入含「${feihuaKeyword.value}」的诗句`
+      : '输入一个汉字作为令字，如：花'
+  }
+  return skill?.placeholder ?? '输入你的问题，Enter 发送 / Shift+Enter 换行'
+})
 
 const handlePickSkill = (id: string) => {
   toggleSkill(id)
+}
+
+/** 飞花令 / 接龙在对话内轻量对局，完整计时闯关可跳独立游戏页 */
+const gamePath = computed(() => {
+  if (activeSkill.value?.id === 'feihua') return '/game/feihua'
+  if (activeSkill.value?.id === 'chain') return '/game/chain'
+  return ''
+})
+
+const gameLabel = computed(() => {
+  if (activeSkill.value?.id === 'feihua') return '飞花令完整对局'
+  if (activeSkill.value?.id === 'chain') return '接龙完整对局'
+  return ''
+})
+
+const openGame = () => {
+  if (gamePath.value) router.push(gamePath.value)
 }
 
 // 支持首页跳转携带 ?role=xxx&skill=xxx（预留能力）
@@ -84,8 +109,11 @@ onMounted(() => {
             :loading="loading"
             :placeholder="placeholder"
             :active-skill="activeSkill"
+            :game-path="gamePath"
+            :game-label="gameLabel"
             @send="send"
             @clear-skill="clearSkill"
+            @open-game="openGame"
           />
         </div>
       </div>

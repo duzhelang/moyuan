@@ -6,12 +6,17 @@ const props = defineProps<{
   loading: boolean
   placeholder: string
   activeSkill: AiSkill | null
+  /** 完整对局页路径；为空表示当前能力没有独立对局页 */
+  gamePath?: string
+  /** 完整对局入口文案 */
+  gameLabel?: string
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
   send: []
   clearSkill: []
+  openGame: []
 }>()
 
 const onInput = (e: Event) => {
@@ -35,6 +40,11 @@ const onSend = () => {
   <div class="chat-input-wrap">
     <div v-if="activeSkill" class="chat-active-skill">
       <span class="chat-active-skill-text">{{ activeSkill.icon }} 已选能力：{{ activeSkill.name }}</span>
+      <button
+        v-if="gamePath"
+        class="chat-active-skill-link"
+        @click="emit('openGame')"
+      >{{ gameLabel || '完整对局' }} →</button>
       <button class="chat-active-skill-clear" title="取消能力" @click="emit('clearSkill')">&times;</button>
     </div>
     <div class="chat-input-row">
@@ -78,6 +88,24 @@ const onSend = () => {
   border-radius: 999px;
   background: #fdf6ee;
   font-size: 12px;
+  color: #b34a31;
+}
+
+.chat-active-skill-link {
+  padding: 0 2px;
+  border: none;
+  background: transparent;
+  color: #8b4513;
+  font-size: 12px;
+  line-height: 1;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.2s ease;
+}
+
+.chat-active-skill-link:hover {
   color: #b34a31;
 }
 
