@@ -443,7 +443,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         Set<String> interestSet = new HashSet<>(Arrays.asList(user.getInterests().split(",")));
 
         if (interestSet.contains("古典")) {
-            addDynastyPoetScores(scores, Arrays.asList(1L, 2L, 3L, 4L, 5L, 6L), INTEREST_WEIGHT * 2);
+            addDynastyPoetScores(scores, Arrays.asList(1L, 2L, 3L, 4L, 5L, 6L, 7L), INTEREST_WEIGHT * 2);
         }
         if (interestSet.contains("现代")) {
             addDynastyPoetScores(scores, Arrays.asList(11L, 12L, 13L), INTEREST_WEIGHT * 2);
@@ -452,7 +452,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             addDynastyPoetScores(scores, Arrays.asList(11L, 12L, 13L), INTEREST_WEIGHT);
         }
         if (interestSet.contains("外国")) {
-            addDynastyPoetScores(scores, Arrays.asList(6L, 7L, 8L), INTEREST_WEIGHT);
+            addDynastyPoetScores(scores, Arrays.asList(6L, 8L), INTEREST_WEIGHT);
         }
 
         return scores;
@@ -571,7 +571,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         Set<String> interestSet = new HashSet<>(Arrays.asList(user.getInterests().split(",")));
 
         if (interestSet.contains("古典")) {
-            addDynastyPoemScores(scores, Arrays.asList(1L, 2L, 3L, 4L, 5L, 6L), 2.0);
+            addDynastyPoemScores(scores, Arrays.asList(1L, 2L, 3L, 4L, 5L, 6L, 7L), 2.0);
         }
         if (interestSet.contains("现代")) {
             addDynastyPoemScores(scores, Arrays.asList(11L, 12L, 13L), 2.0);
@@ -580,7 +580,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             addDynastyPoemScores(scores, Arrays.asList(11L, 12L, 13L), 1.0);
         }
         if (interestSet.contains("外国")) {
-            addDynastyPoemScores(scores, Arrays.asList(6L, 7L, 8L), 1.0);
+            addDynastyPoemScores(scores, Arrays.asList(6L, 8L), 1.0);
         }
 
         return scores;
