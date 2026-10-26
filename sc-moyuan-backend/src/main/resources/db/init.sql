@@ -332,7 +332,8 @@ INSERT IGNORE INTO `dynasty` (`name`, `start_year`, `end_year`, `description`, `
 ('明朝', 1368, 1644, '明朝，汉族建立的最后一个封建王朝', 10),
 ('清朝', 1644, 1912, '清朝，中国最后一个封建王朝', 11),
 ('民国', 1912, 1949, '中华民国时期', 12),
-('现代', 1949, NULL, '现代时期', 13);
+('现代', 1949, NULL, '现代时期', 13),
+('外国', NULL, NULL, '外国诗人与诗歌（欧美、东方、拉美等地区）', 14);
 
 -- ============================================================
 -- 初始数据：诗词分类（优化后的分类体系）
@@ -1423,3 +1424,58 @@ INSERT IGNORE INTO `system_knowledge` (`code`, `title`, `category`, `keywords`, 
 ('account.login', '注册与登录', 'account', '注册,登录,账号,密码', '登录,注册', '注册时需要填写用户名、密码和邮箱，登录使用用户名与密码。登录后可享受收藏、发布、评论等完整功能。注册成功会直接登录。', '进入登录页\n没有账号时切换到注册并填写信息\n登录成功后使用完整功能', '[{"q":"怎么注册账号","a":"在注册页填写用户名、密码和邮箱即可注册，注册成功会直接登录。","aliases":["注册在哪","怎么注册"]},{"q":"怎么登录","a":"在登录页输入用户名和密码即可登录。","aliases":["登录在哪"]}]', '/user/login', 1, 310),
 ('account.guest-limit', '游客与登录用户的权限差异', 'account', '游客,未登录,权限,差异,登录', '游客权限', '未登录的游客可以浏览诗词、诗人、帖子与文章，也能在首页直接体验飞花令、诗词接龙等小工具（对局仅临时保存）。发布诗词、发帖、评论、点赞、收藏、报修、诗人认证等操作需要登录后才能使用。', '未登录时浏览诗词等公开内容\n登录后解锁发布、评论、收藏等操作', '[{"q":"不登录能用吗","a":"不登录可以浏览诗词、诗人、帖子与文章，也能在首页体验飞花令等小工具；发布、评论、收藏等需要登录。","aliases":["游客能做什么","未登录能干嘛"]}]', NULL, 1, 320),
 ('account.ai-login', 'AI功能需要登录', 'account', 'AI功能,登录,权限,使用条件', 'AI需要登录', 'AI 相关功能需要登录后才能使用，包括看图写诗、古籍识文、AI 评分以及诗宝阁对话等。首页的飞花令、诗词接龙小工具游客可在首页直接体验。', '登录账号\n进入 AI 功能入口\n正常使用 AI 能力', '[{"q":"AI功能要登录吗","a":"需要登录后使用，包括看图写诗、古籍识文、AI 评分与诗宝阁对话等；游客可在首页直接体验飞花令、诗词接龙小工具。","aliases":["用AI要登录吗"]}]', NULL, 1, 330);
+
+-- ============================================================
+-- 30. 推荐模型版本表（四组实验模型策略：era/genre/fusion/global）
+-- 说明：active_strategy 为生成列——status=1 时取 strategy，否则为 NULL；
+--       唯一键 uk_rmv_active_strategy 保证每个策略最多只有一个上线版本。
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `recommendation_model_version` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `version` VARCHAR(64) NOT NULL COMMENT '模型版本号',
+  `strategy` VARCHAR(32) NOT NULL COMMENT '模型策略：era/genre/fusion/global',
+  `data_fingerprint` VARCHAR(128) NOT NULL COMMENT '训练数据指纹',
+  `metrics_pool` VARCHAR(32) NOT NULL DEFAULT 'classical-682' COMMENT '指标池口径',
+  `metrics_json` TEXT DEFAULT NULL COMMENT '离线指标 JSON（recall10/ndcg10/precision10/coverage）',
+  `status` TINYINT NOT NULL DEFAULT 0 COMMENT '0=下线，1=上线',
+  `active_strategy` VARCHAR(32) GENERATED ALWAYS AS (IF(`status` = 1, `strategy`, NULL)) STORED COMMENT '上线中的策略（生成列）',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_rmv_strategy_version` (`strategy`, `version`),
+  UNIQUE KEY `uk_rmv_active_strategy` (`active_strategy`),
+  KEY `idx_rmv_strategy_status` (`strategy`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='推荐模型版本表';
+
+-- ============================================================
+-- 31. 推荐结果缓存表（离线训练导出的 user × 策略 × Top20 查表结果）
+-- 说明：rank_no 取值 1-20；poem_id/user_id 使用主库 id 空间；
+--       唯一键防止重复导入，索引覆盖按用户/策略/版本查 Top20。
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `recommendation_cache` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id` BIGINT NOT NULL COMMENT '用户 id（主库空间）',
+  `strategy` VARCHAR(32) NOT NULL COMMENT '模型策略：era/genre/fusion/global',
+  `poem_id` BIGINT NOT NULL COMMENT '诗词 id（主库空间）',
+  `rank_no` INT NOT NULL COMMENT '排名，1 起',
+  `score` DOUBLE NOT NULL COMMENT '模型打分',
+  `model_version` VARCHAR(64) NOT NULL COMMENT '模型版本号',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_rc_user_strategy_version_poem` (`user_id`, `strategy`, `model_version`, `poem_id`),
+  KEY `idx_rc_user_strategy_version_rank` (`user_id`, `strategy`, `model_version`, `rank_no`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='推荐结果缓存表';
+
+-- ============================================================
+-- 32. 推荐策略切换事件表（可选埋点）
+-- 说明：userId 由后端从 JWT 解出，不取前端传值；上报失败静默。
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `recommendation_event` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id` BIGINT NOT NULL COMMENT '用户 id（JWT 解出）',
+  `page` VARCHAR(32) NOT NULL COMMENT '发生页面标识，如 home',
+  `from_strategy` VARCHAR(32) DEFAULT NULL COMMENT '切换前策略',
+  `to_strategy` VARCHAR(32) NOT NULL COMMENT '切换后策略',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_re_user_time` (`user_id`, `create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='推荐策略切换事件表';
