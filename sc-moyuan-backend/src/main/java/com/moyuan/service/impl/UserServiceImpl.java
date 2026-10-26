@@ -23,6 +23,7 @@ import com.moyuan.service.TokenBlacklistService;
 import com.moyuan.service.UserService;
 import com.moyuan.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -174,6 +175,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Override
     @Transactional
+    @CacheEvict(value = "poemRecommendation", allEntries = true)
     public void toggleFavorite(Long userId, Long poemId) {
         UserFavorite existing = userFavoriteMapper.selectOne(
                 new LambdaQueryWrapper<UserFavorite>()

@@ -8,6 +8,7 @@ import com.moyuan.entity.UserHistory;
 import com.moyuan.mapper.UserHistoryMapper;
 import com.moyuan.service.UserHistoryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,8 @@ public class UserHistoryServiceImpl extends ServiceImpl<UserHistoryMapper, UserH
 
     @Override
     @Transactional
+    @CacheEvict(value = "poemRecommendation", allEntries = true,
+            condition = "#targetType != null && #targetType == 1")
     public void addHistory(Long userId, Long targetId, Integer targetType) {
         LambdaQueryWrapper<UserHistory> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(UserHistory::getUserId, userId)
