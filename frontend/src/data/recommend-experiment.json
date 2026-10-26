@@ -1,0 +1,121 @@
+{
+  "updatedAt": "2026-10-27",
+  "modelVersion": "mv_20261026_01",
+  "fingerprint": {
+    "users": 240,
+    "items": 1015,
+    "classicalItems": 682,
+    "trainEvents": 16852,
+    "validPairs": 164,
+    "testPairs": 452,
+    "evalUsers": 40
+  },
+  "params": {
+    "alpha": 0.5,
+    "kSim": 50,
+    "weightHistory": 1,
+    "weightLike": 3,
+    "weightFavorite": 5
+  },
+  "cache": {
+    "rows": 19200,
+    "users": 240,
+    "strategies": 4,
+    "topN": 20,
+    "pool": 682
+  },
+  "strategies": [
+    {
+      "key": "era",
+      "label": "A · 古今视角",
+      "shortLabel": "古今视角",
+      "group": "model",
+      "recall": 0.115801,
+      "ndcg": 0.16298,
+      "precision": 0.1375,
+      "hr": 0.65,
+      "coverage": 0.167488
+    },
+    {
+      "key": "genre",
+      "label": "B · 体裁视角",
+      "shortLabel": "体裁视角",
+      "group": "model",
+      "recall": 0.107807,
+      "ndcg": 0.157031,
+      "precision": 0.13,
+      "hr": 0.6,
+      "coverage": 0.342857
+    },
+    {
+      "key": "fusion",
+      "label": "C · 双视角融合",
+      "shortLabel": "双视角融合",
+      "group": "best",
+      "recall": 0.118879,
+      "ndcg": 0.16713,
+      "precision": 0.14,
+      "hr": 0.675,
+      "coverage": 0.251232
+    },
+    {
+      "key": "global",
+      "label": "D · 全局基线",
+      "shortLabel": "全局基线",
+      "group": "baseline",
+      "recall": 0.108239,
+      "ndcg": 0.153927,
+      "precision": 0.1225,
+      "hr": 0.675,
+      "coverage": 0.160591
+    }
+  ],
+  "clusters": [
+    {
+      "key": "era_A",
+      "label": "古典向 · era_A",
+      "users": 20,
+      "targetInClassicalPool": 0.7347,
+      "recall": {
+        "era": 0.067436,
+        "genre": 0.051603,
+        "fusion": 0.072436,
+        "global": 0.059423
+      }
+    },
+    {
+      "key": "era_B",
+      "label": "现代向 · era_B",
+      "users": 20,
+      "targetInClassicalPool": 0.0234,
+      "recall": {
+        "era": 0.164165,
+        "genre": 0.164011,
+        "fusion": 0.165321,
+        "global": 0.157056
+      }
+    }
+  ],
+  "insights": [
+    {
+      "title": "融合在全量候选下略优",
+      "value": "NDCG 1.09× 全局",
+      "desc": "C 组 NDCG@10 0.1671，高于全局基线 0.1539，说明两视角加权有小幅增益。"
+    },
+    {
+      "title": "古典池下古今视角最优",
+      "value": "NDCG 1.05× 全局",
+      "desc": "仅看线上古典池，A 组 NDCG@10 0.0978，优于全局 0.0931；体裁视角最弱（0.0772）。"
+    },
+    {
+      "title": "古典池覆盖缺口",
+      "value": "24 / 40 用户",
+      "desc": "测试目标落在古典池的仅有 150 对 / 452 对，16 位现代向用户无法从古典池获得有效推荐。"
+    },
+    {
+      "title": "列表多样性保持稳定",
+      "value": "ILD 0.71",
+      "desc": "四组 Top10 的朝代差异率在 0.708–0.714 之间，模型分组未造成推荐同质化。"
+    }
+  ]
+}

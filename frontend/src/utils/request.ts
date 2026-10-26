@@ -62,6 +62,7 @@ const PUBLIC_PATHS = [
   '/ai',
   '/rhyme',
   '/search',
+  '/recommend/models',
   '/external-poetry',
   '/static-pages',
   '/game',
@@ -185,7 +186,9 @@ service.interceptors.response.use(
     if (code === '200') {
       return response.data
     }
-    ElMessage.error(message || '请求失败')
+    if (!response.config.silent) {
+      ElMessage.error(message || '请求失败')
+    }
     return Promise.reject(new Error(message || '请求失败'))
   },
   async (error) => {
@@ -193,12 +196,24 @@ service.interceptors.response.use(
     if (error.config?.__isRetry) {
       return Promise.reject(error)
     }
+    // 被 AbortController 取消的请求：按调用方配置跳过提示，不进入网络错误分支
+    if (axios.isCancel(error)) {
+      if (!error.config?.skipCanceledToast) {
+        handleNetworkError(error)
+      }
+      return Promise.reject(error)
+    }
     if (error.response) {
       const { status } = error.response
       const requestUrl = error.config?.url || ''
+      // 401/403 交给全局请求层处理（静默请求也保留 401 刷新流程）
+      if (status === 401) {
+        return handleUnauthorized(error)
+      }
+      if (error.config?.silent) {
+        return Promise.reject(error)
+      }
       switch (status) {
-        case 401:
-          return handleUnauthorized(error)
         case 403:
           ElMessage.error('没有权限访问该资源')
           break
@@ -223,13 +238,22 @@ service.interceptors.response.use(
           ElMessage.error(error.response.data?.message || error.message || '请求失败')
       }
     } else {
-      handleNetworkError(error)
+      if (!error.config?.silent) {
+        handleNetworkError(error)
+      }
     }
     return Promise.reject(error)
   }
 )
 
 declare module 'axios' {
+  export interface AxiosRequestConfig {
+    /** 静默请求：业务失败与非网络异常不弹全局错误提示（401 刷新流程不受影响） */
+    silent?: boolean
+    /** 被取消的请求（AbortController）不弹「网络连接失败」 */
+    skipCanceledToast?: boolean
+  }
+
   export interface InternalAxiosRequestConfig {
     __isRetry?: boolean
   }

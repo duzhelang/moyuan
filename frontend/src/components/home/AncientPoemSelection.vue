@@ -1,14 +1,21 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { searchPoemsWithRecommend, getRecommendedPoems } from '@/api/modules/external-poetry'
+import { useRoute } from 'vue-router'
+import { searchPoemsWithRecommend } from '@/api/modules/external-poetry'
 import type { PoemSearchResult } from '@/api/modules/external-poetry'
+import type { StrategyKey } from '@/api/modules/recommend'
 import { useUserStore } from '@/stores/user'
+import { useRecommendStrategy } from '@/composables/useRecommendStrategy'
+import RecommendStrategySwitch from '@/components/recommend/RecommendStrategySwitch.vue'
+import RecommendPanel from '@/components/recommend/RecommendPanel.vue'
+import RecommendCompareDialog from '@/components/recommend/RecommendCompareDialog.vue'
 import PoetryDetailDialog from '@/components/business/PoetryDetailDialog.vue'
 import { usePoemCardNavigation } from '@/composables/usePoemCardNavigation'
 import ancientPoemsData from '@/data/home-ancient-poems.json'
 
 const userStore = useUserStore()
+const route = useRoute()
 
 // 卡片点击导航：本地命中跳 /poem/:id，未命中弹窗兜底（同时阻止冒泡，避免触发面板焦点切换）
 const {
@@ -35,7 +42,6 @@ const poemSearchKeyword = ref('')
 const poemSearchResults = ref<PoemSearchResult[]>([])
 const poemSearchLoading = ref(false)
 const poemSearchMode = ref<'default' | 'search' | 'recommend'>('default')
-const recommendedPoems = ref<PoemSearchResult[]>([])
 
 const handlePoemSearch = async () => {
   if (!poemSearchKeyword.value.trim()) {
@@ -55,18 +61,28 @@ const handlePoemSearch = async () => {
   }
 }
 
-const fetchRecommendedPoems = async () => {
-  try {
-    recommendedPoems.value = await getRecommendedPoems(6)
-  } catch (error) {
-    console.error('获取推荐诗词失败:', error)
-  }
-}
+// ==================== 推荐策略切换（附录 A） ====================
+
+const {
+  strategy: currentStrategy,
+  availableStrategies,
+  options: strategyOptions,
+  items: recommendedPoems,
+  loading: recommendLoading,
+  error: recommendError,
+  fallbackNotice,
+  load: loadRecommendations,
+  switchTo: switchStrategy,
+  retry: retryRecommendation,
+  backToRule: backToRuleStrategy,
+  loadModels
+} = useRecommendStrategy({ topK: 6, persist: true })
 
 const showRecommendedPoems = async () => {
   poemSearchMode.value = 'recommend'
-  if (recommendedPoems.value.length === 0) {
-    await fetchRecommendedPoems()
+  await loadModels()
+  if (recommendedPoems.value.length === 0 && !recommendLoading.value) {
+    await loadRecommendations()
   }
 }
 
@@ -74,6 +90,69 @@ const showRecommendedPoems = async () => {
 const recommendBasis = computed(() =>
   userStore.isLoggedIn ? '用户画像匹配 + 兴趣标签建模' : '全站热度排序（浏览量 · 点赞量）'
 )
+
+// 工具栏左侧依据文案随策略变化
+const toolbarBasis = computed(() => {
+  const option = strategyOptions.value.find(o => o.key === currentStrategy.value)
+  return option ? `推荐依据：${option.hint}` : `推荐依据：${recommendBasis.value}`
+})
+
+const canCompare = computed(
+  () => userStore.isLoggedIn && availableStrategies.value.length >= 2
+)
+
+// 对比弹窗：默认左「规则」右「融合」，右列可在可用策略中切换
+const compareVisible = ref(false)
+const compareLeft = ref<StrategyKey>('rule')
+const compareRight = ref<StrategyKey>('fusion')
+
+const openCompare = () => {
+  if (!canCompare.value) return
+  compareLeft.value = 'rule'
+  const preferFusion = availableStrategies.value.includes('fusion')
+  const firstModelStrategy = availableStrategies.value.find(key => key !== 'rule')
+  compareRight.value = preferFusion
+    ? 'fusion'
+    : firstModelStrategy ?? 'rule'
+  compareVisible.value = true
+}
+
+const isValidStrategyParam = (value: unknown): value is StrategyKey =>
+  typeof value === 'string' && availableStrategies.value.includes(value as StrategyKey)
+
+// URL 直链（附录 A.8.3）：?strategy=fusion / ?compare=1&left=rule&right=fusion
+// 参数非法或策略不可用时回落规则，不报错；对比条件不满足时忽略
+onMounted(async () => {
+  const strategyParam = typeof route.query.strategy === 'string' ? route.query.strategy : ''
+  const compareParam = route.query.compare === '1'
+  if (!strategyParam && !compareParam) return
+
+  poemSearchMode.value = 'recommend'
+  await loadModels(true)
+
+  if (strategyParam && isValidStrategyParam(strategyParam)) {
+    if (strategyParam !== currentStrategy.value) {
+      await switchStrategy(strategyParam)
+    } else if (recommendedPoems.value.length === 0 && !recommendLoading.value) {
+      await loadRecommendations()
+    }
+  } else {
+    // 参数缺失/非法回落规则推荐
+    if (recommendedPoems.value.length === 0 && !recommendLoading.value) {
+      await loadRecommendations()
+    }
+  }
+
+  if (compareParam && canCompare.value) {
+    compareLeft.value = isValidStrategyParam(route.query.left) ? route.query.left : 'rule'
+    compareRight.value = isValidStrategyParam(route.query.right)
+      ? route.query.right
+      : availableStrategies.value.includes('fusion')
+        ? 'fusion'
+        : availableStrategies.value.find(key => key !== 'rule') ?? 'rule'
+    compareVisible.value = true
+  }
+})
 
 const showDefaultPoems = () => {
   poemSearchMode.value = 'default'
@@ -113,6 +192,29 @@ const clearPoemSearch = () => {
           </button>
           <button v-if="poemSearchMode === 'search'" class="poem_search_clear" @click="clearPoemSearch">清除</button>
         </div>
+        <!-- 推荐策略工具栏：只在「为您推荐」页签显示（附录 A.1.2 / A.5.1） -->
+        <div v-if="poemSearchMode === 'recommend'" class="recommend_toolbar">
+          <span class="recommend_basis">{{ toolbarBasis }}</span>
+          <div class="recommend_toolbar_right">
+            <RecommendStrategySwitch
+              :model-value="currentStrategy"
+              :options="strategyOptions"
+              @update:model-value="switchStrategy"
+            />
+            <button
+              v-if="canCompare"
+              type="button"
+              class="recommend_compare_btn"
+              @click="openCompare"
+            >
+              对比
+            </button>
+          </div>
+        </div>
+        <!-- 后端缓存未命中/版本下线的轻提示：淡入，不弹 toast、不遮挡卡片 -->
+        <transition name="recommend-notice">
+          <div v-if="fallbackNotice" class="recommend_fallback_notice">{{ fallbackNotice }}</div>
+        </transition>
         <div class="luntan_jx_scroll">
           <template v-if="poemSearchMode === 'default'">
             <div
@@ -168,31 +270,16 @@ const clearPoemSearch = () => {
           </template>
 
           <template v-if="poemSearchMode === 'recommend'">
-            <div v-if="recommendedPoems.length === 0" class="poem_search_status">
-              暂无推荐，多浏览诗词会更精准哦~
-            </div>
-            <template v-else>
-              <div
-                v-for="(poem, idx) in recommendedPoems"
-                :key="'recommend-' + idx"
-                class="poem_card poem_recommend_card"
-                @click.stop="openPoemDetail(poem)"
-              >
-                <div class="poem_card_body">
-                  <div class="poem_title">{{ poem.title }}</div>
-                  <div class="poem_meta">
-                    <span v-if="poem.dynasty">【{{ poem.dynasty }}】</span>
-                    <span v-if="poem.author">{{ poem.author }}</span>
-                  </div>
-                  <div class="poem_lines">
-                    <div v-for="(line, li) in poem.content.split('\n')" :key="li" class="poem_line">{{ line }}</div>
-                  </div>
-                  <div v-if="poem.recommendReason" class="poem_recommend_reason">
-                    <span class="recommend_icon">&#128161;</span> {{ poem.recommendReason }}
-                  </div>
-                </div>
-              </div>
-            </template>
+            <RecommendPanel
+              :items="recommendedPoems"
+              :loading="recommendLoading"
+              :error="recommendError"
+              :is-rule-strategy="currentStrategy === 'rule'"
+              :top-k="6"
+              @retry="retryRecommendation"
+              @switch-rule="backToRuleStrategy"
+              @open="openPoemDetail"
+            />
           </template>
         </div>
       </div>
@@ -207,6 +294,13 @@ const clearPoemSearch = () => {
     v-model:visible="poetryDialogVisible"
     :title="poetryDialogTitle"
     :author="poetryDialogAuthor"
+  />
+
+  <RecommendCompareDialog
+    v-model="compareVisible"
+    :left="compareLeft"
+    :right="compareRight"
+    :top-k="10"
   />
 </template>
 
@@ -538,6 +632,107 @@ const clearPoemSearch = () => {
 
 .recommend_icon {
   margin-right: 4px;
+}
+
+/* ==================== 推荐策略工具栏（附录 A.5.1） ==================== */
+
+.recommend_toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.recommend_basis {
+  font-size: 12px;
+  color: #7a5c37;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recommend_toolbar_right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  /* 标签不换行；空间不足时容器横向滚动，不挤压卡片区 */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.recommend_toolbar_right::-webkit-scrollbar {
+  display: none;
+}
+
+.recommend_compare_btn {
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 12px;
+  font-size: 13px;
+  color: #6b4d2e;
+  background: rgba(255, 252, 245, 0.6);
+  border: 1px solid rgba(138, 90, 43, 0.25);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  font-family: inherit;
+}
+
+.recommend_compare_btn:hover {
+  background: rgba(138, 90, 43, 0.08);
+  border-color: rgba(138, 90, 43, 0.45);
+}
+
+.recommend_fallback_notice {
+  font-size: 12px;
+  color: #7a5c37;
+  background: rgba(138, 90, 43, 0.08);
+  border: 1px solid rgba(138, 90, 43, 0.2);
+  border-radius: 6px;
+  padding: 4px 10px;
+  margin: 0 0 8px;
+}
+
+.recommend-notice-enter-active {
+  transition: opacity 0.2s ease;
+}
+
+.recommend-notice-enter-from {
+  opacity: 0;
+}
+
+.recommend-notice-leave-active {
+  transition: opacity 0.15s ease;
+}
+
+.recommend-notice-leave-to {
+  opacity: 0;
+}
+
+/* 移动端（<768px）：依据与标签分两行，标签横向滚动、高度 28px 字号 12px（附录 A.5.3） */
+@media (max-width: 768px) {
+  .recommend_toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .recommend_toolbar_right {
+    padding: 0 4px;
+  }
+
+  .recommend_toolbar_right :deep(.rs_tab) {
+    height: 28px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .recommend_toolbar_right :deep(.rs_metric) {
+    font-size: 10px;
+  }
 }
 
 </style>

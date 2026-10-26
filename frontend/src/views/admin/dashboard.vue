@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { getAdminStats, getAdminStatsTrend, getVisitStats, getVisitTrend } from '@/api/modules/admin'
+import RecommendationScreen from '@/components/admin/RecommendationScreen.vue'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
@@ -220,6 +221,8 @@ onMounted(async () => {
         </el-tooltip>
       </el-col>
     </el-row>
+
+    <RecommendationScreen />
 
     <el-row :gutter="20" class="chart-row">
       <el-col :xs="24" :lg="12">
