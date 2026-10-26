@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.CacheManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -48,6 +49,7 @@ public class AdminController {
     private final PoetProfileService poetProfileService;
     private final AiGeneratedContentService aiGeneratedContentService;
     private final StatsMapper statsMapper;
+    private final CacheManager cacheManager;
     private final CommentService commentService;
     private final PoetDraftService poetDraftService;
     private final PoetSuggestionService poetSuggestionService;
@@ -811,6 +813,9 @@ public class AdminController {
         try {
             poetService.clearAllCache();
             poemService.clearAllCache();
+            if (cacheManager.getCache("poemRecommendation") != null) {
+                cacheManager.getCache("poemRecommendation").clear();
+            }
             return R.success("所有缓存已清除");
         } catch (Exception e) {
             log.error("清除所有缓存失败", e);

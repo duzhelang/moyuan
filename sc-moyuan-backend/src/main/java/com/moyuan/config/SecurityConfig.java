@@ -73,9 +73,14 @@ public class SecurityConfig {
                     "/uploads/**"
                 ).permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/poems", "/api/poems/{id:[0-9]+}", "/api/poems/{id:[0-9]+}/ratings", "/api/poems/{id:[0-9]+}/ratings/ai").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/poems/modern/page", "/api/poems/random", "/api/poems/daily").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/poet-featured", "/api/poet-featured/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/home-navigation", "/api/home-navigation/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/rhyme/**").permitAll()
+                // 模型策略推荐的上/下线模型信息与可用策略：公开可选 JWT；/api/recommend 本体保持登录
+                .requestMatchers(HttpMethod.GET, "/api/recommend/models").permitAll()
+                // 管理端指标屏的实时统计仅管理员可见
+                .requestMatchers(HttpMethod.GET, "/api/recommend/stats").hasRole("ADMIN")
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )

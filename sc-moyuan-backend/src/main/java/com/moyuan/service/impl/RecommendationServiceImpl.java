@@ -26,6 +26,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     private static final int VIEW_WEIGHT = 1;
     private static final int INTEREST_WEIGHT = 2;
     private static final int MAX_SIMILAR_USERS = 20;
+    private static final int MAX_SIMILAR_ITEMS = 50;
     private static final int POET_FAVORITE_TYPE = 3;
     private static final int POEM_TYPE = 1;
 
@@ -60,7 +61,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
 
         Map<Long, Map<Long, Double>> allUserPoetScores = buildUserPoetMatrix();
-        Map<Long, Double> collaborativeScores = calculateCollaborativeScores(userId, allUserPoetScores);
+        Map<Long, Double> collaborativeScores = calculateItemCollaborativeScores(userId, allUserPoetScores);
         Map<Long, Double> interestScores = getInterestBasedPoetScores(userId);
         Map<Long, Double> combinedScores = mergeScores(collaborativeScores, interestScores);
 
@@ -100,7 +101,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
 
         Map<Long, Map<Long, Double>> allUserPoemScores = buildUserPoemMatrix();
-        Map<Long, Double> collaborativeScores = calculateCollaborativeScores(userId, allUserPoemScores);
+        Map<Long, Double> collaborativeScores = calculateItemCollaborativeScores(userId, allUserPoemScores);
         Map<Long, Double> interestScores = getInterestBasedPoemScores(userId);
         Map<Long, Double> combinedScores = mergeScores(collaborativeScores, interestScores);
 
@@ -340,6 +341,93 @@ public class RecommendationServiceImpl implements RecommendationService {
         return collaborativeScores;
     }
 
+    /**
+     * ItemCF 打分：基于物品-物品余弦相似度，取最相似的 Top-K 物品加权汇总。
+     * 与离线实验口径一致：只用训练行为矩阵，候选排除用户已交互物品。
+     */
+    private Map<Long, Double> calculateItemCollaborativeScores(Long userId, Map<Long, Map<Long, Double>> allUserScores) {
+        Map<Long, Double> itemScores = new HashMap<>();
+        Map<Long, Double> targetUserScores = allUserScores.get(userId);
+        if (targetUserScores == null || targetUserScores.isEmpty()) {
+            return itemScores;
+        }
+
+        // 构建物品-用户倒排表：itemId -> (userId -> 行为权重)，用于计算物品相似度
+        Map<Long, Map<Long, Double>> itemUserScores = new HashMap<>();
+        for (Map.Entry<Long, Map<Long, Double>> userEntry : allUserScores.entrySet()) {
+            Long otherUserId = userEntry.getKey();
+            for (Map.Entry<Long, Double> itemEntry : userEntry.getValue().entrySet()) {
+                itemUserScores.computeIfAbsent(itemEntry.getKey(), k -> new HashMap<>())
+                        .put(otherUserId, itemEntry.getValue());
+            }
+        }
+
+        // 逐个目标用户已交互物品，累计共现物品的相似度贡献
+        for (Map.Entry<Long, Double> targetEntry : targetUserScores.entrySet()) {
+            Long targetItemId = targetEntry.getKey();
+            Map<Long, Double> targetItemUsers = itemUserScores.get(targetItemId);
+            if (targetItemUsers == null || targetItemUsers.isEmpty()) {
+                continue;
+            }
+            double targetNorm = itemNorm(targetItemUsers);
+            if (targetNorm <= 0) {
+                continue;
+            }
+
+            // 共现统计：其他用户同时交互两个物品时累加点积
+            Map<Long, Double> coOccurrences = new HashMap<>();
+            for (Map.Entry<Long, Double> itemUser : targetItemUsers.entrySet()) {
+                Long otherUserId = itemUser.getKey();
+                if (otherUserId.equals(userId)) {
+                    continue;
+                }
+                Map<Long, Double> otherUserScores = allUserScores.get(otherUserId);
+                if (otherUserScores == null) {
+                    continue;
+                }
+                for (Map.Entry<Long, Double> candidateEntry : otherUserScores.entrySet()) {
+                    Long candidateItemId = candidateEntry.getKey();
+                    if (candidateItemId.equals(targetItemId) || targetUserScores.containsKey(candidateItemId)) {
+                        continue;
+                    }
+                    coOccurrences.merge(candidateItemId,
+                            itemUser.getValue() * candidateEntry.getValue(), Double::sum);
+                }
+            }
+
+            // 转为余弦相似度，并只保留最相似的 Top-K 物品
+            Map<Long, Double> similarities = new HashMap<>();
+            for (Map.Entry<Long, Double> coEntry : coOccurrences.entrySet()) {
+                Map<Long, Double> candidateItemUsers = itemUserScores.get(coEntry.getKey());
+                if (candidateItemUsers == null || candidateItemUsers.isEmpty()) {
+                    continue;
+                }
+                double candidateNorm = itemNorm(candidateItemUsers);
+                if (candidateNorm <= 0) {
+                    continue;
+                }
+                similarities.put(coEntry.getKey(),
+                        coEntry.getValue() / (targetNorm * candidateNorm));
+            }
+
+            similarities.entrySet().stream()
+                    .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
+                    .limit(MAX_SIMILAR_ITEMS)
+                    .forEach(e -> itemScores.merge(e.getKey(), e.getValue() * targetEntry.getValue(), Double::sum));
+        }
+
+        return itemScores;
+    }
+
+    // 计算物品向量的二范数，用于余弦相似度归一化
+    private double itemNorm(Map<Long, Double> itemUserScores) {
+        double norm = 0.0;
+        for (double score : itemUserScores.values()) {
+            norm += score * score;
+        }
+        return Math.sqrt(norm);
+    }
+
     private double cosineSimilarity(Map<Long, Double> vecA, Map<Long, Double> vecB) {
         Set<Long> allKeys = new HashSet<>(vecA.keySet());
         allKeys.retainAll(vecB.keySet());
@@ -537,7 +625,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         List<UserFavorite> favorites = userFavoriteMapper.selectList(favWrapper);
         for (UserFavorite fav : favorites) {
             matrix.computeIfAbsent(fav.getUserId(), k -> new HashMap<>())
-                    .merge(fav.getTargetId(), (double) FAVORITE_WEIGHT, Double::sum);
+                    .merge(fav.getTargetId(), (double) FAVORITE_WEIGHT, Math::max);
         }
 
         // 诗词点赞
@@ -546,7 +634,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         List<UserLike> likes = userLikeMapper.selectList(likeWrapper);
         for (UserLike like : likes) {
             matrix.computeIfAbsent(like.getUserId(), k -> new HashMap<>())
-                    .merge(like.getTargetId(), (double) LIKE_WEIGHT, Double::sum);
+                    .merge(like.getTargetId(), (double) LIKE_WEIGHT, Math::max);
         }
 
         // 诗词浏览
@@ -555,7 +643,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         List<UserHistory> histories = userHistoryMapper.selectList(historyWrapper);
         for (UserHistory history : histories) {
             matrix.computeIfAbsent(history.getUserId(), k -> new HashMap<>())
-                    .merge(history.getTargetId(), (double) VIEW_WEIGHT, Double::sum);
+                    .merge(history.getTargetId(), (double) VIEW_WEIGHT, Math::max);
         }
 
         return matrix;

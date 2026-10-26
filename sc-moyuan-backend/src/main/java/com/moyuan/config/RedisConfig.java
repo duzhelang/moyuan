@@ -89,6 +89,8 @@ public class RedisConfig implements CachingConfigurer {
 
             return RedisCacheManager.builder(connectionFactory)
                     .cacheDefaults(config)
+                    // 规则推荐缓存：行为写入时会主动清空，TTL 再兜底到 10 分钟
+                    .withCacheConfiguration("poemRecommendation", config.entryTtl(Duration.ofMinutes(10)))
                     .build();
         }
 
