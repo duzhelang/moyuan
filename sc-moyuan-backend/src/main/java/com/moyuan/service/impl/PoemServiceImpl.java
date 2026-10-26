@@ -24,6 +24,7 @@ import com.moyuan.service.PoemService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -144,6 +145,7 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
 
     @Override
     @Transactional
+    @CacheEvict(value = "poemRecommendation", allEntries = true)
     public void toggleLike(Long userId, Long poemId) {
         boolean exists = userLikeMapper.selectCount(
                 new LambdaQueryWrapper<UserLike>()
@@ -216,7 +218,8 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
         return poemMapper.selectList(wrapper);
     }
 
-    private void populatePoetAndDynasty(List<Poem> poems) {
+    @Override
+    public void populatePoetAndDynasty(List<Poem> poems) {
         if (poems == null || poems.isEmpty()) {
             return;
         }
@@ -236,13 +239,12 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
                 .collect(Collectors.toSet());
 
         // 批量查询诗人、朝代和分类
-        Map<Long, String> poetNameMap = new HashMap<>();
+        Map<Long, Poet> poetMap = new HashMap<>();
         Map<Long, String> dynastyNameMap = new HashMap<>();
         Map<Long, String> categoryNameMap = new HashMap<>();
 
         if (!poetIds.isEmpty()) {
-            poetMapper.selectBatchIds(poetIds).forEach(
-                    poet -> poetNameMap.put(poet.getId(), poet.getName()));
+            poetMapper.selectBatchIds(poetIds).forEach(poet -> poetMap.put(poet.getId(), poet));
         }
         if (!dynastyIds.isEmpty()) {
             dynastyMapper.selectBatchIds(dynastyIds).forEach(
@@ -256,7 +258,11 @@ public class PoemServiceImpl extends ServiceImpl<PoemMapper, Poem> implements Po
         // 填充数据
         for (Poem poem : poems) {
             if (poem.getPoetId() != null) {
-                poem.setPoetName(poetNameMap.get(poem.getPoetId()));
+                Poet poet = poetMap.get(poem.getPoetId());
+                if (poet != null) {
+                    poem.setPoetName(poet.getName());
+                    poem.setPoetAvatar(poet.getAvatar());
+                }
             }
             if (poem.getDynastyId() != null) {
                 poem.setDynastyName(dynastyNameMap.get(poem.getDynastyId()));

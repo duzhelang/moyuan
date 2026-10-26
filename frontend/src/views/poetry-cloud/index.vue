@@ -23,6 +23,9 @@ const loading = ref(true)
 const selectedDynasty = ref('all')
 const selectedPoet = ref<Poet | null>(null)
 const poetPoems = ref<Poem[]>([])
+// 诗人类型码转中文展示
+const poetTypeLabel = (type?: string) =>
+  ({ ancient: '古籍诗人', modern: '现代诗人', foreign: '外国诗人' }[type || ''] || type || '-')
 const showPanel = ref(false)
 const centerTitleVisible = ref(true)
 // 是否显示连线（诗人↔诗作、同朝代诗人赠诗线）
@@ -1677,7 +1680,8 @@ onUnmounted(() => {
 
         <div class="poet-info-card">
           <div class="poet-avatar">
-            <span class="calligraphy">{{ selectedPoet.name?.charAt(0) }}</span>
+            <el-avatar v-if="selectedPoet.avatar" :size="48" :src="selectedPoet.avatar" />
+            <span v-else class="calligraphy">{{ selectedPoet.name?.charAt(0) }}</span>
           </div>
           <div class="poet-meta">
             <h3 class="poet-name">{{ selectedPoet.name }}</h3>
@@ -1691,7 +1695,7 @@ onUnmounted(() => {
 
         <div class="poet-stats-row">
           <span>朝代：{{ selectedPoet.dynastyName || '-' }}</span>
-          <span v-if="selectedPoet.poetType">类型：{{ selectedPoet.poetType }}</span>
+          <span v-if="selectedPoet.poetType">类型：{{ poetTypeLabel(selectedPoet.poetType) }}</span>
         </div>
 
         <!-- 代表作品 -->

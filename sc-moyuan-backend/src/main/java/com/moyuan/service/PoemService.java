@@ -12,6 +12,8 @@ public interface PoemService extends IService<Poem> {
     IPage<Poem> getModernPoems(int pageNum, int pageSize, Boolean isOriginal, Boolean hasCertifiedPoet, String sortBy, String keyword);
     /** 查询已入库的外文诗（poem_type='foreign'），按标题/作者模糊匹配，最多返回 limit 条 */
     List<Poem> listForeignPoems(String keyword, String author, int limit);
+    /** 批量回填诗人姓名/头像与朝代、分类名称，供列表接口组装展示字段 */
+    void populatePoetAndDynasty(List<Poem> poems);
     Poem getPoemDetail(Long id);
     void toggleLike(Long userId, Long poemId);
     boolean isLike(Long userId, Long poemId);

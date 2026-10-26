@@ -7,6 +7,7 @@ import com.moyuan.entity.Poem;
 import com.moyuan.entity.Poet;
 import com.moyuan.mapper.PoemMapper;
 import com.moyuan.mapper.PoetMapper;
+import com.moyuan.service.PoemService;
 import com.moyuan.service.SmartSearchService;
 import com.moyuan.util.PinyinUtil;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class SmartSearchServiceImpl implements SmartSearchService {
 
     private final PoemMapper poemMapper;
     private final PoetMapper poetMapper;
+    private final PoemService poemService;
     private final RedisTemplate<String, Object> redisTemplate;
 
     private static final String SEARCH_HISTORY_KEY = "search:history:";
@@ -77,6 +79,8 @@ public class SmartSearchServiceImpl implements SmartSearchService {
         if (!StringUtils.hasText(keyword)) {
             // 无关键词时按条件筛选
             IPage<Poem> pageResult = searchWithoutKeyword(dynastyId, categoryId, poetId, poetNameIds, sortBy, pageNum, pageSize);
+            // 回填诗人姓名/头像与朝代、分类名称，保证列表卡片展示与关键词路径一致
+            poemService.populatePoetAndDynasty(pageResult.getRecords());
             result.put("list", pageResult.getRecords());
             result.put("total", pageResult.getTotal());
             result.put("searchLevel", "exact");
@@ -117,6 +121,7 @@ public class SmartSearchServiceImpl implements SmartSearchService {
             ? sortedResults.subList(fromIndex, toIndex).stream().map(pws -> pws.poem()).collect(Collectors.toList())
             : Collections.emptyList();
         
+        poemService.populatePoetAndDynasty(pageList);
         result.put("list", pageList);
         result.put("total", total);
         result.put("searchLevel", "exact");

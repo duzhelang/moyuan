@@ -260,6 +260,7 @@ onMounted(() => {
             <h3 class="poet-name">
               {{ poet.name }}
               <el-tag v-if="poet.poetType === 'modern'" type="success" size="small" class="modern-tag">现代诗人</el-tag>
+              <el-tag v-else-if="poet.poetType === 'foreign'" type="warning" size="small" class="modern-tag">外国诗人</el-tag>
             </h3>
             <div class="poet-alias" v-if="poet.courtesyName || poet.pseudonym">
               <span v-if="poet.courtesyName">字：{{ poet.courtesyName }}</span>

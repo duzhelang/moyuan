@@ -59,9 +59,13 @@ const getDynastyName = (id: number) => {
   return dynasties.value.find(d => d.id === id)?.name || ''
 }
 
+const poetTypeLabel = (type?: string) => {
+  return { ancient: '古籍诗人', modern: '现代诗人', foreign: '外国诗人' }[type || 'ancient'] || '古籍诗人'
+}
+
 const handleAdd = () => {
   isEdit.value = false
-  form.value = { id: 0, name: '', courtesyName: '', pseudonym: '', dynastyId: undefined, birthYear: null, deathYear: null, birthplace: '', biography: '', avatar: '', status: 1 }
+  form.value = { id: 0, name: '', poetType: 'ancient', courtesyName: '', pseudonym: '', dynastyId: undefined, birthYear: null, deathYear: null, birthplace: '', biography: '', avatar: '', status: 1 }
   dialogVisible.value = true
 }
 
@@ -225,6 +229,9 @@ onMounted(() => {
         <el-table-column label="朝代" width="100">
           <template #default="{ row }">{{ getDynastyName(row.dynastyId) }}</template>
         </el-table-column>
+        <el-table-column label="类型" width="90">
+          <template #default="{ row }">{{ poetTypeLabel(row.poetType) }}</template>
+        </el-table-column>
         <el-table-column prop="birthplace" label="出生地" width="120" show-overflow-tooltip />
         <el-table-column label="生卒年" width="150">
           <template #default="{ row }">{{ row.birthYear || '?' }} ~ {{ row.deathYear || '?' }}</template>
@@ -261,6 +268,13 @@ onMounted(() => {
             </el-form-item>
           </el-col>
         </el-row>
+        <el-form-item label="诗人类型">
+          <el-radio-group v-model="form.poetType">
+            <el-radio-button value="ancient">古籍诗人</el-radio-button>
+            <el-radio-button value="modern">现代诗人</el-radio-button>
+            <el-radio-button value="foreign">外国诗人</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="字">

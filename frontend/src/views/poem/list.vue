@@ -1706,14 +1706,22 @@ const handleClearHistory = async () => {
           </div>
           <div class="poem-info">
             <div class="poem-header">
-              <h3 class="poem-title">{{ poem.title }}</h3>
               <div class="poem-tags">
                 <span class="tag dynasty-tag" v-if="poem.dynastyName">{{ poem.dynastyName }}</span>
                 <span class="tag category-tag" v-if="poem.categoryName">{{ poem.categoryName }}</span>
                 <span class="tag original-tag" v-if="poem.isOriginal">原创</span>
               </div>
+              <h3 class="poem-title">{{ poem.title }}</h3>
             </div>
             <p class="poem-author">
+              <el-avatar
+                v-if="poem.poetAvatar || poem.poetName"
+                :size="22"
+                :src="poem.poetAvatar"
+                class="poet-avatar-mini"
+              >
+                {{ (poem.poetName || '?').charAt(0) }}
+              </el-avatar>
               <span v-if="poem.poetName">{{ poem.poetName }}</span>
               <span v-else-if="poem.author">{{ poem.author }}</span>
             </p>
@@ -2602,6 +2610,7 @@ const handleClearHistory = async () => {
   display: flex;
   gap: $spacing-lg;
   position: relative;
+  height: 270px;
   border-left: 3px solid $primary-color;
   transition: all $transition-base;
 
@@ -2612,6 +2621,8 @@ const handleClearHistory = async () => {
 
   @include responsive(sm) {
     flex-direction: column;
+    height: auto;
+    min-height: 200px;
     border-left: none;
     border-top: 3px solid $primary-color;
 
@@ -2623,7 +2634,8 @@ const handleClearHistory = async () => {
 
 .poem-image {
   width: 180px;
-  height: 140px;
+  align-self: stretch;
+  min-height: 160px;
   flex-shrink: 0;
   border-radius: $border-radius-sm;
   overflow: hidden;
@@ -2631,7 +2643,9 @@ const handleClearHistory = async () => {
 
   @include responsive(sm) {
     width: 100%;
-    height: 160px;
+    align-self: auto;
+    min-height: auto;
+    height: 180px;
   }
 
   img {
@@ -2709,26 +2723,25 @@ const handleClearHistory = async () => {
 }
 
 .poem-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  display: block;
+  width: 100%;
   margin-bottom: $spacing-xs;
-  gap: $spacing-sm;
 }
 
 .poem-title {
   font-size: $font-size-xl;
   color: $text-color;
   font-family: $font-family-title;
-  flex: 1;
+  width: 100%;
   min-width: 0;
   @include text-ellipsis;
 }
 
 .poem-tags {
   display: flex;
+  flex-wrap: wrap;
   gap: $spacing-xs;
-  flex-shrink: 0;
+  margin-bottom: $spacing-xs;
 }
 
 .tag {
@@ -2755,10 +2768,17 @@ const handleClearHistory = async () => {
 }
 
 .poem-author {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: $font-size-sm;
   color: $text-color-secondary;
   margin-bottom: $spacing-sm;
   font-family: $font-family-base;
+
+  .poet-avatar-mini {
+    flex-shrink: 0;
+  }
 }
 
 .poem-verses {
@@ -2767,6 +2787,7 @@ const handleClearHistory = async () => {
   flex-direction: column;
   gap: $spacing-xs;
   min-height: 60px;
+  overflow: hidden;
 }
 
 .verse-line {
