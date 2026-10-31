@@ -49,7 +49,7 @@ python app.py
 ## 模型策略
 
 - 默认且唯一建索引：`bge-small-zh-v1.5`（512 维）
-- 生成：Ollama 客户端，默认 `qwen3.5:4b`，备用 `minicpm5:2b-q8_0`
+- 生成：Ollama 客户端，默认 `qwen3.5:4b`（评分题约 45 秒），备用 `maternion/minicpm5:2b-q8_0`（约 22 秒，接口列得少一些）
 - 预留接口、不建索引、不实测：`jina-clip-v2`（1024 维）、`qwen3-embedding:0.6b`（1024 维）
 - 每个嵌入模型使用独立索引：`data/index/<embed_key>/`；维度不匹配或未建索引会直接报错
 

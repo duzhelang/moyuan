@@ -13,7 +13,7 @@
 
 本期模型策略：
 - **嵌入默认且唯一实测**：`bge-small-zh-v1.5`
-- **生成**：`ollama` Python 客户端，默认 `qwen3.5:4b`，备用 `minicpm5:2b-q8_0`
+- **生成**：`ollama` Python 客户端，默认 `qwen3.5:4b`，备用 `maternion/minicpm5:2b-q8_0`
 - **其他嵌入模型**（`jina-clip-v2`、`qwen3-embedding:0.6b`）只保留注册接口与独立索引机制，**不建索引、不实测**
 
 ## 1. 现状盘点
@@ -45,7 +45,7 @@
 | key | 模型 | 体积 | 本期策略 |
 |---|---|---|---|
 | `qwen3.5` | `qwen3.5:4b` | 3.4GB | **默认，实测** |
-| `minicpm5` | `minicpm5:2b-q8_0` | 2.7GB | 备用，可切换验证 |
+| `minicpm5` | `maternion/minicpm5:2b-q8_0` | 2.7GB | 备用，已实测可切换 |
 
 生成侧统一使用 **`ollama` Python 客户端**（`from ollama import Client; client.chat(...)`），不再走 `llama_index.llms.ollama`，避免 `ChatMessage` 类型兼容问题，也少一层抽象。
 
@@ -56,7 +56,7 @@
 ### 2.4 推荐组合
 
 - **本期落地**：`bge-small` + `qwen3.5:4b` + `bge-reranker-base`
-- **备用生成**：`minicpm5:2b-q8_0`
+- **备用生成**：`maternion/minicpm5:2b-q8_0`（实测 22.3 秒，速度约为主模型一半）
 - **接口预留**：`jina-clip`、`qwen3-embed`（需要时补建对应索引即可启用）
 
 > 不同嵌入模型维度不同（512 / 1024），必须各自建索引；本期只落地 512 维的 `bge-small`，其他维度仅保留目录与校验逻辑。
@@ -149,7 +149,20 @@ data: {"elapsed":3.2}
 | M4 | 联调：8 题回归、`qwen3.5` 与 `minicpm5` 对比、超时与缓存策略 | 0.5 天 |
 | M5（可选） | Spring/Nginx 转发、鉴权、部署说明 | 0.5 天 |
 
-**当前进度（2026-11-01）**：M1、M2、M3 已完成——小窗已改用 `POST /rag/ask/stream` 流式渲染（首个 `delta` 到达时插入占位消息、后续原地追加，最终答案覆盖并补来源），`meta` 增加 `refused` 字段用于拒答判定与回退；SSE 实测事件序列 `meta → delta×248 → done`，来源 12 条。M4、M5 未开始。
+**当前进度（2026-11-01）**：M1、M2、M3 已完成——小窗已改用 `POST /rag/ask/stream` 流式渲染（首个 `delta` 到达时插入占位消息、后续原地追加，最终答案覆盖并补来源），`meta` 增加 `refused` 字段用于拒答判定与回退；SSE 实测事件序列 `meta → delta×248 → done`，来源 12 条。
+
+M4 已完成生成侧对比（同一评分题）：
+
+| 生成模型 | 耗时 | 质量 | 结论 |
+|---|---|---|---|
+| `qwen3.5:4b` | 44.9 秒 | 5 个评分接口齐全，分条清晰 | 保持默认 |
+| `maternion/minicpm5:2b-q8_0` | 22.3 秒 | 两种评分方式与范围准确，接口列 2 个 | 速度敏感时后台可切 |
+
+- 修复备用模型名：登记为 `maternion/minicpm5:2b-q8_0`（原短名 `minicpm5:2b-q8_0` 在 Ollama 中不存在，调用会失败）。
+- 资料块标题去掉“资料 N”编号，改为 `【文件名 · 章节】`，并在系统提示中要求引用写“文件名·章节标题”；复测回答已输出可读来源。
+- 检索评测 8 题仍为要点覆盖 100%、来源覆盖 100%。
+
+M5 未开始。
 
 ## 9. 验收标准
 
@@ -222,7 +235,7 @@ data: {"elapsed":3.2}
 ### 13.3 拟采用的最小方案
 
 - 保留最近 3~5 轮原文对话；
-- 用快模型 `minicpm5:2b-q8_0` 做一次查询改写（`num_predict` 限制 20~40 token，避免拖慢主回答）；
+- 用快模型 `maternion/minicpm5:2b-q8_0` 做一次查询改写（`num_predict` 限制 20~40 token，避免拖慢主回答）；
 - 超预算按“先裁历史、再裁相邻块、最后裁重排块”的顺序截断；
 - 接口扩展：`POST /rag/ask`、`/rag/ask/stream` 增加可选 `history` 字段（`[{role, content}]`），不传则行为与现在完全一致；
 - 前端只在网页用法助理分区传 history，诗词助理维持单轮。
