@@ -121,7 +121,7 @@ data: {"elapsed":3.2}
 ## 6. 前端接入改造（不新建页面）
 
 1. `frontend/vite.config.ts`：新增 `/rag` 代理 → `http://127.0.0.1:8010`（独立前缀，避开现有 `/api` → 8085）。
-2. 新增 `frontend/src/api/modules/knowledge.ts`：用 `fetch` + `ReadableStream` 解析 SSE（Axios 不适合流式）。
+2. 新增 `frontend/src/api/modules/rag.ts`：用 `fetch` + `ReadableStream` 解析 SSE（Axios 不适合流式），并封装健康探测与配置读写。
 3. 改 `aiChat.ts` 的 `answerBySystem()`：
    - 先做一次 `/rag/health` 探测（结果缓存 30 秒）；
    - 可用则走流式，边收边写入当前 assistant 消息；
@@ -148,6 +148,8 @@ data: {"elapsed":3.2}
 | M3 | 小窗接入：`answerBySystem` 分支、SSE 渲染、来源展示、失败回退 | 0.5 天 |
 | M4 | 联调：8 题回归、`qwen3.5` 与 `minicpm5` 对比、超时与缓存策略 | 0.5 天 |
 | M5（可选） | Spring/Nginx 转发、鉴权、部署说明 | 0.5 天 |
+
+**当前进度（2026-11-01）**：M1、M2、M3 已完成——小窗已改用 `POST /rag/ask/stream` 流式渲染（首个 `delta` 到达时插入占位消息、后续原地追加，最终答案覆盖并补来源），`meta` 增加 `refused` 字段用于拒答判定与回退；SSE 实测事件序列 `meta → delta×248 → done`，来源 12 条。M4、M5 未开始。
 
 ## 9. 验收标准
 

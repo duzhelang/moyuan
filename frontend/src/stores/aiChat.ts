@@ -8,7 +8,7 @@ import { computed, ref, shallowRef } from 'vue'
 import { useUserStore } from './user'
 import { chat as chatApi, getAiModuleConfig } from '@/api/modules/ai'
 import type { AiModuleConfig } from '@/api/modules/ai'
-import { askRag, ragAvailable } from '@/api/modules/rag'
+import { askRagStream, ragAvailable } from '@/api/modules/rag'
 import { getSystemKnowledgeList } from '@/api/modules/systemKnowledge'
 import {
   resolveProfile,
@@ -534,11 +534,14 @@ export const useAiChatStore = defineStore('aiChat', () => {
 
   /* ---------------- 两条回答链路 ---------------- */
 
-  /** RAG 知识问答：服务可用时优先走 FastAPI，失败返回 null 由调用方回退 */
-  async function answerByRag(text: string): Promise<string | null> {
+  /**
+   * RAG 知识问答（SSE 流式）：服务可用时优先走 FastAPI，增量文本交给 onDelta 渲染
+   * 服务未启动、拒答或生成失败时返回 null，由调用方回退原前端检索链路
+   */
+  async function answerByRag(text: string, onDelta?: (partial: string) => void): Promise<string | null> {
     try {
       if (!(await ragAvailable())) return null
-      const res = await askRag(text)
+      const res = await askRagStream(text, { onDelta })
       if (res.refused || !res.answer.trim()) return null
       const answer = res.answer.trim()
       const cites = Array.from(
@@ -552,7 +555,7 @@ export const useAiChatStore = defineStore('aiChat', () => {
   }
 
   /** 系统用法链路：缓存 → FAQ 直答 → RAG 问答 → 检索注入 → 兜底不给结论 */
-  async function answerBySystem(text: string): Promise<string> {
+  async function answerBySystem(text: string, onDelta?: (partial: string) => void): Promise<string> {
     await loadKnowledge()
     const version = knowledgeVersion.value
     const cached = readAnswerCache(text, 'system', version)
@@ -565,8 +568,8 @@ export const useAiChatStore = defineStore('aiChat', () => {
       return answer
     }
 
-    // 优先使用 RAG 服务（混合检索 + 本地模型），失败则继续走原来的前端检索链路
-    const ragAnswer = await answerByRag(text)
+    // 优先使用 RAG 服务（混合检索 + 本地模型流式生成），失败则继续走原来的前端检索链路
+    const ragAnswer = await answerByRag(text, onDelta)
     if (ragAnswer) return ragAnswer
 
     const picked = searchEntries(text, knowledgeEntries.value, 3)
@@ -633,10 +636,34 @@ export const useAiChatStore = defineStore('aiChat', () => {
     persist()
 
     const seq = sessionSeq.value
+    // RAG 流式增量：首个 delta 到达时插入 assistant 占位消息，后续原地追加
+    let streamText = ''
+    let streamMessage: AiMessage | null = null
+    const onDelta = (partial: string) => {
+      // 用户已关闭小窗（会话作废），不再写入
+      if (seq !== sessionSeq.value) return
+      streamText += partial
+      if (!streamMessage) {
+        streamMessage = { role: 'assistant', content: streamText, ts: Date.now(), assistant }
+        pushMessage(key, streamMessage)
+      } else {
+        streamMessage.content = streamText
+      }
+    }
+
     try {
-      const reply = assistant === 'system' ? await answerBySystem(text) : await answerByPoetry(text)
+      const reply =
+        assistant === 'system' ? await answerBySystem(text, onDelta) : await answerByPoetry(text)
       // 期间用户关闭了小窗（会话已清空），丢弃这条过期回答
-      if (seq === sessionSeq.value) pushAssistant(reply, assistant, note)
+      if (seq === sessionSeq.value) {
+        if (streamMessage) {
+          // 已有流式占位：用最终答案覆盖（补上来源），不重复插入
+          streamMessage.content = reply
+          streamMessage.note = note
+        } else {
+          pushAssistant(reply, assistant, note)
+        }
+      }
     } catch (e) {
       console.warn('AI 小窗回答失败', e)
       if (seq === sessionSeq.value) pushAssistant('AI 服务暂时不可用，请稍后重试', assistant)

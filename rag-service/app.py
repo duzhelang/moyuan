@@ -194,7 +194,7 @@ def ask_stream(req: AskRequest):
     if result["refused"]:
         return StreamingResponse(
             iter([
-                sse("meta", {"sources": [], "embed": engine.embed_key, "generation": model_name}),
+                sse("meta", {"sources": [], "embed": engine.embed_key, "generation": model_name, "refused": True}),
                 sse("delta", {"text": "知识库未收录该问题，请换一种问法。"}),
                 sse("done", {"elapsed": round(time.time() - started, 2)}),
             ]),
@@ -210,6 +210,7 @@ def ask_stream(req: AskRequest):
             "sources": sources,
             "embed": engine.embed_key,
             "generation": model_name,
+            "refused": False,
         })
         try:
             for part in client.chat(

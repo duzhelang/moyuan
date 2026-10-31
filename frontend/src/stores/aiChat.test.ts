@@ -4,10 +4,18 @@ import { createPinia, setActivePinia } from 'pinia'
 const chatMock = vi.fn()
 const getAiModuleConfigMock = vi.fn()
 const getSystemKnowledgeListMock = vi.fn()
+const ragAvailableMock = vi.fn()
+const askRagStreamMock = vi.fn()
 
 vi.mock('@/api/modules/ai', () => ({
   chat: (...args: unknown[]) => chatMock(...args),
   getAiModuleConfig: (...args: unknown[]) => getAiModuleConfigMock(...args)
+}))
+
+vi.mock('@/api/modules/rag', () => ({
+  ragAvailable: (...args: unknown[]) => ragAvailableMock(...args),
+  askRag: vi.fn(),
+  askRagStream: (...args: unknown[]) => askRagStreamMock(...args)
 }))
 
 vi.mock('@/api/modules/systemKnowledge', () => ({
@@ -47,6 +55,9 @@ function bootstrap() {
   chatMock.mockReset().mockResolvedValue({ data: { reply: '模拟回答' } })
   getAiModuleConfigMock.mockReset().mockResolvedValue({ data: { moduleCode: 'chat', maxLength: 200, firstResponseLength: 100, promptTemplate: '' } })
   getSystemKnowledgeListMock.mockReset().mockResolvedValue({ data: [KNOWLEDGE_ROW] })
+  // 默认关闭 RAG，保持原有「前端检索 + system_chat」链路的断言
+  ragAvailableMock.mockReset().mockResolvedValue(false)
+  askRagStreamMock.mockReset()
   return useAiChatStore()
 }
 
@@ -109,6 +120,66 @@ describe('aiChat store', () => {
     const payload = chatMock.mock.calls[0][0] as { message: string; moduleCode: string }
     expect(payload.moduleCode).toBe('system_chat')
     expect(payload.message).toContain('【系统资料】')
+  })
+
+  it('RAG 服务可用时走 SSE 流式回答并附带来源，不再回退前端检索', async () => {
+    ragAvailableMock.mockResolvedValue(true)
+    askRagStreamMock.mockImplementation(
+      async (_question: string, handlers: { onDelta?: (text: string) => void }) => {
+        handlers.onDelta?.('平台有')
+        handlers.onDelta?.('两种评分方式')
+        return {
+          answer: '平台有两种评分方式',
+          refused: false,
+          sources: [
+            {
+              file: 'moyuan_business_modules.md',
+              section: '16. 诗词评分模块',
+              vector: 1,
+              bm25: 1,
+              rerank: 1,
+              neighbor: false
+            }
+          ],
+          embed: 'bge-small',
+          generation: 'qwen3.5:4b',
+          elapsed: 1
+        }
+      }
+    )
+
+    const store = useAiChatStore()
+    store.syncRoute('/poem/9')
+    store.setAssistant('system')
+    await store.send('平台有哪两种评分方式')
+
+    expect(chatMock).not.toHaveBeenCalled()
+    const last = store.messages[store.messages.length - 1]
+    expect(last.content).toContain('平台有两种评分方式')
+    // 流式占位被最终答案覆盖，来源追加在末尾
+    expect(last.content).toContain('moyuan_business_modules.md·16. 诗词评分模块')
+    expect(store.messages.filter(item => item.role === 'assistant').length).toBe(2)
+  })
+
+  it('RAG 拒答时回退原有检索链路', async () => {
+    ragAvailableMock.mockResolvedValue(true)
+    askRagStreamMock.mockResolvedValue({
+      answer: '知识库未收录该问题，请换一种问法。',
+      refused: true,
+      sources: [],
+      embed: 'bge-small',
+      generation: 'qwen3.5:4b',
+      elapsed: 0
+    })
+
+    const store = useAiChatStore()
+    store.syncRoute('/poem/9')
+    store.setAssistant('system')
+    await store.send('本站还有哪些玩法')
+
+    expect(chatMock).toHaveBeenCalledTimes(1)
+    const last = store.messages[store.messages.length - 1]
+    expect(last.content).toBe('模拟回答')
   })
 
   it('诗词内容提问走当前页面画像的模块码', async () => {
