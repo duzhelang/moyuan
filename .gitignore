@@ -87,3 +87,12 @@ sdk-tmp/
 # ==================== 本地数据库归档 ====================
 # 数据库全量归档文件（含业务数据，不提交）
 moyuan_db_archive_*.sql
+
+# ==================== Python 问答服务 ====================
+# Python 编译缓存
+__pycache__/
+*.py[cod]
+# 虚拟环境
+rag-service/.venv/
+# 向量索引为构建产物，可由 build_index.py 重新生成
+rag-service/data/index/

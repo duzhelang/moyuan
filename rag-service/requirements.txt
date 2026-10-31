@@ -1,0 +1,16 @@
+# 墨渊知识问答服务依赖
+fastapi>=0.115
+uvicorn>=0.30
+pydantic>=2
+ollama>=0.4
+
+# 嵌入与重排
+sentence-transformers>=3
+torch
+transformers
+numpy
+
+# 检索
+jieba
+rank-bm25
+llama-index-core>=0.14

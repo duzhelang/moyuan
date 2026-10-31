@@ -1,0 +1,6 @@
+{
+  "embed": "bge-small",
+  "generation": "qwen3.5",
+  "rerank": true,
+  "top_k": 8
+}
