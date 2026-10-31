@@ -42,7 +42,8 @@ const adminMenus = [
     icon: 'Cpu',
     children: [
       { path: '/admin/ai-models', name: 'AdminAiModels', icon: 'Cpu', label: 'AI模型管理' },
-      { path: '/admin/ai-config', name: 'AdminAiConfig', icon: 'Setting', label: 'AI功能配置' }
+      { path: '/admin/ai-config', name: 'AdminAiConfig', icon: 'Setting', label: 'AI功能配置' },
+      { path: '/admin/rag-config', name: 'AdminRagConfig', icon: 'Connection', label: '知识问答配置' }
     ]
   },
   {

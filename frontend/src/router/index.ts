@@ -270,6 +270,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'AI功能配置', requiresAuth: true, requiresAdmin: true }
       },
       {
+        path: 'rag-config',
+        name: 'AdminRagConfig',
+        component: () => import('@/views/admin/rag-config.vue'),
+        meta: { title: '知识问答配置', requiresAuth: true, requiresAdmin: true }
+      },
+      {
         path: 'home-navigation',
         name: 'AdminHomeNavigation',
         component: () => import('@/views/admin/home-navigation.vue'),

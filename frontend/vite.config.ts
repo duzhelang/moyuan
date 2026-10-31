@@ -32,6 +32,10 @@ export default defineConfig({
     host: '0.0.0.0',
     open: false,
     proxy: {
+      '/rag': {
+        target: process.env.VITE_RAG_URL || 'http://127.0.0.1:8010',
+        changeOrigin: true
+      },
       '/api': {
         target: process.env.VITE_BACKEND_URL || 'http://localhost:8085',
         changeOrigin: true

@@ -8,6 +8,7 @@ import { computed, ref, shallowRef } from 'vue'
 import { useUserStore } from './user'
 import { chat as chatApi, getAiModuleConfig } from '@/api/modules/ai'
 import type { AiModuleConfig } from '@/api/modules/ai'
+import { askRag, ragAvailable } from '@/api/modules/rag'
 import { getSystemKnowledgeList } from '@/api/modules/systemKnowledge'
 import {
   resolveProfile,
@@ -533,7 +534,24 @@ export const useAiChatStore = defineStore('aiChat', () => {
 
   /* ---------------- 两条回答链路 ---------------- */
 
-  /** 系统用法链路：缓存 → FAQ 直答 → 检索注入 → 兜底不给结论 */
+  /** RAG 知识问答：服务可用时优先走 FastAPI，失败返回 null 由调用方回退 */
+  async function answerByRag(text: string): Promise<string | null> {
+    try {
+      if (!(await ragAvailable())) return null
+      const res = await askRag(text)
+      if (res.refused || !res.answer.trim()) return null
+      const answer = res.answer.trim()
+      const cites = Array.from(
+        new Set(res.sources.map(item => `${item.file}·${item.section}`))
+      ).slice(0, 3)
+      return cites.length ? `${answer}\n\n（来源：${cites.join('；')}）` : answer
+    } catch (e) {
+      console.warn('RAG 问答失败，回退本地知识库链路', e)
+      return null
+    }
+  }
+
+  /** 系统用法链路：缓存 → FAQ 直答 → RAG 问答 → 检索注入 → 兜底不给结论 */
   async function answerBySystem(text: string): Promise<string> {
     await loadKnowledge()
     const version = knowledgeVersion.value
@@ -546,6 +564,10 @@ export const useAiChatStore = defineStore('aiChat', () => {
       writeAnswerCache(text, 'system', version, answer)
       return answer
     }
+
+    // 优先使用 RAG 服务（混合检索 + 本地模型），失败则继续走原来的前端检索链路
+    const ragAnswer = await answerByRag(text)
+    if (ragAnswer) return ragAnswer
 
     const picked = searchEntries(text, knowledgeEntries.value, 3)
     const material = picked.length ? picked : pickCategoryEntries(text, knowledgeEntries.value, 6)
