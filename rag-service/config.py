@@ -76,8 +76,8 @@ GENERATIONS = {
         "note": "默认生成模型",
     },
     "minicpm5": {
-        "label": "minicpm5:2b-q8_0",
-        "model": "minicpm5:2b-q8_0",
+        "label": "maternion/minicpm5:2b-q8_0",
+        "model": "maternion/minicpm5:2b-q8_0",
         "status": "ready",
         "note": "备用快速模型",
     },
