@@ -134,6 +134,23 @@ function scrollToBottom() {
 
 watch(() => messages.value.length, scrollToBottom)
 
+/** 是否正在流式输出最后一条 assistant 消息：此时不再显示「思考中」气泡 */
+const streaming = computed(() => {
+  if (!loading.value) return false
+  const last = messages.value[messages.value.length - 1]
+  return !!last && last.role === 'assistant' && !!last.content
+})
+
+// 流式追加时最后一条消息内容会持续增长，需要跟随贴底
+watch(
+  () => {
+    const list = messages.value
+    const last = list[list.length - 1]
+    return `${list.length}:${last ? last.content.length : 0}`
+  },
+  scrollToBottom
+)
+
 /* ---------------- 拖动（Pointer Events） ---------------- */
 
 function onDragStart(e: PointerEvent) {
@@ -404,7 +421,7 @@ watch(() => store.currentKey, () => {
             </div>
           </div>
 
-          <div v-if="loading" class="chat-message assistant">
+          <div v-if="loading && !streaming" class="chat-message assistant">
             <img class="message-avatar" :src="getAssistant(activeAssistant).avatar" alt="AI 助手" />
             <div class="message-body">
               <div class="message-content loading">思考中...</div>
