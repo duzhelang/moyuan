@@ -2,7 +2,7 @@
 import { ref, computed, nextTick, onMounted, onUnmounted, onActivated, onDeactivated, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getForumPostList } from '@/api/modules/forum'
-import { writePoemFromImage, analyzePoem, matchCouplet, ocrImage, chat } from '@/api/modules/ai'
+import { writePoemFromImage, analyzePoem, matchCouplet, ocrImage, chat, toneCheck } from '@/api/modules/ai'
 import type { ToneCheckResult } from '@/api/modules/ai'
 import PingZeAnnotation from '@/components/poem/PingZeAnnotation.vue'
 import { queryRhymeByCharacter, queryRhymeByGroup } from '@/api/modules/rhyme'
@@ -84,6 +84,28 @@ const openExtraFullPage = () => {
   }
   const target = EXTRA_FULL_PAGE[panel]
   if (target) router.push(target)
+}
+
+/** 古籍识文维护开关：与后端 ai.features.ocr-enabled 保持同步，恢复时两端同开 */
+const OCR_ENABLED = false
+
+/** 维护中功能：明确提示，避免用户误以为点击无响应 */
+const handleMaintenance = (name: string) => {
+  ElMessage.info(`${name}功能维护中，暂不可用`)
+}
+
+/** 未上线功能：给出「开发中」提示 */
+const handleComingSoon = (name: string) => {
+  ElMessage.info(`${name}功能开发中，敬请期待`)
+}
+
+/** 古籍识文入口：维护期间只提示，不打开面板 */
+const toggleOcrPanel = () => {
+  if (!OCR_ENABLED) {
+    handleMaintenance('古籍识文')
+    return
+  }
+  activeExtraPanel.value = activeExtraPanel.value === 'ocr' ? null : 'ocr'
 }
 
 // 「诗境 AI」下方功能卡横向滚动容器（配合左右箭头切换）
@@ -305,7 +327,8 @@ const handleCoupletMatch = async (upperCouplet?: string) => {
   coupletRewritten.value = false
   try {
     const res = await matchCouplet({ upperCouplet: input, moduleCode: 'couplet' })
-    coupletResult.value = res.data.result
+    // 只展示抽取出的下联本体，避免把「对仗思路」一起塞进下联位置
+    coupletResult.value = res.data.check?.lower || res.data.result
     coupletCheck.value = res.data.check || null
     coupletRewritten.value = !!res.data.rewritten
   } catch {
@@ -386,27 +409,6 @@ interface MeterResult {
 const meterInput = ref('')
 const meterLoading = ref(false)
 const meterResult = ref<MeterResult | null>(null)
-const meterRaw = ref('')
-
-// 从 AI 返回中提取首个 JSON 对象（剥离 ``` 围栏）
-function extractJson<T>(raw: string): T | null {
-  if (!raw) return null
-  let text = raw.trim()
-  if (text.startsWith('```')) {
-    const nl = text.indexOf('\n')
-    if (nl >= 0) text = text.slice(nl + 1)
-    const fence = text.lastIndexOf('```')
-    if (fence >= 0) text = text.slice(0, fence)
-  }
-  const start = text.indexOf('{')
-  const end = text.lastIndexOf('}')
-  if (start < 0 || end <= start) return null
-  try {
-    return JSON.parse(text.slice(start, end + 1)) as T
-  } catch {
-    return null
-  }
-}
 
 // 逐句拆出平仄字（仅保留 平/仄）
 const meterRenderLines = computed(() =>
@@ -424,30 +426,26 @@ const handleMeterCheck = async () => {
   }
   meterLoading.value = true
   meterResult.value = null
-  meterRaw.value = ''
   try {
-    const prompt = '你是精通《平水韵》与近体诗格律的专家。请校验下面这首诗的平仄格律与押韵情况。\n'
-      + `待校验诗作：\n${input}\n\n`
-      + '要求：只输出如下严格 JSON，不要任何解释文字、不要 markdown 代码块标记：\n'
-      + '{"valid":true或false,"format":"体裁，如 七言绝句","rhymeGroup":"押韵所属平水韵韵部，如 下平八庚；不押韵填 无",'
-      + '"lines":[{"text":"该句原文（含标点）","tone":"逐字平仄，仅含 平/仄 两种字符并忽略标点，如 平仄平平仄仄平","rhyme":true或false,"note":"该句简评，若不合律请指出问题"}],'
-      + '"summary":"总体格律评价，1-2 句"}'
-    const res = await chat({ message: prompt, moduleCode: 'chat' })
-    const raw = res.data.reply || ''
-    const parsed = extractJson<MeterResult>(raw)
-    if (parsed && Array.isArray(parsed.lines) && parsed.lines.length > 0) {
-      meterResult.value = {
-        valid: !!parsed.valid,
-        format: parsed.format || '',
-        rhymeGroup: parsed.rhymeGroup || '',
-        lines: parsed.lines,
-        summary: parsed.summary || ''
-      }
-    } else if (raw.trim()) {
-      // 解析失败时兜底展示原始文本
-      meterRaw.value = raw.trim()
-    } else {
-      ElMessage.info('AI 未返回内容，请重试')
+    // 走本地确定性平仄引擎，不再让大模型输出 JSON，避免同一首诗两套结论
+    const res = await toneCheck(input)
+    const check = res.data
+    if (!check || !Array.isArray(check.lines) || check.lines.length === 0) {
+      ElMessage.info('未识别到可校验的诗句')
+      return
+    }
+    const issues = check.issues || []
+    meterResult.value = {
+      valid: !!check.passed,
+      format: check.genre || '',
+      rhymeGroup: '',
+      lines: check.lines.map((line) => ({
+        text: line.text,
+        tone: line.pattern || '',
+        rhyme: false,
+        note: (line.issues || []).join('；')
+      })),
+      summary: issues.length ? issues.join('；') : '格律校验通过'
     }
   } catch {
     ElMessage.error('校验失败，请稍后重试')
@@ -606,6 +604,10 @@ const handleImageUpload = (event: Event) => {
 const processImageFile = (file: File) => {
   if (!file.type.match(/image\/(jpeg|png|webp|gif)/)) {
     ElMessage.warning('请上传 JPG / PNG / GIF / WebP 格式的图片')
+    return
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    ElMessage.warning('图片大小不能超过10MB')
     return
   }
   imageFile.value = file
@@ -1123,7 +1125,7 @@ onDeactivated(() => {
           <div class="ai-upload-zone" @click="imageUploadRef?.click()" @dragover.prevent="handleDragOver" @dragleave="handleDragLeave" @drop.prevent="handleDrop">
             <span class="ai-upload-emoji">🏔️</span>
             <p class="ai-upload-text">点击上传图片，或拖拽至此处</p>
-            <p class="ai-upload-hint">支持 JPG / PNG / GIF / WebP，单图 ≤32MB，AI 将为您赋诗一首</p>
+            <p class="ai-upload-hint">支持 JPG / PNG / GIF / WebP，单图 ≤10MB，AI 将为您赋诗一首</p>
             <input ref="imageUploadRef" type="file" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" @change="handleImageUpload">
           </div>
           <div v-if="imagePreview" class="ai-preview-area">
@@ -1140,7 +1142,7 @@ onDeactivated(() => {
             <div v-if="poemCheck" class="ai-tone-check">
               <div class="ai-tone-head">
                 <span class="ai-tone-title">格律校验</span>
-                <span v-if="poemRewritten" class="ai-tone-rewrite">已根据校验结果自动修正</span>
+                <span v-if="poemRewritten && poemCheck?.passed" class="ai-tone-rewrite">已根据校验结果自动修正</span>
               </div>
               <PingZeAnnotation
                 :lines="poemCheck.lines"
@@ -1209,7 +1211,14 @@ onDeactivated(() => {
             <div class="ai-extra-title">AI 对对联</div>
             <div class="ai-extra-desc">上联出题，AI 对下联</div>
           </div>
-          <div class="ai-extra-card" :class="{ active: activeExtraPanel === 'ocr' }" @click="activeExtraPanel = activeExtraPanel === 'ocr' ? null : 'ocr'">
+          <div
+            class="ai-extra-card"
+            :class="{ active: OCR_ENABLED && activeExtraPanel === 'ocr', 'ai-extra-card--disabled': !OCR_ENABLED }"
+            :aria-disabled="!OCR_ENABLED"
+            :title="OCR_ENABLED ? 'AI识别图片中的古诗词文字' : '古籍识文功能维护中，暂不可用'"
+            @click="toggleOcrPanel"
+          >
+            <span v-if="!OCR_ENABLED" class="ai-extra-badge">维护中</span>
             <div class="ai-extra-icon">📷</div>
             <div class="ai-extra-title">古籍识文</div>
             <div class="ai-extra-desc">AI识别图片中的古诗词文字</div>
@@ -1229,12 +1238,14 @@ onDeactivated(() => {
             <div class="ai-extra-title">飞花令</div>
             <div class="ai-extra-desc">行令对诗，诗词接龙</div>
           </div>
-          <div class="ai-extra-card">
+          <div class="ai-extra-card ai-extra-card--disabled" aria-disabled="true" title="书法生成功能开发中" @click="handleComingSoon('书法生成')">
+            <span class="ai-extra-badge">开发中</span>
             <div class="ai-extra-icon">✒️</div>
             <div class="ai-extra-title">书法生成</div>
             <div class="ai-extra-desc">诗句转书法图片</div>
           </div>
-          <div class="ai-extra-card">
+          <div class="ai-extra-card ai-extra-card--disabled" aria-disabled="true" title="我的诗笺功能开发中" @click="handleComingSoon('我的诗笺')">
+            <span class="ai-extra-badge">开发中</span>
             <div class="ai-extra-icon">📚</div>
             <div class="ai-extra-title">我的诗笺</div>
             <div class="ai-extra-desc">收藏喜爱的诗词</div>
@@ -1328,7 +1339,7 @@ onDeactivated(() => {
           <div v-if="coupletCheck" class="ai-tone-check">
             <div class="ai-tone-head">
               <span class="ai-tone-title">对联格律校验</span>
-              <span v-if="coupletRewritten" class="ai-tone-rewrite">已自动修正</span>
+              <span v-if="coupletRewritten && coupletCheck?.passed" class="ai-tone-rewrite">已自动修正</span>
               <span v-else-if="coupletCheck.passed" class="ai-tone-pass">校验通过</span>
             </div>
             <ul v-if="coupletCheck.issues.length" class="ai-tone-issues">
@@ -1387,7 +1398,7 @@ onDeactivated(() => {
             <button class="ai-extra-panel-close" @click="activeExtraPanel = null">&times;</button>
           </div>
         </div>
-        <p class="ai-explore-hint" style="margin-bottom:12px;">粘贴一首绝句/律诗（每句一行），AI 校验平仄、押韵与格律</p>
+        <p class="ai-explore-hint" style="margin-bottom:12px;">粘贴一首绝句/律诗（每句一行），由本地格律引擎校验平仄、押韵与格律（不消耗 AI 额度）</p>
         <textarea
           v-model="meterInput"
           class="meter-textarea"
@@ -1404,7 +1415,7 @@ onDeactivated(() => {
           <span class="rhyme-spinner"></span>
           <span class="rhyme-loading-text">AI 正在校验格律，请稍候…</span>
         </div>
-        <div v-else-if="meterResult" class="ai-result-card meter-result-card">
+        <div v-if="meterResult" class="ai-result-card meter-result-card">
           <div class="meter-head">
             <span class="meter-badge" :class="meterResult.valid ? 'is-valid' : 'is-invalid'">
               {{ meterResult.valid ? '基本合律' : '存在不合律处' }}
@@ -1429,7 +1440,6 @@ onDeactivated(() => {
           </div>
           <div v-if="meterResult.summary" class="meter-summary">{{ meterResult.summary }}</div>
         </div>
-        <div v-else-if="meterRaw" class="ai-result-card meter-raw">{{ meterRaw }}</div>
       </div>
 
       <div v-if="activeExtraPanel === 'feihua'" class="ai-extra-panel">
@@ -1465,7 +1475,7 @@ onDeactivated(() => {
         </div>
       </div>
 
-      <div v-if="activeExtraPanel === 'ocr'" class="ai-extra-panel">
+      <div v-if="OCR_ENABLED && activeExtraPanel === 'ocr'" class="ai-extra-panel">
         <div class="ai-extra-panel-header">
           <span class="ai-extra-panel-title">📷 古籍识文</span>
           <button class="ai-extra-panel-close" @click="activeExtraPanel = null">&times;</button>

@@ -1670,6 +1670,7 @@ html {
 }
 
 .ai-extra-card {
+  position: relative;
   flex: 0 0 200px;
   background: #fdfaf5;
   border-radius: 14px;
@@ -1685,6 +1686,33 @@ html {
   border-color: #b8860b;
   box-shadow: 0 4px 18px rgba(44, 36, 22, 0.08);
   transform: translateY(-2px);
+}
+
+/* 维护中 / 开发中：置灰但保留可见，点击给出明确提示 */
+.ai-extra-card--disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  filter: grayscale(0.25);
+}
+
+.ai-extra-card--disabled:hover {
+  border-color: #d9cebf;
+  box-shadow: none;
+  transform: none;
+}
+
+.ai-extra-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(139, 90, 43, 0.12);
+  border: 1px solid rgba(139, 90, 43, 0.28);
+  color: #8b5a2b;
+  font-size: 11px;
+  line-height: 18px;
+  letter-spacing: 0.04em;
 }
 
 .ai-extra-icon {
