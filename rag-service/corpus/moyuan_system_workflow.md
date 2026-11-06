@@ -263,7 +263,8 @@
 ## 11. AI 能力域
 
 ### 11.1 AI 辅助创作与生成（E1）
-- **触发入口**：`POST /api/ai/chat|write-poem|analyze|couplet|ocr`；流式入口 `POST /api/ai/chat/stream`（SSE，`AiController.chatStream` → `AiService.streamChat` → `AiModelRegistry.streamByModule` → `OpenAiCompatibleAdapter.streamChat` 用 JDK `HttpClient` 逐行解析上游 SSE，客户端断开经 `emitter.onCompletion` 置取消信号停止消费）。
+- **触发入口**：`POST /api/ai/chat|write-poem|analyze|couplet|ocr`；流式入口 `POST /api/ai/chat/stream`（SSE，`AiController.chatStream` → `AiService.streamChat` → `AiModelRegistry.streamByModule` → `OpenAiCompatibleAdapter.streamChat` 用 JDK `HttpClient` 逐行解析上游 SSE，客户端断开经 `emitter.onCompletion` 置取消信号停止消费）；另有 `POST /api/ai/tone-check`（平仄校验，走本地 `PingZeService` 确定性引擎，不调用大模型、**不计 token**，但仍计入请求次数限流）。
+- **统一防护**：上述入口在进入 `AiService` 前依次经过 `AiGuardService.checkRequest`（每分钟/每日请求数与 token 配额，Redis 计数，admin 豁免）与 `AiInputValidator`（字数、消息条数、角色白名单、`maxTokens/temperature` 区间）；超限分别返回 `4291/4292` 与 `4290`。`/api/ai/ocr` 还受 `ai.features.ocr-enabled` 开关控制，关闭时返回 `4293`（当前默认关闭，前端入口置灰）。图片类入口校验非空、≤10MB、MIME 白名单。
 - **分步流程**：`AiController` 分发 `AiService` → 各方法内置系统提示词常量 → 文本类 `AiModelRegistry.chat/getModel`、图片类 Base64 后 `AiModelRegistry.vision`；传 `moduleCode` 走 `chatByModule/visionByModule`（按模块选模型+覆盖提示词）→ 按 `model.provider` 定位 `AiModelAdapter`，`RestTemplate` 带 `Bearer apiKey` POST 到 `ai_model.api_url`（messages=system+user、max_tokens 默认 1024）→ 解析 `choices[0].message.content` 返回；失败抛 `BusinessException`。
 - **注意（代码事实）**：providers 下拉含 qwen/openrouter，但当前**无对应 Adapter**，调用报"不支持的AI提供商"；`OpenAiCompatibleAdapter` 支持 zhipu/deepseek/kimi/mimo，`NvidiaAdapter` 支持 nvidia（vision 抛"暂不支持视觉模型"）。
 - **关键类与方法**：`AiController.*`、`AiServiceImpl.chat/writePoemFromImage/analyzePoem/matchCouplet/ocrImage`、`AiModelRegistry.chat/vision/chatByModule/getModel`、`OpenAiCompatibleAdapter/NvidiaAdapter`。

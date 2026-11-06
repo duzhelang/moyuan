@@ -14,7 +14,7 @@
 | 4 | 诗人认证模块 | 诗人认证申请、审核、资料管理 | 前端+后端已实现 |
 | 5 | 论坛模块 | 用户交流、发帖评论 | 前端+后端已实现 |
 | 6 | 交流广场模块 | 轻量级交流空间，快速发帖和互动 | 前端+后端已实现 |
-| 7 | AI模块 | AI 辅助创作、看图写诗、智能分析、AI对联、藏头诗、平仄格律校验、古籍OCR识文、AI内容填充与审核、AI模型配置管理 | 前端+后端已实现 |
+| 7 | AI模块 | AI 辅助创作、看图写诗、智能分析、AI对联、藏头诗、平仄格律校验、古籍OCR识文（维护中）、AI内容填充与审核、AI模型配置管理 | 前端+后端已实现 |
 | 8 | 搜索模块 | 全文搜索、复合筛选、拼音匹配、搜索建议/历史 | 前端+后端已实现 |
 | 9 | 用户模块 | 注册登录、个人中心、用户主页 | 前端+后端已实现 |
 | 10 | 管理模块 | 后台管理、内容管理、数据统计、内容审核 | 前端+后端已实现 |
@@ -32,7 +32,7 @@
 | 22 | 联系我们模块 | 用户反馈表单页面 | 前端已实现 |
 | 23 | 诗云模块 | Three.js 3D 星空可视化，诗人—诗作两级层级星图 + 配色实验室 | 前端已实现 |
 | 24 | 游戏模块 | 飞花令 / 诗词接龙对局（模式/难度、回合计时、三级真实性校验、游客模式） | 前端+后端已实现 |
-| 25 | AI 对话页「诗宝阁」 | 角色化统一对话入口：6 角色 × 12 能力，覆盖命题作诗/集句/藏头/润色/平仄校验/韵脚查询/对对联/意象典故/诗话点评/飞花令/接龙/群贤论诗；其中飞花令为设令字后逐句判定（含字/判重/真实性）的对局流程 | 阶段一前端已完成（非流式）、阶段二后端 SSE 已完成（前端流式待接入） |
+| 25 | AI 对话页「诗宝阁」 | 角色化统一对话入口：6 角色 × 12 能力，覆盖命题作诗/集句/藏头/润色/平仄校验/韵脚查询/对对联/意象典故/诗话点评/飞花令/接龙/群贤论诗；其中飞花令为设令字后逐句判定（含字/判重/真实性）的对局流程 | 前端+后端已实现（SSE 流式、多轮上下文、服务端会话） |
 | 26 | 全局 AI 小窗与系统知识库 | 全站悬浮 AI 问答入口：诗词助理 / 网页用法助理双助理，接入 system_knowledge 知识库 | 前端+后端已实现 |
 
 ---
@@ -334,10 +334,10 @@
 - 智能分析（输入诗句进行深度解析）
 - AI对对联（输入上联，AI生成下联，遵循平仄规则）
 - **藏头诗**（输入 2-8 个藏头字并选择五言/七言，AI 生成藏头诗，每句首字依次对应藏头字；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
-- **平仄格律校验**（粘贴一首绝句/律诗，AI 逐句标注平仄（平声绿底、仄声红底）、判定是否合律、识别所属平水韵韵部并给出总体评价；AI 返回严格 JSON，前端解析失败时回退展示原始文本；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
-- **AI 对话页「诗宝阁」**（`/ai-chat`）：角色化统一对话入口，6 角色（诗仙·创作 / 诗话·鉴赏 / 格律·校正 / 诗友·行令 / 群贤·论诗 / 顾问·问答）× 12 能力（命题作诗 / 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 / 群贤论诗）；阶段一复用 `POST /api/ai/chat`（moduleCode=chat，非流式），阶段二后端已新增 `POST /api/ai/chat/stream`（SSE 流式，见 6.1 接口契约设计），会话按角色分存 localStorage，详见第 25 章
+- **平仄格律校验**（粘贴一首绝句/律诗，由**本地确定性引擎** `POST /api/ai/tone-check` 逐句标注平仄（平声绿底、仄声红底）、判定是否合律并给出不合律原因；校验规则为句末三平尾/三仄尾、二四六位失替、偶数句押韵，不调用大模型、不消耗 AI 额度）
+- **AI 对话页「诗宝阁」**（`/ai-chat`）：角色化统一对话入口，6 角色（诗仙·创作 / 诗话·鉴赏 / 格律·校正 / 诗友·行令 / 群贤·论诗 / 顾问·问答）× 12 能力（命题作诗 / 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 / 群贤论诗）；对话走 `POST /api/ai/chat/stream`（SSE 流式，网络类失败自动回退非流式 `POST /api/ai/chat`），请求携带 system 人设 + 最近 12 条历史作为多轮上下文，生成中可停止；会话按角色存服务端 Redis（`GET/PUT/DELETE /api/ai/chat/sessions/{roleId}`，TTL 7 天）并以 localStorage 兜底，详见第 25 章
 - **飞花令 / 诗词接龙**：原为纯前端小工具（复用 `POST /api/ai/chat`），现已升级为**独立游戏模块**（见第 24 章「游戏模块」），拥有专属后端接口 `/api/game/feihua`、`/api/game/chain` 与 `ai_module_config` 游戏模块绑定；首页 AI 区块保留「飞花令」「诗词接龙」两张卡片入口。
-- **古籍OCR识文**（上传古诗词图片/书法作品/碑帖，AI精准识别文字内容，保留原文结构，标注印章题款）
+- **古籍OCR识文**（上传古诗词图片/书法作品/碑帖，AI精准识别文字内容，保留原文结构，标注印章题款）——**当前维护中**：后端开关 `ai.features.ocr-enabled=false` 时接口返回 `4293`，前端首页入口置灰并提示「维护中」，恢复需同时打开后端开关与前端 `OCR_ENABLED` 常量，并存在 `ocr` 模块的视觉模型绑定
 - AI模型配置管理（后台管理，支持CRUD、启用/禁用、默认模型设置、连接测试）
 - **AI内容填充与审核**：对诗词/诗人缺失字段由 AI 生成候选内容，存入审核表，管理员审核通过后写回原表
 - **诗词AI助手（poetry_chat）**：寻章摘句页面的AI功能模块，包括译文注释、名人点评、创作背景、历史文化背景、AI逐句解析、AI诗词助手对话
@@ -362,17 +362,23 @@
 
 | 接口 | 说明 | 后端模块 |
 |------|------|----------|
-| POST /api/ai/chat | AI问答（非流式） | sc-moyuan-backend AiController |
-| POST /api/ai/chat/stream | AI流式问答（SSE，返回 `text/event-stream`） | sc-moyuan-backend AiController |
-| POST /api/ai/write-poem | 看图写诗 | sc-moyuan-backend AiController |
+| POST /api/ai/chat/stream | AI流式问答（SSE，返回 `text/event-stream`；主链路） | sc-moyuan-backend AiController |
+| POST /api/ai/chat | AI问答（非流式，流式遇可重试失败时兜底） | sc-moyuan-backend AiController |
+| GET /api/ai/chat/sessions/{roleId} | 读取当前用户该角色会话（Redis，TTL 7 天） | AiChatSessionController |
+| PUT /api/ai/chat/sessions/{roleId} | 保存会话（服务端最多保留 40 条） | AiChatSessionController |
+| DELETE /api/ai/chat/sessions/{roleId} | 清空该角色会话 | AiChatSessionController |
+| POST /api/ai/write-poem | 看图写诗（图片 ≤10MB，jpeg/png/gif/webp） | sc-moyuan-backend AiController |
 | POST /api/ai/analyze | 智能分析 | sc-moyuan-backend AiController |
-| POST /api/ai/ocr | 图片OCR识别（古籍/书法/碑帖） | sc-moyuan-backend AiController |
+| POST /api/ai/ocr | 图片OCR识别（**当前维护中**，`ai.features.ocr-enabled=false` 时返回 `4293`） | sc-moyuan-backend AiController |
+| POST /api/ai/tone-check | 平仄格律校验（本地确定性引擎，不消耗 AI 额度） | sc-moyuan-backend AiController |
 | POST /api/ai/couplet | AI对对联 | sc-moyuan-backend AiController |
 | GET /api/ai/config/{moduleCode} | 获取模块AI配置（提示词模板、回答风格等） | sc-moyuan-backend AiController |
 | POST /api/ai/preview | AI生成预览（不写入数据库） | sc-moyuan-backend AiContentController |
 | POST /api/ai/submit-review | 提交AI内容到审核表 | sc-moyuan-backend AiContentController |
 | POST /api/ai/fill-content | 触发AI填充（直接生成并存库） | sc-moyuan-backend AiContentController |
 | GET /api/ai/fill-status/{targetType}/{targetId} | 查询某目标的AI填充状态 | sc-moyuan-backend AiContentController |
+
+> **调用保护**：上述 `/api/ai/**` 接口统一经 `AiGuardService` 按用户限流（默认 60 次/分、1000 次/天、100 万 token/天，admin 豁免），入参长度与 `maxTokens`/`temperature` 由 `AiInputValidator` 统一校验，超限返回 `4290`，限流返回 `4291`，额度用尽返回 `4292`。详见 `docs/api/endpoints.md`。
 
 **获取模块AI配置**：根据 moduleCode 返回对应模块的配置信息，包含提示词模板（promptTemplate）、最大回答长度（maxLength）、回答风格（responseStyle）、首次回答长度（firstResponseLength）等。前端用于构建 AI 对话的系统约束。
 
@@ -1386,18 +1392,21 @@ file:
   - `advisor` 顾问·问答（通识问答，无专属能力）
 - **12 个能力**（Skill）：`compose` 命题作诗、`gather` 集句成诗、`acrostic` 藏头诗、`polish` 润色入律、`tone` 平仄校验、`rhyme` 韵脚查询、`couplet` 对对联、`imagery` 意象典故、`comment` 诗话点评、`feihua` 飞花令、`chain` 诗词接龙、`salon` 群贤论诗
 - **三段式布局**：左「角色栏」+ 中「对话流」+ 底「能力快捷 chips + 输入框」
-- **会话记忆**：按 `roleId` 分存 `localStorage`（键 `moyuan_ai_chat_${roleId}`），切换角色各自恢复；单角色最多保留 40 条（约 20 轮），单条内容上限 4000 字
+- **会话记忆**：按 `roleId` 存服务端 Redis（键 `ai:chat:session:{userId}:{roleId}`，TTL 7 天、最多 40 条），切换角色各自恢复，换设备登录同一账号可继续；本地 `localStorage`（键 `moyuan_ai_chat_${roleId}`）作为降级缓存，Redis 不可用时仍可用。单条内容上限 4000 字
 - **空态引导**：进入页面 / 新建会话后，按角色给出引导语 + 推荐能力 chip
-- **结果渲染**：普通能力渲染为文本气泡；藏头诗高亮每句首字（藏头字）；平仄校验解析 AI 返回的严格 JSON，渲染为平仄标签卡（平底/仄底、押韵标记、逐句简评、总评），解析失败回退展示原始文本
+- **结果渲染**：普通能力渲染为文本气泡，流式逐字追加并自动滚底；藏头诗高亮每句首字（藏头字）；平仄校验改调本地确定性引擎 `POST /api/ai/tone-check`，把返回的逐字平仄与问题列表渲染为平仄标签卡（平底/仄底，三平尾、三仄尾、二四六失替等问题标红），不再依赖大模型输出 JSON
 - **消息头像**：对话流每条消息两侧带圆形头像——AI 侧统一使用墨渊可爱卡通头像（本地静态资源 `/img/ai_chat_avatar.jpg`），用户侧使用本人头像（未登录 / 无头像时回退金色首字母）；用户气泡靠右、头像居其右，AI 气泡靠左、头像居其左，加载态气泡同样带 AI 头像
 
 ### 技术方案
 
-- 阶段一为**纯前端 MVP**，不新增后端接口、不改数据库表，复用现有非流式接口 `POST /api/ai/chat`
+- 对话主链路为 SSE 流式 `POST /api/ai/chat/stream`：前端用 `fetch` + `ReadableStream` 解析（Axios 不支持读取流、EventSource 不支持 POST）并逐段渲染；网络中断等可重试失败才回退非流式 `POST /api/ai/chat`
+- 请求组装为真正的 system role：`[{role:'system', content: persona.systemPrompt}, …最近 12 条历史, {role:'user', content: skill ? skill.buildPrompt(raw) : raw}]`（历史单条 ≤2000 字、合计 ≤8000 字），不再把角色设定前缀塞进 user 消息
+- 限流/额度/鉴权类错误（400/401/403/429 与 4290~4293）**不**回退非流式——回退会二次扣配额并掩盖真实原因，直接展示后端 `message`
+- 流式正常返回 `text/event-stream`；限流与参数异常由 `@RestControllerAdvice` 以 JSON 返回，前端按 `content-type` 区分后抛出 `message`，错误对象携带 `status`/`code` 供判断是否可重试
+- 生成中可停止：发送按钮切换为「停止」，`abort` 后保留已生成内容并持久化；`finally` 中比对 `AbortController` 实例，避免旧请求复位新请求的 loading
+- 会话同步：切换角色 / 新建会话 / 首次进入时从服务端拉取；本地有而服务端为空时反向上传；`sessionSeq` 防止快速切换角色串台
 - `moduleCode` 必传 `'chat'`（已绑定 DeepSeek）；否则回退智谱默认模型，会因 key 余额不足返回 `429 code 1113`
-- 阶段一后端恒前置自身 `CHAT_SYSTEM_PROMPT`，故角色提示词以「角色设定」前缀注入 user 消息（**非**真正的 system role）；真正的 system role + 多轮上下文属阶段二
-- 加载反馈遵循 loading-patterns 规范：发送按钮内置小转圈 +「生成中」并禁用重复点击、宽度固定；对话流等待期显示居中转圈 +「墨渊正在提笔…」；非流式整段返回（无逐字与停止按钮）
-- 藏头诗 / 平仄校验的任务模板与解析逻辑复用首页现有实现，迁移至能力层
+- 藏头诗任务模板复用首页现有实现并迁至能力层；平仄校验改调本地确定性引擎 `POST /api/ai/tone-check`
 - 配色沿用墨渊棕金色系（宣纸底 / 铜边 / 棕金强调），禁用 Element Plus 默认蓝
 
 ### 前端组件
@@ -1406,12 +1415,13 @@ file:
 |------|------|
 | views/ai-chat/index.vue | 页面壳：组合下辖组件、持有会话状态、处理 `?role=&skill=` query |
 | components/ai-chat/RoleSidebar.vue | 角色栏 |
-| components/ai-chat/ChatStream.vue | 对话流（气泡 + 消息头像 + 空态引导 + 自动滚动 + 平仄/藏头特殊渲染） |
+| components/ai-chat/ChatStream.vue | 对话流（气泡 + 消息头像 + 空态引导 + 流式跟随滚动 + 平仄/藏头特殊渲染） |
 | components/ai-chat/SkillChips.vue | 能力快捷 chips |
-| components/ai-chat/ChatInput.vue | 输入框 + 发送按钮（Enter 发送 / Shift+Enter 换行） |
+| components/ai-chat/ChatInput.vue | 输入框 + 发送按钮（Enter 发送 / Shift+Enter 换行；生成中切换为「停止」） |
 | configs/ai-chat/personas.ts | 角色常量（含 systemPrompt） |
 | configs/ai-chat/skills.ts | 能力常量（含任务模板与发送前校验） |
-| composables/useAiChat.ts | 会话状态、请求封装、本地记忆 |
+| composables/useAiChat.ts | 会话状态、SSE 流式请求、多轮上下文组装、服务端会话同步 |
+| api/modules/ai.ts | `chatStream`（`fetch` + `ReadableStream` 解析 SSE、401 静默刷新后重放一次）与会话接口封装 |
 
 ### 前端路由
 
@@ -1425,14 +1435,18 @@ file:
 
 | 接口 | 说明 | 后端模块 |
 |------|------|----------|
-| POST /api/ai/chat | 复用现有非流式对话接口（请求 `{ message, moduleCode:'chat' }`，响应 `data.reply`） | sc-moyuan-backend AiController |
-| POST /api/ai/chat/stream | 流式对话接口（请求 `{ moduleCode, messages[], temperature, maxTokens }`，响应 `text/event-stream`，事件 `{"delta":"…"}` … `[DONE]`） | sc-moyuan-backend AiController |
+| POST /api/ai/chat/stream | 主链路。SSE 流式对话（请求 `{ moduleCode, messages[], temperature, maxTokens }`，响应 `text/event-stream`，事件 `{"delta":"…"}` … `[DONE]`；限流/入参错误以 JSON 返回） | sc-moyuan-backend AiController |
+| POST /api/ai/chat | 兜底。非流式对话（请求 `{ message, moduleCode:'chat' }`，响应 `data.reply`），仅在流式遇可重试失败时调用 | sc-moyuan-backend AiController |
+| GET /api/ai/chat/sessions/{roleId} | 读取当前用户在该角色下的会话 | AiChatSessionController |
+| PUT /api/ai/chat/sessions/{roleId} | 保存会话（`{"messages":[…]}`，服务端只保留最近 40 条） | AiChatSessionController |
+| DELETE /api/ai/chat/sessions/{roleId} | 清空该角色会话 | AiChatSessionController |
+| POST /api/ai/tone-check | 平仄校验（本地确定性引擎，不消耗 AI 额度） | sc-moyuan-backend AiController |
 
-### 阶段规划
+### 实现状态
 
-- **阶段一（已完成，前端）**：角色 / 能力常量、非流式对话、本地会话记忆、藏头诗与平仄特殊渲染、示例 loading 反馈
-- **阶段二后端（已完成）**：`POST /api/ai/chat/stream`（Spring MVC `SseEmitter`）+ `AiModelAdapter.streamChat()` 默认降级与 `OpenAiCompatibleAdapter` 流式实现（JDK `HttpClient` 逐行解析 `SseParser`）+ `AiModelRegistry.streamByModule`；`@SkipOperationLog` 注解在两个日志切面 pointcut 排除流式方法
-- **阶段二前端（待实施）**：`fetch` 解析 SSE 逐字渲染 + 停止生成；`messages` 多轮上下文；角色配置入库（复用 `ai_module_config`）
+- **已完成**：角色 / 能力常量、SSE 流式逐字渲染、停止生成、system 人设 + 多轮上下文、服务端会话（Redis，本地兜底降级）、藏头诗高亮、平仄本地引擎渲染
+- **后端**：`POST /api/ai/chat/stream`（Spring MVC `SseEmitter`）+ `AiModelAdapter.streamChat()` 默认降级与 `OpenAiCompatibleAdapter` 流式实现（JDK `HttpClient` 逐行解析 `SseParser`）+ `AiModelRegistry.streamByModule`；`@SkipOperationLog` 注解在两个日志切面 pointcut 排除流式方法；会话由 `AiChatSessionService` 读写 Redis（TTL 7 天、最多 40 条，异常降级内存）
+- **待办**：角色 / 能力配置入库（当前为前端常量，可复用 `ai_module_config`）；流式接口的全局在途连接上限（见 `docs/guides/known-gaps-todo.md` #9）
 
 ---
 
@@ -1482,6 +1496,6 @@ file:
 
 ---
 
-**文档版本**：v3.17
-**最后更新**：2026-10-27（推荐算法说明补充「四组模型策略（离线制品查表）」与「后台实时看板」；后台控制台推荐指标屏新增缓存覆盖、模型版本、近 7 天切换趋势、切换去向/页面分布与最近事件）；此前 v3.16（推荐算法说明由 UserCF 更新为 ItemCF，诗词行为矩阵同一作品多行为取最大值合并）；此前 v3.15（新增第 26 章「全局 AI 小窗与系统知识库」：双助理、`system_chat` 模块、`system_knowledge` 表、路由画像、意图分流与 FAQ 直答、知识库跳转入口、登录门禁；模块总数 25 → 26）；v3.14（首页「诗境 AI」展开面板新增「前往完整页面」入口，按工具预选诗宝阁角色与能力；韵脚查询/对对联补充为诗宝阁新能力，能力总数 10 → 12；功能卡增加自动横向滑动）；2026-10-19（AI 对话页模块名统一由「诗阁」更名为「诗宝阁」；此前第 25 章「AI 对话页『诗宝阁』」补充对话流消息头像说明：AI 侧统一卡通头像 / 用户侧本人头像，气泡与头像左右对齐；v3.13 补充阶段二后端流式接口 `POST /api/ai/chat/stream`（SSE 流式）说明与接口表条目；v3.12 新增第 25 章：6 角色 × 10 能力的角色化统一对话入口，阶段一纯前端复用 `POST /api/ai/chat` 非流式接口）
+**文档版本**：v3.18
+**最后更新**：2026-11-07（AI 加固收尾同步：第 25 章诗宝阁由「阶段一非流式」改为 SSE 流式 + system 人设多轮上下文 + 服务端会话（Redis，TTL 7 天，localStorage 兜底）+ 停止生成；平仄校验改述为本地确定性引擎 `POST /api/ai/tone-check`（不消耗 AI 额度）；古籍识文标注维护中（`ai.features.ocr-enabled=false`）；接口清单补 `tone-check` 与 3 个会话接口，并注明 `/api/ai/**` 统一限流与入参校验）；此前 v3.17（推荐算法说明补充「四组模型策略（离线制品查表）」与「后台实时看板」；后台控制台推荐指标屏新增缓存覆盖、模型版本、近 7 天切换趋势、切换去向/页面分布与最近事件）；v3.16（推荐算法说明由 UserCF 更新为 ItemCF，诗词行为矩阵同一作品多行为取最大值合并）；v3.15（新增第 26 章「全局 AI 小窗与系统知识库」：双助理、`system_chat` 模块、`system_knowledge` 表、路由画像、意图分流与 FAQ 直答、知识库跳转入口、登录门禁；模块总数 25 → 26）；v3.14（首页「诗境 AI」展开面板新增「前往完整页面」入口，按工具预选诗宝阁角色与能力；韵脚查询/对对联补充为诗宝阁新能力，能力总数 10 → 12；功能卡增加自动横向滑动）；2026-10-19（AI 对话页模块名统一由「诗阁」更名为「诗宝阁」；此前第 25 章「AI 对话页『诗宝阁』」补充对话流消息头像说明：AI 侧统一卡通头像 / 用户侧本人头像，气泡与头像左右对齐；v3.13 补充后端流式接口 `POST /api/ai/chat/stream`（SSE 流式）说明与接口表条目；v3.12 新增第 25 章：6 角色 × 10 能力的角色化统一对话入口，纯前端复用 `POST /api/ai/chat` 非流式接口）
 **维护人员**：墨渊开发团队
