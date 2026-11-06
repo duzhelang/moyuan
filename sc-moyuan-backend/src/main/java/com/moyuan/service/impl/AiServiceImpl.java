@@ -48,6 +48,11 @@ public class AiServiceImpl implements AiService {
     /** 「作者：」「译文：」等元信息行 */
     private static final Pattern META_LINE = Pattern.compile("^(作者|题目|译文|注释|说明|格律)[:：].*");
 
+    /** 与 application.yml 的 multipart 上限保持一致 */
+    private static final long MAX_IMAGE_BYTES = 10L * 1024 * 1024;
+    private static final Pattern IMAGE_CONTENT_TYPE = Pattern.compile("image/(jpeg|png|gif|webp)",
+            Pattern.CASE_INSENSITIVE);
+
     private static final String ANALYZE_SYSTEM_PROMPT =
             "你是「古今诗话」平台的诗词鉴赏专家，擅长对古典诗词进行深入细致的学术分析。" +
             "你的职责是：从意境、修辞、情感、历史背景等多个维度全面解读诗词作品。" +
@@ -125,9 +130,24 @@ public class AiServiceImpl implements AiService {
         return result;
     }
 
+    /** 图片入参校验：空文件、体积上限、常见图片 MIME 类型 */
+    private void validateImage(MultipartFile image) {
+        if (image == null || image.isEmpty()) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "图片不能为空");
+        }
+        if (image.getSize() > MAX_IMAGE_BYTES) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "图片不能超过 10MB，请压缩后重试");
+        }
+        String contentType = image.getContentType();
+        if (contentType != null && !IMAGE_CONTENT_TYPE.matcher(contentType).matches()) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "仅支持 JPG / PNG / GIF / WebP 格式的图片");
+        }
+    }
+
     /** 统一的视觉写诗调用，供首轮生成与重写复用 */
     private String visionPoem(String prompt, MultipartFile image, String model,
                               String visionModel, String moduleCode) {
+        validateImage(image);
         try {
             String base64Image = Base64.getEncoder().encodeToString(image.getBytes());
             if (moduleCode != null && !moduleCode.isEmpty()) {
@@ -211,9 +231,7 @@ public class AiServiceImpl implements AiService {
 
     @Override
     public String ocrImage(MultipartFile image, String model, String visionModel, String moduleCode) {
-        if (image == null || image.isEmpty()) {
-            throw new BusinessException(ResultCode.ERROR, "图片不能为空");
-        }
+        validateImage(image);
         try {
             String base64Image = Base64.getEncoder().encodeToString(image.getBytes());
             String prompt = "请识别这张图片中的所有文字内容，逐字准确识别，保留原文的段落和换行结构。如有印章、题款等也需识别。";

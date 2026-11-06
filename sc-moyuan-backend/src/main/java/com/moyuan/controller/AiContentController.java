@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.moyuan.common.R;
 import com.moyuan.entity.AiGeneratedContent;
 import com.moyuan.service.AiGeneratedContentService;
+import com.moyuan.service.AiGuardService;
+import com.moyuan.util.AiInputValidator;
 import com.moyuan.util.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,11 +22,13 @@ import java.util.Map;
 public class AiContentController {
 
     private final AiGeneratedContentService aiGeneratedContentService;
+    private final AiGuardService aiGuardService;
 
     @Operation(summary = "AI生成预览（不写入数据库）")
     @PostMapping("/preview")
     public R<Map<String, String>> preview(@RequestBody Map<String, Object> request) {
-        SecurityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
+        aiGuardService.checkRequest(userId);
         String targetType = (String) request.get("targetType");
         Long targetId = Long.valueOf(request.get("targetId").toString());
         String fieldName = (String) request.get("fieldName");
@@ -35,6 +39,7 @@ public class AiContentController {
         }
 
         String content = aiGeneratedContentService.generatePreview(targetType, targetId, fieldName, moduleCode);
+        aiGuardService.consumeTokens(userId, AiInputValidator.estimateTokens(content));
         return R.success(Map.of("content", content));
     }
 
@@ -58,7 +63,8 @@ public class AiContentController {
     @Operation(summary = "触发AI填充（直接生成并存库）")
     @PostMapping("/fill-content")
     public R<AiGeneratedContent> fillContent(@RequestBody Map<String, Object> request) {
-        SecurityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
+        aiGuardService.checkRequest(userId);
         String targetType = (String) request.get("targetType");
         Long targetId = Long.valueOf(request.get("targetId").toString());
         String fieldName = (String) request.get("fieldName");
@@ -69,6 +75,9 @@ public class AiContentController {
         }
 
         AiGeneratedContent record = aiGeneratedContentService.generateContent(targetType, targetId, fieldName, moduleCode);
+        if (record != null) {
+            aiGuardService.consumeTokens(userId, AiInputValidator.estimateTokens(record.getContent()));
+        }
         return R.success(record);
     }
 

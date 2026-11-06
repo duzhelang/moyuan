@@ -1,6 +1,7 @@
 package com.moyuan.controller;
 
 import com.moyuan.ai.StreamCallback;
+import com.moyuan.service.AiGuardService;
 import com.moyuan.service.AiModelConfigService;
 import com.moyuan.service.AiService;
 import com.moyuan.service.TokenBlacklistService;
@@ -43,6 +44,8 @@ class AiControllerStreamTest {
     private AiService aiService;
     @MockBean
     private AiModelConfigService aiModelConfigService;
+    @MockBean
+    private AiGuardService aiGuardService;
     @MockBean
     private JwtUtil jwtUtil;
     @MockBean

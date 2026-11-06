@@ -9,6 +9,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.stream.Collectors;
@@ -48,6 +49,14 @@ public class GlobalExceptionHandler {
     public R<Void> handleNoResourceFoundException(NoResourceFoundException e) {
         // 静态资源/未映射路径缺失属于正常 404，不应作为系统故障记录 ERROR 日志
         return R.error(ResultCode.NOT_FOUND.getCode(), ResultCode.NOT_FOUND.getMessage());
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public R<Void> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException e) {
+        // 上传体积由 application.yml 的 spring.servlet.multipart 控制，这里只做友好提示
+        log.warn("上传文件超过大小限制：{}", e.getMessage());
+        return R.error(ResultCode.PARAM_ERROR.getCode(), "上传文件不能超过 10MB，请压缩后重试");
     }
 
     @ExceptionHandler(Exception.class)

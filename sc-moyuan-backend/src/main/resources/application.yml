@@ -87,3 +87,21 @@ external:
   poetry:
     api:
       enabled: true
+
+# ==================== AI 能力开关与调用保护 ====================
+ai:
+  features:
+    # 古籍识文（OCR）维护开关：false 时接口返回明确的维护提示，前端入口同步置灰。
+    # 恢复时把本开关与首页 OCR_ENABLED 同时打开，并确保存在 ocr 模块的视觉模型绑定。
+    ocr-enabled: ${AI_OCR_ENABLED:false}
+  guard:
+    # 仅作用于 /api/ai/** 的对外接口；游戏、韵脚、RAG 走内部服务，不受影响。
+    enabled: ${AI_GUARD_ENABLED:true}
+    # 单用户每分钟最多请求次数
+    per-minute: ${AI_GUARD_PER_MINUTE:60}
+    # 单用户每日最多请求次数
+    daily-requests: ${AI_GUARD_DAILY_REQUESTS:1000}
+    # 单用户每日估算 token 上限（按字符数近似估算，仅用于防滥用）
+    daily-tokens: ${AI_GUARD_DAILY_TOKENS:1000000}
+    # 单次视觉调用（看图写诗/OCR）按固定 token 计费，避免大图绕过配额
+    vision-token-cost: ${AI_GUARD_VISION_TOKEN_COST:1000}

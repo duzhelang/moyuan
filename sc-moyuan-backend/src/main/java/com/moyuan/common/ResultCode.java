@@ -30,7 +30,11 @@ public enum ResultCode {
     NOT_FAVORITED("5004", "未收藏"),
     REPAIR_ORDER_NOT_FOUND("6001", "报修工单不存在"),
     REPAIR_ORDER_CLOSED("6002", "工单已关闭"),
-    REPAIR_ORDER_NO_PERMISSION("6003", "无权操作此工单");
+    REPAIR_ORDER_NO_PERMISSION("6003", "无权操作此工单"),
+    AI_INPUT_TOO_LONG("4290", "输入内容过长，请精简后重试"),
+    AI_RATE_LIMITED("4291", "AI 请求过于频繁，请稍后再试"),
+    AI_QUOTA_EXCEEDED("4292", "今日 AI 使用额度已用完，请明日再试"),
+    AI_FEATURE_DISABLED("4293", "该 AI 功能暂不可用");
 
     private final String code;
     private final String message;
