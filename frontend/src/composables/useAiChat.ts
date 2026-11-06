@@ -1,15 +1,24 @@
 /**
  * 「诗宝阁」AI 对话页 —— 会话状态与请求组合式函数
  *
- * 阶段一 MVP：
- * - 复用现有非流式接口 POST /api/ai/chat（moduleCode 必传 'chat'，否则回退智谱默认模型会 429）；
- * - 角色 system prompt 以「角色设定」前缀注入 user 消息；
- * - 会话按 roleId 分存 localStorage，切换角色各自恢复；
- * - 历史仅用于展示，不回传模型（多轮上下文属阶段二）。
+ * 本版能力：
+ * - SSE 流式输出（POST /api/ai/chat/stream），支持中断；
+ * - 多轮上下文：system（角色设定）+ 最近若干轮历史 + 本轮任务；
+ * - 服务端会话：按「用户 + 角色」存 Redis，localStorage 仅作兜底；
+ * - 平仄校验走本地确定性引擎（/api/ai/tone-check），失败再回退大模型；
+ * - 飞花令保留对话内轻量对局。
  */
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { chat } from '@/api/modules/ai'
+import {
+  chat,
+  chatStream,
+  clearChatSession,
+  getChatSession,
+  saveChatSession,
+  toneCheck
+} from '@/api/modules/ai'
+import type { ChatSessionMessage, ChatStreamMessage } from '@/api/modules/ai'
 import { searchPoems } from '@/api/modules/poem'
 import { PERSONAS, getPersonaById } from '@/configs/ai-chat/personas'
 import type { AiPersona } from '@/configs/ai-chat/personas'
@@ -27,12 +36,18 @@ export interface ChatMessage {
   time: number
 }
 
-/** localStorage 会话键前缀 */
+/** localStorage 会话键前缀（服务端不可用时的兜底） */
 const STORAGE_PREFIX = 'moyuan_ai_chat_'
 /** 最多保留的消息条数（约 20 轮） */
 const MAX_HISTORY = 40
 /** 单条消息内容长度上限，防止 localStorage 膨胀 */
 const MAX_CONTENT_LEN = 4000
+/** 参与多轮上下文的最近消息条数 */
+const CONTEXT_MESSAGE_LIMIT = 12
+/** 参与多轮上下文的单条消息最大字符数 */
+const CONTEXT_MESSAGE_CHARS = 2000
+/** 参与多轮上下文的合计字符上限 */
+const CONTEXT_TOTAL_CHARS = 8000
 
 /** 生成简易唯一 id */
 function genId(): string {
@@ -52,7 +67,7 @@ function loadMessages(roleId: string): ChatMessage[] {
   return []
 }
 
-/** 持久化指定角色的会话 */
+/** 持久化指定角色的会话（localStorage 兜底） */
 function saveMessages(roleId: string, msgs: ChatMessage[]): void {
   try {
     const trimmed = msgs.slice(-MAX_HISTORY).map((m) => ({
@@ -112,6 +127,11 @@ function aiLineHanzi(reply: string): string {
   return onlyHanzi(sentence.replace(/^诗句[:：]?/, ''))
 }
 
+function isAbortError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null
+    && (error as { name?: string }).name === 'AbortError'
+}
+
 export function useAiChat() {
   const personas = PERSONAS
   const allSkills = SKILLS
@@ -123,6 +143,10 @@ export function useAiChat() {
   const loading = ref(false)
   /** 飞花令对局状态：空令字表示尚未开局 */
   const feihuaGame = ref<FeihuaGame>({ keyword: '', used: [], rounds: 0 })
+  /** 当前流式请求的中断句柄 */
+  const abortController = ref<AbortController | null>(null)
+  /** 会话切换序号，用于丢弃过期的服务端拉取结果 */
+  let sessionSeq = 0
 
   const persona = computed<AiPersona>(() => getPersonaById(roleId.value))
   const skills = computed<AiSkill[]>(() => getSkillsByRole(roleId.value))
@@ -136,24 +160,68 @@ export function useAiChat() {
     feihuaGame.value = { keyword: '', used: [], rounds: 0 }
   }
 
+  /** 把当前会话同步到服务端（失败静默，localStorage 仍是兜底） */
+  const persistServer = (targetRoleId = roleId.value) => {
+    const snapshot: ChatSessionMessage[] = messages.value.map((message) => ({
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      skillId: message.skillId,
+      time: message.time
+    }))
+    void saveChatSession(targetRoleId, snapshot).catch(() => {
+      // 服务端不可用时保持本地会话，不影响后续对话
+    })
+  }
+
+  /** 从服务端恢复会话；服务端为空时把本地会话反向同步一次 */
+  const syncFromServer = async (targetRoleId: string) => {
+    const seq = ++sessionSeq
+    try {
+      const res = await getChatSession(targetRoleId)
+      if (seq !== sessionSeq || roleId.value !== targetRoleId) return
+      const remote = Array.isArray(res.data) ? res.data : []
+      if (!remote.length) {
+        if (messages.value.length) persistServer(targetRoleId)
+        return
+      }
+      messages.value = remote.slice(-MAX_HISTORY).map((message) => ({
+        id: message.id || genId(),
+        role: message.role,
+        content: message.content,
+        skillId: message.skillId,
+        time: message.time || Date.now()
+      }))
+      saveMessages(targetRoleId, messages.value)
+    } catch {
+      // 拉取失败时保留本地会话
+    }
+  }
+
   /** 切换角色：保存当前会话并恢复目标角色会话 */
   const switchRole = (id: string) => {
     if (id === roleId.value) return
     saveMessages(roleId.value, messages.value)
+    sessionSeq++
     roleId.value = id
     messages.value = loadMessages(id)
     skillId.value = null
     resetFeihua()
     input.value = ''
+    void syncFromServer(id)
   }
 
-  /** 清空当前角色的历史与上下文 */
+  /** 清空当前角色的历史与上下文（本地 + 服务端） */
   const newSession = () => {
+    sessionSeq++
     messages.value = []
     saveMessages(roleId.value, [])
     skillId.value = null
     resetFeihua()
     input.value = ''
+    void clearChatSession(roleId.value).catch(() => {
+      // 服务端清理失败不影响本地新会话
+    })
   }
 
   /** 选中/取消能力 chip；切换能力时结束当前飞花令对局 */
@@ -176,6 +244,25 @@ export function useAiChat() {
     saveMessages(roleId.value, next)
   }
 
+  /** 流式增量：替换数组元素触发视图更新 */
+  const appendToMessage = (id: string, delta: string) => {
+    const index = messages.value.findIndex((message) => message.id === id)
+    if (index < 0) return
+    const current = messages.value[index]
+    messages.value[index] = { ...current, content: current.content + delta }
+  }
+
+  /** 用最终结果覆盖流式占位消息 */
+  const setMessageContent = (id: string, content: string) => {
+    const index = messages.value.findIndex((message) => message.id === id)
+    if (index < 0) return
+    messages.value[index] = { ...messages.value[index], content }
+  }
+
+  const removeMessage = (id: string) => {
+    messages.value = messages.value.filter((message) => message.id !== id)
+  }
+
   /** 拼装最终 user 消息：角色设定 + （能力任务模板 | 用户输入） */
   const buildFullPrompt = (raw: string, skill: AiSkill | null): string => {
     const parts: string[] = [`【角色设定】${persona.value.systemPrompt}`]
@@ -185,6 +272,27 @@ export function useAiChat() {
       parts.push(`【用户输入】${raw}`)
     }
     return parts.join('\n\n')
+  }
+
+  /** 多轮上下文：system + 最近历史 + 本轮任务；跳过 tone 的 JSON 结果 */
+  const buildStreamMessages = (raw: string, skill: AiSkill | null): ChatStreamMessage[] => {
+    const history: ChatStreamMessage[] = []
+    let totalChars = 0
+    const candidates = messages.value.slice(-CONTEXT_MESSAGE_LIMIT)
+    for (let i = candidates.length - 1; i >= 0; i--) {
+      const message = candidates[i]
+      if (message.role === 'assistant' && message.skillId === 'tone') continue
+      const content = message.content.slice(0, CONTEXT_MESSAGE_CHARS)
+      if (!content.trim()) continue
+      if (totalChars + content.length > CONTEXT_TOTAL_CHARS) break
+      history.unshift({ role: message.role, content })
+      totalChars += content.length
+    }
+    return [
+      { role: 'system', content: persona.value.systemPrompt },
+      ...history,
+      { role: 'user', content: skill ? skill.buildPrompt(raw) : raw }
+    ]
   }
 
   /** 推送一条飞花令判定消息 */
@@ -310,7 +418,60 @@ export function useAiChat() {
     }
   }
 
-  /** 发送消息（阶段一非流式，整段一次返回） */
+  /** 平仄校验：优先本地确定性引擎，失败回退大模型 */
+  const sendTone = async (raw: string, skill: AiSkill) => {
+    pushMessage({ id: genId(), role: 'user', content: raw, skillId: skill.id, time: Date.now() })
+    input.value = ''
+    loading.value = true
+    try {
+      const res = await toneCheck(raw)
+      const data = res.data
+      if (!data || !Array.isArray(data.lines) || data.lines.length === 0) {
+        throw new Error('EMPTY_TONE_RESULT')
+      }
+      const issues = data.issues || []
+      const content = JSON.stringify({
+        valid: !!data.passed,
+        format: data.genre || '',
+        rhymeGroup: '',
+        lines: data.lines.map((line) => ({
+          text: line.text,
+          tone: line.pattern || '',
+          rhyme: false,
+          note: (line.issues || []).join('；')
+        })),
+        summary: issues.length ? issues.join('；') : '格律校验通过'
+      })
+      pushMessage({ id: genId(), role: 'assistant', content, skillId: 'tone', time: Date.now() })
+    } catch {
+      // 本地引擎不可用时回退原 LLM 路径，保持能力可用
+      try {
+        const res = await chat({ message: buildFullPrompt(raw, skill), moduleCode: 'chat' })
+        const reply = (res.data?.reply || '').trim()
+        if (reply) {
+          pushMessage({ id: genId(), role: 'assistant', content: reply, skillId: 'tone', time: Date.now() })
+        } else {
+          ElMessage.info('AI 未返回内容，请重试')
+        }
+      } catch {
+        ElMessage.error('校验失败，请稍后重试')
+      }
+    } finally {
+      loading.value = false
+      persistServer()
+    }
+  }
+
+  /** 停止生成：保留已输出的部分内容 */
+  const stop = () => {
+    abortController.value?.abort()
+    abortController.value = null
+    loading.value = false
+    saveMessages(roleId.value, messages.value)
+    persistServer()
+  }
+
+  /** 发送消息（SSE 流式 + 多轮；失败回退非流式单轮） */
   const send = async () => {
     const raw = input.value.trim()
     if (!raw || loading.value) return
@@ -319,6 +480,12 @@ export function useAiChat() {
     // 飞花令走独立对局流程：设令字、逐句判定、AI 接句
     if (skill?.id === 'feihua') {
       await sendFeihua(raw, skill)
+      persistServer()
+      return
+    }
+    // 平仄校验走本地确定性引擎
+    if (skill?.id === 'tone') {
+      await sendTone(raw, skill)
       return
     }
 
@@ -330,23 +497,76 @@ export function useAiChat() {
       }
     }
 
+    const streamMessages = buildStreamMessages(raw, skill)
     pushMessage({ id: genId(), role: 'user', content: raw, skillId: skill?.id, time: Date.now() })
     input.value = ''
     loading.value = true
+
+    const controller = new AbortController()
+    abortController.value = controller
+    const assistantId = genId()
+    let placeholderAdded = false
+    const ensurePlaceholder = () => {
+      if (placeholderAdded) return
+      pushMessage({ id: assistantId, role: 'assistant', content: '', skillId: skill?.id, time: Date.now() })
+      placeholderAdded = true
+    }
+
     try {
-      const res = await chat({ message: buildFullPrompt(raw, skill), moduleCode: 'chat' })
-      const reply = (res.data?.reply || '').trim()
-      if (!reply) {
+      const reply = await chatStream(
+        { messages: streamMessages, moduleCode: 'chat' },
+        {
+          signal: controller.signal,
+          onDelta: (delta) => {
+            ensurePlaceholder()
+            appendToMessage(assistantId, delta)
+          }
+        }
+      )
+      if (!reply.trim()) {
+        if (placeholderAdded) removeMessage(assistantId)
         ElMessage.info('AI 未返回内容，请重试')
       } else {
-        pushMessage({ id: genId(), role: 'assistant', content: reply, skillId: skill?.id, time: Date.now() })
+        ensurePlaceholder()
+        setMessageContent(assistantId, reply)
       }
-    } catch {
-      ElMessage.error('生成失败，请稍后重试')
+    } catch (error) {
+      if (isAbortError(error)) {
+        // 用户主动停止：保留已生成的部分内容
+      } else {
+        // 流式失败：回退非流式单轮，至少保证有回复
+        try {
+          const res = await chat({ message: buildFullPrompt(raw, skill), moduleCode: 'chat' })
+          const reply = (res.data?.reply || '').trim()
+          if (!reply) {
+            if (placeholderAdded) removeMessage(assistantId)
+            ElMessage.info('AI 未返回内容，请重试')
+          } else {
+            ensurePlaceholder()
+            setMessageContent(assistantId, reply)
+          }
+        } catch {
+          if (placeholderAdded) {
+            ElMessage.error('生成中断，请重试')
+          } else {
+            ElMessage.error('生成失败，请稍后重试')
+          }
+        }
+      }
     } finally {
-      loading.value = false
+      // 已被「停止」或新请求接管时，不覆盖新一轮的状态
+      if (abortController.value === controller) {
+        loading.value = false
+        abortController.value = null
+        // 流式过程中为避免频繁写盘，只在结束时统一落本地 + 服务端
+        saveMessages(roleId.value, messages.value)
+        persistServer()
+      }
     }
   }
+
+  // 首次进入：本地会话先展示，再异步与服务端合并
+  void syncFromServer(roleId.value)
 
   return {
     // 常量
@@ -368,6 +588,7 @@ export function useAiChat() {
     newSession,
     toggleSkill,
     clearSkill,
-    send
+    send,
+    stop
   }
 }

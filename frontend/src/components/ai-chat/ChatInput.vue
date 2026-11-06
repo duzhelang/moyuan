@@ -15,6 +15,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: string]
   send: []
+  stop: []
   clearSkill: []
   openGame: []
 }>()
@@ -60,14 +61,15 @@ const onSend = () => {
       <button
         class="chat-send-btn"
         :class="{ loading }"
-        :disabled="loading || !modelValue.trim()"
-        @click="onSend"
+        :disabled="!loading && !modelValue.trim()"
+        :title="loading ? '停止生成' : '发送'"
+        @click="loading ? emit('stop') : onSend()"
       >
         <span v-if="loading" class="chat-send-spinner"></span>
-        <span>{{ loading ? '生成中' : '发送' }}</span>
+        <span>{{ loading ? '停止' : '发送' }}</span>
       </button>
     </div>
-    <div class="chat-input-hint">Enter 发送 / Shift+Enter 换行</div>
+    <div class="chat-input-hint">Enter 发送 / Shift+Enter 换行 · 生成中可点「停止」</div>
   </div>
 </template>
 

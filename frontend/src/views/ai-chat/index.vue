@@ -26,7 +26,8 @@ const {
   newSession,
   toggleSkill,
   clearSkill,
-  send
+  send,
+  stop
 } = useAiChat()
 
 /** 空态推荐能力：按角色默认能力取，取不到则跳过 */
@@ -112,6 +113,7 @@ onMounted(() => {
             :game-path="gamePath"
             :game-label="gameLabel"
             @send="send"
+            @stop="stop"
             @clear-skill="clearSkill"
             @open-game="openGame"
           />

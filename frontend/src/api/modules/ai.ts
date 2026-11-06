@@ -160,3 +160,127 @@ export function submitForReview(data: { targetType: string; targetId: number; fi
 export function getFillStatus(targetType: string, targetId: number) {
   return request.get<any[]>(`/ai/fill-status/${targetType}/${targetId}`)
 }
+
+/* ==================== 诗宝阁：流式对话与会话 ==================== */
+
+export interface ChatStreamMessage {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
+
+export interface ChatStreamPayload {
+  messages: ChatStreamMessage[]
+  moduleCode?: string
+  temperature?: number
+  maxTokens?: number
+}
+
+export interface ChatStreamHandlers {
+  /** 增量文本回调 */
+  onDelta?: (delta: string) => void
+  /** 用于「停止生成」 */
+  signal?: AbortSignal
+}
+
+/**
+ * SSE 流式问答。
+ * <p>
+ * Axios 不支持读取流，EventSource 不支持 POST，因此使用 fetch + ReadableStream。
+ * 后端事件格式：data:{"delta":"..."} → data:[DONE]；异常为 data:{"error":"..."}。
+ */
+export async function chatStream(
+  payload: ChatStreamPayload,
+  handlers: ChatStreamHandlers = {}
+): Promise<string> {
+  const base = import.meta.env.VITE_API_BASE_URL || '/api'
+  const token = localStorage.getItem('token') || ''
+  const response = await fetch(`${base}/ai/chat/stream`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify(payload),
+    signal: handlers.signal
+  })
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    throw new Error(text || `AI 流式请求失败（${response.status}）`)
+  }
+  // 限流/参数错误时后端会返回普通 JSON（HTTP 200），需把 message 抛给调用方
+  const contentType = response.headers.get('content-type') || ''
+  if (!contentType.includes('text/event-stream')) {
+    const text = await response.text().catch(() => '')
+    let message = ''
+    try {
+      const body = JSON.parse(text) as { message?: string }
+      message = body?.message || ''
+    } catch {
+      // 非 JSON 响应按原始文本兜底
+    }
+    throw new Error(message || `AI 服务异常（${response.status}）`)
+  }
+  if (!response.body) {
+    throw new Error('当前浏览器不支持流式响应')
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder('utf-8')
+  let buffer = ''
+  let full = ''
+
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
+
+    let frameEnd = buffer.indexOf('\n\n')
+    while (frameEnd >= 0) {
+      const frame = buffer.slice(0, frameEnd)
+      buffer = buffer.slice(frameEnd + 2)
+      for (const line of frame.split('\n')) {
+        if (!line.startsWith('data:')) continue
+        const data = line.slice(5).trim()
+        if (!data) continue
+        if (data === '[DONE]') return full
+        let event: { delta?: string; error?: string }
+        try {
+          event = JSON.parse(data)
+        } catch {
+          continue
+        }
+        if (event.error) throw new Error(event.error)
+        if (typeof event.delta === 'string') {
+          full += event.delta
+          handlers.onDelta?.(event.delta)
+        }
+      }
+      frameEnd = buffer.indexOf('\n\n')
+    }
+  }
+
+  return full
+}
+
+/** 服务端会话消息（与 ChatMessage 字段保持一致） */
+export interface ChatSessionMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  skillId?: string
+  time: number
+}
+
+export function getChatSession(roleId: string) {
+  return request.get<ChatSessionMessage[]>(`/ai/chat/sessions/${roleId}`)
+}
+
+export function saveChatSession(roleId: string, messages: ChatSessionMessage[]) {
+  return request.put<void>(`/ai/chat/sessions/${roleId}`, { messages })
+}
+
+export function clearChatSession(roleId: string) {
+  return request.delete<void>(`/ai/chat/sessions/${roleId}`)
+}

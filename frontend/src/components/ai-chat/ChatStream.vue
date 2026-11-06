@@ -138,6 +138,8 @@ const scrollToBottom = () => {
 }
 
 watch(() => [props.messages.length, props.loading] as const, scrollToBottom)
+// 流式输出时消息长度持续变化，也要跟随滚动
+watch(() => props.messages.map((message) => message.content.length).join(','), scrollToBottom)
 onMounted(scrollToBottom)
 </script>
 
