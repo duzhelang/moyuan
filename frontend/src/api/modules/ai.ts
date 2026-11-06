@@ -1,4 +1,4 @@
-import request from '@/utils/request'
+import request, { refreshSessionForFetch } from '@/utils/request'
 
 export interface ChatRequest {
   message: string
@@ -182,48 +182,87 @@ export interface ChatStreamHandlers {
   signal?: AbortSignal
 }
 
+/** 带业务码的流式错误，便于调用方区分「限流/额度/参数」与「网络/流中断」 */
+export interface ChatStreamError extends Error {
+  /** HTTP 状态码 */
+  status?: number
+  /** 业务码（400 / 4290 / 4291 / 4292 / 4293 …） */
+  code?: string
+}
+
+function buildStreamError(message: string, status?: number, code?: string): ChatStreamError {
+  const error = new Error(message) as ChatStreamError
+  error.status = status
+  if (code) {
+    error.code = code
+  }
+  return error
+}
+
+/** 解析后端错误响应体（可能是 R 包装的 JSON，也可能是纯文本/HTML） */
+async function readErrorBody(response: Response): Promise<{ message: string; code?: string }> {
+  const text = await response.text().catch(() => '')
+  try {
+    const body = JSON.parse(text) as { message?: string; code?: string }
+    return { message: body?.message || '', code: body?.code }
+  } catch {
+    return { message: '', code: undefined }
+  }
+}
+
 /**
  * SSE 流式问答。
  * <p>
  * Axios 不支持读取流，EventSource 不支持 POST，因此使用 fetch + ReadableStream。
  * 后端事件格式：data:{"delta":"..."} → data:[DONE]；异常为 data:{"error":"..."}。
+ * <p>
+ * 该函数不走 axios 拦截器，所以需要自己处理两件事：
+ * 1) 401 时静默刷新一次 token 再重放；
+ * 2) 把后端 R 包装里的 message/code 原样抛给调用方，避免前端只看到「生成失败」。
  */
 export async function chatStream(
   payload: ChatStreamPayload,
   handlers: ChatStreamHandlers = {}
 ): Promise<string> {
   const base = import.meta.env.VITE_API_BASE_URL || '/api'
-  const token = localStorage.getItem('token') || ''
-  const response = await fetch(`${base}/ai/chat/stream`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    },
-    body: JSON.stringify(payload),
-    signal: handlers.signal
-  })
+  const url = `${base}/ai/chat/stream`
+
+  const send = (): Promise<Response> => {
+    const token = localStorage.getItem('token') || ''
+    return fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // 同时接受 JSON：限流/参数错误由 @RestControllerAdvice 以 JSON 返回，
+        // 只写 text/event-stream 会因内容协商失败变成 406，拿不到真实原因
+        Accept: 'text/event-stream, application/json;q=0.9, */*;q=0.5',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(payload),
+      signal: handlers.signal
+    })
+  }
+
+  let response = await send()
+  if (response.status === 401) {
+    const refreshed = await refreshSessionForFetch()
+    if (refreshed) {
+      response = await send()
+    }
+  }
 
   if (!response.ok) {
-    const text = await response.text().catch(() => '')
-    throw new Error(text || `AI 流式请求失败（${response.status}）`)
+    const { message } = await readErrorBody(response)
+    throw buildStreamError(message || `AI 流式请求失败（${response.status}）`, response.status)
   }
-  // 限流/参数错误时后端会返回普通 JSON（HTTP 200），需把 message 抛给调用方
+  // 限流/额度/参数错误时后端返回普通 JSON（HTTP 200），需把真实 message 抛给调用方
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('text/event-stream')) {
-    const text = await response.text().catch(() => '')
-    let message = ''
-    try {
-      const body = JSON.parse(text) as { message?: string }
-      message = body?.message || ''
-    } catch {
-      // 非 JSON 响应按原始文本兜底
-    }
-    throw new Error(message || `AI 服务异常（${response.status}）`)
+    const { message, code } = await readErrorBody(response)
+    throw buildStreamError(message || `AI 服务异常（${response.status}）`, response.status, code)
   }
   if (!response.body) {
-    throw new Error('当前浏览器不支持流式响应')
+    throw buildStreamError('当前浏览器不支持流式响应')
   }
 
   const reader = response.body.getReader()

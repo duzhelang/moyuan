@@ -15,8 +15,14 @@ import java.util.Set;
  */
 public final class AiInputValidator {
 
-    /** 单轮问答最大字符数 */
-    public static final int MAX_CHAT_CHARS = 4000;
+    /**
+     * 单轮问答最大字符数。
+     * <p>
+     * 注意：{@code /api/ai/chat} 收到的不只是用户输入——全局 AI 小窗会把检索到的
+     * 【系统资料】拼进 prompt，诗词页会把整首诗与背景拼进去，长诗 + 资料可能明显超过
+     * 用户手输长度。上限取 8000 是为了防滥用，不能卡到既有正常链路。
+     */
+    public static final int MAX_CHAT_CHARS = 8000;
     /** 智能分析最大字符数 */
     public static final int MAX_ANALYZE_CHARS = 6000;
     /** 对联上联最大字符数 */

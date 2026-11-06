@@ -1413,7 +1413,7 @@ onDeactivated(() => {
         </div>
         <div v-if="meterLoading" class="rhyme-loading">
           <span class="rhyme-spinner"></span>
-          <span class="rhyme-loading-text">AI 正在校验格律，请稍候…</span>
+          <span class="rhyme-loading-text">正在校验格律，请稍候…</span>
         </div>
         <div v-if="meterResult" class="ai-result-card meter-result-card">
           <div class="meter-head">

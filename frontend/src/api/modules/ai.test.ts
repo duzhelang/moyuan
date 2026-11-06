@@ -17,7 +17,8 @@ vi.mock('@/utils/request', () => ({
   default: {
     get: vi.fn(),
     post: vi.fn()
-  }
+  },
+  refreshSessionForFetch: vi.fn()
 }))
 
 describe('ai API', () => {

@@ -132,6 +132,17 @@ function isAbortError(error: unknown): boolean {
     && (error as { name?: string }).name === 'AbortError'
 }
 
+/**
+ * 是否属于「重试也没用」的拒绝：限流、额度用尽、功能关闭、参数非法、未登录。
+ * 这类错误再回退一次非流式请求只会二次扣配额，并掩盖真实原因。
+ */
+function isNonRetryable(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false
+  const { status, code } = error as { status?: number; code?: string }
+  if (status === 400 || status === 401 || status === 403 || status === 429) return true
+  return ['400', '401', '403', '4290', '4291', '4292', '4293'].includes(String(code || ''))
+}
+
 export function useAiChat() {
   const personas = PERSONAS
   const allSkills = SKILLS
@@ -443,8 +454,12 @@ export function useAiChat() {
         summary: issues.length ? issues.join('；') : '格律校验通过'
       })
       pushMessage({ id: genId(), role: 'assistant', content, skillId: 'tone', time: Date.now() })
-    } catch {
-      // 本地引擎不可用时回退原 LLM 路径，保持能力可用
+    } catch (error) {
+      if (isNonRetryable(error)) {
+        // 限流/未登录：请求层已提示，且回退大模型同样会被拦住，直接结束
+        return
+      }
+      // 本地引擎不可用（接口异常/结果为空）时回退原 LLM 路径，保持能力可用
       try {
         const res = await chat({ message: buildFullPrompt(raw, skill), moduleCode: 'chat' })
         const reply = (res.data?.reply || '').trim()
@@ -453,8 +468,10 @@ export function useAiChat() {
         } else {
           ElMessage.info('AI 未返回内容，请重试')
         }
-      } catch {
-        ElMessage.error('校验失败，请稍后重试')
+      } catch (fallbackError) {
+        if (!isNonRetryable(fallbackError)) {
+          ElMessage.error('校验失败，请稍后重试')
+        }
       }
     } finally {
       loading.value = false
@@ -533,8 +550,14 @@ export function useAiChat() {
     } catch (error) {
       if (isAbortError(error)) {
         // 用户主动停止：保留已生成的部分内容
+      } else if (isNonRetryable(error)) {
+        // 限流/额度/功能关闭：重试只会再消耗一次配额，直接给出后端原因
+        if (placeholderAdded && !messages.value.find((m) => m.id === assistantId)?.content?.trim()) {
+          removeMessage(assistantId)
+        }
+        ElMessage.error((error as Error)?.message || '请求被拒绝，请稍后重试')
       } else {
-        // 流式失败：回退非流式单轮，至少保证有回复
+        // 网络/流中断等可重试失败：回退非流式单轮，至少保证有回复
         try {
           const res = await chat({ message: buildFullPrompt(raw, skill), moduleCode: 'chat' })
           const reply = (res.data?.reply || '').trim()
@@ -545,11 +568,14 @@ export function useAiChat() {
             ensurePlaceholder()
             setMessageContent(assistantId, reply)
           }
-        } catch {
-          if (placeholderAdded) {
-            ElMessage.error('生成中断，请重试')
-          } else {
-            ElMessage.error('生成失败，请稍后重试')
+        } catch (fallbackError) {
+          // 业务类失败已由请求层提示过一次，这里只兜真正的网络/未知异常
+          if (!isNonRetryable(fallbackError)) {
+            if (placeholderAdded) {
+              ElMessage.error('生成中断，请重试')
+            } else {
+              ElMessage.error('生成失败，请稍后重试')
+            }
           }
         }
       }

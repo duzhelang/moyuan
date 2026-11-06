@@ -116,6 +116,45 @@ async function tryRefreshToken(): Promise<boolean> {
 }
 
 /**
+ * 登录态彻底失效时的统一收尾：提示、清理本地登录态并跳转登录页。
+ * 加锁避免并发请求同时跳转。
+ */
+function promptLoginExpired() {
+  if (isRedirectingToLogin) {
+    return
+  }
+  isRedirectingToLogin = true
+  ElMessage.error('登录已过期，请重新登录')
+  const userStore = useUserStore()
+  userStore.logout()
+  setTimeout(() => {
+    window.location.href = '/user/login'
+    isRedirectingToLogin = false
+  }, 100)
+}
+
+/**
+ * 供 fetch / SSE 等不走 axios 拦截器的请求复用 401 处理。
+ * 静默刷新成功返回 true，调用方用新 token 重放一次；失败则提示并跳转登录后返回 false。
+ */
+export async function refreshSessionForFetch(): Promise<boolean> {
+  if (isRedirectingToLogin) {
+    return false
+  }
+  if (!refreshPromise) {
+    refreshPromise = tryRefreshToken().finally(() => {
+      refreshPromise = null
+    })
+  }
+  const refreshed = await refreshPromise
+  if (refreshed) {
+    return true
+  }
+  promptLoginExpired()
+  return false
+}
+
+/**
  * 统一的 401 处理：若存在 refresh token 且非 refresh/logout 请求，则静默刷新后重放原请求；
  * 刷新失败或无 refresh token 时，才提示并跳转登录。
  */
@@ -161,14 +200,7 @@ async function handleUnauthorized(originalError: any): Promise<any> {
   }
 
   if (!isRedirectingToLogin) {
-    isRedirectingToLogin = true
-    ElMessage.error('登录已过期，请重新登录')
-    const userStore = useUserStore()
-    userStore.logout()
-    setTimeout(() => {
-      window.location.href = '/user/login'
-      isRedirectingToLogin = false
-    }, 100)
+    promptLoginExpired()
   }
   return Promise.reject(originalError)
 }
@@ -189,7 +221,10 @@ service.interceptors.response.use(
     if (!response.config.silent) {
       ElMessage.error(message || '请求失败')
     }
-    return Promise.reject(new Error(message || '请求失败'))
+    // 保留业务码：调用方可据此区分「限流/额度/参数」与可重试的网络类失败
+    const error = new Error(message || '请求失败') as Error & { code?: string; status?: number }
+    error.code = code
+    return Promise.reject(error)
   },
   async (error) => {
     // 二次重试时若仍 401，避免再次触发刷新

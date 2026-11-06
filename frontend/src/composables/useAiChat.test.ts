@@ -26,6 +26,7 @@ const mockedGetChatSession = vi.mocked(getChatSession)
 const mockedSaveChatSession = vi.mocked(saveChatSession)
 const mockedClearChatSession = vi.mocked(clearChatSession)
 const mockedChatStream = vi.mocked(chatStream)
+const mockedChat = vi.mocked(chat)
 const mockedToneCheck = vi.mocked(toneCheck)
 
 describe('useAiChat', () => {
@@ -99,5 +100,31 @@ describe('useAiChat', () => {
     expect(parsed.valid).toBe(false)
     expect(parsed.format).toBe('七言绝句')
     expect(parsed.lines[0].tone).toBe('仄仄平平平仄仄')
+  })
+
+  it('限流类错误不回退非流式请求，也不留下空白回复', async () => {
+    const rejected = new Error('AI 请求过于频繁，请稍后再试') as Error & { code?: string }
+    rejected.code = '4291'
+    mockedChatStream.mockRejectedValue(rejected)
+
+    const chatState = useAiChat()
+    chatState.input.value = '你好'
+    await chatState.send()
+
+    // 重试只会再消耗一次配额，因此不应触发非流式兜底
+    expect(mockedChat).not.toHaveBeenCalled()
+    expect(chatState.messages.value.map((message) => message.role)).toEqual(['user'])
+  })
+
+  it('网络类失败仍应回退非流式单轮', async () => {
+    mockedChatStream.mockRejectedValue(new Error('Failed to fetch'))
+    mockedChat.mockResolvedValue({ data: { reply: '兜底回复' } } as never)
+
+    const chatState = useAiChat()
+    chatState.input.value = '你好'
+    await chatState.send()
+
+    expect(mockedChat).toHaveBeenCalledTimes(1)
+    expect(chatState.messages.value.at(-1)?.content).toBe('兜底回复')
   })
 })

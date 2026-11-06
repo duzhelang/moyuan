@@ -30,7 +30,7 @@ public class AiContentController {
         Long userId = SecurityUtil.getCurrentUserId();
         aiGuardService.checkRequest(userId);
         String targetType = (String) request.get("targetType");
-        Long targetId = Long.valueOf(request.get("targetId").toString());
+        Long targetId = parseTargetId(request);
         String fieldName = (String) request.get("fieldName");
         String moduleCode = (String) request.get("moduleCode");
 
@@ -48,7 +48,7 @@ public class AiContentController {
     public R<AiGeneratedContent> submitForReview(@RequestBody Map<String, Object> request) {
         SecurityUtil.getCurrentUserId();
         String targetType = (String) request.get("targetType");
-        Long targetId = Long.valueOf(request.get("targetId").toString());
+        Long targetId = parseTargetId(request);
         String fieldName = (String) request.get("fieldName");
         String content = (String) request.get("content");
 
@@ -66,7 +66,7 @@ public class AiContentController {
         Long userId = SecurityUtil.getCurrentUserId();
         aiGuardService.checkRequest(userId);
         String targetType = (String) request.get("targetType");
-        Long targetId = Long.valueOf(request.get("targetId").toString());
+        Long targetId = parseTargetId(request);
         String fieldName = (String) request.get("fieldName");
         String moduleCode = (String) request.get("moduleCode");
 
@@ -92,5 +92,21 @@ public class AiContentController {
                .orderByDesc(AiGeneratedContent::getCreateTime);
         List<AiGeneratedContent> list = aiGeneratedContentService.list(wrapper);
         return R.success(list);
+    }
+
+    /**
+     * 解析 targetId：缺参或非数字时返回 null，由调用方统一按参数不完整处理，
+     * 避免直接 {@code toString()} 触发 NPE 变成 500。
+     */
+    private Long parseTargetId(Map<String, Object> request) {
+        Object value = request.get("targetId");
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Long.valueOf(value.toString().trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }
