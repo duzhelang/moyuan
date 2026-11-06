@@ -17,7 +17,7 @@ import type { PoemSearchResult } from '@/api/modules/external-poetry'
 import { getForeignPoetry, type PoetryDbPoem } from '@/api/modules/external-poetry'
 import { getAiModuleConfig, chat, type AiModuleConfig } from '@/api/modules/ai'
 import { smartSearch, getSearchSuggestions, getHotSearches, getSearchHistory, clearSearchHistory } from '@/api/modules/search'
-import type { SmartSearchResult } from '@/api/modules/search'
+import type { SmartSearchResult, PingZeMatch } from '@/api/modules/search'
 import { getCachedContent as getPoemCachedContent, saveCachedContent as savePoemCachedContent } from '@/api/modules/poem-content'
 import LoginPrompt from '@/components/common/LoginPrompt.vue'
 import { useParticles } from '@/composables/useParticles'
@@ -156,6 +156,30 @@ const searchHistoryList = ref<string[]>([])
 const showSearchPanel = ref(false)
 const searchLevel = ref<string>('')
 const searchMessage = ref('')
+/** 格律检索开关：开启后关键词按「平/仄/中」模式匹配诗句 */
+const pingzeMode = ref(false)
+/** 后端返回的格律命中明细（用于在卡片上展示命中句） */
+const pingzeMatches = ref<PingZeMatch[]>([])
+
+/** 按诗词 ID 聚合命中句 */
+const matchesByPoemId = computed(() => {
+  const map = new Map<number, PingZeMatch[]>()
+  pingzeMatches.value.forEach(match => {
+    const list = map.get(match.poemId) || []
+    list.push(match)
+    map.set(match.poemId, list)
+  })
+  return map
+})
+
+const matchOf = (poemId: number) => matchesByPoemId.value.get(poemId) || []
+
+/** 切换格律检索时清空搜索建议面板与旧命中明细，避免状态串扰 */
+const handlePingzeModeChange = () => {
+  searchSuggestions.value = []
+  pingzeMatches.value = []
+  showSearchPanel.value = false
+}
 
 const annotationContent = ref('')
 const appreciationContent = ref('')
@@ -241,6 +265,7 @@ const fetchPoems = async () => {
   externalPoemResults.value = []
   searchLevel.value = ''
   searchMessage.value = ''
+  pingzeMatches.value = []
   
   try {
     if (activeTab.value === 'classical') {
@@ -259,6 +284,7 @@ const fetchPoems = async () => {
       poemStore.total = result.total
       searchLevel.value = result.searchLevel
       searchMessage.value = result.message
+      pingzeMatches.value = result.pingzeMatches || []
 
       if (result.searchLevel === 'fuzzy' || result.searchLevel === 'pinyin') {
         ElMessage.info(result.message)
@@ -953,6 +979,14 @@ const handleTabChange = (tab: string | number | boolean | undefined) => {
 }
 
 const handleFilterChange = () => {
+  // 格律检索模式下校验输入：只允许「平/仄/中」
+  if (pingzeMode.value && activeTab.value === 'classical') {
+    const cleaned = filters.value.keyword.replace(/\s/g, '')
+    if (cleaned && !/^[平仄中]+$/.test(cleaned)) {
+      ElMessage.warning('格律检索请只输入「平」「仄」「中」，例如：平平仄仄平平仄')
+      return
+    }
+  }
   currentPage.value = 1
   syncFiltersToUrl()
   fetchPoems()
@@ -1318,6 +1352,11 @@ const initSearchData = async () => {
 }
 
 const handleSearchInput = async (value: string) => {
+  // 格律检索模式下不请求普通关键词建议
+  if (pingzeMode.value) {
+    searchSuggestions.value = []
+    return
+  }
   if (value.trim()) {
     try {
       searchSuggestions.value = await getSearchSuggestions(value.trim(), 10)
@@ -1520,7 +1559,7 @@ const handleClearHistory = async () => {
               <div class="search-input-wrapper" ref="searchInputRef">
                 <el-input
                   v-model="filters.keyword"
-                  placeholder="搜索诗词..."
+                  :placeholder="pingzeMode ? '输入平仄模式，如 平平仄仄平平仄（中为通配）' : '搜索诗词...'"
                   clearable
                   @keyup.enter="handleFilterChange"
                   @input="handleSearchInput"
@@ -1532,7 +1571,7 @@ const handleClearHistory = async () => {
                   </template>
                 </el-input>
                 
-                <div v-if="showSearchPanel && (searchSuggestions.length > 0 || hotSearches.length > 0 || searchHistoryList.length > 0)" class="search-panel" :style="searchPanelStyle">
+                <div v-if="!pingzeMode && showSearchPanel && (searchSuggestions.length > 0 || hotSearches.length > 0 || searchHistoryList.length > 0)" class="search-panel" :style="searchPanelStyle">
                   <div v-if="searchSuggestions.length > 0" class="panel-section">
                     <div class="panel-title">搜索建议</div>
                     <div v-for="item in searchSuggestions" :key="item" class="panel-item" @mousedown.prevent="selectSuggestion(item)">
@@ -1563,6 +1602,19 @@ const handleClearHistory = async () => {
                 </div>
               </div>
             </div>
+
+            <el-tooltip
+              content="按平仄模式检索诗句，输入仅含「平/仄/中」，其中「中」为通配符"
+              placement="top"
+            >
+              <div class="filter-item pingze-toggle">
+                <el-switch
+                  v-model="pingzeMode"
+                  active-text="格律检索"
+                  @change="handlePingzeModeChange"
+                />
+              </div>
+            </el-tooltip>
 
             <el-button type="primary" @click="handleFilterChange">
               搜索
@@ -1678,6 +1730,7 @@ const handleClearHistory = async () => {
         <span v-else>共找到 <strong>{{ total }}</strong> 首诗词</span>
         <el-tag v-if="searchLevel === 'fuzzy'" type="warning" size="small" class="search-level-tag">模糊匹配</el-tag>
         <el-tag v-else-if="searchLevel === 'pinyin'" type="info" size="small" class="search-level-tag">拼音匹配</el-tag>
+        <el-tag v-else-if="pingzeMode && total > 0" type="success" size="small" class="search-level-tag">格律匹配</el-tag>
       </div>
 
       <div class="poem-grid" v-loading="loading || foreignLoading" :element-loading-text="foreignSlowHint ? '检索耗时较久，请耐心等待…' : ''" v-if="(loading || foreignLoading || poems.length > 0 || (!externalSearching && externalPoemResults.length === 0)) && !selectedExternalPoem">
@@ -1729,6 +1782,13 @@ const handleClearHistory = async () => {
               <p v-for="(line, index) in getFormattedVerses(poem.chineseContent || poem.content)" :key="index" class="verse-line">
                 {{ line }}
               </p>
+            </div>
+            <div v-if="pingzeMode && matchOf(poem.id).length" class="pingze-hit">
+              <div v-for="(hit, hitIndex) in matchOf(poem.id)" :key="hitIndex" class="pingze-hit-item">
+                <span class="pingze-hit-label">格律命中</span>
+                <span class="pingze-hit-line">{{ hit.line }}</span>
+                <span class="pingze-hit-pattern">{{ hit.pattern }}</span>
+              </div>
             </div>
             <div class="poem-footer">
               <div class="poem-meta">
@@ -2798,6 +2858,51 @@ const handleClearHistory = async () => {
   font-family: $font-family-base;
   white-space: normal;
   word-break: break-all;
+}
+
+.pingze-hit {
+  margin-top: $spacing-sm;
+  padding: $spacing-sm;
+  border-radius: 6px;
+  background: rgba(212, 175, 135, 0.08);
+  border: 1px dashed rgba(212, 175, 135, 0.35);
+}
+
+.pingze-hit-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: $font-size-sm;
+  line-height: 1.8;
+
+  & + & {
+    margin-top: 6px;
+  }
+}
+
+.pingze-hit-label {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.12);
+}
+
+.pingze-hit-line {
+  color: #e8dcc8;
+  font-family: 'KaiTi', 'STKaiti', serif;
+}
+
+.pingze-hit-pattern {
+  color: #9a8c7c;
+  letter-spacing: 2px;
+}
+
+.pingze-toggle {
+  display: flex;
+  align-items: center;
 }
 
 .poem-footer {

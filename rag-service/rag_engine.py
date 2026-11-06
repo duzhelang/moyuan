@@ -9,6 +9,7 @@
 - 每个文本块带“文件名 + 章节标题”，回答可精确标注出处。
 """
 import re
+import time
 
 import jieba
 import numpy as np
@@ -45,12 +46,18 @@ def tokenize(text):
     return [t for t in jieba.lcut_for_search(text) if t.strip()]
 
 
+RETRIEVAL_MODES = ("vector", "bm25", "hybrid")
+
+
 class RagEngine:
-    def __init__(self, embed_key=None, use_rerank=None):
+    def __init__(self, embed_key=None, use_rerank=None, retrieval_mode="hybrid"):
         runtime = config.load_runtime_config()
         self.embed_key = embed_key or runtime["embed"]
         if use_rerank is None:
             use_rerank = runtime["rerank"]
+        if retrieval_mode not in RETRIEVAL_MODES:
+            raise ValueError(f"未知的检索模式：{retrieval_mode}")
+        self.retrieval_mode = retrieval_mode
         self.rerank_top_k = runtime["top_k"]
         if self.embed_key not in config.EMBEDDINGS:
             raise ValueError(f"未注册的嵌入模型：{self.embed_key}")
@@ -107,41 +114,69 @@ class RagEngine:
         return len(pa) >= 3 and pa[:-1] == pb[:-1]
 
     # ---------------- 检索主流程 ----------------
-    def retrieve(self, question, rerank_top_k=None):
+    def retrieve(self, question, rerank_top_k=None, min_score=None):
+        started = time.perf_counter()
         top_n = rerank_top_k or self.rerank_top_k
         queries = split_questions(question)
         merged = {}
+        use_vector = self.retrieval_mode in ("vector", "hybrid")
+        use_bm25 = self.retrieval_mode in ("bm25", "hybrid")
+        latency = {"embed": 0.0, "bm25": 0.0, "rerank": 0.0}
+
         for query in queries:
-            for rank, (idx, score) in enumerate(
-                self._vector_ranking(query, config.VECTOR_TOP_K), 1
-            ):
-                item = merged.setdefault(
-                    idx, {"rrf": 0.0, "vector": 0.0, "bm25": 0.0, "hits": 0}
-                )
-                item["rrf"] += 1.0 / (config.RRF_K + rank)
-                item["vector"] = max(item["vector"], score)
-                item["hits"] += 1
-            for rank, (idx, score) in enumerate(
-                self._bm25_ranking(query, config.BM25_TOP_K), 1
-            ):
-                item = merged.setdefault(
-                    idx, {"rrf": 0.0, "vector": 0.0, "bm25": 0.0, "hits": 0}
-                )
-                item["rrf"] += 1.0 / (config.RRF_K + rank)
-                item["bm25"] = max(item["bm25"], score)
-                item["hits"] += 1
+            if use_vector:
+                t0 = time.perf_counter()
+                vector_hits = self._vector_ranking(query, config.VECTOR_TOP_K)
+                latency["embed"] += time.perf_counter() - t0
+                for rank, (idx, score) in enumerate(vector_hits, 1):
+                    item = merged.setdefault(
+                        idx, {"rrf": 0.0, "vector": 0.0, "bm25": 0.0, "hits": 0}
+                    )
+                    item["rrf"] += 1.0 / (config.RRF_K + rank)
+                    item["vector"] = max(item["vector"], score)
+                    item["hits"] += 1
+            if use_bm25:
+                t0 = time.perf_counter()
+                bm25_hits = self._bm25_ranking(query, config.BM25_TOP_K)
+                latency["bm25"] += time.perf_counter() - t0
+                for rank, (idx, score) in enumerate(bm25_hits, 1):
+                    item = merged.setdefault(
+                        idx, {"rrf": 0.0, "vector": 0.0, "bm25": 0.0, "hits": 0}
+                    )
+                    item["rrf"] += 1.0 / (config.RRF_K + rank)
+                    item["bm25"] = max(item["bm25"], score)
+                    item["hits"] += 1
 
         candidates = sorted(
             merged.items(), key=lambda kv: (-kv[1]["rrf"], -kv[1]["vector"])
         )
         best_rrf = candidates[0][1]["rrf"] if candidates else 0.0
+        best_vector = max((v["vector"] for v in merged.values()), default=0.0)
+        best_bm25 = max((v["bm25"] for v in merged.values()), default=0.0)
+        gate_score = {
+            "vector": best_vector,
+            "bm25": best_bm25,
+            "hybrid": best_rrf,
+        }[self.retrieval_mode]
+        threshold = (
+            min_score
+            if min_score is not None
+            else config.REFUSAL_MIN_SCORE[self.retrieval_mode]
+        )
         result = {
             "question": question,
             "queries": queries,
+            "mode": self.retrieval_mode,
             "chunks": [],
             "files": [],
+            "ranked": [],
+            "ranked_scores": [],
             "best_rrf": best_rrf,
-            "refused": not candidates or best_rrf < config.MIN_RRF_SCORE,
+            "best_vector": best_vector,
+            "best_bm25": best_bm25,
+            "gate_score": gate_score,
+            "threshold": threshold,
+            "refused": not candidates or gate_score < threshold,
         }
         if result["refused"]:
             return result
@@ -149,14 +184,18 @@ class RagEngine:
         # 1) 重排：候选过多时先截断，再按“问题—文本块”相关性排序
         pool = candidates[:30]
         if self.reranker:
+            t0 = time.perf_counter()
             pairs = [[question, self.chunks[i]["text"]] for i, _ in pool]
             rerank_scores = [float(s) for s in self.reranker.predict(pairs)]
+            latency["rerank"] += time.perf_counter() - t0
             rerank_all = {i: s for (i, _), s in zip(pool, rerank_scores)}
             order = sorted(pool, key=lambda pair: -rerank_all[pair[0]])
             selected = [(i, rerank_all[i]) for i, _ in order[:top_n]]
         else:
             rerank_all = {i: fused["rrf"] for i, fused in pool}
             selected = [(i, fused["rrf"]) for i, fused in pool[:top_n]]
+        result["ranked"] = [i for i, _ in selected]
+        result["ranked_scores"] = [score for _, score in selected]
 
         # 2) 来源覆盖：某语料文件有召回却未进上下文时，补入该文件最相关的一块
         final = list(selected)
@@ -242,6 +281,10 @@ class RagEngine:
             {c["file"] for c in result["chunks"]},
             key=self.file_order.index,
         )
+        latency["total"] = (time.perf_counter() - started) * 1000
+        for key in ("embed", "bm25", "rerank"):
+            latency[key] = latency[key] * 1000
+        result["latency_ms"] = latency
         return result
 
     # ---------------- 提示词 ------------

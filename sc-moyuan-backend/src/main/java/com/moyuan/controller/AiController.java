@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -107,17 +108,19 @@ public class AiController {
 
     @Operation(summary = "看图写诗")
     @PostMapping("/write-poem")
-    public R<Map<String, String>> writePoemFromImage(
+    public R<Map<String, Object>> writePoemFromImage(
             @RequestParam("image") MultipartFile image,
             @RequestParam(value = "model", defaultValue = "zhipu") String model,
             @RequestParam(value = "visionModel", required = false) String visionModel,
             @RequestParam(value = "moduleCode", required = false) String moduleCode) {
 
-        String poem = aiService.writePoemFromImage(image, model, visionModel, moduleCode);
+        Map<String, Object> checked = aiService.writePoemFromImageChecked(image, model, visionModel, moduleCode);
         String actualModel = aiModelConfigService.resolveModelName(model, moduleCode, visionModel);
 
         return R.success(Map.of(
-                "poem", poem,
+                "poem", checked.get("poem"),
+                "check", checked.get("check"),
+                "rewritten", checked.get("rewritten"),
                 "model", actualModel,
                 "visionModel", visionModel != null ? visionModel : "default"
         ));
@@ -159,18 +162,30 @@ public class AiController {
 
     @Operation(summary = "AI对对联")
     @PostMapping("/couplet")
-    public R<Map<String, String>> matchCouplet(@RequestBody Map<String, String> request) {
+    public R<Map<String, Object>> matchCouplet(@RequestBody Map<String, String> request) {
         String upperCouplet = request.get("upperCouplet");
         String model = request.getOrDefault("model", "zhipu");
         String moduleCode = request.get("moduleCode");
 
-        String result = aiService.matchCouplet(upperCouplet, model, moduleCode);
+        Map<String, Object> checked = aiService.matchCoupletChecked(upperCouplet, model, moduleCode);
 
         return R.success(Map.of(
                 "upperCouplet", upperCouplet,
-                "result", result,
+                "result", checked.get("result"),
+                "check", checked.get("check"),
+                "rewritten", checked.get("rewritten"),
                 "model", model
         ));
+    }
+
+    @Operation(summary = "平仄校验")
+    @PostMapping("/tone-check")
+    public R<Map<String, Object>> toneCheck(@RequestBody Map<String, String> request) {
+        String text = request.get("text");
+        if (!StringUtils.hasText(text)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "text 不能为空");
+        }
+        return R.success(aiService.checkTone(text));
     }
 
     @Operation(summary = "获取模块AI配置")

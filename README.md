@@ -57,6 +57,16 @@
 | JUnit 5 + Mockito | 5.10.x | 后端测试框架 |
 | H2 | 2.x | 测试内存数据库 |
 
+### 问答服务技术栈（可选）
+
+| 技术 | 用途 |
+|------|------|
+| Python 3.12 + FastAPI + Uvicorn | 知识问答服务接口层与 SSE 流式响应 |
+| sentence-transformers / bge-small-zh-v1.5 | 向量嵌入（512 维，默认唯一实测） |
+| bge-reranker-base | 检索结果重排 |
+| jieba + rank-bm25 | 中文分词与关键词召回 |
+| Ollama（Python 客户端） | 本地生成模型（`qwen3.5:4b` / `maternion/minicpm5:2b-q8_0`） |
+
 ### 开发工具
 
 | 工具 | 用途 |
@@ -167,6 +177,7 @@
 - **智能问答**：诗词相关问题解答（`POST /api/ai/chat` 非流式 / `POST /api/ai/chat/stream` SSE 流式）
 - **AI 对话页「诗宝阁」**：角色化统一对话入口（6 角色 × 12 能力），复用 `POST /api/ai/chat`（阶段一）/ `POST /api/ai/chat/stream`（阶段二 SSE 流式）
 - **全局 AI 小窗**：全站页面可唤起，内置「诗词助理」与「网页用法助理」；后者走 `system_chat` 模块并检索 `system_knowledge` 系统知识库，支持 FAQ 直答与页面跳转入口
+- **知识问答服务（RAG，可选）**：独立 Python FastAPI 服务（`/rag`，127.0.0.1:8010），章节切分 + `bge-small` 向量与 BM25 混合召回 + `bge-reranker-base` 重排 + Ollama 本地模型（`qwen3.5:4b`）生成；小窗优先调用，服务不可用时自动回退原链路；管理员在「AI模型管理 → 知识问答（本地模型）」标签页可切换嵌入/生成模型
 - **看图写诗**：基于图片生成诗词（视觉模型）
 - **古籍识文（OCR）**：图片文字识别
 - **智能分析**：诗词内容分析解读
@@ -215,7 +226,7 @@ cd sc-moyuan-backend
 mysql -u root -p < src/main/resources/db/init.sql
 ```
 
-> **说明**：`init.sql` 是全量合并版脚本（v3.4），包含数据库创建、全部 **32 张表**建表语句及基础种子数据（13 个朝代、74 个诗词分类、13 位诗人、43 首诗词（含 20 首外文诗）、3 个测试用户、29 条 AI 模型、13 条 AI 模块配置、6 位精选诗人、7 条论坛示例帖、10 篇诗话视野文章、24 条首页导航、24 条系统知识库）。详见 [数据库初始化说明文档](sc-moyuan-backend/src/main/resources/db/数据库初始化说明文档.md)。
+> **说明**：`init.sql` 是全量合并版脚本（v3.4），包含数据库创建、全部 **35 张表**建表语句及基础种子数据（13 个朝代、74 个诗词分类、13 位诗人、43 首诗词（含 20 首外文诗）、3 个测试用户、29 条 AI 模型、13 条 AI 模块配置、6 位精选诗人、7 条论坛示例帖、10 篇诗话视野文章、24 条首页导航、24 条系统知识库）。详见 [数据库初始化说明文档](sc-moyuan-backend/src/main/resources/db/数据库初始化说明文档.md)。
 
 ### 3. 后端配置
 
@@ -280,6 +291,31 @@ npm run dev
 ```
 
 前端服务启动后，访问 http://localhost:5173 查看效果（前端通过 Vite 代理将 `/api`、`/uploads` 转发到后端 `http://localhost:8085`，可用环境变量 `VITE_BACKEND_URL` 覆盖）。
+
+### 5.1 启动知识问答服务（可选）
+
+知识问答服务是独立的 Python 服务，仅「网页用法助理」使用；**不启动也不影响其他功能**，小窗会自动回退到原关键词检索链路。
+
+```bash
+# 前置：本机已安装 Ollama 并拉取生成模型
+ollama pull qwen3.5:4b
+
+# 进入问答服务目录
+cd rag-service
+
+# 安装依赖（首次）
+pip install -r requirements.txt
+
+# 1) 导出语料（docs 文档 + system_knowledge 24 条）
+python corpus_export.py
+# 2) 构建索引（默认 bge-small，输出到 data/index/bge-small/）
+python build_index.py
+# 3) 启动服务（127.0.0.1:8010）
+python app.py
+```
+
+验证：`curl http://127.0.0.1:8010/rag/health` 返回 `status=ok`；管理员登录后可在「后台 → AI功能 → AI模型管理 → 知识问答（本地模型）」（`/admin/ai-models?tab=rag`）切换嵌入/生成模型。
+Vite 已配置 `/rag` 代理到 8010，可用环境变量 `VITE_RAG_URL` 覆盖。
 
 ### 6. 默认账号
 
@@ -349,6 +385,12 @@ moyuan-master2/
 │   │   │       └── secrets/                  # 敏感配置（已 gitignore）
 │   │   └── test/                # 测试代码（H2）
 │   └── pom.xml                  # Maven 配置
+├── rag-service/                 # Python 知识问答服务（FastAPI，可选，127.0.0.1:8010）
+│   ├── app.py                   # 接口层（/rag/health、/models、/config、/ask、/ask/stream）
+│   ├── rag_engine.py            # 混合检索（向量+BM25+RRF+重排+邻居扩展）
+│   ├── build_index.py           # 按嵌入模型建索引（data/index/<embed_key>/）
+│   ├── config.py                # 模型注册表与运行时配置
+│   └── corpus/ data/            # 语料与索引
 ├── docs/                        # 项目文档（通过 .git/info/exclude 排除，本地可访问）
 │   ├── architecture/ standards/ constraints/
 │   ├── database/                # 表结构文档 + migrations/ 迁移脚本
@@ -395,6 +437,7 @@ moyuan-master2/
 | AI模块 | `/api/ai` | AI 问答、看图写诗、OCR、智能分析、内容填充 |
 | 管理员模块 | `/api/admin` | 管理员专属接口（审核/统计等） |
 | AI模型配置 | `/api/admin/ai-models` | AI 模型与模块绑定管理 |
+| 知识问答服务（独立） | `/rag` | Python FastAPI 服务（127.0.0.1:8010）：健康、模型清单、配置、同步问答、SSE 流式问答 |
 
 ### 统一响应格式
 
@@ -1175,6 +1218,6 @@ A: 管理员可以在后台管理页面配置 AI 模型：
 
 ---
 
-**文档版本**：v2.10
-**最后更新**：2026-10-21（同步全局 AI 小窗双助理与系统知识库、数据库 32 张表、诗宝阁 12 能力）
+**文档版本**：v2.13
+**最后更新**：2026-11-07（后台「知识问答配置」合并进「AI模型管理」：新增「知识问答（本地模型）」标签页，抽离 `RagConfigPanel` 组件，旧地址 `/admin/rag-config` 自动跳转；本地模型与外部 API 的存储逻辑保持不变）
 **维护人员**：墨渊开发团队

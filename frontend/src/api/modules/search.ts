@@ -11,12 +11,29 @@ export interface SmartSearchParams {
   pageSize?: number
 }
 
+export interface PingZeMatch {
+  poemId: number
+  /** 命中的诗句原文 */
+  line: string
+  plainLine?: string
+  /** 该句的完整平仄串 */
+  pattern: string
+  /** 命中位置（平仄串内起始下标，0 起） */
+  start: number
+}
+
 export interface SmartSearchResult {
   list: any[]
   total: number
   searchLevel: 'exact' | 'fuzzy' | 'pinyin' | 'none'
   message: string
   suggestExternal?: boolean
+  /** 自适应路由：pinyin / like / ngram / ngram->like / pingze */
+  route?: string
+  /** 候选集规模（路由命中的结果数） */
+  candidateCount?: number
+  /** 格律检索命中的诗句明细 */
+  pingzeMatches?: PingZeMatch[]
 }
 
 export interface SearchSuggestion {

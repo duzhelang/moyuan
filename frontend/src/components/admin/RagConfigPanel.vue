@@ -57,26 +57,23 @@ onMounted(loadData)
 </script>
 
 <template>
-  <div class="rag-config-page">
-    <el-card class="tip-card">
-      <h3>知识问答配置</h3>
-      <p>
-        用于全站 AI 小窗「网页用法助理」的检索问答。切换嵌入模型需要先构建对应索引；
-        预留模型只保留接口，不参与实际检索。
-      </p>
-    </el-card>
-
-    <el-card v-loading="loading" class="config-card">
+  <div class="rag-config-panel">
+    <el-card class="table-card">
       <template #header>
         <div class="card-header">
-          <span>当前生效配置</span>
+          <span>知识问答配置</span>
           <el-tag :type="health?.ollama ? 'success' : 'danger'" size="small">
             Ollama {{ health?.ollama ? '已连接' : '未连接' }}
           </el-tag>
         </div>
       </template>
 
-      <el-form label-width="120px" class="config-form">
+      <p class="panel-tip">
+        用于全站 AI 小窗「网页用法助理」的检索问答，独立于上方的外部 API 模型配置。
+        切换嵌入模型需要先构建对应索引；预留模型只保留接口，不参与实际检索。
+      </p>
+
+      <el-form v-loading="loading" label-width="120px" class="config-form">
         <el-form-item label="嵌入模型">
           <el-select v-model="form.embed" style="width: 320px">
             <el-option
@@ -126,7 +123,7 @@ onMounted(loadData)
       </el-form>
     </el-card>
 
-    <el-card v-loading="loading" class="model-card">
+    <el-card v-loading="loading" class="table-card">
       <template #header>
         <div class="card-header">
           <span>本地模型与索引状态</span>
@@ -136,7 +133,7 @@ onMounted(loadData)
         </div>
       </template>
 
-      <el-table :data="models?.embeddings || []" size="small">
+      <el-table :data="models?.embeddings || []" size="small" stripe style="width: 100%">
         <el-table-column prop="key" label="标识" width="120" />
         <el-table-column prop="label" label="模型" min-width="160" />
         <el-table-column prop="provider" label="提供方" width="110" />
@@ -156,33 +153,32 @@ onMounted(loadData)
           </template>
         </el-table-column>
         <el-table-column prop="chunks" label="文本块" width="90" />
-        <el-table-column prop="note" label="说明" min-width="220" />
+        <el-table-column prop="note" label="说明" min-width="220" show-overflow-tooltip />
       </el-table>
     </el-card>
   </div>
 </template>
 
 <style scoped>
-.rag-config-page {
+.rag-config-panel {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-.tip-card h3 {
-  margin: 0 0 8px;
-  font-size: 16px;
-}
-.tip-card p {
-  margin: 0;
-  color: #606266;
-  font-size: 13px;
-  line-height: 1.7;
+.table-card {
+  border-radius: 8px;
 }
 .card-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
   font-weight: 600;
+}
+.panel-tip {
+  margin: 0 0 16px;
+  color: #606266;
+  font-size: 13px;
+  line-height: 1.7;
 }
 .config-form {
   max-width: 620px;

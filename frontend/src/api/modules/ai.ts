@@ -12,10 +12,34 @@ export interface ChatResponse {
   model: string
 }
 
+export interface PingZeChar {
+  char: string
+  pingze: '平' | '仄' | '中' | string
+  pinyin: string
+}
+
+export interface PingZeLine {
+  text: string
+  pattern: string
+  chars: PingZeChar[]
+  issues: string[]
+}
+
+export interface ToneCheckResult {
+  passed: boolean
+  genre: string
+  issues: string[]
+  lines: PingZeLine[]
+}
+
 export interface WritePoemResponse {
   poem: string
   model: string
   visionModel: string
+  /** 生成后的格律校验结果 */
+  check?: ToneCheckResult
+  /** 是否因格律不合格触发了重写 */
+  rewritten?: boolean
 }
 
 export interface AnalyzeRequest {
@@ -65,10 +89,19 @@ export interface CoupletResponse {
   upperCouplet: string
   result: string
   model: string
+  /** 对联格律校验结果 */
+  check?: { passed: boolean; issues: string[]; lower?: string }
+  /** 是否因格律不合格触发了重写 */
+  rewritten?: boolean
 }
 
 export function matchCouplet(data: CoupletRequest) {
   return request.post<CoupletResponse>('/ai/couplet', data)
+}
+
+/** 平仄标注与格律校验 */
+export function toneCheck(text: string) {
+  return request.post<ToneCheckResult>('/ai/tone-check', { text })
 }
 
 export interface AiModuleConfig {

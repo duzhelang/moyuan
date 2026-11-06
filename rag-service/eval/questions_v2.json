@@ -1,0 +1,297 @@
+[
+  {
+    "id": "E1",
+    "tier": "easy",
+    "question": "用户评分和 AI 评分的评分范围是多少？分别调用哪个接口？",
+    "keywords": ["1.0-5.0", "POST /api/poems/{id}/ratings", "ratings/ai"],
+    "sources": ["moyuan_business_modules.md"],
+    "note": "答案集中在「16. 诗词评分模块」的评分类型与 API 接口两节"
+  },
+  {
+    "id": "E2",
+    "tier": "easy",
+    "question": "浏览历史保存在哪里？前端会把它写进浏览器本地存储吗？",
+    "keywords": ["user_history", "服务端接口", "localStorage"],
+    "sources": ["moyuan_system_workflow.md"],
+    "note": "5.2 浏览历史与 15.4 localStorage 汇总，同一文件"
+  },
+  {
+    "id": "E3",
+    "tier": "easy",
+    "question": "飞花令单回合限时多久？有几种模式和几档难度？",
+    "keywords": ["30 秒", "古制严格", "超级飞花令", "三档"],
+    "sources": ["moyuan_system_knowledge.md"],
+    "note": "单一知识库条目内即可完整作答"
+  },
+  {
+    "id": "E4",
+    "tier": "easy",
+    "question": "诗词评分支持哪些维度？",
+    "keywords": ["格律", "意境", "用词", "情感", "创新"],
+    "sources": ["moyuan_business_modules.md"],
+    "note": "两个模块页都有同名小节，答案相同"
+  },
+  {
+    "id": "E5",
+    "tier": "easy",
+    "question": "搜索评分中标题完全匹配得多少分？内容包含拆分词得多少分？",
+    "keywords": ["1.0", "0.2"],
+    "sources": ["moyuan_business_modules.md"],
+    "note": "答案在一张评分规则表内"
+  },
+  {
+    "id": "E6",
+    "tier": "easy",
+    "question": "智能搜索的建议词、热门词和搜索历史分别缓存成什么 key？",
+    "keywords": ["search:suggestion", "search:hot", "search:history"],
+    "sources": ["moyuan_system_workflow.md"],
+    "note": "2.5 缓存策略速览与 10.1 均有，单文件可答"
+  },
+  {
+    "id": "E7",
+    "tier": "easy",
+    "question": "登录成功后签发哪两种 token，各自有效期多久？",
+    "keywords": ["access", "refresh", "24h", "7 天"],
+    "sources": ["moyuan_system_workflow.md"],
+    "note": "4.2 登录与 JWT 签发"
+  },
+  {
+    "id": "E8",
+    "tier": "easy",
+    "question": "报修工单从待处理到已关闭经过哪几个状态？",
+    "keywords": ["待处理", "处理中", "已解决", "已关闭"],
+    "sources": ["moyuan_business_modules.md"],
+    "note": "18. 报修模块 / 工单状态流转，单小节可答"
+  },
+  {
+    "id": "E9",
+    "tier": "easy",
+    "question": "诗云星空页面是什么，能做什么交互？",
+    "keywords": ["3D", "诗人是一颗星", "配色实验室"],
+    "sources": ["moyuan_system_knowledge.md"],
+    "note": "单一知识库条目"
+  },
+  {
+    "id": "E10",
+    "tier": "easy",
+    "question": "哪些 AI 功能必须登录后才能用？",
+    "keywords": ["看图写诗", "古籍识文", "AI 评分", "诗宝阁"],
+    "sources": ["moyuan_system_knowledge.md"],
+    "note": "account.ai-login 单条"
+  },
+  {
+    "id": "M1",
+    "tier": "medium",
+    "question": "有人收藏了一首诗、又点赞并浏览了一次，推荐算法分别给这三种行为记几分？",
+    "keywords": ["收藏5分", "点赞3分", "浏览1分", "取最大值"],
+    "sources": ["moyuan_business_modules.md"],
+    "note": "换说法问「评分规则」，原文写作「用户-内容评分矩阵」"
+  },
+  {
+    "id": "M2",
+    "tier": "medium",
+    "question": "用户提交评分后，诗词的平均分是怎么更新的？AI 评分解析失败时会怎么办？",
+    "keywords": ["updatePoemAverageScore", "avg_score", "rating_count", "3.5"],
+    "sources": ["moyuan_system_workflow.md"],
+    "note": "需要把 8.4 的分步流程读完整，跨小节拼答案"
+  },
+  {
+    "id": "M3",
+    "tier": "medium",
+    "question": "在诗汇论坛发帖、评论、点赞分别要满足什么条件？涉及哪些接口？帖子列表怎么展示置顶与精华？",
+    "keywords": ["登录", "/api/forum/posts", "isTop", "/api/forum/posts/{id}/like"],
+    "sources": [
+      "moyuan_business_modules.md",
+      "moyuan_system_workflow.md",
+      "moyuan_system_knowledge.md"
+    ],
+    "note": "三文件联动：接口表、发帖流程、入口与登录要求"
+  },
+  {
+    "id": "M4",
+    "tier": "medium",
+    "question": "诗人认证从提交到通过要经历哪些状态？管理员用哪个接口审核？用户从哪里提交？",
+    "keywords": ["verifiedStatus=2", "/api/admin/poet-profiles/{id}/verify", "个人中心"],
+    "sources": [
+      "moyuan_business_modules.md",
+      "moyuan_system_workflow.md",
+      "moyuan_system_knowledge.md"
+    ],
+    "note": "状态表、审核接口、提交流程、入口分散在三文件"
+  },
+  {
+    "id": "M5",
+    "tier": "medium",
+    "question": "一份报修工单从创建到关闭再到满意度评价，经历了哪些状态和接口？用户在哪个页面操作？",
+    "keywords": ["/api/repair/orders", "satisfaction", "close", "报修中心"],
+    "sources": [
+      "moyuan_business_modules.md",
+      "moyuan_system_workflow.md",
+      "moyuan_system_knowledge.md"
+    ],
+    "note": "状态流转、全生命周期、页面入口分属三文件"
+  },
+  {
+    "id": "M6",
+    "tier": "medium",
+    "question": "智能搜索没有关键词时怎么处理？带关键词时三路并发分别做什么？",
+    "keywords": ["searchWithoutKeyword", "三路并发", "suggestExternal"],
+    "sources": ["moyuan_system_workflow.md"],
+    "note": "10.1 跨两个长块，1024 字以上需拼合"
+  },
+  {
+    "id": "M7",
+    "tier": "medium",
+    "question": "文件上传时会做哪些校验和处理？上传接口是什么？",
+    "keywords": ["格式", "10MB", "MD5", "水印", "/api/files/upload"],
+    "sources": ["moyuan_business_modules.md", "moyuan_system_workflow.md"],
+    "note": "工作流写了处理链路，接口表在业务模块"
+  },
+  {
+    "id": "M8",
+    "tier": "medium",
+    "question": "平台为什么用双 token？用户登出后旧的 access token 怎么失效？",
+    "keywords": ["access", "refresh", "jti", "TokenBlacklistService"],
+    "sources": ["moyuan_system_workflow.md"],
+    "note": "4.2 签发与 2.3 过滤器链、黑名单两处拼合"
+  },
+  {
+    "id": "M9",
+    "tier": "medium",
+    "question": "诗词详情页的赏析增强内容缓存在哪张表？缓存 key 由哪些字段组成？",
+    "keywords": ["poem_content_cache", "poem_title", "poet_name", "content_type"],
+    "sources": ["moyuan_system_workflow.md"],
+    "note": "8.2 与 2.5 缓存表两处"
+  },
+  {
+    "id": "M10",
+    "tier": "medium",
+    "question": "AI 模型配置在后台改完之后怎么生效？API Key 是从哪里读的？",
+    "keywords": ["refreshCache", "application-secrets.yml", "ai.providers", "AiModelRegistry"],
+    "sources": ["moyuan_system_workflow.md", "moyuan_business_modules.md"],
+    "note": "11.4 流程 + 管理员接口表"
+  },
+  {
+    "id": "H1",
+    "tier": "hard",
+    "question": "搜索排序规则里，诗人名精确匹配和标题完全匹配，哪个分数更高？分别是多少？",
+    "keywords": ["诗人名精确匹配 0.9", "标题完全匹配 1.0"],
+    "sources": ["moyuan_business_modules.md"],
+    "note": "近义干扰：与「诗词评分」的 1.0-5.0 争抢 top 位"
+  },
+  {
+    "id": "H2",
+    "tier": "hard",
+    "question": "给一首诗点赞之后，诗作记录上的点赞数和收藏数会同步变化吗？",
+    "keywords": ["like_count", "不维护", "favorite_count", "user_favorite"],
+    "sources": ["moyuan_system_workflow.md"],
+    "note": "代码事实型：易被「点赞收藏都会计数」的常识覆盖"
+  },
+  {
+    "id": "H3",
+    "tier": "hard",
+    "question": "诗宝阁和首页 AI 小工具区是什么关系？藏头诗这两处都有吗？",
+    "keywords": ["统一的角色化对话入口", "两处并存", "诗仙·创作"],
+    "sources": [
+      "moyuan_system_knowledge.md",
+      "moyuan_business_modules.md"
+    ],
+    "note": "多跳：知识库问答 + 模块角色能力表 + 藏头诗条目"
+  },
+  {
+    "id": "H4",
+    "tier": "hard",
+    "question": "游客在首页直接玩飞花令，对局记录会保存到哪里？",
+    "keywords": ["游客", "临时保存"],
+    "sources": ["moyuan_system_knowledge.md"],
+    "note": "答案在游客权限条目，飞花令条目反而没有，易召回到错的块"
+  },
+  {
+    "id": "H5",
+    "tier": "hard",
+    "question": "藏头诗最多能藏几个字？除了首页还能从哪里进入？",
+    "keywords": ["2 至 8", "诗仙·创作"],
+    "sources": ["moyuan_system_knowledge.md"],
+    "note": "别名入口：首页 AI 小工具区 / 诗宝阁角色"
+  },
+  {
+    "id": "H6",
+    "tier": "hard",
+    "question": "诗词接龙开局限定朝代以后，哪些环节会被限制在该朝代内？",
+    "keywords": ["起句", "AI 接句", "作答"],
+    "sources": ["moyuan_system_knowledge.md"],
+    "note": "同条目内易只答「作答」漏掉另两项"
+  },
+  {
+    "id": "H7",
+    "tier": "hard",
+    "question": "诗云页面的配色实验室能调哪些显示参数？一共几套配色方案？",
+    "keywords": ["7 套", "光晕", "连线", "尺寸倍率"],
+    "sources": ["moyuan_business_modules.md"],
+    "note": "与「诗云是什么」近义，但答案在数据可视化小节而非知识库条目"
+  },
+  {
+    "id": "H8",
+    "tier": "hard",
+    "question": "AI 评分的分数是怎么从模型输出里解析出来的？解析失败时的兜底分是多少？",
+    "keywords": ["正则", "3.5", "rating_type=2"],
+    "sources": ["moyuan_system_workflow.md"],
+    "note": "与用户评分同章节，需区分 rating_type=1 与 2"
+  },
+  {
+    "id": "H9",
+    "tier": "hard",
+    "question": "未登录时能查看自己的浏览历史吗？能体验哪些诗词游戏？",
+    "keywords": ["登录后在个人中心", "飞花令", "诗词接龙"],
+    "sources": ["moyuan_system_knowledge.md", "moyuan_system_workflow.md"],
+    "note": "多跳：历史需登录 + 游客可体验的游戏清单"
+  },
+  {
+    "id": "H10",
+    "tier": "hard",
+    "question": "诗云里诗人节点的大小由什么决定？3D 坐标数据存在哪里？",
+    "keywords": ["log10", "作品数", "poetPositionMap", "内存"],
+    "sources": ["moyuan_business_modules.md", "moyuan_system_workflow.md"],
+    "note": "公式在业务模块，坐标缓存事实在工作流"
+  },
+  {
+    "id": "R1",
+    "tier": "refuse",
+    "question": "平台支持哪些支付方式？可以充值会员吗？",
+    "keywords": [],
+    "sources": [],
+    "note": "语料无支付、充值、会员相关内容"
+  },
+  {
+    "id": "R2",
+    "tier": "refuse",
+    "question": "墨渊目前的日活用户数和月活用户数分别是多少？",
+    "keywords": [],
+    "sources": [],
+    "note": "语料无任何 DAU/MAU 运营数据"
+  },
+  {
+    "id": "R3",
+    "tier": "refuse",
+    "question": "部署墨渊服务需要什么 CPU 和内存配置？",
+    "keywords": [],
+    "sources": [],
+    "note": "语料无部署硬件规格"
+  },
+  {
+    "id": "R4",
+    "tier": "refuse",
+    "question": "平台是否支持繁体中文界面切换？",
+    "keywords": [],
+    "sources": [],
+    "note": "语料只有 theme/language/fontSize 等偏好项，无繁体界面说明"
+  },
+  {
+    "id": "R5",
+    "tier": "refuse",
+    "question": "飞花令的排行榜奖励规则是什么？",
+    "keywords": [],
+    "sources": [],
+    "note": "语料无排行榜与奖励机制"
+  }
+]

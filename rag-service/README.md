@@ -14,7 +14,11 @@
 | `rag_engine.py` | 混合检索、RRF、重排、邻居扩展、来源覆盖 |
 | `app.py` | FastAPI 接口（健康、模型、配置、问答、SSE） |
 | `ask.py` | 命令行问答 |
-| `evaluate.py` + `eval/` | 8 题跨文档检索评测 |
+| `evaluate.py` + `eval/questions.json` | 旧版 8 题要点/来源覆盖回归 |
+| `evaluate_retrieval.py` | 四组检索对比（A 仅向量 / B 仅 BM25 / C 混合无重排 / D 混合+重排） |
+| `evaluate_generation.py` | 生成层对比（A / D 两组，含拒答与事实一致率） |
+| `annotate.py` + `eval/questions_v2.json` + `eval/qrels.json` | 35 题评测集与 qrels 标注辅助 |
+| `plot_results.py` | 论文双轴图：左 NDCG@8、右平均耗时 |
 | `PLAN.md` | 接入方案 |
 
 ## 启动
@@ -33,7 +37,7 @@ python app.py
 ```
 
 前端开发时 Vite 已把 `/rag` 代理到 `http://127.0.0.1:8010`，管理员页面入口：
-`/admin/rag-config`（AI功能 → 知识问答配置）。
+`/admin/ai-models` 的「知识问答（本地模型）」标签页（旧地址 `/admin/rag-config` 会自动跳转）。
 
 ## 接口
 
@@ -56,6 +60,9 @@ python app.py
 ## 已验证
 
 - 8 个跨三文件问题：要点覆盖 100%，来源覆盖 100%
+- 35 题评测集（10 Easy / 10 Medium / 10 Hard / 5 拒答）四组对比：
+  仅向量 NDCG@8 0.721 → 仅 BM25 0.735 → 混合无重排 0.743 → 混合+重排 0.864，
+  重排代价约 +9.2 秒/题；结果见 `eval/results/retrieval_groups.md` 与 `fig_retrieval.png`
 - 评分问题端到端回答：两种评分方式、1.0-5.0、四个接口、入口 `/poem/:id`
 - FastAPI 健康/模型/配置接口通过；切换预留模型会返回明确拒绝
 - 前端 `aiChat` 单测 14/14 通过；小窗已接入 RAG，服务不可用时自动回退原链路

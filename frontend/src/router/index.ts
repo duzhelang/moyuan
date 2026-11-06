@@ -272,7 +272,7 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'rag-config',
         name: 'AdminRagConfig',
-        component: () => import('@/views/admin/rag-config.vue'),
+        redirect: { path: '/admin/ai-models', query: { tab: 'rag' } },
         meta: { title: '知识问答配置', requiresAuth: true, requiresAdmin: true }
       },
       {

@@ -8,6 +8,7 @@ import com.moyuan.entity.Poet;
 import com.moyuan.mapper.PoemMapper;
 import com.moyuan.mapper.PoetMapper;
 import com.moyuan.service.PoemService;
+import com.moyuan.service.PingZeService;
 import com.moyuan.service.SmartSearchService;
 import com.moyuan.util.PinyinUtil;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class SmartSearchServiceImpl implements SmartSearchService {
     private final PoemMapper poemMapper;
     private final PoetMapper poetMapper;
     private final PoemService poemService;
+    private final PingZeService pingZeService;
     private final RedisTemplate<String, Object> redisTemplate;
 
     private static final String SEARCH_HISTORY_KEY = "search:history:";
@@ -67,6 +69,14 @@ public class SmartSearchServiceImpl implements SmartSearchService {
     );
 
     private static final Pattern PUNCTUATION_PATTERN = Pattern.compile("[\\p{P}\\s]+");
+    // 纯拉丁字母输入（含空白）判定，用于自适应路由到拼音检索
+    private static final Pattern LATIN_PATTERN = Pattern.compile("[A-Za-z\\s]+");
+
+    private static final String ROUTE_PINYIN = "pinyin";
+    private static final String ROUTE_LIKE = "like";
+    private static final String ROUTE_NGRAM = "ngram";
+    private static final String ROUTE_NGRAM_TO_LIKE = "ngram->like";
+    private static final String ROUTE_PINGZE = "pingze";
 
     @Override
     public Map<String, Object> smartSearch(Long dynastyId, Long categoryId, Long poetId,
@@ -88,31 +98,58 @@ public class SmartSearchServiceImpl implements SmartSearchService {
             return result;
         }
         
-        // 综合搜索：同时匹配标题、内容、诗人名
-        
-        // 1. 搜索诗词（标题、内容）
-        List<PoemWithScore> poemResults = searchPoems(dynastyId, categoryId, poetId, poetNameIds, keyword);
-        List<PoemWithScore> allResults = new ArrayList<>(poemResults);
-        
-        // 2. 搜索诗人（按诗人名搜索其作品）
-        List<PoemWithScore> poetResults = searchByPoetName(dynastyId, categoryId, keyword);
-        allResults.addAll(poetResults);
-        
-        // 3. 拼音匹配（补充）
-        List<PoemWithScore> pinyinResults = searchByPinyin(dynastyId, categoryId, poetId, poetNameIds, keyword);
-        allResults.addAll(pinyinResults);
-        
-        // 去重并按评分排序
-        Map<Long, PoemWithScore> uniqueResults = new LinkedHashMap<>();
-        for (PoemWithScore pws : allResults) {
-            PoemWithScore existing = uniqueResults.get(pws.poem().getId());
-            if (existing == null || pws.score() > existing.score()) {
-                uniqueResults.put(pws.poem().getId(), pws);
+        // 综合搜索：先按输入形态自适应路由，命中即停，避免无条件并行执行三条路径
+        String cleanKeyword = PUNCTUATION_PATTERN.matcher(keyword).replaceAll(" ").trim();
+
+        // 格律检索：查询串只由「平/仄/中」构成时，按平仄模式匹配诗句（「中」为通配）
+        if (pingZeService.isPingZeQuery(cleanKeyword)) {
+            Map<String, Object> pingzeResult = pingZeService.searchByPattern(
+                    cleanKeyword, dynastyId, categoryId, poetId, poetNameIds, pageNum, pageSize);
+            int total = ((Number) pingzeResult.get("total")).intValue();
+            result.put("list", pingzeResult.get("list"));
+            result.put("total", total);
+            result.put("route", ROUTE_PINGZE);
+            result.put("candidateCount", total);
+            result.put("pingzeMatches", pingzeResult.get("pingzeMatches"));
+            result.put("searchLevel", "exact");
+            result.put("message", String.format("按格律「%s」命中 %d 首", cleanKeyword, total));
+            result.put("suggestExternal", false);
+            return result;
+        }
+
+        String route;
+        List<PoemWithScore> allResults = new ArrayList<>();
+        if (isLatinInput(cleanKeyword)) {
+            // 拉丁字母输入：拼音是唯一合理路径，即使结果为 0 也不回退中文路径
+            route = ROUTE_PINYIN;
+            allResults.addAll(searchByPinyin(dynastyId, categoryId, poetId, poetNameIds, keyword));
+        } else {
+            int codePointCount = cleanKeyword.codePointCount(0, cleanKeyword.length());
+            // ngram 最小分词长度为 2，单汉字必然无法命中，强制走 LIKE
+            boolean forceLike = codePointCount == 1;
+            boolean useNgram = fulltextEnabled && !forceLike;
+            route = useNgram ? ROUTE_NGRAM : ROUTE_LIKE;
+
+            // 1. 搜索诗词（标题、内容）
+            allResults.addAll(searchPoems(dynastyId, categoryId, poetId, poetNameIds, keyword, forceLike));
+
+            // 2. 搜索诗人（按诗人名搜索其作品）
+            allResults.addAll(searchByPoetName(dynastyId, categoryId, keyword));
+
+            if (useNgram && dedupeByPoemId(allResults).isEmpty()) {
+                // ngram 无命中时降级为 LIKE 再检索一次；中文关键词拼音路径无意义，不再回退拼音
+                allResults.addAll(searchPoems(dynastyId, categoryId, poetId, poetNameIds, keyword, true));
+                route = ROUTE_NGRAM_TO_LIKE;
             }
         }
-        
+
+        // 去重并按评分排序
+        Map<Long, PoemWithScore> uniqueResults = dedupeByPoemId(allResults);
+        int candidateCount = uniqueResults.size();
+        log.debug("[search] route={}, keyword={}, candidates={}", route, keyword, candidateCount);
+
         // 分页
-        int total = uniqueResults.size();
+        int total = candidateCount;
         List<PoemWithScore> sortedResults = new ArrayList<>(uniqueResults.values());
         sortedResults.sort((a, b) -> Double.compare(b.score(), a.score()));
         int fromIndex = (pageNum - 1) * pageSize;
@@ -124,11 +161,30 @@ public class SmartSearchServiceImpl implements SmartSearchService {
         poemService.populatePoetAndDynasty(pageList);
         result.put("list", pageList);
         result.put("total", total);
+        result.put("route", route);
+        result.put("candidateCount", candidateCount);
         result.put("searchLevel", "exact");
         result.put("message", String.format("找到 %d 条结果", total));
         result.put("suggestExternal", total == 0);
         
         return result;
+    }
+
+    /** 判断清洗后的关键词是否为纯拉丁字母输入（拼音检索的唯一合理形态） */
+    private static boolean isLatinInput(String cleanKeyword) {
+        return cleanKeyword != null && LATIN_PATTERN.matcher(cleanKeyword).matches();
+    }
+
+    /** 按诗词 ID 去重，保留评分更高的记录 */
+    private Map<Long, PoemWithScore> dedupeByPoemId(List<PoemWithScore> results) {
+        Map<Long, PoemWithScore> uniqueResults = new LinkedHashMap<>();
+        for (PoemWithScore pws : results) {
+            PoemWithScore existing = uniqueResults.get(pws.poem().getId());
+            if (existing == null || pws.score() > existing.score()) {
+                uniqueResults.put(pws.poem().getId(), pws);
+            }
+        }
+        return uniqueResults;
     }
     
     /**
@@ -148,11 +204,13 @@ public class SmartSearchServiceImpl implements SmartSearchService {
         return poemMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
     }
     
-    private List<PoemWithScore> searchPoems(Long dynastyId, Long categoryId, Long poetId, Set<Long> poetNameIds, String keyword) {
+    private List<PoemWithScore> searchPoems(Long dynastyId, Long categoryId, Long poetId, Set<Long> poetNameIds,
+                                             String keyword, boolean forceLike) {
         LambdaQueryWrapper<Poem> wrapper = buildPoemWrapper(dynastyId, categoryId, poetId, poetNameIds);
 
         // #7 方案A：开启全文索引时，对 title/content 用 ngram 分词检索（相关度更高、性能更优）
-        if (fulltextEnabled) {
+        // forceLike=true 时（如单汉字关键词）强制走 LIKE 分支
+        if (fulltextEnabled && !forceLike) {
             wrapper.apply("MATCH(`title`, `content`) AGAINST ({0} IN NATURAL LANGUAGE MODE)", keyword);
             return scoreAndRank(wrapper, keyword);
         }

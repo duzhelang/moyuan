@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
+import RagConfigPanel from '@/components/admin/RagConfigPanel.vue'
 import {
   getAllModels,
   createModel,
@@ -19,6 +21,7 @@ import {
 } from '@/api/modules/admin-ai-model'
 
 const activeTab = ref('models')
+const route = useRoute()
 const models = ref<AiModelConfig[]>([])
 const moduleConfigs = ref<AiModuleConfig[]>([])
 const providers = ref<{ value: string; label: string }[]>([])
@@ -263,6 +266,9 @@ async function handleSaveModuleConfig() {
 }
 
 onMounted(() => {
+  if (route.query.tab === 'rag') {
+    activeTab.value = 'rag'
+  }
   loadModels()
   loadProviders()
   loadModuleConfigs()
@@ -371,6 +377,10 @@ onMounted(() => {
             </el-table-column>
           </el-table>
         </el-card>
+      </el-tab-pane>
+
+      <el-tab-pane label="知识问答（本地模型）" name="rag" lazy>
+        <RagConfigPanel />
       </el-tab-pane>
     </el-tabs>
 

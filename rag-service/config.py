@@ -100,6 +100,11 @@ MAX_CONTEXT_CHUNKS = 12
 MAX_CONTEXT_CHARS = 5500
 MIN_RRF_SCORE = 0.03
 
+# 各检索模式的拒答阈值（口径不同，不能混用）：
+# - hybrid 用 RRF 累积分，沿用 MIN_RRF_SCORE；
+# - 单路模式用该路 top-1 原始分，评测前由 calibrate.py 依据 30 道可答题重新标定。
+REFUSAL_MIN_SCORE = {"vector": 0.0, "bm25": 0.0, "hybrid": MIN_RRF_SCORE}
+
 RERANK_MODEL_DIR = Path(
     r"D:\BIG\huggingface\hub\models--BAAI--bge-reranker-base\snapshots"
 )

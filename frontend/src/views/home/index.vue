@@ -3,6 +3,8 @@ import { ref, computed, nextTick, onMounted, onUnmounted, onActivated, onDeactiv
 import { useRouter, useRoute } from 'vue-router'
 import { getForumPostList } from '@/api/modules/forum'
 import { writePoemFromImage, analyzePoem, matchCouplet, ocrImage, chat } from '@/api/modules/ai'
+import type { ToneCheckResult } from '@/api/modules/ai'
+import PingZeAnnotation from '@/components/poem/PingZeAnnotation.vue'
 import { queryRhymeByCharacter, queryRhymeByGroup } from '@/api/modules/rhyme'
 import type { RhymeItem } from '@/api/modules/rhyme'
 import { getRandomPoetFeatured } from '@/api/modules/poetFeatured'
@@ -51,6 +53,10 @@ const imageFile = ref<File | null>(null)
 const imagePreview = ref('')
 const poemResult = ref('')
 const poemLoading = ref(false)
+/** 看图写诗的格律校验结果 */
+const poemCheck = ref<ToneCheckResult | null>(null)
+/** 是否因格律不合格触发过重写 */
+const poemRewritten = ref(false)
 
 const analyzeInput = ref('')
 const analyzeResult = ref('')
@@ -258,6 +264,10 @@ const handleRhymeQuery = async () => {
 const coupletInput = ref('')
 const coupletResult = ref('')
 const coupletLoading = ref(false)
+/** 对联的格律校验结果 */
+const coupletCheck = ref<{ passed: boolean; issues: string[]; lower?: string } | null>(null)
+/** 是否因格律不合格触发过重写 */
+const coupletRewritten = ref(false)
 
 const exampleCouplets = homePoetryData.exampleCouplets
 
@@ -291,9 +301,13 @@ const handleCoupletMatch = async (upperCouplet?: string) => {
   coupletInput.value = input
   coupletLoading.value = true
   coupletResult.value = ''
+  coupletCheck.value = null
+  coupletRewritten.value = false
   try {
     const res = await matchCouplet({ upperCouplet: input, moduleCode: 'couplet' })
     coupletResult.value = res.data.result
+    coupletCheck.value = res.data.check || null
+    coupletRewritten.value = !!res.data.rewritten
   } catch {
     coupletResult.value = '抱歉，AI服务暂时不可用，请稍后重试。'
   } finally {
@@ -622,6 +636,8 @@ const clearImage = () => {
   imageFile.value = null
   imagePreview.value = ''
   poemResult.value = ''
+  poemCheck.value = null
+  poemRewritten.value = false
   if (imageUploadRef.value) imageUploadRef.value.value = ''
 }
 
@@ -632,11 +648,15 @@ const handleWritePoem = async () => {
   }
   poemLoading.value = true
   poemResult.value = ''
+  poemCheck.value = null
+  poemRewritten.value = false
   try {
     console.log('开始调用看图写诗, model:', aiModel.value)
     const res = await writePoemFromImage(imageFile.value, aiModel.value, undefined, 'write_poem')
     console.log('看图写诗响应:', res)
     poemResult.value = res.data.poem
+    poemCheck.value = res.data.check || null
+    poemRewritten.value = !!res.data.rewritten
   } catch (error) {
     console.error('看图写诗失败:', error)
     poemResult.value = '抱歉，AI服务暂时不可用，请稍后重试。'
@@ -1117,6 +1137,18 @@ onDeactivated(() => {
           </div>
           <div v-if="poemResult" class="ai-result-card">
             <div class="ai-poem-content">{{ poemResult }}</div>
+            <div v-if="poemCheck" class="ai-tone-check">
+              <div class="ai-tone-head">
+                <span class="ai-tone-title">格律校验</span>
+                <span v-if="poemRewritten" class="ai-tone-rewrite">已根据校验结果自动修正</span>
+              </div>
+              <PingZeAnnotation
+                :lines="poemCheck.lines"
+                :issues="poemCheck.issues"
+                :passed="poemCheck.passed"
+                :genre="poemCheck.genre"
+              />
+            </div>
           </div>
         </div>
 
@@ -1292,6 +1324,16 @@ onDeactivated(() => {
             <div class="couplet-upper">上联：{{ coupletInput }}</div>
             <div class="couplet-divider">—</div>
             <div class="couplet-lower">{{ coupletResult }}</div>
+          </div>
+          <div v-if="coupletCheck" class="ai-tone-check">
+            <div class="ai-tone-head">
+              <span class="ai-tone-title">对联格律校验</span>
+              <span v-if="coupletRewritten" class="ai-tone-rewrite">已自动修正</span>
+              <span v-else-if="coupletCheck.passed" class="ai-tone-pass">校验通过</span>
+            </div>
+            <ul v-if="coupletCheck.issues.length" class="ai-tone-issues">
+              <li v-for="(issue, index) in coupletCheck.issues" :key="index">{{ issue }}</li>
+            </ul>
           </div>
         </div>
       </div>
@@ -1527,5 +1569,54 @@ onDeactivated(() => {
 .carousel-wrapper .sy_top_daohang_biao {
   position: absolute;
   z-index: 10;
+}
+
+/* 看图写诗 / 对联结果的格律校验区（卡片为浅色底，覆盖组件的默认浅色文字） */
+.ai-tone-check {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed #d9cebf;
+  --pingze-char-color: #2c2416;
+  --pingze-line-bg: rgba(44, 36, 22, 0.035);
+}
+
+.ai-tone-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.ai-tone-title {
+  font-size: 13px;
+  color: #8b5a2b;
+  letter-spacing: 0.05em;
+}
+
+.ai-tone-rewrite {
+  font-size: 12px;
+  color: #b8860b;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgba(184, 134, 11, 0.12);
+}
+
+.ai-tone-pass {
+  font-size: 12px;
+  color: #2e7d32;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgba(46, 125, 50, 0.1);
+}
+
+.ai-tone-issues {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: #c62828;
+}
+
+.ai-tone-issues li {
+  line-height: 1.7;
 }
 </style>
