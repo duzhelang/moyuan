@@ -1,6 +1,6 @@
 -- ============================================================
--- 版本：v3.6（全量合并版）
--- 日期：2026-11-07
+-- 版本：v3.7（全量合并版）
+-- 日期：2026-11-08
 -- 说明：全量合并所有表结构和初始数据，删除过渡迁移脚本
 --       所有建表使用 IF NOT EXISTS，数据使用 INSERT IGNORE
 --       v3.3：poem 表新增 author 列；新增 20 首外文诗词初始数据
@@ -16,6 +16,11 @@
 --             account.ai-login 同步 OCR 维护状态。
 --             已有库请执行 docs/database/migrations/20261107_ai_knowledge_sync.sql
 --             （INSERT IGNORE 不会覆盖已存在的行）。
+--       v3.7：审核流水线三表 audit_reviewer / audit_rule / audit_ticket 合并进本脚本
+--             （原仅存在于根目录 audit_pipeline.sql）；同时确认 20261107 指标日志四表
+--             api_request_metric / search_log / ai_call_log / security_event 与
+--             20261108 举报/通知两表 user_report / user_notification 已在本脚本内。
+--             合并后建表总数 44 张，本文档即权威定义。
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS `moyuan` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -847,6 +852,68 @@ CREATE TABLE IF NOT EXISTS `security_event` (
   KEY `idx_se_create_time` (`create_time`),
   KEY `idx_se_type` (`type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='安全事件（登录失败/越权/限流）';
+
+-- ============================================================
+-- 审核员表（审核流水线）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `audit_reviewer` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT NOT NULL COMMENT '关联 user.id',
+  `display_name` VARCHAR(50) NOT NULL COMMENT '工位名，如 诗部·唐',
+  `specialties` VARCHAR(200) DEFAULT NULL COMMENT '擅长类型，逗号分隔',
+  `max_concurrent` INT NOT NULL DEFAULT 30 COMMENT '同时在手工单上限',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 在岗 0 停用',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_ar_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='审核员';
+
+-- ============================================================
+-- 审核分派规则表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `audit_rule` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `scope_type` VARCHAR(20) NOT NULL COMMENT 'author / dynasty / content_type / global',
+  `scope_value` VARCHAR(100) DEFAULT NULL COMMENT '作者 id、朝代 id 或内容类型',
+  `reviewer_id` BIGINT NOT NULL COMMENT '命中后分派给谁',
+  `priority` INT NOT NULL DEFAULT 100 COMMENT '越小越先匹配',
+  `enabled` TINYINT NOT NULL DEFAULT 1,
+  `remark` VARCHAR(200) DEFAULT NULL COMMENT '说明',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_ar_scope` (`scope_type`, `scope_value`, `priority`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='审核分派规则';
+
+-- ============================================================
+-- 审核工单表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `audit_ticket` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `biz_type` VARCHAR(30) NOT NULL COMMENT 'poem/comment/ai_content/poet_profile/poet_draft/poet_suggestion',
+  `biz_id` BIGINT NOT NULL COMMENT '业务主键',
+  `title` VARCHAR(200) DEFAULT NULL COMMENT '冗余标题',
+  `author_name` VARCHAR(100) DEFAULT NULL COMMENT '冗余作者/提交人',
+  `author_ref` VARCHAR(50) DEFAULT NULL COMMENT '作者 id，供 author 规则匹配',
+  `dynasty_name` VARCHAR(50) DEFAULT NULL,
+  `content_type` VARCHAR(30) DEFAULT NULL COMMENT 'poem_ancient/poem_modern/comment/ai_content/...',
+  `priority` TINYINT NOT NULL DEFAULT 0 COMMENT '0 普通 1 高 2 紧急',
+  `status` VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT 'pending/assigned/reviewing/approved/rejected/void',
+  `reviewer_id` BIGINT DEFAULT NULL,
+  `result` VARCHAR(500) DEFAULT NULL COMMENT '审核结论或理由',
+  `assign_note` VARCHAR(200) DEFAULT NULL COMMENT '命中的规则说明',
+  `assigned_at` DATETIME DEFAULT NULL,
+  `claimed_at` DATETIME DEFAULT NULL,
+  `finished_at` DATETIME DEFAULT NULL,
+  `deadline_at` DATETIME DEFAULT NULL COMMENT '按优先级算出的 SLA 截止',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_at_biz` (`biz_type`, `biz_id`),
+  KEY `idx_at_status_deadline` (`status`, `deadline_at`),
+  KEY `idx_at_reviewer` (`reviewer_id`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='审核工单';
 
 -- ============================================================
 -- 文件元数据表
