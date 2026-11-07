@@ -59,7 +59,7 @@ description: "古今诗话——墨渊（SC_MoYuan2）项目的系统架构文�
 
 | 文档 | 路径 | 内容 |
 |------|------|------|
-| 表结构 | [database/schema.md](../../docs/database/schema.md) | 35 张核心表清单、字段说明、索引、建表脚本状态 |
+| 表结构 | [database/schema.md](../../docs/database/schema.md) | 44 张核心表清单、字段说明、索引、建表脚本状态 |
 | 迁移脚本 | [db/init.sql](../../sc-moyuan-backend/src/main/resources/db/init.sql) | 迁移脚本属过渡性文件，执行后清理；数据库权威定义见 init.sql |
 
 ### 业务功能文档
@@ -102,7 +102,7 @@ description: "古今诗话——墨渊（SC_MoYuan2）项目的系统架构文�
 | 智能体协作 | [reports/agent-skill-coordination-report.md](../../docs/reports/agent-skill-coordination-report.md) | 智能体与技能协作报告 |
 | 代码审查 | [review/code-review-report-2026-06-06.md](../../docs/review/code-review-report-2026-06-06.md) | 代码审查报告 |
 | 后端数据库计划 | [backend-database-plan.md](../../docs/backend-database-plan.md) | 后端数据库建设计划 |
-| ER 图 | [diagrams/数据库ER图.dot](../../docs/diagrams/数据库ER图.dot) [数据库ER图.svg](../../docs/diagrams/数据库ER图.svg) | 数据库 ER 关系图（Graphviz/SVG，全量 35 张核心表；旧版备份 数据库ER图_20261014.*） |
+| ER 图 | [diagrams/数据库ER图.dot](../../docs/diagrams/数据库ER图.dot) [数据库ER图.svg](../../docs/diagrams/数据库ER图.svg) | 数据库 ER 关系图（Graphviz/SVG，核心关系子集绘出 35 张 / 全库 44 张；旧版备份 数据库ER图_20261014.*） |
 
 > 数据资产相关文档索引见 [moyuan-data-assets](../moyuan-data-assets/SKILL.md) 技能
 > 文档同步更新规范见 [doc-manager](../doc-manager/SKILL.md) 技能

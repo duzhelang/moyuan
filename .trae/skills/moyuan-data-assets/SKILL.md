@@ -7,10 +7,10 @@ description: "古今诗话——墨渊（SC_MoYuan2）项目的数据资产文�
 
 ## 检测到的数据相关技术栈
 
-- **数据库**: MySQL 8.x（库名 `moyuan`，utf8mb4，35 张核心表）
+- **数据库**: MySQL 8.x（库名 `moyuan`，utf8mb4，44 张核心表）
 - **ORM框架**: MyBatis-Plus 3.5.x
 - **缓存**: Redis 7.x（搜索建议/热门/历史缓存）
-- **建表脚本**: `sc-moyuan-backend/src/main/resources/db/init.sql`（全量合并版 v3.4）
+- **建表脚本**: `sc-moyuan-backend/src/main/resources/db/init.sql`（全量合并版 v3.7）
 - **前端静态数据**: `frontend/src/data/*.json`
 
 ## 数据相关目录总览
@@ -29,14 +29,14 @@ description: "古今诗话——墨渊（SC_MoYuan2）项目的数据资产文�
 
 | 文档 | 路径 | 内容 |
 |------|------|------|
-| 表结构 | [docs/database/schema.md](../../docs/database/schema.md) | 35 张核心表清单、字段说明、索引、建表脚本状态 |
+| 表结构 | [docs/database/schema.md](../../docs/database/schema.md) | 44 张核心表清单、字段说明、索引、建表脚本状态 |
 | 迁移脚本 | [db/init.sql](../../sc-moyuan-backend/src/main/resources/db/init.sql) | 迁移脚本属过渡性文件，执行后清理；数据库权威定义见 init.sql |
 
 ### 建表与种子数据
 
 | 文件 | 路径 | 内容 |
 |------|------|------|
-| 全量建表脚本 | [sc-moyuan-backend/src/main/resources/db/init.sql](../../sc-moyuan-backend/src/main/resources/db/init.sql) | 35 张表建表 DDL（全量合并版 v3.4） |
+| 全量建表脚本 | [sc-moyuan-backend/src/main/resources/db/init.sql](../../sc-moyuan-backend/src/main/resources/db/init.sql) | 44 张表建表 DDL（全量合并版 v3.7） |
 | 初始化脚本 | [根目录 init-db.bat](../../init-db.bat) | 数据库一键初始化批处理 |
 
 ### 前端静态数据
