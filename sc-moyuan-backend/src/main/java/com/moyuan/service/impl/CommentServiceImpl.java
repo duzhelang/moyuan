@@ -17,6 +17,7 @@ import com.moyuan.mapper.CommentMapper;
 import com.moyuan.mapper.ForumPostMapper;
 import com.moyuan.mapper.UserLikeMapper;
 import com.moyuan.mapper.UserMapper;
+import com.moyuan.service.AiModerationService;
 import com.moyuan.service.CommentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
@@ -36,6 +37,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
     private final ForumPostMapper forumPostMapper;
     private final UserLikeMapper userLikeMapper;
     private final UserMapper userMapper;
+    private final AiModerationService aiModerationService;
 
     private void fillUserInfo(List<Comment> comments) {
         if (comments == null || comments.isEmpty()) return;
@@ -70,6 +72,10 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
     @Override
     @Transactional
     public Comment createComment(Long userId, CommentCreateRequest request) {
+        // 发布前先过 AI 风控；模型异常会自行降级为低风险，不阻断发布
+        AiModerationService.ModerationResult moderation =
+                aiModerationService.analyze("comment", null, request.getContent());
+
         Comment comment = new Comment();
         comment.setContent(request.getContent());
         comment.setUserId(userId);
@@ -78,7 +84,11 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         comment.setParentId(request.getParentId() != null ? request.getParentId() : 0L);
         comment.setReplyToUserId(request.getReplyToUserId());
         comment.setLikeCount(0);
-        comment.setStatus(1);
+        comment.setStatus(moderation.isHigh() ? 0 : 1);
+        if (moderation.isHigh()) {
+            comment.setAuditReason("AI风控：" + moderation.reason());
+            comment.setAuditTime(LocalDateTime.now());
+        }
         commentMapper.insert(comment);
 
         if (request.getTargetType() == 2) {
@@ -88,6 +98,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
                     .set(ForumPost::getLastCommentTime, LocalDateTime.now()));
         }
 
+        aiModerationService.handleRisk("comment", comment.getId(), userId, moderation);
         return comment;
     }
 

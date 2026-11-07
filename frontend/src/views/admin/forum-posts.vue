@@ -1,7 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAdminForumPosts, updateForumPostStatus, deleteAdminForumPost } from '@/api/modules/admin'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
+/** 审核员可关闭/发布帖子做内容治理，删除仍仅限管理员 */
+const isAdmin = computed(() => userStore.userInfo?.role === 'admin')
 
 const tableData = ref<any[]>([])
 const total = ref(0)
@@ -99,7 +104,7 @@ onMounted(fetchData)
           <template #default="{ row }">
             <el-button size="small" v-if="row.status === 1" @click="handleStatusChange(row, 2)">关闭</el-button>
             <el-button size="small" v-if="row.status === 2" @click="handleStatusChange(row, 1)">发布</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button size="small" type="danger" v-if="isAdmin" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -112,7 +117,7 @@ onMounted(fetchData)
 </template>
 
 <style scoped lang="scss">
-.page-title { font-size: 24px; margin-bottom: 20px; color: #333; }
+.page-title { font-size: 24px; margin-bottom: 20px; color: var(--adm-text); }
 .search-card { margin-bottom: 16px; }
 .table-card { border-radius: 8px; }
 .pagination-wrapper { display: flex; justify-content: flex-end; margin-top: 16px; }

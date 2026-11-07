@@ -1,13 +1,26 @@
 import { computed } from 'vue'
 import { useUserStore } from '@/stores/user'
 import type { Role, PermissionConfig } from '@/utils/permission'
-import { hasRole, hasAnyRole, hasPermission, hasAnyPermission, hasAllPermissions, checkPermission } from '@/utils/permission'
+import {
+  ROLE_LABELS,
+  resolveRole,
+  hasRole,
+  hasAnyRole,
+  hasPermission,
+  hasAnyPermission,
+  hasAllPermissions,
+  checkPermission
+} from '@/utils/permission'
 
 export function usePermission() {
   const userStore = useUserStore()
 
-  const currentRole = computed(() => userStore.userInfo?.role as Role | undefined)
-  const isAdmin = computed(() => hasRole('admin'))
+  const currentRole = computed<Role>(() => resolveRole())
+  const roleName = computed(() => ROLE_LABELS[currentRole.value])
+  const isAdmin = computed(() => currentRole.value === 'admin')
+  const isReviewer = computed(() => currentRole.value === 'reviewer')
+  const isPoet = computed(() => currentRole.value === 'poet')
+  const isGuest = computed(() => currentRole.value === 'guest')
   const isLoggedIn = computed(() => userStore.isLoggedIn)
 
   function checkRole(role: Role): boolean {
@@ -36,7 +49,11 @@ export function usePermission() {
 
   return {
     currentRole,
+    roleName,
     isAdmin,
+    isReviewer,
+    isPoet,
+    isGuest,
     isLoggedIn,
     checkRole,
     checkAnyRole,

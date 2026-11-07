@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.moyuan.common.R;
 import com.moyuan.entity.PoetDraft;
 import com.moyuan.entity.User;
+import com.moyuan.service.AuditPipelineService;
 import com.moyuan.service.PoetDraftService;
 import com.moyuan.util.SecurityUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 public class PoetDraftController {
 
     private final PoetDraftService poetDraftService;
+    private final AuditPipelineService auditPipelineService;
 
     @PostMapping("/poet-drafts")
     public R<Void> saveDraft(@RequestBody PoetDraft draft, HttpServletRequest request) {
@@ -47,6 +49,7 @@ public class PoetDraftController {
             @RequestParam(required = false) String reviewComment) {
         User currentUser = SecurityUtil.getCurrentUser();
         poetDraftService.reviewDraft(id, status, reviewComment, currentUser.getId());
+        auditPipelineService.syncResult("poet_draft", id, status == 1, reviewComment);
         return R.success();
     }
 

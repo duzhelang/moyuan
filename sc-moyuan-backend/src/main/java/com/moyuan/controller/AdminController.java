@@ -54,6 +54,7 @@ public class AdminController {
     private final PoetDraftService poetDraftService;
     private final PoetSuggestionService poetSuggestionService;
     private final RepairOrderService repairOrderService;
+    private final AuditPipelineService auditPipelineService;
 
     // ========== 统计数据 ==========
 
@@ -288,6 +289,7 @@ public class AdminController {
         user.setEmail(params.get("email"));
         user.setNickname(params.getOrDefault("nickname", username));
         user.setPhone(params.get("phone"));
+        user.setRole(normalizeRole(params.get("role")));
         user.setStatus(1);
         userService.save(user);
         user.setPassword(null);
@@ -305,6 +307,7 @@ public class AdminController {
         if (params.containsKey("email")) user.setEmail((String) params.get("email"));
         if (params.containsKey("phone")) user.setPhone((String) params.get("phone"));
         if (params.containsKey("bio")) user.setBio((String) params.get("bio"));
+        if (params.containsKey("role")) user.setRole(normalizeRole((String) params.get("role")));
         if (params.containsKey("status")) user.setStatus((Integer) params.get("status"));
         if (params.containsKey("password") && StringUtils.hasText((String) params.get("password"))) {
             user.setPassword(passwordEncoder.encode((String) params.get("password")));
@@ -319,6 +322,20 @@ public class AdminController {
     public R<Void> deleteUser(@PathVariable Long id) {
         userService.removeById(id);
         return R.success();
+    }
+
+    /** 角色白名单：管理员 / 审核员 / 认证诗人 / 普通用户 */
+    private static final Set<String> ALLOWED_ROLES = Set.of("admin", "reviewer", "poet", "user");
+
+    private String normalizeRole(String role) {
+        if (!StringUtils.hasText(role)) {
+            return "user";
+        }
+        String normalized = role.trim().toLowerCase();
+        if (!ALLOWED_ROLES.contains(normalized)) {
+            throw new com.moyuan.exception.BusinessException("不支持的角色类型：" + role);
+        }
+        return normalized;
     }
 
     // ========== 诗词管理 ==========
@@ -881,6 +898,7 @@ public class AdminController {
             return R.error("审核状态不能为空");
         }
         commentService.auditComment(id, status, reason);
+        auditPipelineService.syncResult("comment", id, status == 1, reason);
         return R.success();
     }
 
@@ -902,6 +920,8 @@ public class AdminController {
             return R.error("审核状态不能为空");
         }
         poemService.auditPoem(id, status, reason);
+        // 弱管控：同步工单状态，未走流水线的内容会被自动忽略
+        auditPipelineService.syncResult("poem", id, status == 1, reason);
         return R.success();
     }
 
@@ -928,6 +948,7 @@ public class AdminController {
             return R.error("审核状态不能为空");
         }
         poetProfileService.verifyProfile(id, status, reason);
+        auditPipelineService.syncResult("poet_profile", id, status == 1, reason);
         return R.success();
     }
 
@@ -975,6 +996,7 @@ public class AdminController {
         Long reviewerId = SecurityUtil.getCurrentUserId();
         String reviewComment = params.get("reviewComment");
         aiGeneratedContentService.approve(id, reviewerId, reviewComment);
+        auditPipelineService.syncResult("ai_content", id, true, reviewComment);
         return R.success();
     }
 
@@ -984,6 +1006,7 @@ public class AdminController {
         Long reviewerId = SecurityUtil.getCurrentUserId();
         String reviewComment = params.get("reviewComment");
         aiGeneratedContentService.reject(id, reviewerId, reviewComment);
+        auditPipelineService.syncResult("ai_content", id, false, reviewComment);
         return R.success();
     }
 

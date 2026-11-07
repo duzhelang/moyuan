@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getUserList as getAdminUsers, createUser, updateUser, deleteUser } from '@/api/modules/admin'
+import { roleLabel } from '@/utils/permission'
 
 const tableData = ref<any[]>([])
 const total = ref(0)
@@ -92,7 +93,10 @@ const handleSearch = () => {
 }
 
 const getRoleTagType = (role: string) => {
-  return role === 'admin' ? 'danger' : 'primary'
+  if (role === 'admin') return 'danger'
+  if (role === 'reviewer') return 'warning'
+  if (role === 'poet') return 'success'
+  return 'primary'
 }
 
 onMounted(fetchData)
@@ -123,9 +127,9 @@ onMounted(fetchData)
         <el-table-column prop="nickname" label="昵称" width="120" />
         <el-table-column prop="email" label="邮箱" min-width="180" />
         <el-table-column prop="phone" label="手机号" width="130" />
-        <el-table-column label="角色" width="80">
+        <el-table-column label="角色" width="100">
           <template #default="{ row }">
-            <el-tag :type="getRoleTagType(row.role)" size="small">{{ row.role === 'admin' ? '管理员' : '用户' }}</el-tag>
+            <el-tag :type="getRoleTagType(row.role)" size="small">{{ roleLabel(row.role) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="状态" width="80">
@@ -175,6 +179,8 @@ onMounted(fetchData)
             <el-form-item label="角色">
               <el-select v-model="form.role" style="width: 100%">
                 <el-option label="普通用户" value="user" />
+                <el-option label="认证诗人" value="poet" />
+                <el-option label="审核员" value="reviewer" />
                 <el-option label="管理员" value="admin" />
               </el-select>
             </el-form-item>
@@ -204,7 +210,7 @@ onMounted(fetchData)
 .page-title {
   font-size: 24px;
   margin-bottom: 20px;
-  color: #333;
+  color: var(--adm-text);
 }
 
 .search-card {

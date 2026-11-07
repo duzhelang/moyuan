@@ -40,10 +40,30 @@ export function setupRouterGuards(router: Router) {
         }
       }
 
-      if (userStore.userInfo?.role !== 'admin') {
+      const role = userStore.userInfo?.role
+      if (role !== 'admin' && role !== 'reviewer') {
         ElMessage.error('无权限访问，需要管理员权限')
         next({ name: 'Home' })
         return
+      }
+
+      // 审核员只能进审核相关页面，其余后台页直接送回流水线
+      if (role === 'reviewer') {
+        const allowed = [
+          '/admin/audit-pipeline',
+          '/admin/audit-records',
+          '/admin/poem-audit',
+          '/admin/poet-profiles',
+          '/admin/poet-suggestions',
+          '/admin/ai-contents',
+          '/admin/comments',
+          '/admin/forum-posts',
+          '/admin/reports'
+        ]
+        if (!allowed.some((p) => to.path.startsWith(p))) {
+          next('/admin/audit-pipeline')
+          return
+        }
       }
     }
 

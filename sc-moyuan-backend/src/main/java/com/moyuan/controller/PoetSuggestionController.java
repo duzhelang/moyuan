@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.moyuan.common.R;
 import com.moyuan.entity.PoetSuggestion;
 import com.moyuan.entity.User;
+import com.moyuan.service.AuditPipelineService;
 import com.moyuan.service.PoetSuggestionService;
 import com.moyuan.util.SecurityUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 public class PoetSuggestionController {
 
     private final PoetSuggestionService poetSuggestionService;
+    private final AuditPipelineService auditPipelineService;
 
     @PostMapping("/poet-suggestions")
     public R<Void> submitSuggestion(@RequestBody PoetSuggestion suggestion, HttpServletRequest request) {
@@ -42,6 +44,8 @@ public class PoetSuggestionController {
             @RequestParam(required = false) String reviewComment) {
         User currentUser = SecurityUtil.getCurrentUser();
         poetSuggestionService.reviewSuggestion(id, status, reviewComment, currentUser.getId());
+        // 建议用字符串状态：approved / rejected
+        auditPipelineService.syncResult("poet_suggestion", id, "approved".equals(status), reviewComment);
         return R.success();
     }
 

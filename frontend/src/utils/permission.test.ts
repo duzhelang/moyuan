@@ -8,6 +8,7 @@ import {
   hasAllPermissions,
   checkPermission
 } from './permission'
+import type { PermissionConfig } from './permission'
 
 vi.mock('@/stores/user', () => ({
   useUserStore: vi.fn()
@@ -169,7 +170,7 @@ describe('permission utils', () => {
         userInfo: { role: 'user' }
       })
       
-      const config = {
+      const config: PermissionConfig = {
         roles: ['user'],
         permissions: ['poem:read']
       }
@@ -183,7 +184,7 @@ describe('permission utils', () => {
         userInfo: { role: 'guest' }
       })
       
-      const config = {
+      const config: PermissionConfig = {
         roles: ['admin'],
         permissions: ['poem:read']
       }
@@ -197,7 +198,7 @@ describe('permission utils', () => {
         userInfo: { role: 'user' }
       })
       
-      const config = {
+      const config: PermissionConfig = {
         roles: ['user'],
         permissions: ['user:manage']
       }
