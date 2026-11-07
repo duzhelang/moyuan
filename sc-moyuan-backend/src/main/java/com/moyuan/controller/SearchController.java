@@ -9,6 +9,7 @@ import com.moyuan.mapper.PoemMapper;
 import com.moyuan.mapper.PoetMapper;
 import com.moyuan.service.ForumPostService;
 import com.moyuan.service.RecommendationService;
+import com.moyuan.service.SearchLogService;
 import com.moyuan.service.SmartSearchService;
 import com.moyuan.util.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,6 +33,7 @@ public class SearchController {
     private final ForumPostService forumPostService;
     private final RecommendationService recommendationService;
     private final SmartSearchService smartSearchService;
+    private final SearchLogService searchLogService;
 
     @Operation(summary = "全局搜索")
     @GetMapping
@@ -57,6 +59,12 @@ public class SearchController {
                 .and(w -> w.like(ForumPost::getTitle, keyword).or().like(ForumPost::getContent, keyword))
                 .last("LIMIT 10");
         result.put("posts", forumPostService.list(postWrapper));
+
+        // 搜索埋点：全局搜索的结果数取三类合计，用于「搜索无结果率」
+        int total = ((List<?>) result.get("poems")).size()
+                + ((List<?>) result.get("poets")).size()
+                + ((List<?>) result.get("posts")).size();
+        searchLogService.record(keyword, total, "global", "global", currentUserIdOrNull());
 
         return R.success(result);
     }
@@ -143,6 +151,13 @@ public class SearchController {
         if (userId != null && StringUtils.hasText(keyword)) {
             smartSearchService.saveSearchHistory(userId, keyword);
         }
+
+        // 搜索埋点：只记第一页，翻页属于同一次搜索，重复记录会把搜索量放大
+        if (StringUtils.hasText(keyword) && pageNum <= 1) {
+            int total = result.get("total") instanceof Number n ? n.intValue() : 0;
+            Object route = result.get("route");
+            searchLogService.record(keyword, total, route == null ? null : route.toString(), "smart", userId);
+        }
         
         return R.success(result);
     }
@@ -182,5 +197,14 @@ public class SearchController {
         } catch (Exception ignored) {}
         smartSearchService.clearSearchHistory(userId);
         return R.success();
+    }
+
+    /** 匿名访问取不到用户时不抛异常，返回 null */
+    private Long currentUserIdOrNull() {
+        try {
+            return SecurityUtil.getCurrentUserId();
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { setupRouterGuards } from './guards'
+import { useAdminTheme } from '@/composables/useAdminTheme'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -122,6 +123,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '提交报修', requiresAuth: true }
       },
       {
+        path: 'notifications',
+        name: 'Notifications',
+        component: () => import('@/views/user/notifications.vue'),
+        meta: { title: '站内通知', requiresAuth: true }
+      },
+      {
         path: 'repair/:id',
         name: 'RepairDetail',
         component: () => import('@/views/repair/detail.vue'),
@@ -178,6 +185,24 @@ const routes: RouteRecordRaw[] = [
         name: 'AdminDashboard',
         component: () => import('@/views/admin/dashboard.vue'),
         meta: { title: '控制台', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'monitor',
+        name: 'AdminMonitor',
+        component: () => import('@/views/admin/monitor.vue'),
+        meta: { title: '系统监测', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'user-analytics',
+        name: 'AdminUserAnalytics',
+        component: () => import('@/views/admin/user-analytics.vue'),
+        meta: { title: '用户分析', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'recommend',
+        name: 'AdminRecommend',
+        component: () => import('@/views/admin/recommend.vue'),
+        meta: { title: '推荐与实验', requiresAuth: true, requiresAdmin: true }
       },
       {
         path: 'users',
@@ -246,6 +271,18 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '诗词审核', requiresAuth: true, requiresAdmin: true }
       },
       {
+        path: 'audit-pipeline',
+        name: 'AuditPipeline',
+        component: () => import('@/views/admin/audit-pipeline.vue'),
+        meta: { title: '审核流水线', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'audit-records',
+        name: 'AuditRecords',
+        component: () => import('@/views/admin/audit-records.vue'),
+        meta: { title: '审核记录', requiresAuth: true, requiresAdmin: true }
+      },
+      {
         path: 'poet-profiles',
         name: 'PoetProfiles',
         component: () => import('@/views/admin/poet-profiles.vue'),
@@ -286,6 +323,12 @@ const routes: RouteRecordRaw[] = [
         name: 'AdminRepairs',
         component: () => import('@/views/admin/repairs.vue'),
         meta: { title: '报修管理', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'reports',
+        name: 'AdminReports',
+        component: () => import('@/views/admin/reports.vue'),
+        meta: { title: '举报管理', requiresAuth: true, requiresAdmin: true }
       },
       {
         path: 'static-pages',
@@ -339,5 +382,14 @@ const router = createRouter({
 })
 
 setupRouterGuards(router)
+
+// 主题作用域跟随实际落地的路由：重定向到登录页等场景不会残留后台主题
+router.afterEach((to) => {
+  if (to.path.startsWith('/admin')) {
+    useAdminTheme().activate()
+  } else {
+    useAdminTheme().deactivate()
+  }
+})
 
 export default router

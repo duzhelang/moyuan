@@ -26,7 +26,8 @@ const moduleUsageMap: Record<string, string> = {
   feihua_gen_super: '飞花令 · 超级候选生成',
   feihua_verify: '飞花令 · 诗句真伪兜底核验',
   feihua_topic: '飞花令 · 主题语义匹配',
-  chain_generate: '诗词接龙 · 接句生成'
+  chain_generate: '诗词接龙 · 接句生成',
+  content_moderation: '帖子/评论发布 · AI自动风控（中高风险生成举报单，高风险限制展示）'
 }
 
 const models = ref<AiModelConfig[]>([])
@@ -68,7 +69,7 @@ function getModuleUsage(moduleCode: string) {
 }
 
 function getModelName(modelId: number | null) {
-  if (!modelId) return '未配置'
+  if (!modelId) return '默认模型'
   const model = models.value.find(m => m.id === modelId)
   return model ? model.displayName : '未知模型'
 }
@@ -171,7 +172,7 @@ onMounted(() => {
         </el-table-column>
         <el-table-column label="当前模型" width="140">
           <template #default="{ row }">
-            <el-tag :type="row.modelId ? 'success' : 'danger'" size="small">
+            <el-tag :type="row.modelId ? 'success' : 'info'" size="small">
               {{ getModelName(row.modelId) }}
             </el-tag>
           </template>
@@ -271,20 +272,20 @@ onMounted(() => {
       h3 {
         margin: 0 0 8px;
         font-size: 16px;
-        color: #5a3d1e;
+        color: var(--adm-text);
       }
 
       p {
         margin: 4px 0;
         font-size: 13px;
-        color: #7a6a55;
+        color: var(--adm-text-muted);
       }
 
       .tip-warn {
-        color: #b88230;
+        color: var(--adm-warn);
 
         strong {
-          color: #8a5a1e;
+          color: var(--adm-primary);
         }
       }
     }
@@ -292,13 +293,13 @@ onMounted(() => {
 
   .usage-text {
     font-size: 13px;
-    color: #6b5b45;
+    color: var(--adm-text-2);
   }
 
   .form-tip {
     margin-top: 6px;
     font-size: 12px;
-    color: #999;
+    color: var(--adm-text-muted);
   }
 }
 </style>

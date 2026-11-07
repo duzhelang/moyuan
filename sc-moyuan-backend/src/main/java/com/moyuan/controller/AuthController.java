@@ -5,6 +5,8 @@ import com.moyuan.dto.request.LoginRequest;
 import com.moyuan.dto.request.RefreshTokenRequest;
 import com.moyuan.dto.request.RegisterRequest;
 import com.moyuan.dto.response.TokenResponse;
+import com.moyuan.entity.SecurityEvent;
+import com.moyuan.service.SecurityEventService;
 import com.moyuan.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,6 +23,7 @@ import jakarta.servlet.http.HttpServletRequest;
 public class AuthController {
 
     private final UserService userService;
+    private final SecurityEventService securityEventService;
 
     @Operation(summary = "用户注册")
     @PostMapping("/register")
@@ -30,8 +33,15 @@ public class AuthController {
 
     @Operation(summary = "用户登录")
     @PostMapping("/login")
-    public R<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
-        return R.success(userService.login(request));
+    public R<TokenResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        try {
+            return R.success(userService.login(request));
+        } catch (RuntimeException e) {
+            // 登录失败属于安全审计事件，密码错误/账号锁定/验证失败都记一条
+            securityEventService.recordFromRequest(
+                    SecurityEvent.TYPE_LOGIN_FAIL, request.getUsername(), httpRequest, null);
+            throw e;
+        }
     }
 
     @Operation(summary = "刷新访问令牌")

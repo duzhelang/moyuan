@@ -1,74 +1,65 @@
 <script setup lang="ts">
+import { computed, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { adminMenus, reviewerMenus } from '@/configs/adminMenu'
+import { useAdminTabs } from '@/composables/useAdminTabs'
+import { useAdminTheme } from '@/composables/useAdminTheme'
+import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb.vue'
+import TagsView from '@/components/admin/TagsView.vue'
+import AdminThemeSwitch from '@/components/admin/AdminThemeSwitch.vue'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const { addTab, closeAll, tabs } = useAdminTabs()
+const { activate, deactivate } = useAdminTheme()
 
-const adminMenus = [
-  { path: '/admin/dashboard', name: 'dashboard', icon: 'DataAnalysis', label: '控制台' },
-  {
-    label: '用户管理',
-    icon: 'User',
-    children: [
-      { path: '/admin/users', name: 'AdminUsers', icon: 'User', label: '用户管理' }
-    ]
-  },
-  {
-    label: '内容管理',
-    icon: 'Document',
-    children: [
-      { path: '/admin/poems', name: 'AdminPoems', icon: 'Reading', label: '诗词管理' },
-      { path: '/admin/categories', name: 'AdminCategories', icon: 'FolderOpened', label: '分类管理' },
-      { path: '/admin/dynasties', name: 'AdminDynasties', icon: 'Clock', label: '朝代管理' },
-      { path: '/admin/poets', name: 'AdminPoets', icon: 'EditPen', label: '诗人管理' },
-      { path: '/admin/poet-featured', name: 'AdminPoetFeatured', icon: 'Star', label: '精选诗人管理' },
-      { path: '/admin/home-navigation', name: 'AdminHomeNavigation', icon: 'Guide', label: '首页导航管理' },
-      { path: '/admin/vision-articles', name: 'AdminVisionArticles', icon: 'Notebook', label: '诗话视野管理' },
-      { path: '/admin/system-knowledge', name: 'AdminSystemKnowledge', icon: 'Collection', label: '系统知识库' }
-    ]
-  },
-  {
-    label: '社区管理',
-    icon: 'ChatLineSquare',
-    children: [
-      { path: '/admin/forum-posts', name: 'AdminForumPosts', icon: 'ChatLineSquare', label: '帖子管理' },
-      { path: '/admin/repairs', name: 'AdminRepairs', icon: 'Tickets', label: '报修管理' }
-    ]
-  },
-  {
-    label: 'AI功能',
-    icon: 'Cpu',
-    children: [
-      { path: '/admin/ai-models', name: 'AdminAiModels', icon: 'Cpu', label: 'AI模型管理' },
-      { path: '/admin/ai-config', name: 'AdminAiConfig', icon: 'Setting', label: 'AI功能配置' }
-    ]
-  },
-  {
-    label: '审核管理',
-    icon: 'Checked',
-    children: [
-      { path: '/admin/poem-audit', name: 'PoemAudit', icon: 'Reading', label: '诗词审核' },
-      { path: '/admin/poet-profiles', name: 'PoetProfiles', icon: 'User', label: '诗人认证审核' },
-      { path: '/admin/poet-suggestions', name: 'AdminPoetSuggestions', icon: 'Checked', label: '诗人内容审核' },
-      { path: '/admin/ai-contents', name: 'AdminAiContents', icon: 'MagicStick', label: 'AI内容审核' },
-      { path: '/admin/comments', name: 'Comments', icon: 'ChatLineSquare', label: '评论管理' }
-    ]
-  },
-  {
-    label: '系统管理',
-    icon: 'Setting',
-    children: [
-      { path: '/admin/logs', name: 'AdminLogs', icon: 'Document', label: '操作日志' },
-      { path: '/admin/static-pages', name: 'AdminStaticPages', icon: 'Document', label: '静态页面管理' },
-      { path: '/admin/files', name: 'AdminFiles', icon: 'FolderOpened', label: '文件管理' },
-      { path: '/admin/cache', name: 'AdminCache', icon: 'Refresh', label: '缓存管理' }
-    ]
+/** 管理员看到全部后台菜单；审核员使用精简的审核工作台菜单 */
+const isReviewer = computed(() => userStore.userInfo?.role === 'reviewer')
+// 审核员菜单已按角色单独定义，过滤仅作为后备保护
+const REVIEWER_ALLOWED = new Set([
+  '/admin/audit-pipeline',
+  '/admin/audit-records',
+  '/admin/poem-audit',
+  '/admin/poet-profiles',
+  '/admin/poet-suggestions',
+  '/admin/ai-contents',
+  '/admin/comments',
+  '/admin/forum-posts',
+  '/admin/reports'
+])
+
+const visibleMenus = computed(() => {
+  if (userStore.userInfo?.role !== 'reviewer') {
+    return adminMenus
   }
-]
+  return reviewerMenus
+    .map((group) => ({
+      ...group,
+      children: (group.children || []).filter((item) =>
+        item.path ? REVIEWER_ALLOWED.has(item.path) : false
+      )
+    }))
+    .filter((group) => group.children.length > 0)
+})
+
+// 在父级 setup 阶段立即生效，保证子页面读取 CSS 变量时主题已就绪
+activate()
+
+onUnmounted(() => {
+  deactivate()
+})
+
+// 每次进入后台页面都登记标签；同一页面只换 query 时也要更新定位，所以监听 fullPath
+watch(
+  () => route.fullPath,
+  () => addTab(route),
+  { immediate: true }
+)
 
 const handleLogout = () => {
+  closeAll()
   userStore.logout()
   router.push('/')
 }
@@ -83,18 +74,15 @@ const goHome = () => {
     <el-container style="height: 100vh">
       <el-aside width="220px" class="admin-sidebar">
         <div class="sidebar-header">
-          <h2 class="sidebar-title">墨渊后台</h2>
+          <h2 class="sidebar-title">{{ isReviewer ? '墨渊 · 审核工作台' : '墨渊后台' }}</h2>
         </div>
         <el-menu
           :default-active="route.path"
           router
           class="sidebar-menu"
-          background-color="#001529"
-          text-color="#ffffff99"
-          active-text-color="#ffffff"
         >
-          <template v-for="menu in adminMenus" :key="menu.path || menu.label">
-            <el-menu-item v-if="!menu.children" :index="menu.path">
+          <template v-for="menu in visibleMenus" :key="menu.label">
+            <el-menu-item v-if="!menu.children" :index="menu.path || ''">
               <el-icon><component :is="menu.icon" /></el-icon>
               <span>{{ menu.label }}</span>
             </el-menu-item>
@@ -122,6 +110,7 @@ const goHome = () => {
             <span class="welcome-text">欢迎回来，{{ userStore.username }}</span>
           </div>
           <div class="header-right">
+            <AdminThemeSwitch />
             <el-button text @click="goHome">
               <el-icon><HomeFilled /></el-icon>
               返回前台
@@ -144,6 +133,10 @@ const goHome = () => {
           </div>
         </el-header>
 
+        <AdminBreadcrumb />
+        <!-- 只有控制台一个标签时不显示标签栏，避免首屏多占一行 -->
+        <TagsView v-if="tabs.length > 1" />
+
         <el-main class="admin-main">
           <router-view />
         </el-main>
@@ -155,11 +148,13 @@ const goHome = () => {
 <style scoped lang="scss">
 .admin-layout {
   height: 100vh;
+  background: var(--adm-bg);
 }
 
 .admin-sidebar {
-  background-color: #001529;
+  background-color: var(--adm-sidebar-bg);
   overflow-y: auto;
+  transition: background-color 0.25s;
 }
 
 .sidebar-header {
@@ -167,70 +162,80 @@ const goHome = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--adm-border-soft);
 }
 
 .sidebar-title {
-  color: #ffffff;
+  color: var(--adm-sidebar-text);
+  font-family: var(--adm-font-serif);
   font-size: 20px;
   font-weight: 600;
+  letter-spacing: 2px;
   margin: 0;
 }
 
 .sidebar-menu {
   border-right: none;
-  
+  background-color: transparent;
+
   :deep(.el-sub-menu) {
     .el-sub-menu__title {
       height: 56px;
       line-height: 56px;
-      
+      color: var(--adm-sidebar-text);
+
       &:hover {
-        background-color: rgba(255, 255, 255, 0.1) !important;
+        background-color: var(--adm-sidebar-active-bg) !important;
       }
     }
-    
+
     .el-menu {
-      background-color: #000c17 !important;
-      
+      background-color: var(--adm-sidebar-bg) !important;
+
       .el-menu-item {
         height: 50px;
         line-height: 50px;
         padding-left: 56px !important;
-        
+        color: var(--adm-sidebar-text);
+
         &:hover {
-          background-color: rgba(255, 255, 255, 0.1) !important;
+          background-color: var(--adm-sidebar-active-bg) !important;
         }
-        
+
         &.is-active {
-          background-color: #1890ff !important;
+          background-color: var(--adm-sidebar-active-bg) !important;
+          color: var(--adm-primary) !important;
         }
       }
     }
   }
-  
+
   :deep(.el-menu-item) {
     height: 56px;
     line-height: 56px;
-    
+    color: var(--adm-sidebar-text);
+
     &:hover {
-      background-color: rgba(255, 255, 255, 0.1) !important;
+      background-color: var(--adm-sidebar-active-bg) !important;
     }
-    
+
     &.is-active {
-      background-color: #1890ff !important;
+      background-color: var(--adm-sidebar-active-bg) !important;
+      color: var(--adm-primary) !important;
     }
   }
 }
 
 .admin-header {
-  background-color: #ffffff;
+  background-color: var(--adm-surface);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid var(--adm-border-soft);
+  box-shadow: none;
   z-index: 10;
+  transition: background-color 0.25s;
 }
 
 .header-left {
@@ -240,7 +245,7 @@ const goHome = () => {
 
 .welcome-text {
   font-size: 14px;
-  color: #666;
+  color: var(--adm-text-muted);
 }
 
 .header-right {
@@ -258,11 +263,14 @@ const goHome = () => {
 
 .username {
   font-size: 14px;
-  color: #333;
+  color: var(--adm-text-2);
 }
 
 .admin-main {
-  background-color: #f0f2f5;
+  background-color: var(--adm-bg);
+  background-image: var(--adm-page-gradient);
   padding: 20px;
+  overflow-y: auto;
+  transition: background-color 0.25s;
 }
 </style>

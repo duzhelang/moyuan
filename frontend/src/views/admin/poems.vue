@@ -224,7 +224,7 @@ onMounted(() => {
 .page-title {
   font-size: 24px;
   margin-bottom: 20px;
-  color: #333;
+  color: var(--adm-text);
 }
 
 .search-card {

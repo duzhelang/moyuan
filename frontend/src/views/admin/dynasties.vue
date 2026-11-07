@@ -146,7 +146,7 @@ onMounted(fetchData)
 </template>
 
 <style scoped lang="scss">
-.page-title { font-size: 24px; margin-bottom: 20px; color: #333; }
+.page-title { font-size: 24px; margin-bottom: 20px; color: var(--adm-text); }
 .table-card { border-radius: 8px; }
 .pagination-wrapper { display: flex; justify-content: flex-end; margin-top: 16px; }
 

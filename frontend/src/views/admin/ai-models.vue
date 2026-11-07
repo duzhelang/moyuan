@@ -491,7 +491,7 @@ onMounted(() => {
 .page-title {
   font-size: 24px;
   margin-bottom: 20px;
-  color: #333;
+  color: var(--adm-text);
 }
 
 .ai-tabs {
@@ -512,13 +512,13 @@ onMounted(() => {
 
 .vision-tip {
   font-size: 12px;
-  color: #e6a23c;
+  color: var(--adm-warn);
   margin-top: 4px;
 }
 
 .form-tip {
   font-size: 12px;
-  color: #909399;
+  color: var(--adm-text-muted);
   margin-top: 4px;
   line-height: 1.5;
 }

@@ -339,7 +339,7 @@ onMounted(() => {
 .page-title {
   font-size: 24px;
   margin-bottom: 20px;
-  color: #333;
+  color: var(--adm-text);
 }
 .table-card {
   border-radius: 8px;
@@ -376,7 +376,7 @@ onMounted(() => {
   p {
     margin: 0;
     font-size: 13px;
-    color: #666;
+    color: var(--adm-text-2);
     line-height: 1.6;
   }
 }

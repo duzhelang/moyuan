@@ -7,6 +7,7 @@ import com.moyuan.common.ResultCode;
 import com.moyuan.dto.request.ChatStreamRequest;
 import com.moyuan.entity.AiModuleConfig;
 import com.moyuan.exception.BusinessException;
+import com.moyuan.service.AiCallLogService;
 import com.moyuan.service.AiGuardService;
 import com.moyuan.service.AiModelConfigService;
 import com.moyuan.service.AiService;
@@ -37,6 +38,7 @@ public class AiController {
     private final AiService aiService;
     private final AiModelConfigService aiModelConfigService;
     private final AiGuardService aiGuardService;
+    private final AiCallLogService aiCallLogService;
 
     /** 古籍识文维护开关；与前端首页 OCR_ENABLED 同步 */
     @Value("${ai.features.ocr-enabled:false}")
@@ -53,10 +55,19 @@ public class AiController {
         String model = request.getOrDefault("model", "zhipu");
         String moduleCode = request.get("moduleCode");
 
-        String reply = aiService.chat(message, model, moduleCode);
-        if (!StringUtils.hasText(reply)) {
-            throw new BusinessException(ResultCode.ERROR, "AI 未返回内容，请稍后重试");
+        String reply;
+        long start = System.currentTimeMillis();
+        try {
+            reply = aiService.chat(message, model, moduleCode);
+            if (!StringUtils.hasText(reply)) {
+                throw new BusinessException(ResultCode.ERROR, "AI 未返回内容，请稍后重试");
+            }
+        } catch (RuntimeException e) {
+            aiCallLogService.error("chat", model, moduleCode,
+                    System.currentTimeMillis() - start, null, e.getMessage(), userId);
+            throw e;
         }
+        aiCallLogService.success("chat", model, moduleCode, System.currentTimeMillis() - start, null, userId);
         aiGuardService.consumeTokens(userId, AiInputValidator.estimateTokens(message, reply));
 
         return R.success(Map.of(
@@ -85,18 +96,49 @@ public class AiController {
         SseEmitter emitter = new SseEmitter(5 * 60 * 1000L); // 5 分钟
         AtomicBoolean cancelled = new AtomicBoolean(false);
         AtomicBoolean settled = new AtomicBoolean(false);
+        AtomicBoolean logged = new AtomicBoolean(false);
         AtomicLong outputChars = new AtomicLong(0);
+        // 流式接口的耗时从请求开始算，首字延迟从首个 delta 到达算
+        long streamStart = System.currentTimeMillis();
+        AtomicLong ttft = new AtomicLong(0);
+        String streamModel = request.getModuleCode() != null && !request.getModuleCode().isEmpty()
+                ? request.getModuleCode() : "default";
+
+        // 调用日志只写一次，避免 timeout/error/complete 回调叠加重复记录
+        java.util.function.BiConsumer<String, String> logStream = (status, errorMsg) -> {
+            if (!logged.compareAndSet(false, true)) {
+                return;
+            }
+            long duration = System.currentTimeMillis() - streamStart;
+            Long ttftValue = ttft.get() == 0 ? null : ttft.get();
+            if ("success".equals(status)) {
+                aiCallLogService.success("chat_stream", streamModel, request.getModuleCode(),
+                        duration, ttftValue, userId);
+            } else {
+                aiCallLogService.error("chat_stream", streamModel, request.getModuleCode(),
+                        duration, ttftValue, errorMsg, userId);
+            }
+        };
+
         emitter.onCompletion(() -> cancelled.set(true));
         emitter.onTimeout(() -> {
             cancelled.set(true);
+            logStream.accept("error", "timeout");
             emitter.complete();
         });
-        emitter.onError(e -> cancelled.set(true));
+        emitter.onError(e -> {
+            cancelled.set(true);
+            logStream.accept("error", e.getMessage());
+        });
 
         aiService.streamChat(messages, request.getModuleCode(), temperature, maxTokens,
                 new StreamCallback() {
                     @Override
                     public void onDelta(String delta) {
+                        // 只记第一个 delta 的到达时间，即首字延迟
+                        if (ttft.get() == 0) {
+                            ttft.compareAndSet(0, System.currentTimeMillis() - streamStart);
+                        }
                         outputChars.addAndGet(delta == null ? 0 : delta.length());
                         try {
                             emitter.send(SseEmitter.event().data(Map.of("delta", delta == null ? "" : delta)));
@@ -108,6 +150,7 @@ public class AiController {
                     @Override
                     public void onError(Throwable error) {
                         settleUsage();
+                        logStream.accept("error", error.getMessage() != null ? error.getMessage() : "生成失败");
                         try {
                             emitter.send(SseEmitter.event().data(Map.of("error",
                                     error.getMessage() != null ? error.getMessage() : "生成失败")));
@@ -120,6 +163,7 @@ public class AiController {
                     @Override
                     public void onComplete() {
                         settleUsage();
+                        logStream.accept("success", null);
                         try {
                             emitter.send(SseEmitter.event().data("[DONE]"));
                         } catch (IOException ignored) {
@@ -156,11 +200,21 @@ public class AiController {
         aiGuardService.checkRequest(userId);
         aiGuardService.checkVisionCall(userId);
 
-        Map<String, Object> checked = aiService.writePoemFromImageChecked(image, model, visionModel, moduleCode);
-        Object poem = checked.get("poem");
-        if (!(poem instanceof String poemText) || !StringUtils.hasText(poemText)) {
-            throw new BusinessException(ResultCode.ERROR, "AI 未返回诗词内容，请稍后重试");
+        long start = System.currentTimeMillis();
+        Map<String, Object> checked;
+        try {
+            checked = aiService.writePoemFromImageChecked(image, model, visionModel, moduleCode);
+            Object poem = checked.get("poem");
+            if (!(poem instanceof String poemText) || !StringUtils.hasText(poemText)) {
+                throw new BusinessException(ResultCode.ERROR, "AI 未返回诗词内容，请稍后重试");
+            }
+        } catch (RuntimeException e) {
+            aiCallLogService.error("write_poem", model, moduleCode,
+                    System.currentTimeMillis() - start, null, e.getMessage(), userId);
+            throw e;
         }
+        aiCallLogService.success("write_poem", model, moduleCode, System.currentTimeMillis() - start, null, userId);
+        String poemText = String.valueOf(checked.get("poem"));
         aiGuardService.consumeVisionCall(userId);
         aiGuardService.consumeTokens(userId, AiInputValidator.estimateTokens(poemText));
 
@@ -186,10 +240,19 @@ public class AiController {
         String model = request.getOrDefault("model", "zhipu");
         String moduleCode = request.get("moduleCode");
 
-        String analysis = aiService.analyzePoem(poem, model, moduleCode);
-        if (!StringUtils.hasText(analysis)) {
-            throw new BusinessException(ResultCode.ERROR, "AI 未返回分析内容，请稍后重试");
+        String analysis;
+        long start = System.currentTimeMillis();
+        try {
+            analysis = aiService.analyzePoem(poem, model, moduleCode);
+            if (!StringUtils.hasText(analysis)) {
+                throw new BusinessException(ResultCode.ERROR, "AI 未返回分析内容，请稍后重试");
+            }
+        } catch (RuntimeException e) {
+            aiCallLogService.error("analyze", model, moduleCode,
+                    System.currentTimeMillis() - start, null, e.getMessage(), userId);
+            throw e;
         }
+        aiCallLogService.success("analyze", model, moduleCode, System.currentTimeMillis() - start, null, userId);
         aiGuardService.consumeTokens(userId, AiInputValidator.estimateTokens(poem, analysis));
 
         return R.success(Map.of(
@@ -215,10 +278,19 @@ public class AiController {
         aiGuardService.checkRequest(userId);
         aiGuardService.checkVisionCall(userId);
 
-        String text = aiService.ocrImage(image, model, visionModel, moduleCode);
-        if (!StringUtils.hasText(text)) {
-            throw new BusinessException(ResultCode.ERROR, "AI 未识别到文字，请更换图片后重试");
+        String text;
+        long start = System.currentTimeMillis();
+        try {
+            text = aiService.ocrImage(image, model, visionModel, moduleCode);
+            if (!StringUtils.hasText(text)) {
+                throw new BusinessException(ResultCode.ERROR, "AI 未识别到文字，请更换图片后重试");
+            }
+        } catch (RuntimeException e) {
+            aiCallLogService.error("ocr", model, moduleCode,
+                    System.currentTimeMillis() - start, null, e.getMessage(), userId);
+            throw e;
         }
+        aiCallLogService.success("ocr", model, moduleCode, System.currentTimeMillis() - start, null, userId);
         aiGuardService.consumeVisionCall(userId);
         aiGuardService.consumeTokens(userId, AiInputValidator.estimateTokens(text));
 
@@ -242,11 +314,21 @@ public class AiController {
         String model = request.getOrDefault("model", "zhipu");
         String moduleCode = request.get("moduleCode");
 
-        Map<String, Object> checked = aiService.matchCoupletChecked(upperCouplet, model, moduleCode);
-        Object result = checked.get("result");
-        if (!(result instanceof String resultText) || !StringUtils.hasText(resultText)) {
-            throw new BusinessException(ResultCode.ERROR, "AI 未返回下联，请稍后重试");
+        Map<String, Object> checked;
+        long start = System.currentTimeMillis();
+        try {
+            checked = aiService.matchCoupletChecked(upperCouplet, model, moduleCode);
+            Object result = checked.get("result");
+            if (!(result instanceof String resultText) || !StringUtils.hasText(resultText)) {
+                throw new BusinessException(ResultCode.ERROR, "AI 未返回下联，请稍后重试");
+            }
+        } catch (RuntimeException e) {
+            aiCallLogService.error("couplet", model, moduleCode,
+                    System.currentTimeMillis() - start, null, e.getMessage(), userId);
+            throw e;
         }
+        aiCallLogService.success("couplet", model, moduleCode, System.currentTimeMillis() - start, null, userId);
+        String resultText = String.valueOf(checked.get("result"));
         long tokens = AiInputValidator.estimateTokens(upperCouplet, resultText);
         if (Boolean.TRUE.equals(checked.get("rewritten"))) {
             tokens *= 2; // 重写会再调用一次模型
@@ -265,9 +347,6 @@ public class AiController {
     @Operation(summary = "平仄校验")
     @PostMapping("/tone-check")
     public R<Map<String, Object>> toneCheck(@RequestBody Map<String, String> request) {
-        Long userId = SecurityUtil.getCurrentUserIdOrNull();
-        aiGuardService.checkRequest(userId);
-
         String text = AiInputValidator.requireText(request.get("text"), "text",
                 AiInputValidator.MAX_TONE_CHARS);
         // 本地确定性引擎，不调用大模型，因此不计 token

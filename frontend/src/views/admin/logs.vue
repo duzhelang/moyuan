@@ -123,7 +123,7 @@ onMounted(fetchData)
         <el-table-column prop="username" label="用户名" width="100" />
         <el-table-column label="耗时" width="90">
           <template #default="{ row }">
-            <span :style="{ color: row.duration > 1000 ? '#f56c6c' : '#666' }">{{ row.duration }}ms</span>
+            <span :style="{ color: row.duration > 1000 ? 'var(--adm-down)' : 'var(--adm-text-2)' }">{{ row.duration }}ms</span>
           </template>
         </el-table-column>
         <el-table-column label="状态" width="80">
@@ -153,7 +153,7 @@ onMounted(fetchData)
 .page-title {
   font-size: 24px;
   margin-bottom: 20px;
-  color: #333;
+  color: var(--adm-text);
 }
 
 .search-card {
@@ -180,16 +180,16 @@ onMounted(fetchData)
 
 .expand-label {
   font-weight: 600;
-  color: #333;
+  color: var(--adm-text);
 }
 
 .expand-value {
   margin: 4px 0 0;
   padding: 8px 12px;
-  background-color: #f5f7fa;
+  background-color: var(--adm-bg);
   border-radius: 4px;
   font-size: 13px;
-  color: #666;
+  color: var(--adm-text-2);
   white-space: pre-wrap;
   word-break: break-all;
   max-height: 200px;
@@ -197,6 +197,6 @@ onMounted(fetchData)
 }
 
 .error-text {
-  color: #f56c6c;
+  color: var(--adm-down);
 }
 </style>

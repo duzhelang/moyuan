@@ -1,0 +1,358 @@
+@use 'sass:color';
+
+/**
+ * 后台主题体系
+ * 三套实际主题 + 一套自动模式（由 JS 解析为 paper / night）
+ * 变量统一以 --adm- 前缀定义在 body 上，Element Plus 变量在同一作用域内映射，
+ * 因此后台内所有 Element 组件、teleport 到 body 的弹层都能自动跟随主题。
+ */
+
+@mixin admin-theme-tokens(
+  $bg,
+  $surface,
+  $surface-elevated,
+  $surface-muted,
+  $text,
+  $text-2,
+  $text-muted,
+  $text-faint,
+  $border,
+  $border-soft,
+  $primary,
+  $primary-soft,
+  $sidebar-bg,
+  $sidebar-text,
+  $sidebar-active-bg,
+  $shadow,
+  $ok,
+  $warn,
+  $down,
+  $unknown,
+  $c1,
+  $c2,
+  $c3,
+  $c4,
+  $c5,
+  $c6
+) {
+  // 基础色板
+  --adm-bg: #{$bg};
+  --adm-surface: #{$surface};
+  --adm-surface-elevated: #{$surface-elevated};
+  --adm-surface-muted: #{$surface-muted};
+  --adm-text: #{$text};
+  --adm-text-2: #{$text-2};
+  --adm-text-muted: #{$text-muted};
+  --adm-text-faint: #{$text-faint};
+  --adm-border: #{$border};
+  --adm-border-soft: #{$border-soft};
+  --adm-primary: #{$primary};
+  --adm-primary-soft: #{$primary-soft};
+  --adm-shadow: #{$shadow};
+
+  // 侧栏
+  --adm-sidebar-bg: #{$sidebar-bg};
+  --adm-sidebar-text: #{$sidebar-text};
+  --adm-sidebar-active-bg: #{$sidebar-active-bg};
+
+  // 状态色
+  --adm-ok: #{$ok};
+  --adm-warn: #{$warn};
+  --adm-down: #{$down};
+  --adm-unknown: #{$unknown};
+
+  // 图表色
+  --adm-chart-1: #{$c1};
+  --adm-chart-2: #{$c2};
+  --adm-chart-3: #{$c3};
+  --adm-chart-4: #{$c4};
+  --adm-chart-5: #{$c5};
+  --adm-chart-6: #{$c6};
+
+  // 字体
+  --adm-font-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Source Han Serif CN', 'Songti SC',
+    'STSong', 'SimSun', serif;
+  --adm-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', sans-serif;
+  --adm-font-mono: 'JetBrains Mono', 'SF Mono', Consolas, 'Courier New', monospace;
+
+  // ---------------- Element Plus 变量映射 ----------------
+  --el-color-primary: #{$primary};
+  --el-color-primary-light-3: #{color.mix($surface, $primary, 30%)};
+  --el-color-primary-light-5: #{color.mix($surface, $primary, 50%)};
+  --el-color-primary-light-7: #{color.mix($surface, $primary, 70%)};
+  --el-color-primary-light-8: #{color.mix($surface, $primary, 80%)};
+  --el-color-primary-light-9: #{color.mix($surface, $primary, 90%)};
+  --el-color-primary-dark-2: #{color.mix(#000, $primary, 20%)};
+
+  --el-color-success: #{$ok};
+  --el-color-warning: #{$warn};
+  --el-color-danger: #{$down};
+  --el-color-error: #{$down};
+  --el-color-info: #{$unknown};
+
+  --el-bg-color: #{$surface};
+  --el-bg-color-page: #{$bg};
+  --el-bg-color-overlay: #{$surface-elevated};
+  --el-text-color-primary: #{$text};
+  --el-text-color-regular: #{$text-2};
+  --el-text-color-secondary: #{$text-muted};
+  --el-text-color-placeholder: #{$text-faint};
+  --el-text-color-disabled: #{$text-faint};
+  --el-border-color: #{$border};
+  --el-border-color-light: #{$border-soft};
+  --el-border-color-lighter: #{$border-soft};
+  --el-border-color-extra-light: #{$border-soft};
+  --el-fill-color-blank: #{$surface};
+  --el-fill-color: #{$surface-muted};
+  --el-fill-color-light: #{$surface-muted};
+  --el-fill-color-lighter: #{$surface-muted};
+  --el-fill-color-extra-light: #{$surface-muted};
+  --el-fill-color-dark: #{$border-soft};
+  --el-disabled-bg-color: #{$surface-muted};
+  --el-disabled-text-color: #{$text-faint};
+  --el-disabled-border-color: #{$border-soft};
+  --el-mask-color: #{color.change($bg, $alpha: 0.72)};
+  --el-mask-color-extra-light: #{color.change($bg, $alpha: 0.3)};
+  --el-box-shadow: #{$shadow};
+  --el-box-shadow-light: #{$shadow};
+  --el-box-shadow-lighter: #{$shadow};
+  --el-box-shadow-dark: #{$shadow};
+
+  // 表格
+  --el-table-bg-color: #{$surface};
+  --el-table-tr-bg-color: #{$surface};
+  --el-table-header-bg-color: #{$surface-muted};
+  --el-table-row-hover-bg-color: #{$surface-muted};
+  --el-table-current-row-bg-color: #{$surface-muted};
+  --el-table-border-color: #{$border-soft};
+  --el-table-text-color: #{$text-2};
+  --el-table-header-text-color: #{$text-muted};
+  --el-table-fixed-box-shadow: #{$shadow};
+
+  // 菜单
+  --el-menu-bg-color: #{$sidebar-bg};
+  --el-menu-text-color: #{$sidebar-text};
+  --el-menu-hover-bg-color: #{$sidebar-active-bg};
+  --el-menu-active-color: #{$primary};
+
+  // 卡片
+  --el-card-bg-color: #{$surface};
+  --el-card-border-color: #{$border-soft};
+}
+
+/** 方案 A 宣纸墨韵（浅色文人书房） */
+body.admin-theme-active[data-admin-theme='paper'] {
+  @include admin-theme-tokens(
+    $bg: #f3eee4,
+    $surface: #fffdf7,
+    $surface-elevated: #fffdf7,
+    $surface-muted: #f8f3e9,
+    $text: #2b241c,
+    $text-2: #4a3f32,
+    $text-muted: #7b6c5a,
+    $text-faint: #a89880,
+    $border: rgba(120, 88, 48, 0.18),
+    $border-soft: rgba(120, 88, 48, 0.09),
+    $primary: #8a5a2b,
+    $primary-soft: #efe3cf,
+    $sidebar-bg: #2a211a,
+    $sidebar-text: #d9c9ae,
+    $sidebar-active-bg: rgba(201, 164, 92, 0.16),
+    $shadow: 0 6px 20px rgba(90, 61, 36, 0.08),
+    $ok: #5e7a5a,
+    $warn: #b88230,
+    $down: #a63a2e,
+    $unknown: #a89880,
+    $c1: #8a5a2b,
+    $c2: #c9a45c,
+    $c3: #6e8b7a,
+    $c4: #a63a2e,
+    $c5: #7b6c5a,
+    $c6: #b08d57
+  );
+
+  --adm-page-gradient: radial-gradient(1200px 480px at 18% -8%, rgba(201, 164, 92, 0.16), transparent 60%),
+    radial-gradient(900px 420px at 88% 0%, rgba(138, 90, 43, 0.08), transparent 62%);
+  --adm-grid-line: rgba(120, 88, 48, 0.045);
+  --adm-on-primary: #fffdf7;
+}
+
+/** 方案 B 夜墨金线（深色墨夜 + 金线） */
+body.admin-theme-active[data-admin-theme='night'] {
+  @include admin-theme-tokens(
+    $bg: #0d141b,
+    $surface: #141c24,
+    $surface-elevated: #1a232d,
+    $surface-muted: #1b242e,
+    $text: #e7dfd0,
+    $text-2: #cfc5b4,
+    $text-muted: #9c917f,
+    $text-faint: #6e665a,
+    $border: rgba(201, 164, 92, 0.2),
+    $border-soft: rgba(201, 164, 92, 0.1),
+    $primary: #c9a45c,
+    $primary-soft: #2a2418,
+    $sidebar-bg: #0a1015,
+    $sidebar-text: #cdbfa6,
+    $sidebar-active-bg: rgba(201, 164, 92, 0.14),
+    $shadow: 0 8px 28px rgba(0, 0, 0, 0.45),
+    $ok: #7f9d7a,
+    $warn: #d9a441,
+    $down: #c25a4a,
+    $unknown: #6e665a,
+    $c1: #c9a45c,
+    $c2: #6e8b7a,
+    $c3: #d9c9ae,
+    $c4: #c25a4a,
+    $c5: #7a8b99,
+    $c6: #8c7b5a
+  );
+
+  --adm-page-gradient: radial-gradient(1100px 460px at 15% -6%, rgba(201, 164, 92, 0.12), transparent 62%),
+    radial-gradient(900px 420px at 90% 2%, rgba(110, 139, 122, 0.1), transparent 60%);
+  --adm-grid-line: rgba(201, 164, 92, 0.05);
+  --adm-on-primary: #101820;
+}
+
+/** 方案 C 砚石墨白（中性工业浅色） */
+body.admin-theme-active[data-admin-theme='ink'] {
+  @include admin-theme-tokens(
+    $bg: #f2f3f5,
+    $surface: #ffffff,
+    $surface-elevated: #ffffff,
+    $surface-muted: #f7f8fa,
+    $text: #1f2329,
+    $text-2: #3a3f45,
+    $text-muted: #646a73,
+    $text-faint: #a2a6ad,
+    $border: rgba(31, 35, 41, 0.12),
+    $border-soft: rgba(31, 35, 41, 0.07),
+    $primary: #3a3f45,
+    $primary-soft: #eceef1,
+    $sidebar-bg: #23282e,
+    $sidebar-text: #d5d8dc,
+    $sidebar-active-bg: rgba(255, 255, 255, 0.1),
+    $shadow: 0 4px 16px rgba(31, 35, 41, 0.07),
+    $ok: #5e7a5a,
+    $warn: #b88230,
+    $down: #a63a2e,
+    $unknown: #a2a6ad,
+    $c1: #3a3f45,
+    $c2: #8a9099,
+    $c3: #a63a2e,
+    $c4: #5e7a5a,
+    $c5: #6b7280,
+    $c6: #b9bec5
+  );
+
+  --adm-page-gradient: none;
+  --adm-grid-line: rgba(31, 35, 41, 0.04);
+  --adm-on-primary: #ffffff;
+}
+
+/** 后台通用外观：卡片、折叠、滚动条统一走 token */
+body.admin-theme-active {
+  background: var(--adm-bg);
+  color: var(--adm-text);
+
+  .el-card {
+    --el-card-bg-color: var(--adm-surface);
+    --el-card-border-color: var(--adm-border-soft);
+    color: var(--adm-text);
+  }
+
+  .el-collapse {
+    --el-collapse-header-bg-color: var(--adm-surface);
+    --el-collapse-content-bg-color: var(--adm-surface);
+    --el-collapse-border-color: var(--adm-border-soft);
+    --el-collapse-header-text-color: var(--adm-text-2);
+    --el-collapse-content-text-color: var(--adm-text-2);
+  }
+
+  .el-tabs {
+    --el-tabs-header-height: 40px;
+  }
+
+  .el-descriptions {
+    --el-descriptions-item-bordered-label-background: var(--adm-surface-muted);
+  }
+
+  .el-empty {
+    --el-empty-fill-color-0: var(--adm-surface);
+    --el-empty-fill-color-1: var(--adm-surface-muted);
+    --el-empty-fill-color-2: var(--adm-surface-muted);
+  }
+
+  /* 滚动条 */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--adm-border);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/** 布局层：侧栏与主区 */
+body.admin-theme-active {
+  .admin-layout {
+    background: var(--adm-bg);
+  }
+
+  .admin-sidebar {
+    background: var(--adm-sidebar-bg) !important;
+    border-right: 1px solid var(--adm-border-soft);
+  }
+
+  .admin-main {
+    background-color: var(--adm-bg) !important;
+    background-image: var(--adm-page-gradient);
+    color: var(--adm-text);
+  }
+
+  .admin-header {
+    background: var(--adm-surface) !important;
+    border-bottom: 1px solid var(--adm-border-soft);
+    box-shadow: none;
+  }
+
+  .sidebar-menu {
+    background: var(--adm-sidebar-bg) !important;
+
+    .el-sub-menu .el-menu {
+      background: var(--adm-sidebar-bg) !important;
+    }
+
+    .el-menu-item,
+    .el-sub-menu__title {
+      color: var(--adm-sidebar-text) !important;
+
+      &:hover {
+        background: var(--adm-sidebar-active-bg) !important;
+      }
+
+      &.is-active {
+        background: var(--adm-sidebar-active-bg) !important;
+        color: var(--adm-sidebar-text) !important;
+
+        &::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 12px;
+          bottom: 12px;
+          width: 2px;
+          border-radius: 2px;
+          background: var(--adm-primary);
+        }
+      }
+    }
+  }
+}

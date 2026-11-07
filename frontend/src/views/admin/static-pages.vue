@@ -220,11 +220,11 @@ onMounted(fetchPages)
   h2 {
     font-size: 20px;
     margin: 0 0 8px;
-    color: #303133;
+    color: var(--adm-text);
   }
 
   .desc {
-    color: #909399;
+    color: var(--adm-text-muted);
     font-size: 14px;
     margin: 0;
   }
@@ -257,12 +257,12 @@ onMounted(fetchPages)
   align-items: center;
   margin-bottom: 16px;
   padding-bottom: 16px;
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--adm-border-soft);
 
   h3 {
     margin: 0;
     font-size: 16px;
-    color: #303133;
+    color: var(--adm-text);
   }
 }
 
@@ -287,7 +287,7 @@ onMounted(fetchPages)
 
 .section-index {
   font-weight: 600;
-  color: #409eff;
+  color: var(--adm-primary);
 }
 
 .section-actions {

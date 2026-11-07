@@ -237,7 +237,7 @@ onMounted(() => {
           <template #default="{ row }">
             <el-image :src="row.imageUrl" fit="cover" style="width: 60px; height: 60px; border-radius: 4px">
               <template #error>
-                <div style="width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; background: #f5f5f5; border-radius: 4px">
+                <div style="width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; background: var(--adm-surface-muted); border-radius: 4px">
                   <el-icon><Picture /></el-icon>
                 </div>
               </template>
@@ -335,7 +335,7 @@ onMounted(() => {
 .page-title {
   font-size: 24px;
   margin-bottom: 20px;
-  color: #333;
+  color: var(--adm-text);
 }
 
 .animation-card {
@@ -357,19 +357,19 @@ onMounted(() => {
 
 .animation-label {
   font-size: 14px;
-  color: #606266;
+  color: var(--adm-text-2);
   font-weight: 500;
 }
 
 .animation-preview {
   margin-top: 24px;
   padding-top: 16px;
-  border-top: 1px solid #ebeef5;
+  border-top: 1px solid var(--adm-border-soft);
 }
 
 .preview-title {
   font-size: 14px;
-  color: #606266;
+  color: var(--adm-text-2);
   font-weight: 500;
   margin-bottom: 16px;
 }
@@ -386,7 +386,7 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--adm-primary) 0%, var(--adm-chart-2) 100%);
   border-radius: 8px;
   color: white;
   cursor: pointer;

@@ -132,6 +132,164 @@ export function getVisitTrend(days?: number) {
   }>('/admin/stats/visits/trend', { params: { days } })
 }
 
+/** 链路节点健康检查（管理端） */
+export interface SystemHealthNode {
+  key: string
+  name: string
+  status: 'ok' | 'warn' | 'down'
+  latencyMs: number | null
+  message?: string
+  metrics: { label: string; value: string }[]
+}
+
+export interface SystemHealth {
+  checkedAt: string
+  nodes: SystemHealthNode[]
+}
+
+export function getSystemHealth() {
+  return request.get<SystemHealth>('/admin/system/health', { silent: true })
+}
+
+/** 接口调用指标（错误率 / P95 / 慢接口） */
+export interface SystemMetricsSlowApi {
+  path: string
+  count: number
+  avgMs: number
+  maxMs: number
+}
+
+export interface SystemMetrics {
+  windowHours: number
+  available: boolean
+  message?: string
+  total: number
+  errorCount: number
+  errorRate: number
+  avgMs: number
+  p95Ms: number | null
+  slowTop: SystemMetricsSlowApi[]
+}
+
+export function getSystemMetrics(hours = 24) {
+  return request.get<SystemMetrics>('/admin/system/metrics', {
+    params: { hours },
+    silent: true
+  })
+}
+
+export interface SearchKeywordRow {
+  keyword: string
+  count: number
+  avgResult: number
+}
+
+export interface SearchDailyRow {
+  date: string
+  total: number
+  noResult: number
+}
+
+export interface SearchMetrics {
+  windowDays: number
+  available: boolean
+  message?: string
+  total: number
+  noResult: number
+  noResultRate: number
+  distinctKeywords: number
+  topKeywords: SearchKeywordRow[]
+  topNoResult: SearchKeywordRow[]
+  trend: SearchDailyRow[]
+}
+
+export function getSearchMetrics(days = 7) {
+  return request.get<SearchMetrics>('/admin/system/search-metrics', {
+    params: { days },
+    silent: true
+  })
+}
+
+export interface AiEndpointRow {
+  endpoint: string
+  count: number
+  errorCount: number
+  avgMs: number
+}
+
+export interface AiModelRow {
+  model: string
+  count: number
+  errorCount: number
+}
+
+export interface AiMetrics {
+  windowHours: number
+  available: boolean
+  message?: string
+  total: number
+  errorCount: number
+  errorRate: number
+  avgMs: number
+  p95Ms: number | null
+  ttftAvgMs: number | null
+  streamCount: number
+  byEndpoint: AiEndpointRow[]
+  byModel: AiModelRow[]
+}
+
+export function getAiMetrics(hours = 24) {
+  return request.get<AiMetrics>('/admin/system/ai-metrics', {
+    params: { hours },
+    silent: true
+  })
+}
+
+export interface SecurityTypeRow {
+  type: string
+  count: number
+}
+
+export interface SecurityIpRow {
+  ip: string
+  count: number
+}
+
+export interface SecurityMetrics {
+  windowHours: number
+  available: boolean
+  message?: string
+  loginFail: number
+  forbidden: number
+  rateLimit: number
+  total: number
+  distinctIp: number
+  highRiskOps: number | null
+  byType: SecurityTypeRow[]
+  topIps: SecurityIpRow[]
+}
+
+export function getSecurityMetrics(hours = 24) {
+  return request.get<SecurityMetrics>('/admin/system/security-metrics', {
+    params: { hours },
+    silent: true
+  })
+}
+
+export interface RecentEvent {
+  time: string
+  source: 'ai' | 'security' | 'api'
+  title: string
+  detail: string
+}
+
+export function getRecentEvents(limit = 12) {
+  return request.get<RecentEvent[]>('/admin/system/recent-events', {
+    params: { limit },
+    silent: true
+  })
+}
+
 export function getAdminLogs(params?: { page?: number; size?: number; keyword?: string; startTime?: string; endTime?: string }) {
   return request.get<{ records: any[]; total: number }>('/admin/logs', { params })
 }
@@ -210,7 +368,7 @@ export function auditPoem(id: number, status: number, reason?: string) {
   return request.put<void>(`/admin/poems/${id}/audit`, { status, reason })
 }
 
-export function getAdminPoetProfiles(params: { page?: number; size?: number; status?: number | null }) {
+export function getAdminPoetProfiles(params: { page?: number; size?: number; status?: number }) {
   return request.get<{ records: any[]; total: number }>('/admin/poet-profiles', { params })
 }
 

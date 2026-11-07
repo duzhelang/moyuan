@@ -8,7 +8,14 @@ import router from './router'
 import App from './App.vue'
 import '@/assets/styles/original.css'
 import '@/assets/styles/global.scss'
+import '@/assets/styles/admin-themes.scss'
+import '@fontsource/noto-serif-sc/400.css'
+import '@fontsource/noto-serif-sc/600.css'
+import '@fontsource/noto-serif-sc/700.css'
 import { permission, permissionOr, permissionAnd } from './directives/permission'
+import { initAdminTheme } from '@/composables/useAdminTheme'
+
+initAdminTheme()
 
 const app = createApp(App)
 const pinia = createPinia()

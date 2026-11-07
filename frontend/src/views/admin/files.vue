@@ -220,15 +220,15 @@ onMounted(() => {
   width: 220px;
   .stat-label {
     font-size: 13px;
-    color: #909399;
+    color: var(--adm-text-muted);
     margin-bottom: 8px;
   }
   .stat-value {
     font-size: 22px;
     font-weight: 600;
-    color: #303133;
+    color: var(--adm-text);
     &.warn {
-      color: #e6a23c;
+      color: var(--adm-warn);
     }
   }
 }
@@ -239,13 +239,13 @@ onMounted(() => {
     flex-wrap: wrap;
     gap: 4px 12px;
     font-size: 13px;
-    color: #606266;
+    color: var(--adm-text-2);
     max-height: 72px;
     overflow-y: auto;
   }
   .type-empty {
     font-size: 13px;
-    color: #c0c4cc;
+    color: var(--adm-text-faint);
   }
 }
 .filter-bar {

@@ -7,8 +7,11 @@ import { LineChart, BarChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import experiment from '@/data/recommend-experiment.json'
 import { MODEL_STRATEGY_LABELS, recommendApi, type RecommendLiveStats } from '@/api/modules/recommend'
+import { readChartPalette, useAdminTheme } from '@/composables/useAdminTheme'
 
 use([CanvasRenderer, LineChart, BarChart, GridComponent, LegendComponent, TooltipComponent])
+
+const { resolvedTheme } = useAdminTheme()
 
 interface Strategy {
   key: string
@@ -39,6 +42,23 @@ const COPPER = '#a05a2c'
 const COPPER_SOFT = 'rgba(160, 90, 44, 0.4)'
 const CLUSTER_A = '#cfa14d'
 const CLUSTER_B = '#a9714f'
+
+/** 大屏图表文字色随主题变化，深色下避免深棕字落在深底上 */
+const ink = computed(() => {
+  void resolvedTheme.value
+  const styles = getComputedStyle(document.body)
+  const read = (name: string) => styles.getPropertyValue(name).trim()
+  return {
+    text: read('--adm-text'),
+    muted: read('--adm-text-muted'),
+    faint: read('--adm-text-faint'),
+    border: read('--adm-border'),
+    surface: read('--adm-surface'),
+    gold: read('--adm-chart-2'),
+    copper: read('--adm-chart-1'),
+    palette: readChartPalette()
+  }
+})
 
 const panelRef = ref<HTMLElement | null>(null)
 const isFullscreen = ref(false)
@@ -127,13 +147,13 @@ const axisMax = (values: number[]) => Math.ceil((Math.max(...values) * 1.18) / 0
 const mainValues = strategies.flatMap(s => [s.recall, s.ndcg])
 const clusterValues = clusters.flatMap(c => Object.values(c.recall))
 
-const tooltipStyle = {
-  backgroundColor: 'rgba(255, 252, 244, 0.97)',
-  borderColor: 'rgba(150, 105, 50, 0.45)',
+const tooltipStyle = computed(() => ({
+  backgroundColor: ink.value.surface,
+  borderColor: ink.value.border,
   borderWidth: 1,
   padding: [8, 12],
-  textStyle: { color: '#5a3d24', fontSize: 12 }
-}
+  textStyle: { color: ink.value.text, fontSize: 12 }
+}))
 
 const mainChartOption = computed(() => ({
   backgroundColor: 'transparent',
@@ -145,10 +165,10 @@ const mainChartOption = computed(() => ({
     itemWidth: 10,
     itemHeight: 10,
     itemGap: 18,
-    textStyle: { color: '#8a6a45', fontSize: 11 }
+    textStyle: { color: ink.value.muted, fontSize: 11 }
   },
   tooltip: {
-    ...tooltipStyle,
+    ...tooltipStyle.value,
     trigger: 'axis',
     axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(150, 105, 50, 0.08)' } },
     valueFormatter: (value: number) => Number(value).toFixed(4)
@@ -159,11 +179,11 @@ const mainChartOption = computed(() => ({
     axisLine: { show: false },
     axisTick: { show: false },
     axisLabel: {
-      color: 'rgba(90, 61, 36, 0.55)',
+      color: ink.value.faint,
       fontSize: 10,
       formatter: (value: number) => value.toFixed(2)
     },
-    splitLine: { lineStyle: { color: 'rgba(150, 105, 50, 0.15)' } }
+    splitLine: { lineStyle: { color: ink.value.border } }
   },
   yAxis: {
     type: 'category',
@@ -171,7 +191,7 @@ const mainChartOption = computed(() => ({
     data: strategies.map(s => s.label),
     axisLine: { show: false },
     axisTick: { show: false },
-    axisLabel: { color: '#5a3d24', fontSize: 12 }
+    axisLabel: { color: ink.value.text, fontSize: 12 }
   },
   series: [
     {
@@ -212,7 +232,7 @@ const mainChartOption = computed(() => ({
         show: true,
         position: 'right',
         distance: 6,
-        color: '#8a5a2b',
+        color: ink.value.copper,
         fontSize: 10,
         formatter: (params: { value: number }) => Number(params.value).toFixed(3)
       }
@@ -230,10 +250,10 @@ const clusterChartOption = computed(() => ({
     itemWidth: 10,
     itemHeight: 10,
     itemGap: 16,
-    textStyle: { color: '#8a6a45', fontSize: 11 }
+    textStyle: { color: ink.value.muted, fontSize: 11 }
   },
   tooltip: {
-    ...tooltipStyle,
+    ...tooltipStyle.value,
     trigger: 'axis',
     axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(150, 105, 50, 0.08)' } },
     valueFormatter: (value: number) => Number(value).toFixed(4)
@@ -244,11 +264,11 @@ const clusterChartOption = computed(() => ({
     axisLine: { show: false },
     axisTick: { show: false },
     axisLabel: {
-      color: 'rgba(90, 61, 36, 0.55)',
+      color: ink.value.faint,
       fontSize: 10,
       formatter: (value: number) => value.toFixed(2)
     },
-    splitLine: { lineStyle: { color: 'rgba(150, 105, 50, 0.15)' } }
+    splitLine: { lineStyle: { color: ink.value.border } }
   },
   yAxis: {
     type: 'category',
@@ -256,7 +276,7 @@ const clusterChartOption = computed(() => ({
     data: strategies.map(s => s.shortLabel),
     axisLine: { show: false },
     axisTick: { show: false },
-    axisLabel: { color: '#6b5236', fontSize: 11 }
+    axisLabel: { color: ink.value.muted, fontSize: 11 }
   },
   series: clusters.map((cluster, index) => ({
     name: cluster.label,
@@ -298,7 +318,7 @@ const liveTrendOption = computed(() => ({
   animationDuration: 520,
   grid: { left: 6, right: 16, top: 22, bottom: 2, containLabel: true },
   tooltip: {
-    ...tooltipStyle,
+    ...tooltipStyle.value,
     trigger: 'axis',
     valueFormatter: (value: number) => `${value} 次`
   },
@@ -316,7 +336,7 @@ const liveTrendOption = computed(() => ({
     axisLine: { show: false },
     axisTick: { show: false },
     axisLabel: { color: 'rgba(90, 61, 36, 0.55)', fontSize: 10 },
-    splitLine: { lineStyle: { color: 'rgba(150, 105, 50, 0.15)' } }
+    splitLine: { lineStyle: { color: ink.value.border } }
   },
   series: [
     {
@@ -338,7 +358,7 @@ const liveStrategyOption = computed(() => ({
   animationDuration: 520,
   grid: { left: 4, right: 44, top: 12, bottom: 2, containLabel: true },
   tooltip: {
-    ...tooltipStyle,
+    ...tooltipStyle.value,
     trigger: 'axis',
     axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(150, 105, 50, 0.08)' } },
     valueFormatter: (value: number) => `${value} 次`
@@ -349,7 +369,7 @@ const liveStrategyOption = computed(() => ({
     axisLine: { show: false },
     axisTick: { show: false },
     axisLabel: { color: 'rgba(90, 61, 36, 0.55)', fontSize: 10 },
-    splitLine: { lineStyle: { color: 'rgba(150, 105, 50, 0.15)' } }
+    splitLine: { lineStyle: { color: ink.value.border } }
   },
   yAxis: {
     type: 'category',
@@ -357,7 +377,7 @@ const liveStrategyOption = computed(() => ({
     data: liveByStrategy.value.map(item => strategyName(item.name)),
     axisLine: { show: false },
     axisTick: { show: false },
-    axisLabel: { color: '#5a3d24', fontSize: 12 }
+    axisLabel: { color: ink.value.text, fontSize: 12 }
   },
   series: [
     {
@@ -369,7 +389,7 @@ const liveStrategyOption = computed(() => ({
         show: true,
         position: 'right',
         distance: 6,
-        color: '#9a6b2f',
+        color: ink.value.gold,
         fontSize: 10,
         formatter: (params: { value: number }) => `${params.value}`
       },
@@ -616,13 +636,13 @@ onBeforeUnmount(() => {
   margin-bottom: 20px;
   padding: 22px 24px 20px;
   border-radius: 14px;
-  border: 1px solid rgba(150, 105, 50, 0.28);
+  border: 1px solid var(--adm-border);
   background:
     radial-gradient(1100px 380px at 12% -12%, rgba(201, 164, 92, 0.18), transparent 62%),
     radial-gradient(900px 460px at 102% 4%, rgba(178, 118, 62, 0.1), transparent 58%),
-    linear-gradient(158deg, #fdfaf3 0%, #f8efdd 55%, #f2e4c9 100%);
+    linear-gradient(158deg, var(--adm-surface) 0%, var(--adm-surface-muted) 55%, var(--adm-bg) 100%);
   box-shadow:
-    inset 0 0 60px rgba(255, 255, 255, 0.4),
+    inset 0 0 60px color-mix(in srgb, var(--adm-primary) 5%, transparent),
     0 10px 26px rgba(120, 85, 40, 0.14);
   overflow: hidden;
 
@@ -632,7 +652,7 @@ onBeforeUnmount(() => {
     position: absolute;
     width: 26px;
     height: 26px;
-    border-color: rgba(150, 105, 50, 0.45);
+    border-color: var(--adm-border);
     border-style: solid;
     pointer-events: none;
   }
@@ -693,7 +713,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 16px;
   padding-bottom: 14px;
-  border-bottom: 1px solid rgba(150, 105, 50, 0.22);
+  border-bottom: 1px solid var(--adm-border-soft);
 
   &::after {
     content: '';
@@ -702,7 +722,7 @@ onBeforeUnmount(() => {
     bottom: -1px;
     width: 180px;
     height: 1px;
-    background: linear-gradient(90deg, #b98a3e, rgba(185, 138, 62, 0));
+    background: linear-gradient(90deg, var(--adm-primary), transparent);
   }
 }
 
@@ -710,7 +730,7 @@ onBeforeUnmount(() => {
   margin: 0 0 6px;
   font-size: 10px;
   letter-spacing: 3px;
-  color: rgba(150, 105, 50, 0.75);
+  color: var(--adm-text-muted);
 }
 
 .head-title {
@@ -719,7 +739,7 @@ onBeforeUnmount(() => {
   font-size: 23px;
   font-weight: 700;
   letter-spacing: 2px;
-  background: linear-gradient(92deg, #5f4423, #a06428 46%, #5f4423);
+  background: linear-gradient(92deg, var(--adm-text), var(--adm-primary) 46%, var(--adm-text));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -729,7 +749,7 @@ onBeforeUnmount(() => {
 .head-sub {
   margin: 6px 0 0;
   font-size: 12px;
-  color: rgba(90, 61, 36, 0.72);
+  color: var(--adm-text-muted);
 }
 
 .head-side {
@@ -745,14 +765,14 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   font-size: 11px;
-  color: rgba(90, 61, 36, 0.55);
+  color: var(--adm-text-faint);
 }
 
 .meta-dot {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: rgba(150, 105, 50, 0.55);
+  background: var(--adm-text-faint);
 }
 
 .fs-btn {
@@ -761,17 +781,17 @@ onBeforeUnmount(() => {
   gap: 6px;
   padding: 5px 12px;
   font-size: 12px;
-  color: #7a5230;
+  color: var(--adm-text-2);
   background: rgba(201, 164, 92, 0.14);
-  border: 1px solid rgba(150, 105, 50, 0.4);
+  border: 1px solid var(--adm-border);
   border-radius: 999px;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    color: #5a3d24;
+    color: var(--adm-text);
     background: rgba(201, 164, 92, 0.26);
-    border-color: rgba(150, 105, 50, 0.6);
+    border-color: var(--adm-border);
     box-shadow: 0 0 12px rgba(201, 164, 92, 0.3);
   }
 }
@@ -783,7 +803,7 @@ onBeforeUnmount(() => {
   row-gap: 4px;
   margin-top: 12px;
   font-size: 11px;
-  color: rgba(90, 61, 36, 0.6);
+  color: var(--adm-text-muted);
 
   .meta-item {
     display: inline-flex;
@@ -793,7 +813,7 @@ onBeforeUnmount(() => {
     & + .meta-item::before {
       content: '·';
       margin: 0 12px;
-      color: rgba(150, 105, 50, 0.5);
+      color: var(--adm-text-faint);
     }
   }
 
@@ -801,7 +821,7 @@ onBeforeUnmount(() => {
     font-family: 'Georgia', $font-family-base;
     font-size: 13px;
     font-weight: 600;
-    color: #8a5a2b;
+    color: var(--adm-primary);
     font-variant-numeric: tabular-nums;
   }
 
@@ -810,7 +830,7 @@ onBeforeUnmount(() => {
   }
 
   .meta-live b {
-    color: #a06428;
+    color: var(--adm-primary);
   }
 
   .live-dot {
@@ -818,7 +838,7 @@ onBeforeUnmount(() => {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #4e9a51;
+    background: var(--adm-ok);
     animation: live-pulse 2s ease-in-out infinite;
   }
 }
@@ -852,13 +872,13 @@ onBeforeUnmount(() => {
   min-width: 0;
   padding: 12px 14px 10px;
   border-radius: 10px;
-  border: 1px solid rgba(150, 105, 50, 0.2);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 250, 240, 0.3));
+  border: 1px solid var(--adm-border-soft);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--adm-primary) 6%, transparent), transparent);
   transition: border-color 0.2s ease, background 0.2s ease;
 
   &:hover {
-    border-color: rgba(150, 105, 50, 0.42);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 250, 240, 0.4));
+    border-color: var(--adm-border);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--adm-primary) 10%, transparent), transparent);
   }
 }
 
@@ -876,7 +896,7 @@ onBeforeUnmount(() => {
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 1px;
-  color: #5a3d24;
+  color: var(--adm-text);
 
   &::before {
     content: '';
@@ -886,13 +906,13 @@ onBeforeUnmount(() => {
     width: 3px;
     height: 12px;
     border-radius: 2px;
-    background: linear-gradient(180deg, #c9a45c, #a06428);
+    background: linear-gradient(180deg, var(--adm-chart-2), var(--adm-primary));
   }
 }
 
 .pane-note {
   font-size: 11px;
-  color: rgba(90, 61, 36, 0.5);
+  color: var(--adm-text-faint);
   white-space: nowrap;
 }
 
@@ -917,7 +937,7 @@ onBeforeUnmount(() => {
   margin: 6px 2px 0;
   font-size: 11px;
   line-height: 1.7;
-  color: rgba(90, 61, 36, 0.45);
+  color: var(--adm-text-faint);
 }
 
 .live-table {
@@ -943,32 +963,32 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 7px 8px;
   font-size: 11px;
-  color: #6b5236;
+  color: var(--adm-text-muted);
   font-variant-numeric: tabular-nums;
 
   & + .event-row {
-    border-top: 1px dashed rgba(150, 105, 50, 0.18);
+    border-top: 1px dashed var(--adm-border-soft);
   }
 }
 
 .ev-time {
-  color: rgba(90, 61, 36, 0.55);
+  color: var(--adm-text-faint);
 }
 
 .ev-flow {
-  color: #8a5a2b;
+  color: var(--adm-primary);
 }
 
 .ev-page {
   text-align: right;
-  color: rgba(90, 61, 36, 0.55);
+  color: var(--adm-text-faint);
 }
 
 .cluster-foot {
   margin: 2px 2px 0;
   font-size: 11px;
   line-height: 1.7;
-  color: rgba(90, 61, 36, 0.5);
+  color: var(--adm-text-faint);
 }
 
 :fullscreen .chart-main,
@@ -989,11 +1009,11 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 7px 8px;
   border-radius: 6px;
-  color: #6b5236;
+  color: var(--adm-text-muted);
   transition: background 0.18s ease, color 0.18s ease;
 
   & + .mt-row {
-    border-top: 1px solid rgba(150, 105, 50, 0.14);
+    border-top: 1px solid var(--adm-border-soft);
   }
 
   & > span:not(.mt-name) {
@@ -1003,7 +1023,7 @@ onBeforeUnmount(() => {
 
 .mt-row.mt-active {
   background: rgba(201, 164, 92, 0.18);
-  color: #4a3218;
+  color: var(--adm-text);
   box-shadow: inset 2px 0 0 rgba(160, 100, 40, 0.55);
 }
 
@@ -1011,20 +1031,20 @@ onBeforeUnmount(() => {
   border-top: 0 !important;
   font-size: 11px;
   letter-spacing: 0.5px;
-  color: #a08050;
+  color: var(--adm-text-faint);
 }
 
 .mt-name {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #5a3d24;
+  color: var(--adm-text);
 }
 
 .mt-best {
   background: rgba(201, 164, 92, 0.2);
-  color: #4a3218;
-  box-shadow: inset 2px 0 0 #b98a3e;
+  color: var(--adm-text);
+  box-shadow: inset 2px 0 0 var(--adm-primary);
 }
 
 .best-tag {
@@ -1032,8 +1052,8 @@ onBeforeUnmount(() => {
   font-size: 10px;
   font-style: normal;
   line-height: 16px;
-  color: #3a2a14;
-  background: linear-gradient(90deg, #e8c987, #c99a4e);
+  color: var(--adm-text);
+  background: linear-gradient(90deg, var(--adm-chart-2), var(--adm-primary));
   border-radius: 3px;
 }
 
@@ -1041,7 +1061,7 @@ onBeforeUnmount(() => {
   margin: 8px 2px 2px;
   font-size: 11px;
   line-height: 1.7;
-  color: rgba(90, 61, 36, 0.5);
+  color: var(--adm-text-faint);
 }
 
 .insight-list {
@@ -1055,7 +1075,7 @@ onBeforeUnmount(() => {
   padding: 9px 0;
 
   & + .insight {
-    border-top: 1px dashed rgba(150, 105, 50, 0.25);
+    border-top: 1px dashed var(--adm-border-soft);
   }
 }
 
@@ -1068,14 +1088,14 @@ onBeforeUnmount(() => {
 
 .insight-title {
   font-size: 12px;
-  color: #5a3d24;
+  color: var(--adm-text);
 }
 
 .insight-value {
   font-family: 'Georgia', $font-family-base;
   font-size: 14px;
   font-weight: 700;
-  color: #9a6b2f;
+  color: var(--adm-primary);
   white-space: nowrap;
 }
 
@@ -1083,7 +1103,7 @@ onBeforeUnmount(() => {
   margin: 4px 0 0;
   font-size: 11px;
   line-height: 1.7;
-  color: rgba(90, 61, 36, 0.55);
+  color: var(--adm-text-faint);
 }
 
 .chips {
@@ -1095,7 +1115,7 @@ onBeforeUnmount(() => {
 .chip {
   padding: 3px 10px;
   font-size: 11px;
-  color: #7a5a30;
+  color: var(--adm-text-2);
   border: 1px solid rgba(150, 105, 50, 0.35);
   border-radius: 999px;
   background: rgba(201, 164, 92, 0.12);

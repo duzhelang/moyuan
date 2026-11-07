@@ -172,7 +172,7 @@ onMounted(() => {
           <template #default="{ row }">
             <el-image :src="row.imageUrl" :size="50" fit="cover" style="width: 60px; height: 60px; border-radius: 4px">
               <template #error>
-                <div style="width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; background: #f5f5f5; border-radius: 4px">
+                <div style="width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; background: var(--adm-surface-muted); border-radius: 4px">
                   <el-icon><Picture /></el-icon>
                 </div>
               </template>
@@ -265,7 +265,7 @@ onMounted(() => {
 .page-title {
   font-size: 24px;
   margin-bottom: 20px;
-  color: #333;
+  color: var(--adm-text);
 }
 .table-card {
   border-radius: 8px;

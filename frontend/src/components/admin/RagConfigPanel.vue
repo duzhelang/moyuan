@@ -176,7 +176,7 @@ onMounted(loadData)
 }
 .panel-tip {
   margin: 0 0 16px;
-  color: #606266;
+  color: var(--adm-text-2);
   font-size: 13px;
   line-height: 1.7;
 }

@@ -2,6 +2,10 @@ package com.moyuan.exception;
 
 import com.moyuan.common.R;
 import com.moyuan.common.ResultCode;
+import com.moyuan.entity.SecurityEvent;
+import com.moyuan.service.SecurityEventService;
+import com.moyuan.util.SecurityUtil;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.BindException;
@@ -15,12 +19,20 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import java.util.stream.Collectors;
 
 @Slf4j
+@RequiredArgsConstructor
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private final SecurityEventService securityEventService;
 
     @ExceptionHandler(BusinessException.class)
     public R<Void> handleBusinessException(BusinessException e) {
         log.warn("业务异常：{}", e.getMessage());
+        // AI 限流触发属于安全审计事件，单独计数（不影响接口错误率）
+        if (ResultCode.AI_RATE_LIMITED.getCode().equals(e.getCode())) {
+            securityEventService.record(SecurityEvent.TYPE_RATE_LIMIT, e.getMessage(), null,
+                    SecurityUtil.getCurrentUserIdOrNull());
+        }
         return R.error(e.getCode(), e.getMessage());
     }
 

@@ -455,7 +455,7 @@ onMounted(fetchData)
 .page-title {
   font-size: 24px;
   margin-bottom: 20px;
-  color: #333;
+  color: var(--adm-text);
 }
 
 .stats-bar {
@@ -465,13 +465,13 @@ onMounted(fetchData)
 
   .stat-item {
     flex: 1;
-    background: #fff;
+    background: var(--adm-surface);
     border-radius: 8px;
     padding: 16px 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    border: 1px solid #e4e7ed;
+    border: 1px solid var(--adm-border);
     transition: box-shadow 0.3s;
 
     &:hover {
@@ -481,16 +481,16 @@ onMounted(fetchData)
     .stat-value {
       font-size: 28px;
       font-weight: 600;
-      color: #303133;
+      color: var(--adm-text);
       line-height: 1.2;
 
-      &.enabled { color: #67c23a; }
-      &.disabled { color: #f56c6c; }
+      &.enabled { color: var(--adm-ok); }
+      &.disabled { color: var(--adm-down); }
     }
 
     .stat-label {
       font-size: 13px;
-      color: #909399;
+      color: var(--adm-text-muted);
       margin-top: 4px;
     }
   }
@@ -522,7 +522,7 @@ onMounted(fetchData)
   gap: 12px;
   margin-bottom: 16px;
   padding-bottom: 16px;
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--adm-border-soft);
 }
 
 .empty-state {
@@ -545,7 +545,7 @@ onMounted(fetchData)
 
 .category-group {
   margin-bottom: 20px;
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--adm-border);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -555,8 +555,8 @@ onMounted(fetchData)
   justify-content: space-between;
   align-items: center;
   padding: 14px 20px;
-  background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ed 100%);
-  border-bottom: 1px solid #e4e7ed;
+  background: linear-gradient(135deg, var(--adm-bg) 0%, var(--adm-border) 100%);
+  border-bottom: 1px solid var(--adm-border);
 }
 
 .category-info {
@@ -571,7 +571,7 @@ onMounted(fetchData)
 }
 
 .category-desc {
-  color: #606266;
+  color: var(--adm-text-2);
   font-size: 13px;
   max-width: 400px;
   overflow: hidden;
@@ -582,13 +582,13 @@ onMounted(fetchData)
   transition: all 0.2s ease;
 
   &:hover {
-    color: #409eff;
-    border-bottom-color: #409eff;
+    color: var(--adm-primary);
+    border-bottom-color: var(--adm-primary);
   }
 }
 
 .category-time {
-  color: #c0c4cc;
+  color: var(--adm-text-faint);
   font-size: 12px;
 }
 
@@ -610,21 +610,21 @@ onMounted(fetchData)
 }
 
 .sub-category-item {
-  background: #f9fafc;
+  background: var(--adm-surface-muted);
   border-radius: 6px;
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--adm-border-soft);
   transition: all 0.3s ease;
   cursor: pointer;
   overflow: hidden;
 
   &:hover {
-    background: #f0f2f5;
-    border-color: #c0c4cc;
+    background: var(--adm-bg);
+    border-color: var(--adm-text-faint);
   }
 
   &.is-expanded {
     grid-column: 1 / -1;
-    border-color: #409eff;
+    border-color: var(--adm-primary);
     box-shadow: 0 2px 12px rgba(64, 158, 255, 0.1);
   }
 }
@@ -650,7 +650,7 @@ onMounted(fetchData)
 }
 
 .sub-desc-text {
-  color: #606266;
+  color: var(--adm-text-2);
   font-size: 12px;
   flex: 1;
   min-width: 0;
@@ -660,7 +660,7 @@ onMounted(fetchData)
 }
 
 .sub-sort {
-  color: #c0c4cc;
+  color: var(--adm-text-faint);
   font-size: 11px;
   white-space: nowrap;
 }
@@ -673,8 +673,8 @@ onMounted(fetchData)
 
 .sub-detail {
   padding: 14px;
-  background: #fff;
-  border-top: 1px solid #ebeef5;
+  background: var(--adm-surface);
+  border-top: 1px solid var(--adm-border-soft);
   animation: slideDown 0.3s ease;
 }
 
@@ -693,7 +693,7 @@ onMounted(fetchData)
   display: flex;
   align-items: flex-start;
   padding: 8px 0;
-  border-bottom: 1px dashed #ebeef5;
+  border-bottom: 1px dashed var(--adm-border-soft);
 
   &:last-child {
     border-bottom: none;
@@ -701,14 +701,14 @@ onMounted(fetchData)
 }
 
 .detail-label {
-  color: #909399;
+  color: var(--adm-text-muted);
   font-size: 13px;
   min-width: 80px;
   flex-shrink: 0;
 }
 
 .detail-value {
-  color: #303133;
+  color: var(--adm-text);
   font-size: 13px;
   flex: 1;
   word-break: break-all;
@@ -716,7 +716,7 @@ onMounted(fetchData)
 
 .no-sub {
   padding: 12px 20px;
-  color: #c0c4cc;
+  color: var(--adm-text-faint);
   font-size: 13px;
   text-align: center;
 }

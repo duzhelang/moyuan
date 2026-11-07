@@ -111,7 +111,7 @@ const handleClearAll = async () => {
   }
   .card-desc {
     font-size: 13px;
-    color: #909399;
+    color: var(--adm-text-muted);
     margin-bottom: 16px;
     min-height: 36px;
   }
