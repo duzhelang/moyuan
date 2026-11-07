@@ -105,3 +105,29 @@ ai:
     daily-tokens: ${AI_GUARD_DAILY_TOKENS:1000000}
     # 单次视觉调用（看图写诗/OCR）按固定 token 计费，避免大图绕过配额
     vision-token-cost: ${AI_GUARD_VISION_TOKEN_COST:1000}
+
+# ==================== 系统健康检查（管理端链路条 / 运维资源） ====================
+moyuan:
+  health:
+    # RAG 服务健康探测地址；未部署 RAG 时该节点显示断连，不影响其他节点
+    rag-url: ${RAG_HEALTH_URL:http://127.0.0.1:8010/rag/health}
+    # 单节点探测超时（毫秒）
+    timeout-ms: ${HEALTH_TIMEOUT_MS:800}
+    # RAG 单独超时：/rag/health 会连带探测 Ollama，需要比数据库探活更宽松
+    rag-timeout-ms: ${RAG_HEALTH_TIMEOUT_MS:3000}
+    # 结果缓存（毫秒），面板 30s 刷新时避免反复打下游
+    cache-ms: ${HEALTH_CACHE_MS:10000}
+
+  # ==================== RAG 服务托管（本地开发便利） ====================
+  # 后端启动时若 8010 未监听，自动执行 python app.py；关闭时回收自己拉起的进程。
+  # 生产环境建议设 RAG_AUTO_START=false，交给 systemd / Docker 管理。
+  rag-service:
+    auto-start: ${RAG_AUTO_START:true}
+    # Python 可执行文件，使用虚拟环境时可指向 .venv/Scripts/python.exe
+    python: ${RAG_PYTHON:python}
+    # 工作目录，相对后端启动目录；找不到时会自动尝试 rag-service / ../rag-service
+    work-dir: ${RAG_SERVICE_DIR:../rag-service}
+    script: app.py
+    # 子进程输出日志（含启动失败原因）
+    log-file: ${RAG_SERVICE_LOG:logs/rag-service.log}
+
