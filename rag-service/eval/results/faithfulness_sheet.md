@@ -5,13 +5,17 @@
 
 ## E1（easy）用户评分和 AI 评分的评分范围是多少？分别调用哪个接口？
 
-**回答**：用户评分范围为 1.0-5.0 分；AI 评分无固定数值上限，由 AI 模型生成（来源：moyuan_business_modules.md·业务模块说明/16.诗词评分模块/功能说明）。
+**回答**：用户评分范围为 1.0-5.0 分，AI 评分由系统自动计算（失败兜底 3.5），无固定上限下限设定。
 
 **用户评分接口：**
-资料中未明确列出用户评分的具体请求路径或参数定义。根据系统工作流文档，评分功能属于独立 `rating` 模块，调用链涉及 `PoemRatingServiceImpl.requestAiRating`（来源：moyuan_system_workflow.md·系统工作流文档/17.关键代码速查表），但具体前端路由或 API 端点未在提供的参考资料中直接给出。
+*   **GET 接口**：`GET /api/poems/{poemId}/ratings`（获取评分详情）
+*   **POST 接口**：`POST .../ratings?score&comment`（提交带分数的用户评分，需校验 score∈[1.0,5.0]）
 
 **AI 评分接口：**
-资料中未明确列出 AI 评分的具体请求路径或参数定义。根据系统工作流文档，AI 评分调用 `aiService.analyzePoem(content, null, "rating")`（来源：moyuan_system_workflow.md·系统工作流文档/17.关键代码速查表），且诗词详情页提供该功能（来源：moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/诗词AI评分（play.rating）），但具体接口路径未在提供的参考资料中直接给出。
+*   **POST 接口**：`POST .../ratings/ai`（触发 AI 自动评分，rating_type=2，userId=null）
+*   **GET 接口**：`GET /api/poems/{poemId}/ratings`（获取包含 AI 评分的详情）
+
+（来源：moyuan_business_modules.md · 业务模块说明 / 16. 诗词评分模块 / 功能说明；moyuan_system_workflow.md · 系统工作流文档 / 8. 诗词内容域 / 8.4 诗词评分（C4）；moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ 诗词 AI 评分（play.rating））
 
 **评级**： 
 
@@ -57,18 +61,6 @@
 | 用户评分 | 用户手动评分，可附带评语 |
 | AI评分 | AI自动评分，附带AI分析内容 |
 
-【moyuan_business_modules.md · 业务模块说明 / 16. 诗词评分模块 / 评分维度】
-【章节：业务模块说明 / 16. 诗词评分模块 / 评分维度】
-### 评分维度
-
-| 维度 | 说明 |
-|------|------|
-| 格律 | 诗词的格律规范性 |
-| 意境 | 诗词的意境表达 |
-| 用词 | 诗词的用词精准度 |
-| 情感 | 诗词的情感表达 |
-| 创新 | 诗词的创新程度 |
-
 【moyuan_business_modules.md · 业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 功能说明】
 【章节：业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 功能说明】
 ### 功能说明
@@ -83,46 +75,25 @@
   - `advisor` 顾问·问答（通识问答，无专属能力）
 - **12 个能力**（Skill）：`compose` 命题作诗、`gather` 集句成诗、`acrostic` 藏头诗、`polish` 润色入律、`tone` 平仄校验、`rhyme` 韵脚查询、`couplet` 对对联、`imagery` 意象典故、`comment` 诗话点评、`feihua` 飞花令、`chain` 诗词接龙、`salon` 群贤论诗
 - **三段式布局**：左「角色栏」+ 中「对话流」+ 底「能力快捷 chips + 输入框」
-- **会话记忆**：按 `roleId` 分存 `localStorage`（键 `moyuan_ai_chat_${roleId}`），切换角色各自恢复；单角色最多保留 40 条（约 20 轮），单条内容上限 4000 字
+- **会话记忆**：按 `roleId` 存服务端 Redis（键 `ai:chat:session:{userId}:{roleId}`，TTL 7 天、最多 40 条），切换角色各自恢复，换设备登录同一账号可继续；本地 `localStorage`（键 `moyuan_ai_chat_${roleId}`）作为降级缓存，Redis 不可用时仍可用。单条内容上限 4000 字
 - **空态引导**：进入页面 / 新建会话后，按角色给出引导语 + 推荐能力 chip
-- **结果渲染**：普通能力渲染为文本气泡；藏头诗高亮每句首字（藏头字）；平仄校验解析 AI 返回的严格 JSON，渲染为平仄标签卡（平底/仄底、押韵标记、逐句简评、总评），解析失败回退展示原始文本
+- **结果渲染**：普通能力渲染为文本气泡，流式逐字追加并自动滚底；藏头诗高亮每句首字（藏头字）；平仄校验改调本地确定性引擎 `POST /api/ai/tone-check`，把返回的逐字平仄与问题列表渲染为平仄标签卡（平底/仄底，三平尾、三仄尾、二四六失替等问题标红），不再依赖大模型输出 JSON
 - **消息头像**：对话流每条消息两侧带圆形头像——AI 侧统一使用墨渊可爱卡通头像（本地静态资源 `/img/ai_chat_avatar.jpg`），用户侧使用本人头像（未登录 / 无头像时回退金色首字母）；用户气泡靠右、头像居其右，AI 气泡靠左、头像居其左，加载态气泡同样带 AI 头像
 
-【moyuan_business_modules.md · 业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 技术方案】
-【章节：业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 技术方案】
-### 技术方案
-
-- 阶段一为**纯前端 MVP**，不新增后端接口、不改数据库表，复用现有非流式接口 `POST /api/ai/chat`
-- `moduleCode` 必传 `'chat'`（已绑定 DeepSeek）；否则回退智谱默认模型，会因 key 余额不足返回 `429 code 1113`
-- 阶段一后端恒前置自身 `CHAT_SYSTEM_PROMPT`，故角色提示词以「角色设定」前缀注入 user 消息（**非**真正的 system role）；真正的 system role + 多轮上下文属阶段二
-- 加载反馈遵循 loading-patterns 规范：发送按钮内置小转圈 +「生成中」并禁用重复点击、宽度固定；对话流等待期显示居中转圈 +「墨渊正在提笔…」；非流式整段返回（无逐字与停止按钮）
-- 藏头诗 / 平仄校验的任务模板与解析逻辑复用首页现有实现，迁移至能力层
-- 配色沿用墨渊棕金色系（宣纸底 / 铜边 / 棕金强调），禁用 Element Plus 默认蓝
+【moyuan_system_workflow.md · 系统工作流文档 / 8. 诗词内容域 / 8.4 诗词评分（C4）】
+【章节：系统工作流文档 / 8. 诗词内容域 / 8.4 诗词评分（C4）】
+### 8.4 诗词评分（C4）
+- **触发入口**：`GET /api/poems/{poemId}/ratings`；`POST .../ratings?score&comment`；`POST .../ratings/ai`、`GET/regenerate`；`GET .../ratings/me`。
+- **分步流程**：校验 score∈[1.0,5.0] → `ratePoem`（`@Transactional`）按 `poem_id+user_id+rating_type=1` 增改评分 → `updatePoemAverageScore` 重算 `avg_score/rating_count`；AI 评分 `rating_type=2`（userId=null）：`aiService.analyzePoem(content, null, "rating")` 走 `ai_module_config` 的独立 `rating` 模块绑定（不再写死默认模型，可在后台「AI功能配置」页面调整）→ 正则解析分（失败兜底 3.5）→ 摘要取前 200 字、去 markdown 标记，随后重算均分，`ai_model` 字段记录实际生效模型名。`getPoemRatings` 返回 userRatings(type=1)/aiRating(type=2 最新)/averageScore/ratingCount，异常回退空数据。
+- **关键类与方法**：`PoemRatingServiceImpl.ratePoem/requestAiRating/parseAiScore/generateSummary/updatePoemAverageScore`、`AiService.analyzePoem`。`PoemRatingController.*`。
+- **数据与缓存**：`poem_rating`（score/comment/rating_type:1用户2AI/ai_model/ai_summary/ai_analysis）、`poem.avg_score/rating_count`。
 
 【moyuan_system_workflow.md · 系统工作流文档 / 11. AI 能力域 / 11.1 AI 辅助创作与生成（E1）】
 【章节：系统工作流文档 / 11. AI 能力域 / 11.1 AI 辅助创作与生成（E1）】
 ### 11.1 AI 辅助创作与生成（E1）
-- **触发入口**：`POST /api/ai/chat|write-poem|analyze|couplet|ocr`；流式入口 `POST /api/ai/chat/stream`（SSE，`AiController.chatStream` → `AiService.streamChat` → `AiModelRegistry.streamByModule` → `OpenAiCompatibleAdapter.streamChat` 用 JDK `HttpClient` 逐行解析上游 SSE，客户端断开经 `emitter.onCompletion` 置取消信号停止消费）。
+- **触发入口**：`POST /api/ai/chat|write-poem|analyze|couplet|ocr`；流式入口 `POST /api/ai/chat/stream`（SSE，`AiController.chatStream` → `AiService.streamChat` → `AiModelRegistry.streamByModule` → `OpenAiCompatibleAdapter.streamChat` 用 JDK `HttpClient` 逐行解析上游 SSE，客户端断开经 `emitter.onCompletion` 置取消信号停止消费）；另有 `POST /api/ai/tone-check`（平仄校验，走本地 `PingZeService` 确定性引擎，不调用大模型、**不计 token**，但仍计入请求次数限流）。
+- **统一防护**：上述入口在进入 `AiService` 前依次经过 `AiGuardService.checkRequest`（每分钟/每日请求数与 token 配额，Redis 计数，admin 豁免）与 `AiInputValidator`（字数、消息条数、角色白名单、`maxTokens/temperature` 区间）；超限分别返回 `4291/4292` 与 `4290`。`/api/ai/ocr` 还受 `ai.features.ocr-enabled` 开关控制，关闭时返回 `4293`（当前默认关闭，前端入口置灰）。图片类入口校验非空、≤10MB、MIME 白名单。
 - **分步流程**：`AiController` 分发 `AiService` → 各方法内置系统提示词常量 → 文本类 `AiModelRegistry.chat/getModel`、图片类 Base64 后 `AiModelRegistry.vision`；传 `moduleCode` 走 `chatByModule/visionByModule`（按模块选模型+覆盖提示词）→ 按 `model.provider` 定位 `AiModelAdapter`，`RestTemplate` 带 `Bearer apiKey` POST 到 `ai_model.api_url`（messages=system+user、max_tokens 默认 1024）→ 解析 `choices[0].message.content` 返回；失败抛 `BusinessException`。
-- **注意（代码事实）**：providers 下拉含 qwen/openrouter，但当前**无对应 Adapter**，调用报"不支持的AI提供商"；`OpenAiCompatibleAdapter` 支持 zhipu/deepseek/kimi/mimo，`NvidiaAdapter` 支持 nvidia（vision 抛"暂不支持视觉模型"）。
-- **关键类与方法**：`AiController.*`、`AiServiceImpl.chat/writePoemFromImage/analyzePoem/matchCouplet/ocrImage`、`AiModelRegistry.chat/vision/chatByModule/getModel`、`OpenAiCompatibleAdapter/NvidiaAdapter`。
-- **数据与缓存**：`ai_model`（name/provider/apiUrl/modelId/visionModelId/apiKey/maxTokens/isEnabled/isDefault/modelType）；内存 `AiModelRegistry.modelCache`。
-
-【moyuan_system_workflow.md · 系统工作流文档 / 12. 论坛与社区域 / 12.2 内容审核流（E6）】
-【章节：系统工作流文档 / 12. 论坛与社区域 / 12.2 内容审核流（E6）】
-### 12.2 内容审核流（E6）
-- **触发入口**：`PUT /api/admin/poems/{id}/audit`、`/forum-posts/{id}/audit`、`/comments/{id}/audit`、`/ai-contents/{id}/approve|reject`、`GET /api/admin/audit/stats`。
-- **分步流程**：各类内容创建进入待审态（`poem.audit_status=0`、AI 内容 `status=0`；评论创建即 `status=1` 直接可见，后台可置 0 隐藏）→ 运营后台列表筛选提交 status/reason → service 更新并记审计字段；AI 内容通过含写回原表（见 11.3）。`GET /api/admin/audit/stats` 聚合诗作/评论/诗人认证/AI内容/诗人草稿/投稿建议的待审数量。
-- **待审对象速查**：
-  | 对象 | 待审字段 | 审核接口 |
-  |------|----------|----------|
-  | 诗作 | `poem.audit_status=0` | `PUT /api/admin/poems/{id}/audit` |
-  | 论坛帖子 | `forum_post.status` | `PUT /api/admin/forum-posts/{id}/audit` |
-  | 评论 | `comment.status=1`（正常；0 为隐藏） | `PUT /api/admin/comments/{id}/audit` |
-  | AI 内容 | `ai_generated_content.status=0` | `PUT /api/admin/ai-contents/{id}/approve|reject` |
-  | 诗人认证 | `poet_profile.verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
-  | 诗人草稿 | `poet_draft.status=0` | `PUT /api/admin/poet-drafts/{id}/review` |
-  | 投稿建议 | `poet_suggestion.
 
 【moyuan_system_workflow.md · 系统工作流文档 / 17. 关键代码速查表】
 【章节：系统工作流文档 / 17. 关键代码速查表】
@@ -140,7 +111,9 @@
 - 前端路由：/poem/:id
 - 说明：诗词详情页提供 AI 评分，由 AI 从意境、格律、修辞、情感、用词等维度评价诗词并给出分数。进入任意诗词详情页即可查看或请求 AI 评分，用户本人也可以手动给诗词评分。
 - 使用步骤：
-  1. 打开任意诗词详情页\n查看已有评分或请求 AI 评分\n查看 AI 给出的评价与分数
+  1. 打开任意诗词详情页
+  2. 查看已有评分或请求 AI 评分
+  3. 查看 AI 给出的评价与分数
 - 常见问答：
   - 问：AI评分在哪里  答：在诗词详情页可以查看或请求 AI 评分，AI 会多维度评价并给出分数。
 ```
@@ -148,12 +121,12 @@
 
 ## E2（easy）浏览历史保存在哪里？前端会把它写进浏览器本地存储吗？
 
-**回答**：浏览历史数据**不保存于浏览器本地存储（localStorage）**，而是通过服务端接口记录与查询。
+**回答**：浏览历史不保存在浏览器本地存储（localStorage），而是通过服务端接口记录与保存。
 
-- **数据存储位置**：后端数据库表 `user_history`，由 `UserHistoryServiceImpl` 服务类在访问诗词或诗人时写入（来源：moyuan_system_workflow.md·5.2 浏览历史（B2）；moyuan_business_modules.md·12. 浏览历史模块 / 功能说明）。
-- **前端处理方式**：前端不执行 localStorage 写入操作，收藏、AI 对话及浏览历史均走服务端接口或内存 ref 处理（来源：moyuan_system_workflow.md·15.4 localStorage 使用点汇总（K4）；moyuan_business_modules.md·12. 浏览历史模块 / API 接口）。
-- **访问与清空方式**：用户需登录后在个人中心页面 `/user/profile` 查看历史记录，通过 `DELETE /api/history` 接口执行清空操作（来源：moyuan_system_workflow.md·5.2 浏览历史（B2）；moyuan_business_modules.md·12. 浏览历史模块 / API 接口；moyuan_system_knowledge.md·浏览历史（feature.history））。
-- **关键实现类**：后端 `HistoryController`、`UserHistoryServiceImpl`，前端通过 `/api/history` 系列接口交互（来源：moyuan_business_modules.md·12. 浏览历史模块 / API 接口；moyuan_system_workflow.md·5.2 浏览历史（B2））。
+- **存储位置**：后端数据库表 `user_history`，数据由 `UserHistoryServiceImpl` 服务处理（来源：moyuan_business_modules.md·业务模块说明/12. 浏览历史模块/API 接口；moyuan_system_workflow.md·系统工作流文档/5. 用户与个人中心域/5.2 浏览历史（B2））。
+- **前端存储方式**：前端不写入 localStorage，收藏、AI 对话及浏览历史均走服务端接口或内存 ref（来源：moyuan_system_workflow.md·系统工作流文档/15. 前端数据流转层/15.4 localStorage 使用点汇总（K4）；moyuan_business_modules.md·业务模块说明/12. 浏览历史模块/功能说明）。
+- **访问入口**：登录后可在个人中心页面 `/user/profile` 查看历史记录，支持清空操作（来源：moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/浏览历史（feature.history）；moyuan_business_modules.md·业务模块说明/12. 浏览历史模块/API 接口）。
+- **API 交互**：通过 `POST /api/history` 添加、`GET /api/history` 获取、`DELETE /api/history` 清空，后端模块为 `sc-moyuan-backend HistoryController`（来源：moyuan_business_modules.md·业务模块说明/12. 浏览历史模块/API 接口）。
 
 **评级**： 
 
@@ -273,7 +246,9 @@
 - 前端路由：/user/profile
 - 说明：浏览历史记录你访问过的诗词与诗人，登录后可在个人中心查看，也支持清空。历史通过服务端接口保存，不存放在本地。
 - 使用步骤：
-  1. 登录后浏览诗词或诗人\n在个人中心查看浏览历史\n需要时清空历史记录
+  1. 登录后浏览诗词或诗人
+  2. 在个人中心查看浏览历史
+  3. 需要时清空历史记录
 - 常见问答：
   - 问：浏览历史在哪  答：登录后在个人中心可以查看浏览历史，并支持清空。
 ```
@@ -281,11 +256,20 @@
 
 ## E3（easy）飞花令单回合限时多久？有几种模式和几档难度？
 
-**回答**：飞花令单回合有效答题时长为 30 秒（含 5 秒缓冲窗口，总上限 35 秒）。共有三种模式和三档难度。
+**回答**：飞花令单回合有效答题时长为**30 秒**。系统设有古制严格、标准版、超级飞花令三种模式，以及简单、中等、困难三档难度。
 
-- **限时说明**：单回合倒计时从点击「开始挑战」后直接启动，输入即暂停；超时判定依据后端上报的有效秒数，≥35 秒判为超时（来源：moyuan_business_modules.md·业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙）/ 功能说明）。
-- **三种模式**：`ancient`（古制严格，令字须落在本回合第 N 个汉字位置）、`normal`（标准版，诗句包含令字即可）、`super`（超级飞花令，含 `char` 多关键字或 `topic` 主题两种子类型）（来源：moyuan_business_modules.md·业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙）/ 功能说明）。
-- **三档难度**：`easy`（达标 10 句即胜）、`medium`（达标 20 句即胜）、`hard`（AI 无句可接则用户胜，无固定目标条数）（来源：moyuan_business_modules.md·业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙）/ 功能说明）。
+具体规则如下：
+1. **限时机制**：单回合倒计时从点击「开始挑战」后直接启动（30 秒递减）。输入框一旦有变化即暂停倒计时进入监测状态；连续 5 秒无改动恢复递减。30 秒耗尽后进入 5 秒缓冲窗口，期内可提交；缓冲耗尽仍无变动则判超时。有效答题时长上限为 35 秒（题面计时可随时终止）。
+2. **三种模式**：
+   - `ancient`（古制严格）：令字须落在本回合第 N 个汉字位置。
+   - `normal`（标准版）：诗句包含令字即可。
+   - `super`（超级飞花令）：含多关键字（`char`）或主题（`topic`）两种子类型。
+3. **三档难度**：
+   - `easy`（简单）：达标 10 句即胜。
+   - `medium`（中等）：达标 20 句即胜。
+   - `hard`（困难）：AI 无句可接则用户胜，无固定目标条数。
+
+（来源：moyuan_business_modules.md · 业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙） / 功能说明；moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / 飞花令（play.feihualing））
 
 **评级**： 
 
@@ -399,7 +383,10 @@
 - 前端路由：/game/feihua
 - 说明：飞花令是与 AI 对句的诗词游戏，你每回合说出一句含指定「令字」的真实古诗词名句，AI 轮流接句，接不上或超时即判负。入口在首页 AI 小工具区的「飞花令」卡片，登录用户点击后进入对局页。有古制严格、标准版、超级飞花令三种模式与三档难度可选。现代诗不参与本游戏。
 - 使用步骤：
-  1. 选择模式与难度\n设定令字（如「花」）\n每回合提交一句含令字的古诗词，单回合限时 30 秒\n与 AI 交替接句，AI 接不上或你超时判负
+  1. 选择模式与难度
+  2. 设定令字（如「花」）
+  3. 每回合提交一句含令字的古诗词，单回合限时 30 秒
+  4. 与 AI 交替接句，AI 接不上或你超时判负
 - 常见问答：
   - 问：飞花令怎么玩  答：每回合提交一句含指定令字的真实古诗词名句，与 AI 交替接句，AI 接不上或你超时则对方判负。
   - 问：在哪里能玩飞花令  答：首页 AI 小工具区有「飞花令」卡片，登录用户点击进入对局页。
@@ -418,7 +405,7 @@
 - **情感**：评估诗词的情感表达。
 - **创新**：评估诗词的创新程度。
 
-用户评分与 AI 评分均支持上述多维度评价，AI 会从这些维度对诗词进行综合分析并给出分数（来源：moyuan_system_workflow.md·系统工作流文档/8. 诗词内容域/8.4 诗词评分（C4））。
+用户评分与 AI 评分均支持上述多维度评价，AI 还会结合修辞等维度进行分析（来源：moyuan_system_workflow.md·系统工作流文档/8. 诗词内容域/8.4 诗词评分（C4）；墨渊小助手系统知识库（24 条）·诗词 AI 评分（play.rating））。
 
 **评级**： 
 
@@ -567,7 +554,9 @@
 - 前端路由：/poem/:id
 - 说明：诗词详情页提供 AI 评分，由 AI 从意境、格律、修辞、情感、用词等维度评价诗词并给出分数。进入任意诗词详情页即可查看或请求 AI 评分，用户本人也可以手动给诗词评分。
 - 使用步骤：
-  1. 打开任意诗词详情页\n查看已有评分或请求 AI 评分\n查看 AI 给出的评价与分数
+  1. 打开任意诗词详情页
+  2. 查看已有评分或请求 AI 评分
+  3. 查看 AI 给出的评价与分数
 - 常见问答：
   - 问：AI评分在哪里  答：在诗词详情页可以查看或请求 AI 评分，AI 会多维度评价并给出分数。
 ```
@@ -575,11 +564,13 @@
 
 ## E5（easy）搜索评分中标题完全匹配得多少分？内容包含拆分词得多少分？
 
-**回答**：搜索评分中，标题完全匹配得 1.0 分，内容包含拆分词得 0.2 分。
+**回答**：搜索评分中，标题完全匹配得 1.0 分；内容包含拆分词得 0.2 分。
 
 具体评分规则如下：
-- **标题完全匹配**：去除标点后完全一致时，得分为 1.0（来源：moyuan_business_modules.md·业务模块说明/8.搜索模块/搜索评分算法）。
-- **内容包含拆分词**：诗词内容中包含拆分后的单个关键词时，得分为 0.2（来源：moyuan_business_modules.md·业务模块说明/8.搜索模块/搜索评分算法）。
+- **标题完全匹配**：去除标点后完全一致，得分为 1.0（来源：moyuan_business_modules.md·业务模块说明/8.搜索模块/搜索评分算法）。
+- **内容包含拆分词**：诗词内容中包含拆分后的单个关键词，得分为 0.2（来源：moyuan_business_modules.md·业务模块说明/8.搜索模块/搜索评分算法）。
+
+此外，在智能搜索的三路并行逻辑中，标题拆分词匹配同样适用 0.3 分规则，而内容拆分词匹配仍为 0.2 分（来源：moyuan_system_workflow.md·系统工作流文档/10.搜索与运营域/10.1 全文/跨模块智能搜索）。
 
 **评级**： 
 
@@ -730,7 +721,9 @@
 - 前端路由：/poem/:id
 - 说明：诗词详情页提供 AI 评分，由 AI 从意境、格律、修辞、情感、用词等维度评价诗词并给出分数。进入任意诗词详情页即可查看或请求 AI 评分，用户本人也可以手动给诗词评分。
 - 使用步骤：
-  1. 打开任意诗词详情页\n查看已有评分或请求 AI 评分\n查看 AI 给出的评价与分数
+  1. 打开任意诗词详情页
+  2. 查看已有评分或请求 AI 评分
+  3. 查看 AI 给出的评价与分数
 - 常见问答：
   - 问：AI评分在哪里  答：在诗词详情页可以查看或请求 AI 评分，AI 会多维度评价并给出分数。
 ```
@@ -741,10 +734,10 @@
 **回答**：智能搜索的建议词、热门词和搜索历史分别缓存为以下 Redis Key：
 
 - **建议词**：`search:suggestion:{kw}`（来源：moyuan_system_workflow.md·10.1 全文/跨模块智能搜索）
-- **热门词**：`search:hot`（来源：moyuan_system_workflow.md·10.1 全文/跨模块智能搜索）
-- **搜索历史**：`search:history:{userId}`（来源：moyuan_system_workflow.md·10.1 全文/跨模块智能搜索）
+- **热门词**：`search:hot`（ZSet 结构，来源：moyuan_business_modules.md·缓存策略 / moyuan_system_workflow.md·10.1 全文/跨模块智能搜索）
+- **搜索历史**：`search:history:{userId}`（List 结构，来源：moyuan_business_modules.md·搜索历史 / moyuan_system_workflow.md·10.1 全文/跨模块智能搜索）
 
-其中建议词缓存过期时间为 5 分钟，热门词为实时统计，搜索历史为 30 天过期且最多保留 20 条（来源：moyuan_business_modules.md·搜索模块·功能说明）。
+所有缓存均基于 Redis 实现，其中建议词和热门词支持 5 分钟或实时统计，搜索历史为已登录用户保存且 30 天过期。
 
 **评级**： 
 
@@ -867,7 +860,9 @@
 - 前端路由：/poem
 - 说明：智能检索支持按关键词搜索诗词、诗人与帖子，首页与诗词列表页内嵌了搜索入口。搜索会记录你的历史，登录后还会根据兴趣给出推荐。
 - 使用步骤：
-  1. 在首页或诗词列表页输入关键词\n查看匹配的诗词、诗人或帖子\n点开结果查看详情
+  1. 在首页或诗词列表页输入关键词
+  2. 查看匹配的诗词、诗人或帖子
+  3. 点开结果查看详情
 - 常见问答：
   - 问：怎么搜索  答：在首页或诗词列表页的搜索框输入关键词，即可搜索诗词、诗人与帖子。
 ```
@@ -877,10 +872,10 @@
 
 **回答**：登录成功后签发的两种 token 为 access token（访问令牌）和 refresh token（刷新令牌），其有效期如下：
 
-1. **Access Token**：默认有效期为 **24 小时**。该令牌用于后续请求的自动续期，包含随机 `jti` 标识符。
+1. **Access Token**：默认有效期为 **24 小时**。该令牌用于后续请求的自动续期，包含随机生成的 `jti` 标识符。
 2. **Refresh Token**：默认有效期为 **7 天**。该令牌用于在 Access Token 过期后获取新的访问令牌，与 Access Token 共享相同的 `jti`。
 
-（来源：moyuan_system_workflow.md · 系统工作流文档 / 4. 认证与权限域 / 4.2 登录与 JWT 签发（A2））
+（来源：moyuan_system_workflow.md · 系统工作流文档 / 4. 认证与权限域 / 4.2 登录与 JWT 签发（A2）；moyuan_business_modules.md · 业务模块说明 / 4. 诗人认证模块 / API 接口）
 
 **评级**： 
 
@@ -977,7 +972,9 @@
 - 前端路由：/user/login
 - 说明：注册时需要填写用户名、密码和邮箱，登录使用用户名与密码。登录后可享受收藏、发布、评论等完整功能。注册成功会直接登录。
 - 使用步骤：
-  1. 进入登录页\n没有账号时切换到注册并填写信息\n登录成功后使用完整功能
+  1. 进入登录页
+  2. 没有账号时切换到注册并填写信息
+  3. 登录成功后使用完整功能
 - 常见问答：
   - 问：怎么注册账号  答：在注册页填写用户名、密码和邮箱即可注册，注册成功会直接登录。
   - 问：怎么登录  答：在登录页输入用户名和密码即可登录。
@@ -986,15 +983,15 @@
 
 ## E8（easy）报修工单从待处理到已关闭经过哪几个状态？
 
-**回答**：报修工单从“待处理”到“已关闭”共经过 4 个状态（来源：moyuan_business_modules.md·业务模块说明/18. 报修模块/工单状态流转；moyuan_system_workflow.md·系统工作流文档/13. 报修工单域/13.1 工单全生命周期（E7））。
+**回答**：报修工单从待处理到已关闭共经过**5 个状态**。
 
-具体状态流转如下：
-1. **待处理 (0)**：工单创建后初始状态，默认优先级为 2。
-2. **处理中 (1)**：管理员分配处理人后，状态由 0 转为 1。
-3. **已解决 (2)**：处理完成后，状态由 1 转为 2，系统记录 resolveTime。
-4. **已关闭 (3)**：用户或管理员执行关闭操作后，状态由 2 转为 3，系统记录 closeTime。
+1. **待处理 (0)**：工单创建后的初始状态，等待管理员分配或处理。
+2. **处理中 (1)**：管理员分配给具体人员后进入此状态。
+3. **已解决 (2)**：问题被修复或确认处理后进入此状态，系统记录解决时间。
+4. **拒绝 (4)**：在流转过程中若被拒绝，会进入此状态（注：部分资料提及状态 3 为已关闭，但在状态机逻辑中明确列出了 4 为拒绝）。
+5. **已关闭 (3)**：工单最终关闭的状态，系统记录关闭时间。
 
-注：资料中还存在“拒绝 (4)"状态，但标准闭环流程通常止于“已关闭”。
+*注：根据资料《moyuan_business_modules.md · 业务模块说明 / 18. 报修模块 / 工单状态流转》，标准流转顺序为 `待处理(0) → 处理中(1) → 已解决(2) → 已关闭(3)`；但在《moyuan_system_workflow.md · 系统工作流文档 / 13. 报修工单域 / 13.1 工单全生命周期（E7）》的数据与缓存章节中，明确指出了状态机包含 `0/1/2/3/4`，其中 **4** 对应拒绝。*
 
 **评级**： 
 
@@ -1117,7 +1114,10 @@
 - 前端路由：/repair
 - 说明：报修中心用于提交报修工单，可填写标题、描述、分类与优先级，提交后查看我的报修列表与详情、添加反馈评论、关闭工单并提交满意度评价。需要登录后进入。
 - 使用步骤：
-  1. 登录后进入报修中心\n点击提交报修并填写工单信息\n在列表中查看工单详情与进度\n添加评论、关闭工单并评价
+  1. 登录后进入报修中心
+  2. 点击提交报修并填写工单信息
+  3. 在列表中查看工单详情与进度
+  4. 添加评论、关闭工单并评价
 - 常见问答：
   - 问：怎么报修  答：登录后进入报修中心，点击提交报修，填写标题、描述、分类与优先级后提交。
 ```
@@ -1125,15 +1125,14 @@
 
 ## E9（easy）诗云星空页面是什么，能做什么交互？
 
-**回答**：诗云星空页面（`/poetry-cloud`）是墨渊平台利用 Three.js 构建的 3D 古诗词数据可视化模块，将中国古诗词以“诗人—诗作”两级层级星图形式呈现。每位诗人是一颗发光大节点，其诗作环绕分布为小球节点，通过贝塞尔曲线连接同朝代相邻诗人，支持缩放、旋转及交互浏览（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 功能说明）。
+**回答**：诗云星空页面（`/poetry-cloud`）是墨渊平台利用 Three.js 引擎构建的 3D 古诗词数据可视化界面，将中国古诗词以“诗人—诗作”两级层级星图形式呈现。每位诗人是一颗发光的大节点，其诗作则是环绕分布的可交互小球，通过贝塞尔曲线连接同朝代相邻诗人，并支持像素级线宽渲染与高亮切换（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 功能说明）。
 
-主要交互功能如下：
-1. **相机漫游**：鼠标拖动旋转、滚轮缩放、右键平移、点击星点飞向目标（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 功能说明）。
-2. **节点交互**：悬停显示提示框（诗人/诗作信息），点击诗人右侧滑出信息与作品面板，点击诗作弹出详情浮层并保留跳转按钮（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 功能说明）。
-3. **虚空取诗**：点击星空空白处随机浮现一首诗，生成蓝色新星飞向该位置（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 功能说明）。
-4. **数据筛选**：支持按朝代过滤诗人与诗词，重建星图布局（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 功能说明）。
-5. **配色调节**：底部“配色实验室”可切换 7 套方案，实时调节光晕、连线可见度、节点尺寸及整体亮度（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 功能说明）。
-6. **回归原点**：
+该页面支持以下核心交互功能：
+1. **相机漫游**：鼠标拖动旋转、滚轮缩放、右键平移，点击星点可飞向目标（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 功能说明）。
+2. **节点交互**：悬停显示 DOM 提示框（非 Sprite），点击诗人星滑出信息面板并聚焦其诗作簇，点击诗作小点弹出详情浮层（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 功能说明）。
+3. **虚空取诗**：点击星空空白处随机浮现一首诗，生成蓝色“虚空新星”并飞向该位置（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 功能说明）。
+4. **配色实验室**：底部控制模块可切换 7 套配色方案（琥珀星海/青玉/珊瑚/冰川蓝/梅子紫/苔绿/赤陶），调节光晕强度、连线可见度、节点尺寸及整体亮度，支持“显示诗人姓名”与“诗人按朝代配色”开关（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 功能说明）。
+5. **
 
 **评级**： 
 
@@ -1146,7 +1145,7 @@
 | 22 | 联系我们模块 | 用户反馈表单页面 | 前端已实现 |
 | 23 | 诗云模块 | Three.js 3D 星空可视化，诗人—诗作两级层级星图 + 配色实验室 | 前端已实现 |
 | 24 | 游戏模块 | 飞花令 / 诗词接龙对局（模式/难度、回合计时、三级真实性校验、游客模式） | 前端+后端已实现 |
-| 25 | AI 对话页「诗宝阁」 | 角色化统一对话入口：6 角色 × 12 能力，覆盖命题作诗/集句/藏头/润色/平仄校验/韵脚查询/对对联/意象典故/诗话点评/飞花令/接龙/群贤论诗；其中飞花令为设令字后逐句判定（含字/判重/真实性）的对局流程 | 阶段一前端已完成（非流式）、阶段二后端 SSE 已完成（前端流式待接入） |
+| 25 | AI 对话页「诗宝阁」 | 角色化统一对话入口：6 角色 × 12 能力，覆盖命题作诗/集句/藏头/润色/平仄校验/韵脚查询/对对联/意象典故/诗话点评/飞花令/接龙/群贤论诗；其中飞花令为设令字后逐句判定（含字/判重/真实性）的对局流程 | 前端+后端已实现（SSE 流式、多轮上下文、服务端会话） |
 | 26 | 全局 AI 小窗与系统知识库 | 全站悬浮 AI 问答入口：诗词助理 / 网页用法助理双助理，接入 system_knowledge 知识库 | 前端+后端已实现 |
 
 ---
@@ -1256,7 +1255,10 @@
 - 前端路由：/poetry-cloud
 - 说明：诗云是用 3D 星空展示古诗数据的可视化页面，每位诗人是一颗星，其诗作环绕分布，可缩放旋转浏览。点击诗人星可查看诗人信息与代表作品，点击诗作节点可查看诗词详情。页面底部「配色实验室」可切换配色方案并调节光晕、连线、亮度等显示效果。
 - 使用步骤：
-  1. 进入诗云页面\n拖动旋转、滚轮缩放浏览星图\n点击诗人星查看诗人信息与作品\n点击诗作节点查看诗词详情
+  1. 进入诗云页面
+  2. 拖动旋转、滚轮缩放浏览星图
+  3. 点击诗人星查看诗人信息与作品
+  4. 点击诗作节点查看诗词详情
 - 常见问答：
   - 问：诗云是什么  答：诗云是把古诗词数据做成 3D 星空的页面，诗人是星、诗作围绕其分布，可交互浏览。
   - 问：诗云怎么用  答：拖动旋转、滚轮缩放浏览星图，点击诗人或诗作节点查看详情。
@@ -1265,15 +1267,9 @@
 
 ## E10（easy）哪些 AI 功能必须登录后才能用？
 
-**回答**：必须登录才能使用的 AI 功能包括：看图写诗、古籍 OCR 识文、AI 评分以及诗宝阁对话（来源：moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ AI 功能需要登录（account.ai-login））。
+**回答**：必须登录才能使用的 AI 功能包括：看图写诗、AI 评分、诗宝阁对话以及平仄格律校验（来源：moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ AI 功能需要登录（account.ai-login））。
 
-具体说明如下：
-1. **看图写诗**：上传图片生成古诗词，需登录后调用视觉模型。
-2. **古籍 OCR 识文**：识别诗词图片、书法作品或碑帖文字，需登录后处理。
-3. **AI 评分**：涉及对诗词或诗人内容的 AI 评估功能，需登录。
-4. **诗宝阁对话**：角色化统一对话入口（/ai-chat），包含六类角色与十二项能力，需登录后使用。
-
-游客可在首页直接体验飞花令、诗词接龙小工具等无需登录的功能，但上述核心 AI 能力均受登录门禁限制，未登录点击唤起时会提示跳转登录页（来源：moyuan_business_modules.md · 业务模块说明 / 26. 全局 AI 小窗与系统知识库模块 / 功能说明；moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ AI 功能需要登录（account.ai-login））。
+古籍 OCR 识文虽属 AI 功能，但当前处于维护中，未登录用户无法使用；飞花令、诗词接龙等小工具游客可直接体验。
 
 **评级**： 
 
@@ -1282,17 +1278,19 @@
 ```
 【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明】
 【章节：业务模块说明 / 7. AI 模块 / 功能说明】
-可用提供商：智谱AI、DeepSeek、Kimi、千问、小米MiMo、OpenRouter；NVIDIA NIM 已全部禁用/下线）
+### 功能说明
+
+- AI诗词问答（支持多模型切换；调用优先走 `ai_module_config` 模块绑定，未绑定某模块时回退默认模型。可用提供商：智谱AI、DeepSeek、Kimi、千问、小米MiMo、OpenRouter；NVIDIA NIM 已全部禁用/下线）
 - 看图写诗（上传图片，AI生成古诗词，支持视觉模型如 GLM-4V-Flash、DeepSeek-Flash）
 - 智能分析（输入诗句进行深度解析）
 - AI对对联（输入上联，AI生成下联，遵循平仄规则）
 - **藏头诗**（输入 2-8 个藏头字并选择五言/七言，AI 生成藏头诗，每句首字依次对应藏头字；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
-- **平仄格律校验**（粘贴一首绝句/律诗，AI 逐句标注平仄（平声绿底、仄声红底）、判定是否合律、识别所属平水韵韵部并给出总体评价；AI 返回严格 JSON，前端解析失败时回退展示原始文本；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
-- **AI 对话页「诗宝阁」**（`/ai-chat`）：角色化统一对话入口，6 角色（诗仙·创作 / 诗话·鉴赏 / 格律·校正 / 诗友·行令 / 群贤·论诗 / 顾问·问答）× 12 能力（命题作诗 / 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 / 群贤论诗）；阶段一复用 `POST /api/ai/chat`（moduleCode=chat，非流式），阶段二后端已新增 `POST /api/ai/chat/stream`（SSE 流式，见 6.
+- **平仄格律校验**（粘贴一首绝句/律诗，由**本地确定性引擎** `POST /api/ai/tone-check` 逐句标注平仄（平声绿底、仄声红底）、判定是否合律并给出不合律原因；校验规则为句末三平尾/三仄尾、二四六位失替、偶数句押韵，不调用大模型、不消耗 AI 额度）
+- **AI 对话页「诗宝阁」**（`/ai-chat`）：角色化统一对话入口，6 角色（诗仙·创作 / 诗话·鉴赏 / 格律·校正 / 诗友·行令 / 群贤·论诗 / 顾问·问答）× 12 能力（命题作诗 / 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 /
 
 【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明】
 【章节：业务模块说明 / 7. AI 模块 / 功能说明】
-- **古籍OCR识文**（上传古诗词图片/书法作品/碑帖，AI精准识别文字内容，保留原文结构，标注印章题款）
+- **古籍OCR识文**（上传古诗词图片/书法作品/碑帖，AI精准识别文字内容，保留原文结构，标注印章题款）——**当前维护中**：后端开关 `ai.features.ocr-enabled=false` 时接口返回 `4293`，前端首页入口置灰并提示「维护中」，恢复需同时打开后端开关与前端 `OCR_ENABLED` 常量，并存在 `ocr` 模块的视觉模型绑定
 - AI模型配置管理（后台管理，支持CRUD、启用/禁用、默认模型设置、连接测试）
 - **AI内容填充与审核**：对诗词/诗人缺失字段由 AI 生成候选内容，存入审核表，管理员审核通过后写回原表
 - **诗词AI助手（poetry_chat）**：寻章摘句页面的AI功能模块，包括译文注释、名人点评、创作背景、历史文化背景、AI逐句解析、AI诗词助手对话
@@ -1355,19 +1353,16 @@
 【moyuan_system_workflow.md · 系统工作流文档 / 11. AI 能力域 / 11.1 AI 辅助创作与生成（E1）】
 【章节：系统工作流文档 / 11. AI 能力域 / 11.1 AI 辅助创作与生成（E1）】
 ### 11.1 AI 辅助创作与生成（E1）
-- **触发入口**：`POST /api/ai/chat|write-poem|analyze|couplet|ocr`；流式入口 `POST /api/ai/chat/stream`（SSE，`AiController.chatStream` → `AiService.streamChat` → `AiModelRegistry.streamByModule` → `OpenAiCompatibleAdapter.streamChat` 用 JDK `HttpClient` 逐行解析上游 SSE，客户端断开经 `emitter.onCompletion` 置取消信号停止消费）。
+- **触发入口**：`POST /api/ai/chat|write-poem|analyze|couplet|ocr`；流式入口 `POST /api/ai/chat/stream`（SSE，`AiController.chatStream` → `AiService.streamChat` → `AiModelRegistry.streamByModule` → `OpenAiCompatibleAdapter.streamChat` 用 JDK `HttpClient` 逐行解析上游 SSE，客户端断开经 `emitter.onCompletion` 置取消信号停止消费）；另有 `POST /api/ai/tone-check`（平仄校验，走本地 `PingZeService` 确定性引擎，不调用大模型、**不计 token**，但仍计入请求次数限流）。
+- **统一防护**：上述入口在进入 `AiService` 前依次经过 `AiGuardService.checkRequest`（每分钟/每日请求数与 token 配额，Redis 计数，admin 豁免）与 `AiInputValidator`（字数、消息条数、角色白名单、`maxTokens/temperature` 区间）；超限分别返回 `4291/4292` 与 `4290`。`/api/ai/ocr` 还受 `ai.features.ocr-enabled` 开关控制，关闭时返回 `4293`（当前默认关闭，前端入口置灰）。图片类入口校验非空、≤10MB、MIME 白名单。
 - **分步流程**：`AiController` 分发 `AiService` → 各方法内置系统提示词常量 → 文本类 `AiModelRegistry.chat/getModel`、图片类 Base64 后 `AiModelRegistry.vision`；传 `moduleCode` 走 `chatByModule/visionByModule`（按模块选模型+覆盖提示词）→ 按 `model.provider` 定位 `AiModelAdapter`，`RestTemplate` 带 `Bearer apiKey` POST 到 `ai_model.api_url`（messages=system+user、max_tokens 默认 1024）→ 解析 `choices[0].message.content` 返回；失败抛 `BusinessException`。
+
+【moyuan_system_workflow.md · 系统工作流文档 / 11. AI 能力域 / 11.1 AI 辅助创作与生成（E1）】
+【章节：系统工作流文档 / 11. AI 能力域 / 11.1 AI 辅助创作与生成（E1）】
+provider` 定位 `AiModelAdapter`，`RestTemplate` 带 `Bearer apiKey` POST 到 `ai_model.api_url`（messages=system+user、max_tokens 默认 1024）→ 解析 `choices[0].message.content` 返回；失败抛 `BusinessException`。
 - **注意（代码事实）**：providers 下拉含 qwen/openrouter，但当前**无对应 Adapter**，调用报"不支持的AI提供商"；`OpenAiCompatibleAdapter` 支持 zhipu/deepseek/kimi/mimo，`NvidiaAdapter` 支持 nvidia（vision 抛"暂不支持视觉模型"）。
 - **关键类与方法**：`AiController.*`、`AiServiceImpl.chat/writePoemFromImage/analyzePoem/matchCouplet/ocrImage`、`AiModelRegistry.chat/vision/chatByModule/getModel`、`OpenAiCompatibleAdapter/NvidiaAdapter`。
 - **数据与缓存**：`ai_model`（name/provider/apiUrl/modelId/visionModelId/apiKey/maxTokens/isEnabled/isDefault/modelType）；内存 `AiModelRegistry.modelCache`。
-
-【moyuan_system_workflow.md · 系统工作流文档 / 11. AI 能力域 / 11.3 AI 内容生成与审核（E3）】
-【章节：系统工作流文档 / 11. AI 能力域 / 11.3 AI 内容生成与审核（E3）】
-### 11.3 AI 内容生成与审核（E3）
-- **触发入口**：`POST /api/ai/preview`（只生成不落库）、`POST /api/ai/fill-content`（生成存审核表）、`POST /api/ai/submit-review`、`GET /api/ai/fill-status/{targetType}/{targetId}`；审核 `GET /api/admin/ai-contents`、`PUT .../approve|reject`。
-- **分步流程**：鉴权 → `validateField` 白名单（诗词 translation/appreciation/background；诗人 biography/life_story/influence/evaluation/anecdotes）→ 读取实体+朝代/诗人信息，`buildPoemPrompt/buildPoetPrompt` 拼提示词 → `generateContent` 先查同 id 待审记录（有则复用）→ `adapter.chat` 生成写入 `ai_generated_content`（status=0）→ 管理员 `approve` 置 status=1 并 `writeContentToPoem/Poet` 写回原字段；`reject` 置 status=2 留原因。
-- **关键类与方法**：`AiContentController.*`、`AiGeneratedContentServiceImpl.generateContent/approve/reject/writeContentToPoem/writeContentToPoet`、`AiModelRegistry.getModelForModule`。
-- **数据与缓存**：`ai_generated_content`（status 0待审/1通过/2拒绝）。
 
 【moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / AI功能需要登录（account.ai-login）】
 【章节：墨渊小助手系统知识库（24 条） / AI功能需要登录（account.ai-login）】
@@ -1376,11 +1371,13 @@
 - 分类：account
 - 关键词：AI功能,登录,权限,使用条件
 - 别名：AI需要登录
-- 说明：AI 相关功能需要登录后才能使用，包括看图写诗、古籍识文、AI 评分以及诗宝阁对话等。首页的飞花令、诗词接龙小工具游客可在首页直接体验。
+- 说明：AI 相关功能需要登录后才能使用，包括看图写诗、AI 评分、诗宝阁对话以及平仄格律校验等；古籍识文目前处于维护中。首页的飞花令、诗词接龙小工具游客可在首页直接体验。
 - 使用步骤：
-  1. 登录账号\n进入 AI 功能入口\n正常使用 AI 能力
+  1. 登录账号
+  2. 进入 AI 功能入口
+  3. 正常使用 AI 能力
 - 常见问答：
-  - 问：AI功能要登录吗  答：需要登录后使用，包括看图写诗、古籍识文、AI 评分与诗宝阁对话等；游客可在首页直接体验飞花令、诗词接龙小工具。
+  - 问：AI功能要登录吗  答：需要登录后使用，包括看图写诗、AI 评分、诗宝阁对话与平仄校验等（古籍识文维护中）；游客可在首页直接体验飞花令、诗词接龙小工具。
 ```
 </details>
 
@@ -1388,15 +1385,15 @@
 
 **回答**：推荐算法对三种行为的计分规则如下：
 
-1. **收藏**：计 **5 分**。
-2. **点赞**：计 **3 分**。
-3. **浏览**：计 **1 分**。
+1. **收藏**：记 **5 分**。
+2. **点赞**：记 **3 分**。
+3. **浏览**：记 **1 分**。
 
 （来源：moyuan_business_modules.md · 业务模块说明 / 8. 搜索模块 / 推荐算法说明；moyuan_system_workflow.md · 系统工作流文档 / 9. 诗人内容域 / 9.2 推荐 / 热门诗人（C7））
 
-**补充规则：**
-- **诗词侧多行为处理**：同一用户对同一作品的多次行为取**最大值**合并，不累加。
-- **诗人侧计算**：收藏、点赞、浏览分别对应权重 5、3、1，用于构建用户 - 诗人矩阵及余弦相似度计算。
+**补充说明：**
+- 在诗词侧，同一用户对同一作品的多行为取**最大值合并，不累加**。
+- 在诗人侧，计算热门诗人时，诗收藏 5 分 + 词收藏 5 分 + 赞 3 分 + 浏览 1 分。
 
 **评级**： 
 
@@ -1557,34 +1554,18 @@
 
 ## M2（medium）用户提交评分后，诗词的平均分是怎么更新的？AI 评分解析失败时会怎么办？
 
-**回答**：用户提交评分后，诗词平均分通过重算逻辑更新；AI 评分解析失败时采用兜底机制返回固定分数。
+**回答**：用户提交评分后，系统会重新计算平均分；若 AI 评分解析失败，将兜底返回 3.5 分。
 
-1. **用户评分后的平均分更新**：
-   - 当用户提交评分（`POST /api/poems/{id}/ratings`）时，系统会调用 `updatePoemAverageScore` 方法。
-   - 该方法会重新计算诗词的 `avg_score`（平均分）和 `rating_count`（评分数量），并更新到诗词数据中（来源：moyuan_system_workflow.md · 8.4 诗词评分（C4））。
+1. **平均分更新机制**：当用户提交评分（`POST /api/poems/{id}/ratings`）或请求 AI 评分时，系统会调用 `updatePoemAverageScore` 方法，基于最新的评分数据重新计算该诗词的 `avg_score`（平均分）和 `rating_count`（评分数量），并更新至数据库中的 `poem` 表。
+2. **AI 解析失败处理**：在 AI 评分流程中，若正则解析分数失败，系统会执行兜底逻辑，直接返回固定分数 **3.5** 分，确保评分数据始终有效且不影响后续统计计算。
 
-2. **AI 评分解析失败的处理**：
-   - AI 评分请求（`POST /api/poems/{id}/ratings/ai`）调用 `aiService.analyzePoem` 进行分析。
-   - 若正则解析分数失败，系统会执行兜底逻辑，直接返回固定分数 **3.5**（来源：moyuan_system_workflow.md · 8.4 诗词评分（C4））。
+（来源：moyuan_business_modules.md · 业务模块说明 / 16. 诗词评分模块 / 功能说明；moyuan_system_workflow.md · 系统工作流文档 / 8. 诗词内容域 / 8.4 诗词评分（C4））
 
 **评级**： 
 
 <details><summary>上下文</summary>
 
 ```
-【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明】
-【章节：业务模块说明 / 7. AI 模块 / 功能说明】
-- **古籍OCR识文**（上传古诗词图片/书法作品/碑帖，AI精准识别文字内容，保留原文结构，标注印章题款）
-- AI模型配置管理（后台管理，支持CRUD、启用/禁用、默认模型设置、连接测试）
-- **AI内容填充与审核**：对诗词/诗人缺失字段由 AI 生成候选内容，存入审核表，管理员审核通过后写回原表
-- **诗词AI助手（poetry_chat）**：寻章摘句页面的AI功能模块，包括译文注释、名人点评、创作背景、历史文化背景、AI逐句解析、AI诗词助手对话
-  - **译文注释**：逐句翻译，关键词语注释
-  - **名人点评**：历代名家点评（引用《诗品》《沧浪诗话》《人间词话》等）、文学史地位
-  - **创作背景**：诗人生平、创作缘由、历史背景
-  - **AI逐句解析**：点击诗句展开解释，支持多句同时展开，内存缓存不写库，可关闭
-  - **弹窗交互**：三个功能按钮以向左展开的弹窗形式呈现，覆盖在诗词内容上方，不挤压布局
-  - **搜索式加载**：AI生成过程中以搜索动画替代旋转加载图标
-
 【moyuan_business_modules.md · 业务模块说明 / 8. 搜索模块 / 搜索评分算法】
 【章节：业务模块说明 / 8. 搜索模块 / 搜索评分算法】
 ### 搜索评分算法
@@ -1603,6 +1584,27 @@
 | 拼音匹配（基础） | 0.3 | 拼音匹配基础分 |
 | 拼音标题加成 | +0.2 | 拼音匹配标题额外加分 |
 | 拼音诗人加成 | +0.1 | 拼音匹配诗人名额外加分 |
+
+【moyuan_business_modules.md · 业务模块说明 / 10. 管理模块 / 功能说明】
+【章节：业务模块说明 / 10. 管理模块 / 功能说明】
+### 功能说明
+
+- 管理后台布局（左侧导航 + 右侧内容区域）
+- 控制台（Dashboard）：系统统计数据展示、审核统计数据
+- 用户管理：用户列表、状态管理、创建/编辑/删除用户
+- 诗词管理：诗词列表、状态管理、创建/编辑/删除诗词（支持标题/内容关键字搜索与按创建时间正序/倒序切换）
+- **诗词审核**（新增）：审核用户发布的诗词（列表按 auditStatus 0-待审/1-通过/2-拒绝 筛选，通过或拒绝）
+- **评论管理**（新增）：评论列表、审核评论、删除评论（status 1-正常/0-隐藏）
+- 分类管理：分类列表、创建/编辑/删除分类
+- 朝代管理：朝代列表、创建/编辑/删除朝代
+- 诗人管理：诗人列表、状态管理、创建/编辑/删除诗人（支持姓名关键字搜索与按创建时间正序/倒序切换）
+- 帖子管理：帖子列表、状态管理、创建/编辑/删除帖子
+- **帖子审核**（新增）：审核帖子，通过或拒绝
+- **诗人认证审核**（新增）：审核诗人认证申请，通过或拒绝
+- **AI内容审核**（新增）：审核AI生成的内容，通过或拒绝后写入原表
+- **诗话视野管理**（新增）：诗话视野文章的增删改查、上下架、推荐设置（含草稿）
+- **文件管理**（新增）：文件列表与存储统计、单文件删除、孤儿文件清理
+- **缓存管理**（新增）：一键清除诗人缓存 / 全部业务缓存
 
 【moyuan_business_modules.md · 业务模块说明 / 16. 诗词评分模块 / 功能说明】
 【章节：业务模块说明 / 16. 诗词评分模块 / 功能说明】
@@ -1682,7 +1684,9 @@
 - 前端路由：/poem/:id
 - 说明：诗词详情页提供 AI 评分，由 AI 从意境、格律、修辞、情感、用词等维度评价诗词并给出分数。进入任意诗词详情页即可查看或请求 AI 评分，用户本人也可以手动给诗词评分。
 - 使用步骤：
-  1. 打开任意诗词详情页\n查看已有评分或请求 AI 评分\n查看 AI 给出的评价与分数
+  1. 打开任意诗词详情页
+  2. 查看已有评分或请求 AI 评分
+  3. 查看 AI 给出的评价与分数
 - 常见问答：
   - 问：AI评分在哪里  答：在诗词详情页可以查看或请求 AI 评分，AI 会多维度评价并给出分数。
 ```
@@ -1690,20 +1694,21 @@
 
 ## M3（medium）在诗汇论坛发帖、评论、点赞分别要满足什么条件？涉及哪些接口？帖子列表怎么展示置顶与精华？
 
-**回答**：在诗汇论坛发帖、评论、点赞需满足登录条件，涉及以下接口及展示逻辑：
+**回答**：在诗汇论坛发帖、评论、点赞需满足以下条件及涉及接口如下：
 
-**1. 发帖、评论、点赞的条件与接口**
-*   **发帖条件**：用户必须登录。
-    *   **接口**：`POST /api/forum/posts`（后端模块：sc-moyuan-backend ForumController）。（来源：moyuan_business_modules.md · 业务模块说明 / 5. 论坛模块 / API 接口）
-*   **评论条件**：用户必须登录，且支持多级回复。
-    *   **接口**：`POST /api/forum/posts/{id}/comments`（后端模块：sc-moyuan-backend ForumController）。（来源：moyuan_business_modules.md · 业务模块说明 / 5. 论坛模块 / API 接口）
-*   **点赞条件**：用户必须登录。
-    *   **接口**：`POST /api/forum/posts/{id}/like`（后端模块：sc-moyuan-backend ForumController）。（来源：moyuan_business_modules.md · 业务模块说明 / 5. 论坛模块 / API 接口）
+**1. 发帖条件与接口**
+- **条件**：用户必须完成登录（注册支持兴趣选项用于协同过滤推荐）。
+- **接口**：`POST /api/auth/register`（注册）、`POST /api/auth/login`（登录）；发布帖子具体接口资料未收录，仅知后端模块为 `sc-moyuan-backend AuthController` 或论坛模块相关逻辑。
 
-**2. 帖子列表展示置顶与精华的逻辑**
-*   **展示逻辑**：帖子列表浏览功能支持“置顶帖”与“精华帖推荐”。
-*   **数据来源**：后台管理支持对帖子进行单个或批量设置首页展示开关（对应置顶与精华状态），前端在获取帖子列表时，会依据这些标记进行排序或优先展示。
-*   **相关接口**：`GET /api/forum/posts` 用于获取帖子列表。（来源：moyuan_business_modules.md · 业务模块说明 / 5. 论坛模块 / API 接口）
+**2. 评论与点赞条件与接口**
+- **条件**：必须拥有账号且已登录；论坛支持多级回复。
+- **接口**：资料中未收录具体的评论和点赞 API 接口路径及参数，仅说明功能存在（来源：moyuan_business_modules.md·业务模块说明/5. 论坛模块/功能说明）。
+
+**3. 帖子列表展示置顶与精华**
+- **展示方式**：帖子列表支持“置顶帖”与“精华帖推荐”功能。
+- **机制**：资料中未收录具体的前端渲染逻辑或后端筛选接口路径，仅确认该功能属于论坛模块（来源：moyuan_business_modules.md·业务模块说明/5. 论坛模块/功能说明）。
+
+注：知识库未收录发帖、评论、点赞的具体 API 路径及置顶/精华的筛选接口参数。
 
 **评级**： 
 
@@ -1721,21 +1726,6 @@
 - 点赞功能
 - 精华帖推荐
 - 置顶帖功能
-
-【moyuan_business_modules.md · 业务模块说明 / 5. 论坛模块 / API 接口】
-【章节：业务模块说明 / 5. 论坛模块 / API 接口】
-### API 接口
-
-| 接口 | 说明 | 后端模块 |
-|------|------|----------|
-| GET /api/forum/posts | 帖子列表 | sc-moyuan-backend ForumController |
-| GET /api/forum/posts/{id} | 帖子详情 | sc-moyuan-backend ForumController |
-| POST /api/forum/posts | 发布帖子 | sc-moyuan-backend ForumController |
-| PUT /api/forum/posts/{id} | 编辑帖子 | sc-moyuan-backend ForumController |
-| DELETE /api/forum/posts/{id} | 删除帖子 | sc-moyuan-backend ForumController |
-| POST /api/forum/posts/{id}/like | 点赞帖子 | sc-moyuan-backend ForumController |
-| GET /api/forum/posts/{id}/comments | 评论列表 | sc-moyuan-backend ForumController |
-| POST /api/forum/posts/{id}/comments | 发表评论 | sc-moyuan-backend ForumController |
 
 【moyuan_business_modules.md · 业务模块说明 / 9. 用户模块 / 功能说明】
 【章节：业务模块说明 / 9. 用户模块 / 功能说明】
@@ -1794,6 +1784,35 @@
 
 ---
 
+【moyuan_business_modules.md · 业务模块说明 / 10. 管理模块 / 功能说明】
+【章节：业务模块说明 / 10. 管理模块 / 功能说明】
+### 功能说明
+
+- 管理后台布局（左侧导航 + 右侧内容区域）
+- 控制台（Dashboard）：系统统计数据展示、审核统计数据
+- 用户管理：用户列表、状态管理、创建/编辑/删除用户
+- 诗词管理：诗词列表、状态管理、创建/编辑/删除诗词（支持标题/内容关键字搜索与按创建时间正序/倒序切换）
+- **诗词审核**（新增）：审核用户发布的诗词（列表按 auditStatus 0-待审/1-通过/2-拒绝 筛选，通过或拒绝）
+- **评论管理**（新增）：评论列表、审核评论、删除评论（status 1-正常/0-隐藏）
+- 分类管理：分类列表、创建/编辑/删除分类
+- 朝代管理：朝代列表、创建/编辑/删除朝代
+- 诗人管理：诗人列表、状态管理、创建/编辑/删除诗人（支持姓名关键字搜索与按创建时间正序/倒序切换）
+- 帖子管理：帖子列表、状态管理、创建/编辑/删除帖子
+- **帖子审核**（新增）：审核帖子，通过或拒绝
+- **诗人认证审核**（新增）：审核诗人认证申请，通过或拒绝
+- **AI内容审核**（新增）：审核AI生成的内容，通过或拒绝后写入原表
+- **诗话视野管理**（新增）：诗话视野文章的增删改查、上下架、推荐设置（含草稿）
+- **文件管理**（新增）：文件列表与存储统计、单文件删除、孤儿文件清理
+- **缓存管理**（新增）：一键清除诗人缓存 / 全部业务缓存
+
+【moyuan_business_modules.md · 业务模块说明 / 10. 管理模块 / 后台菜单结构】
+【章节：业务模块说明 / 10. 管理模块 / 后台菜单结构】
+### 后台菜单结构
+
+- 内容管理：诗词管理、分类管理、朝代管理、诗人管理、精选诗人管理、首页导航管理、**诗话视野管理**
+- 审核管理：诗词审核、**诗人认证审核**、诗人内容审核、AI内容审核、**评论管理**
+- 系统管理：操作日志、静态页面管理、**文件管理**、**缓存管理**
+
 【moyuan_business_modules.md · 业务模块说明 / 14. 精选诗人模块 / 功能说明】
 【章节：业务模块说明 / 14. 精选诗人模块 / 功能说明】
 ### 功能说明
@@ -1811,16 +1830,6 @@
 | GET /api/poet-featured/random | 随机获取精选诗人 | sc-moyuan-backend PoetFeaturedController |
 | GET /api/poet-featured/list | 获取精选诗人列表 | sc-moyuan-backend PoetFeaturedController |
 | GET /api/poet-featured/{id} | 获取精选诗人详情 | sc-moyuan-backend PoetFeaturedController |
-
-【moyuan_business_modules.md · 业务模块说明 / 15. 诗话视野模块 / 功能说明】
-【章节：业务模块说明 / 15. 诗话视野模块 / 功能说明】
-### 功能说明
-
-- 首页「诗话视野」板块动态展示文章列表（替代原有硬编码内容）
-- 文章详情页展示（标题、摘要、正文、作者、分类、浏览量、点赞）
-- 支持文章点赞
-- 独立的文章列表页（分页浏览）
-- 文章分类筛选
 
 【moyuan_system_workflow.md · 系统工作流文档 / 9. 诗人内容域 / 9.3 诗人认证、草稿与投稿建议（E10，合并）】
 【章节：系统工作流文档 / 9. 诗人内容域 / 9.3 诗人认证、草稿与投稿建议（E10，合并）】
@@ -1845,7 +1854,10 @@
 - 前端路由：/forum
 - 说明：诗汇论坛是诗词交流社区，登录后可发布新帖，浏览帖子、评论与点赞。帖子列表支持置顶与精华展示，帖子详情页可查看正文与多级评论。
 - 使用步骤：
-  1. 进入诗汇论坛\n浏览帖子列表或搜索\n登录后点击发布新帖\n在帖子详情中评论、点赞
+  1. 进入诗汇论坛
+  2. 浏览帖子列表或搜索
+  3. 登录后点击发布新帖
+  4. 在帖子详情中评论、点赞
 - 常见问答：
   - 问：论坛在哪里  答：在顶部导航进入诗汇论坛，可浏览帖子、发帖、评论与点赞。
   - 问：论坛怎么发帖  答：登录后进入诗汇论坛，点击发布新帖，编辑标题与内容后提交。
@@ -1860,7 +1872,9 @@
 - 前端路由：/forum
 - 说明：在诗词、帖子与文章详情页可以对内容点赞与评论，论坛评论支持多级回复。评论需要有账号登录。
 - 使用步骤：
-  1. 打开诗词、帖子或文章详情\n点击点赞或发表评论\n在论坛可对评论进行回复
+  1. 打开诗词、帖子或文章详情
+  2. 点击点赞或发表评论
+  3. 在论坛可对评论进行回复
 - 常见问答：
   - 问：怎么评论  答：在诗词、帖子或文章详情页可以直接发表评论与点赞，论坛评论支持多级回复。
 ```
@@ -1871,11 +1885,11 @@
 **回答**：诗人认证从提交到通过需经历“未认证、认证中（待审核）、已认证”三种状态，最终状态为 1 表示已通过。管理员使用 `PUT /api/admin/poet-profiles/{id}/verify` 接口进行审核，该接口属于 `sc-moyuan-backend AdminController`。用户登录后进入个人中心页面（前端路由 `/user/profile`），通过“提交诗人认证申请”功能入口填写资料并提交。
 
 具体状态流转如下：
-1. **未认证**：初始状态，状态值为 0。
-2. **认证中（待审核）**：用户提交申请后进入此状态，状态值为 2，等待管理员处理。
-3. **已认证**：管理员审核通过后状态变为 1，用户获得诗人标识并在主页展示。
+1. **未认证**：初始状态，状态值为 0；
+2. **认证中（待审核）**：提交申请后进入此状态，状态值为 2；
+3. **已认证**：管理员审核通过后变为该状态，状态值为 1。
 
-若审核被拒，状态将变为 3（认证失败）。所有操作均需在个人中心页面完成资料填写与提交。
+若审核失败，状态将变为 3（认证失败）。用户需在个人中心提交申请，系统会将资料存入数据库并标记为待审核状态，随后由管理员调用上述接口完成最终判定。（来源：moyuan_business_modules.md·业务模块说明 / 4. 诗人认证模块 / 认证状态；moyuan_business_modules.md·业务模块说明 / 10. 管理模块 / API 接口；moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/ 个人中心（page.profile）；moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/ 诗人认证（feature.poet-cert））
 
 **评级**： 
 
@@ -1976,7 +1990,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/user/profile
 - 说明：个人中心可查看与修改个人资料、上传头像、修改密码，并查看我的收藏、我的点赞、我的帖子和浏览历史。诗人认证申请也从个人中心提交。需要登录后进入。
 - 使用步骤：
-  1. 登录后进入个人中心\n修改资料、头像或密码\n查看收藏、点赞、帖子与浏览历史\n需要时提交诗人认证申请
+  1. 登录后进入个人中心
+  2. 修改资料、头像或密码
+  3. 查看收藏、点赞、帖子与浏览历史
+  4. 需要时提交诗人认证申请
 - 常见问答：
   - 问：个人中心在哪里  答：登录后可从用户菜单进入个人中心，管理资料、收藏、历史并提交诗人认证。
 
@@ -1990,7 +2007,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/user/profile
 - 说明：诗人认证可让你申请成为认证诗人，提交笔名、简介、擅长体裁等资料，由管理员审核，通过后获得诗人标识并在用户主页展示。认证申请从个人中心提交，需要登录。
 - 使用步骤：
-  1. 登录后进入个人中心\n提交诗人认证申请并填写资料\n等待管理员审核\n通过后在用户主页展示认证状态
+  1. 登录后进入个人中心
+  2. 提交诗人认证申请并填写资料
+  3. 等待管理员审核
+  4. 通过后在用户主页展示认证状态
 - 常见问答：
   - 问：怎么成为认证诗人  答：登录后在个人中心提交诗人认证申请，填写资料，通过管理员审核后即获得诗人标识。
 ```
@@ -1998,19 +2018,18 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## M5（medium）一份报修工单从创建到关闭再到满意度评价，经历了哪些状态和接口？用户在哪个页面操作？
 
-**回答**：一份报修工单从创建到关闭再到满意度评价，经历了待处理（0）、处理中（1）、已解决（2）、已关闭（3）四个核心状态，并伴随拒绝（4）状态；用户主要在“我的报修列表”和“报修详情”页面操作。
+**回答**：一份报修工单从创建到关闭再到满意度评价，经历了待处理、处理中、已解决、已关闭四个核心状态，并伴随内部备注或拒绝状态（4）。用户主要在“我的报修列表”及“报修详情”页面进行操作。
 
-**状态流转与接口：**
-*   **创建阶段**：生成工单时状态为 0（待处理），后端调用 `POST /api/repair/orders` 提交，前端路由 `/repair/create`。
-*   **处理中阶段**：管理员分配后状态变为 1（处理中），通过 `PUT /api/admin/repairs/{id}/status` 更新；用户侧查看列表用 `GET /api/repair/orders`，详情用 `GET /api/repair/orders/{id}`。
-*   **已解决阶段**：状态变为 2（已解决），记录解决时间，接口同上。
-*   **关闭与评价阶段**：状态变为 3（已关闭）或 4（拒绝），通过 `PUT /api/admin/repairs/{id}/status` 更新；用户提交满意度评价需调用 `PUT /api/repair/orders/{id}/satisfaction`，前端路由 `/repair/:id`。
-*   **沟通环节**：全生命周期中均涉及评论，用户添加反馈用 `POST /api/repair/orders/{id}/comments`，管理端内部备注用 `POST /api/admin/repairs/{id}/comments`。
+**1. 状态流转与数值**
+- **待处理 (0)**：工单创建初始状态，由系统生成唯一编号。
+- **处理中 (1)**：管理员分配处理人后进入此状态。
+- **已解决 (2)**：处理完成时记录解决时间。
+- **已关闭 (3)**：用户主动关闭或管理员操作后进入。
+- **拒绝 (4)**：工单被拒绝时的特殊状态（来源：moyuan_business_modules.md · 业务模块说明 / 18. 报修模块 / API 接口；moyuan_system_workflow.md · 系统工作流文档 / 13. 报修工单域 / 13.1 工单全生命周期（E7））。
 
-**用户操作页面：**
-*   提交报修：进入 `/repair`（报修中心）点击“提交报修”。
-*   查看进度：在 `/repair` 列表或 `/repair/:id` 详情页查看状态及处理人。
-*   关闭与评价：在 `/repair/:id` 详情页执行关闭操作并提交 1-5 星
+**2. 关键接口路径与方法**
+- **创建工单**：`POST /api/repair/orders`（来源：moyuan_business_modules.md · 业务模块说明 / 18. 报修模块 / API 接口；moyuan_system_workflow.md · 系统工作流文档 / 13. 报修工单域 / 13.1 工单全生命周期（E7））。
+- **更新状态**：`PUT /api/admin/repairs/{id}/status`（来源：moyuan_business_modules.md · 业务模块说明 / 18. 报修模块 / API 接口；moyuan_system_workflow.md · 系统工作流文档 / 13. 报修工单域 / 13.1 工单全生命周期（E7）
 
 **评级**： 
 
@@ -2131,7 +2150,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/repair
 - 说明：报修中心用于提交报修工单，可填写标题、描述、分类与优先级，提交后查看我的报修列表与详情、添加反馈评论、关闭工单并提交满意度评价。需要登录后进入。
 - 使用步骤：
-  1. 登录后进入报修中心\n点击提交报修并填写工单信息\n在列表中查看工单详情与进度\n添加评论、关闭工单并评价
+  1. 登录后进入报修中心
+  2. 点击提交报修并填写工单信息
+  3. 在列表中查看工单详情与进度
+  4. 添加评论、关闭工单并评价
 - 常见问答：
   - 问：怎么报修  答：登录后进入报修中心，点击提交报修，填写标题、描述、分类与优先级后提交。
 ```
@@ -2139,19 +2161,33 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## M6（medium）智能搜索没有关键词时怎么处理？带关键词时三路并发分别做什么？
 
-**回答**：当智能搜索无关键词时，执行条件筛选与排序；有关键词时触发三路并行搜索并去重合并。
+**回答**：当智能搜索无关键词时，系统执行条件筛选与排序；有关键词时则启动三路并行搜索并去重合并。具体处理如下：
 
-1. **无关键词处理**：后端调用 `searchWithoutKeyword()` 方法，依据用户输入的朝代、分类、诗人 ID 等筛选条件进行分页检索，结果按最新、热门或点赞数排序（来源：moyuan_business_modules.md·业务模块说明 / 8. 搜索模块 / 搜索流程；moyuan_system_workflow.md·系统工作流文档 / 10.1 全文/跨模块智能搜索（C8））。
-2. **有关键词处理**：执行三路并发搜索，具体任务如下：
-   - `searchPoems()`：匹配诗词标题或内容。默认开启 ngram 中文全文索引模式（`search.fulltext-enabled=true`），对标题和内容使用原始词去标点拆分后进行模糊匹配；若关闭该模式则用原始词直接匹配。命中结果经 `calculateScore` 打分，标题精确得 1.0 分，包含得 0.8 分，拆分得 0.3 分；内容包含得 0.5 分，拆分得 0.2 分（来源：moyuan_system_workflow.md·系统工作流文档 / 10.1 全文/跨模块智能搜索（C8））。
-   - `searchByPoetName()`：匹配诗人名以获取其作品。精确匹配得 0.9 分，包含得 0.7 分，部分匹配得 0.3 分（来源：moyuan_system_workflow.md·系统工作流文档 / 10.1 全文/跨模块智能搜索（C8））。
-   - `searchByPinyin()`：通过拼音联想匹配。基础分 0.3 分，结合标题得 0.2 分，
+1. **无关键词处理**：后端调用 `searchWithoutKeyword()` 方法，依据用户输入的朝代、分类、诗人等筛选条件进行分页查询，并按最新、热门或点赞数进行排序返回结果（来源：moyuan_business_modules.md·业务模块说明 / 8. 搜索模块 / 技术方案；moyuan_system_workflow.md·系统工作流文档 / 10.1 全文/跨模块智能搜索）。
+
+2. **有关键词时的三路并发**：
+   - **`searchPoems()`**：执行标题与内容的匹配。默认开启 MySQL ngram 全文检索（`MATCH(title, content) AGAINST(...)`），若关闭全文则回退为 `LIKE` 模糊匹配，结果经 `calculateScore` 打分排序；
+   - **`searchByPoetName()`**：通过 `resolvePoetNameIds()` 模糊匹配诗人 ID，再检索该诗人的作品，评分规则为精确 0.9、包含 0.7、部分 0.3；
+   - **`searchByPinyin()`**：利用 `PinyinUtil.matchesPinyin` 进行拼音联想搜索，基础分 0.3，结合标题 0.2 与诗人 0.1 加权计算（来源：moyuan_system_workflow.md·系统工作流文档 / 10.1 全文/跨模块智能搜索；moyuan_business_modules.md·业务模块说明 / 8. 搜索模块 / 技术方案）。
+
+最终三路结果按 `poem.id` 去重合并，统一评分排序后分页返回。
 
 **评级**： 
 
 <details><summary>上下文</summary>
 
 ```
+【moyuan_business_modules.md · 业务模块说明 / 8. 搜索模块 / 技术方案】
+【章节：业务模块说明 / 8. 搜索模块 / 技术方案】
+### 技术方案
+
+- **搜索核心**：SmartSearchService，多条件复合查询 + 评分排序
+- **搜索引擎**：MySQL 8 ngram 中文全文检索（`/api/search/smart` 关键词默认走 `MATCH(title,content) AGAINST(...)`，`search.fulltext-enabled` 默认开启，可经 `SEARCH_FULLTEXT_ENABLED` 关闭回退 LIKE）；Elasticsearch 属后期可选优化
+- **拼音支持**：PinyinUtil 工具类，可配置搜索范围（默认200条，最大1000条）
+- **缓存策略**：Redis 缓存搜索建议（5分钟）、热门搜索（实时统计）、搜索历史（30天）
+- **推荐服务**：RecommendationService，协同过滤 + 兴趣推荐 + 外部API
+- **外部API集成**：今日诗词API，补充古诗词数据源
+
 【moyuan_business_modules.md · 业务模块说明 / 8. 搜索模块 / 搜索流程】
 【章节：业务模块说明 / 8. 搜索模块 / 搜索流程】
 ### 搜索流程
@@ -2247,15 +2283,6 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - **关键类与方法**：`SmartSearchServiceImpl.*`、`SearchController.*`、`PinyinUtil.matchesPinyin`、`RecommendationServiceImpl.searchPoems/getExternalPoems/calculatePoemRecommendScore`；配置 `search.fulltext-enabled`（默认 true，全文已开启，可用环境变量 `SEARCH_FULLTEXT_ENABLED` 覆盖）、`search.pinyin.limit`。
 - **数据与缓存**：Redis `search:suggestion:{kw}`、`search:hot`(ZSet)、`search:history:{userId}`(List)；`poem` 表全文索引 `ft_poem_title_content`（ngram）。
 
-【moyuan_system_workflow.md · 系统工作流文档 / 11. AI 能力域 / 11.1 AI 辅助创作与生成（E1）】
-【章节：系统工作流文档 / 11. AI 能力域 / 11.1 AI 辅助创作与生成（E1）】
-### 11.1 AI 辅助创作与生成（E1）
-- **触发入口**：`POST /api/ai/chat|write-poem|analyze|couplet|ocr`；流式入口 `POST /api/ai/chat/stream`（SSE，`AiController.chatStream` → `AiService.streamChat` → `AiModelRegistry.streamByModule` → `OpenAiCompatibleAdapter.streamChat` 用 JDK `HttpClient` 逐行解析上游 SSE，客户端断开经 `emitter.onCompletion` 置取消信号停止消费）。
-- **分步流程**：`AiController` 分发 `AiService` → 各方法内置系统提示词常量 → 文本类 `AiModelRegistry.chat/getModel`、图片类 Base64 后 `AiModelRegistry.vision`；传 `moduleCode` 走 `chatByModule/visionByModule`（按模块选模型+覆盖提示词）→ 按 `model.provider` 定位 `AiModelAdapter`，`RestTemplate` 带 `Bearer apiKey` POST 到 `ai_model.api_url`（messages=system+user、max_tokens 默认 1024）→ 解析 `choices[0].message.content` 返回；失败抛 `BusinessException`。
-- **注意（代码事实）**：providers 下拉含 qwen/openrouter，但当前**无对应 Adapter**，调用报"不支持的AI提供商"；`OpenAiCompatibleAdapter` 支持 zhipu/deepseek/kimi/mimo，`NvidiaAdapter` 支持 nvidia（vision 抛"暂不支持视觉模型"）。
-- **关键类与方法**：`AiController.*`、`AiServiceImpl.chat/writePoemFromImage/analyzePoem/matchCouplet/ocrImage`、`AiModelRegistry.chat/vision/chatByModule/getModel`、`OpenAiCompatibleAdapter/NvidiaAdapter`。
-- **数据与缓存**：`ai_model`（name/provider/apiUrl/modelId/visionModelId/apiKey/maxTokens/isEnabled/isDefault/modelType）；内存 `AiModelRegistry.modelCache`。
-
 【moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / 智能检索（feature.search）】
 【章节：墨渊小助手系统知识库（24 条） / 智能检索（feature.search）】
 ## 智能检索（feature.search）
@@ -2266,7 +2293,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poem
 - 说明：智能检索支持按关键词搜索诗词、诗人与帖子，首页与诗词列表页内嵌了搜索入口。搜索会记录你的历史，登录后还会根据兴趣给出推荐。
 - 使用步骤：
-  1. 在首页或诗词列表页输入关键词\n查看匹配的诗词、诗人或帖子\n点开结果查看详情
+  1. 在首页或诗词列表页输入关键词
+  2. 查看匹配的诗词、诗人或帖子
+  3. 点开结果查看详情
 - 常见问答：
   - 问：怎么搜索  答：在首页或诗词列表页的搜索框输入关键词，即可搜索诗词、诗人与帖子。
 ```
@@ -2276,13 +2305,12 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 **回答**：文件上传时执行格式大小校验、MD5 秒传、分类存储及 AI 水印处理，具体流程如下：
 
-1. **校验规则**：检查文件是否为空（返回 400），验证扩展名是否在 `.jpg,.jpeg,.png,.gif,.webp,.bmp` 范围内，限制文件大小不超过 10MB。
-2. **秒传机制**：计算文件 MD5，若 `file_metadata` 表中存在相同 MD5 且磁盘文件已存在，则直接复用旧文件。
-3. **存储逻辑**：生成 UUID+ 扩展名作为唯一文件名，根据 `relatedId` 和类型（如 avatar、poem、vision 等）自动构建子目录路径写入磁盘。
-4. **AI 水印**：若 `fileType` 为 `ai_generated` 且为图片，调用 `WatermarkUtil.addAiWatermark` 生成水印覆盖原图。
-5. **元数据入库**：读取图片尺寸（失败仅警告），将文件关键信息存入 `file_metadata` 表。
+1. **校验规则**：空文件返回 400；扩展名校验（默认支持 `.jpg,.jpeg,.png,.gif,.webp,.bmp`）；文件大小校验（默认限制 10MB）。
+2. **存储逻辑**：生成唯一文件名（UUID 去横线 + 扩展名）；根据类型选择子目录（如 `avatar→avatars/{relatedId}/`、`poem→poems/{relatedId}/` 等）；计算 MD5 值，若磁盘已存在则复用文件。
+3. **特殊处理**：若为 AI 生成图片（`fileType=="ai_generated"`），自动添加水印；读取图片尺寸并入库元数据。
+4. **返回结果**：包含访问 URL、文件名及 fileKey。
 
-上传接口路径为 `POST /api/files/upload`，位于后端模块 `sc-moyuan-backend FileController`，支持参数 `fileType`、`relatedId`、`relatedType`。删除与获取接口分别为 `DELETE /api/files/{fileKey}` 和 `GET /api/files/{fileKey}`（来源：moyuan_business_modules.md·业务模块说明/11.文件模块/API 接口；moyuan_system_workflow.md·系统工作流文档/6.文件与资源域/6.1文件上传全链路（A6））。
+上传接口路径为 `POST /api/files/upload`，位于后端模块 `sc-moyuan-backend FileController`，支持参数 `fileType`、`relatedId` 和 `relatedType`（来源：moyuan_business_modules.md·业务模块说明/11.文件模块/API 接口；moyuan_system_workflow.md·系统工作流文档/6.文件与资源域/6.1文件上传全链路（A6））。
 
 **评级**： 
 
@@ -2383,40 +2411,31 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## M8（medium）平台为什么用双 token？用户登出后旧的 access token 怎么失效？
 
-**回答**：平台采用双 token（access 短时效 + refresh 续期）机制，旨在平衡安全性与用户体验：access token 有效期短（默认 24h），降低泄露风险；refresh token 有效期长（默认 7 天），用于自动续期，避免频繁登录。用户登出后，旧 access token 通过将其 `jti`（唯一标识）加入黑名单而失效，具体流程如下：
+**回答**：平台采用双 token（access 短时效 + refresh 续期）机制，旨在平衡安全性与用户体验：access token 有效期短（默认 24h），降低长期持有风险；refresh token 有效期长（默认 7 天），用于自动续期，避免频繁登录。用户登出后，旧 access token 通过后端黑名单服务失效，具体流程如下：
 
-1. **触发机制**：调用后端接口 `POST /api/auth/logout`（来源：moyuan_system_workflow.md·4.2 登录与 JWT 签发）。
-2. **后端处理**：
-   - 系统通过 `TokenBlacklistService.blacklist(jti)` 将当前 token 的 `jti` 写入黑名单。
-   - 黑名单优先存储于 Redis，失败时降级为进程内内存（来源：moyuan_system_workflow.md·4.2 登录与 JWT 签发）。
-3. **失效原理**：
-   - 前端请求携带 access token 进入后端过滤器 `JwtAuthenticationFilter`。
-   - 过滤器执行 `jwtUtil.validateToken` 验签及过期检查，并调用 `TokenBlacklistService.isBlacklisted(jti)` 校验。
-   - 若 `jti` 在黑名单中，则判定 token 失效，拒绝服务请求（来源：moyuan_system_workflow.md·4.3 JWT 校验与安全过滤器链）。
-4. **前端行为**：
-   - 前端在统一请求层检测到 HTTP 401 时，会尝试用 refresh token 续期；若刷新失败或为登出请求，则清除双 token 并跳转登录页（来源：moyuan_system_workflow.md·15.1 统一请求层、15.2 登录态与用户 Store）。
+1. **触发机制**：调用 `POST /api/auth/logout` 接口（来源：moyuan_system_workflow.md·4.2 登录与 JWT 签发（A2））。
+2. **失效原理**：前端将当前 token 的 `jti`（唯一标识）发送给后端，后端通过 `TokenBlacklistService` 将该 `jti` 加入黑名单（优先 Redis，失败降级内存），标记为已失效（来源：moyuan_system_workflow.md·4.2 登录与 JWT 签发（A2））。
+3. **拦截验证**：当旧 token 被再次使用时，`JwtAuthenticationFilter` 会先校验 `jti` 是否在黑名单中。若存在，则拒绝验签或视为无效，直接抛出错误，无需重新请求后端拉取用户信息（来源：moyuan_system_workflow.md·4.3 JWT 校验与安全过滤器链认证（A3））。
+4. **前端处理**：若遇到 401 未鉴权，统一请求层会尝试用 refresh token 续期；若刷新失败或已登出，则跳转登录页（来源：moyuan_system_workflow.md·15.1 统一请求层（K1））。
 
 **评级**： 
 
 <details><summary>上下文</summary>
 
 ```
-【moyuan_business_modules.md · 业务模块说明 / 9. 用户模块 / API 接口】
-【章节：业务模块说明 / 9. 用户模块 / API 接口】
-### API 接口
+【moyuan_business_modules.md · 业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 技术方案】
+【章节：业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 技术方案】
+### 技术方案
 
-| 接口 | 说明 | 后端模块 |
-|------|------|----------|
-| POST /api/auth/register | 注册（支持兴趣选项） | sc-moyuan-backend AuthController |
-| POST /api/auth/login | 登录 | sc-moyuan-backend AuthController |
-| GET /api/users/me | 获取当前用户信息 | sc-moyuan-backend UserController |
-| PUT /api/users/me | 更新当前用户信息 | sc-moyuan-backend UserController |
-| PUT /api/users/me/password | 修改密码 | sc-moyuan-backend UserController |
-| GET /api/users/me/posts | 获取当前用户帖子列表 | sc-moyuan-backend UserController |
-| GET /api/users/me/stats | 获取当前用户统计信息 | sc-moyuan-backend UserController |
-| GET /api/users/{id} | 获取用户信息 | sc-moyuan-backend UserController |
-| GET /api/users/{id}/profile | 获取用户主页信息（含诗人资料） | sc-moyuan-backend UserController |
-| GET /api/users/{id}/works | 获取用户作品列表 | sc-moyuan-backend UserController |
+- 对话主链路为 SSE 流式 `POST /api/ai/chat/stream`：前端用 `fetch` + `ReadableStream` 解析（Axios 不支持读取流、EventSource 不支持 POST）并逐段渲染；网络中断等可重试失败才回退非流式 `POST /api/ai/chat`
+- 请求组装为真正的 system role：`[{role:'system', content: persona.systemPrompt}, …最近 12 条历史, {role:'user', content: skill ? skill.buildPrompt(raw) : raw}]`（历史单条 ≤2000 字、合计 ≤8000 字），不再把角色设定前缀塞进 user 消息
+- 限流/额度/鉴权类错误（400/401/403/429 与 4290~4293）**不**回退非流式——回退会二次扣配额并掩盖真实原因，直接展示后端 `message`
+- 流式正常返回 `text/event-stream`；限流与参数异常由 `@RestControllerAdvice` 以 JSON 返回，前端按 `content-type` 区分后抛出 `message`，错误对象携带 `status`/`code` 供判断是否可重试
+- 生成中可停止：发送按钮切换为「停止」，`abort` 后保留已生成内容并持久化；`finally` 中比对 `AbortController` 实例，避免旧请求复位新请求的 loading
+- 会话同步：切换角色 / 新建会话 / 首次进入时从服务端拉取；本地有而服务端为空时反向上传；`sessionSeq` 防止快速切换角色串台
+- `moduleCode` 必传 `'chat'`（已绑定 DeepSeek）；否则回退智谱默认模型，会因 key 余额不足返回 `429 code 1113`
+- 藏头诗任务模板复用首页现有实现并迁至能力层；平仄校验改调本地确定性引擎 `POST /api/ai/tone-check`
+- 配色沿用墨渊棕金色系（宣纸底 / 铜边 / 棕金强调），禁用 Element Plus 默认蓝
 
 【moyuan_system_workflow.md · 系统工作流文档 / 2. 全局约定与分层（引擎级机制） / 2.3 JWT 认证与过滤器链】
 【章节：系统工作流文档 / 2. 全局约定与分层（引擎级机制） / 2.3 JWT 认证与过滤器链】
@@ -2505,15 +2524,18 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 **回答**：诗词详情页的赏析增强内容缓存在 `poem_content_cache` 表中，缓存 key 由诗词标题（poem_title）、诗人姓名（poet_name）和内容类型（content_type）三个字段组合而成。
 
-1. **缓存表名**：`poem_content_cache`
-   - 该表用于存储外部 API 获取的诗词内容（译文、注释、赏析等），避免重复调用外部接口。（来源：moyuan_business_modules.md · 业务模块说明 / 21. 诗词内容缓存模块 / 数据库表）
+1. **缓存表**：`poem_content_cache`
+   - 该表用于存储外部 API 获取的诗词内容（译文、注释、赏析等），避免重复调用外部接口。
+   - （来源：moyuan_business_modules.md · 业务模块说明 / 21. 诗词内容缓存模块 / 数据库表）
 
-2. **缓存 Key 组成**：
-   - `poem_title` + `poet_name` + `content_type`
-   - 查询逻辑为按“诗词标题 + 诗人 + 内容类型”进行匹配，命中则直接返回缓存数据，未命中则由外部或 AI 生成后写入。（来源：moyuan_business_modules.md · 业务模块说明 / 21. 诗词内容缓存模块 / 功能说明）
+2. **缓存 Key 组成**：`poem_title + poet_name + content_type`
+   - 查询逻辑支持按诗词标题、诗人及内容类型进行组合匹配。
+   - （来源：moyuan_business_modules.md · 业务模块说明 / 21. 诗词内容缓存模块 / 功能说明）
 
-3. **相关接口**：
-   - `POST /api/poem-content/cache`：用于保存诗词内容缓存，后端模块为 `PoemContentController`。（来源：moyuan_business_modules.md · 业务模块说明 / 21. 诗词内容缓存模块 / API 接口）
+3. **触发入口与流程**：
+   - 用户访问 `GET /api/poems/{id}` 时，系统会调用 `PoemContentCacheServiceImpl`。
+   - 若命中缓存则直接返回；未命中则由外部或 AI 生成内容后通过 `POST /api/poem-content/cache` 接口落库保存。
+   - （来源：moyuan_system_workflow.md · 系统工作流文档 / 8. 诗词内容域 / 8.2 诗词详情与赏析缓存（C2））
 
 **评级**： 
 
@@ -2636,14 +2658,16 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## M10（medium）AI 模型配置在后台改完之后怎么生效？API Key 是从哪里读的？
 
-**回答**：AI 模型配置修改后通过数据库表 `ai_model` 动态生效，由 `AiModelRegistry` 按模块解析并调用对应适配器；API Key 不直接存入配置表，而是从运行时配置文件 `secrets/application-secrets.yml` 注入。
+**回答**：AI 模型配置修改后需同时满足后端开关开启与前端常量同步方可生效，API Key 从运行时注入文件读取。
 
-具体机制如下：
-1. **配置生效流程**：后台通过 `POST /api/admin/ai-models/{id}` 等接口更新 `ai_model` 表中的模型信息（含 provider、url、key 占位符）。前端或业务层调用时，`AiModelRegistry` 根据 `moduleCode` 查询该表获取实际模型参数，再交由 `OpenAiCompatibleAdapter` 或 `NvidiaAdapter` 执行请求。
-2. **API Key 读取方式**：配置表中仅存储占位符，真实密钥在应用启动或运行时从 `secrets/application-secrets.yml` 文件中注入到环境变量或配置中心，供适配器层动态获取。
-3. **技术实现细节**：调用链为 `AiController` → `AiService` → `AiModelRegistry` → `Adapter`，最终通过 `RestTemplate` 携带 `Bearer apiKey` 发起 POST 请求至 `ai_model.api_url`。
+1. **配置生效条件**：
+   - 后端必须打开 OCR 功能开关（`ai.features.ocr-enabled=true`），否则接口返回 `4293` 错误。
+   - 前端需将首页入口置灰状态移除，并开启 `OCR_ENABLED` 常量。
+   - 两者需同时恢复，且存在 `ocr` 模块的视觉模型绑定（来源：moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明）。
 
-（来源：moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 技术方案；moyuan_system_workflow.md · 系统工作流文档 / 11.1 AI 辅助创作与生成（E1）；moyuan_business_modules.md · 业务模块说明 / 26. 全局 AI 小窗与系统知识库模块 / 后端与数据结构）
+2. **API Key 读取方式**：
+   - API Key 不直接存储在数据库中，而是作为占位符存入 `ai_model` 表。
+   - 真实密钥从配置文件 `secrets/application-secrets.yml` 中运行时动态注入（来源：moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 技术方案）。
 
 **评级**： 
 
@@ -2652,13 +2676,28 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 ```
 【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明】
 【章节：业务模块说明 / 7. AI 模块 / 功能说明】
-可用提供商：智谱AI、DeepSeek、Kimi、千问、小米MiMo、OpenRouter；NVIDIA NIM 已全部禁用/下线）
+### 功能说明
+
+- AI诗词问答（支持多模型切换；调用优先走 `ai_module_config` 模块绑定，未绑定某模块时回退默认模型。可用提供商：智谱AI、DeepSeek、Kimi、千问、小米MiMo、OpenRouter；NVIDIA NIM 已全部禁用/下线）
 - 看图写诗（上传图片，AI生成古诗词，支持视觉模型如 GLM-4V-Flash、DeepSeek-Flash）
 - 智能分析（输入诗句进行深度解析）
 - AI对对联（输入上联，AI生成下联，遵循平仄规则）
 - **藏头诗**（输入 2-8 个藏头字并选择五言/七言，AI 生成藏头诗，每句首字依次对应藏头字；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
-- **平仄格律校验**（粘贴一首绝句/律诗，AI 逐句标注平仄（平声绿底、仄声红底）、判定是否合律、识别所属平水韵韵部并给出总体评价；AI 返回严格 JSON，前端解析失败时回退展示原始文本；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
-- **AI 对话页「诗宝阁」**（`/ai-chat`）：角色化统一对话入口，6 角色（诗仙·创作 / 诗话·鉴赏 / 格律·校正 / 诗友·行令 / 群贤·论诗 / 顾问·问答）× 12 能力（命题作诗 / 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 / 群贤论诗）；阶段一复用 `POST /api/ai/chat`（moduleCode=chat，非流式），阶段二后端已新增 `POST /api/ai/chat/stream`（SSE 流式，见 6.
+- **平仄格律校验**（粘贴一首绝句/律诗，由**本地确定性引擎** `POST /api/ai/tone-check` 逐句标注平仄（平声绿底、仄声红底）、判定是否合律并给出不合律原因；校验规则为句末三平尾/三仄尾、二四六位失替、偶数句押韵，不调用大模型、不消耗 AI 额度）
+- **AI 对话页「诗宝阁」**（`/ai-chat`）：角色化统一对话入口，6 角色（诗仙·创作 / 诗话·鉴赏 / 格律·校正 / 诗友·行令 / 群贤·论诗 / 顾问·问答）× 12 能力（命题作诗 / 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 /
+
+【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明】
+【章节：业务模块说明 / 7. AI 模块 / 功能说明】
+- **古籍OCR识文**（上传古诗词图片/书法作品/碑帖，AI精准识别文字内容，保留原文结构，标注印章题款）——**当前维护中**：后端开关 `ai.features.ocr-enabled=false` 时接口返回 `4293`，前端首页入口置灰并提示「维护中」，恢复需同时打开后端开关与前端 `OCR_ENABLED` 常量，并存在 `ocr` 模块的视觉模型绑定
+- AI模型配置管理（后台管理，支持CRUD、启用/禁用、默认模型设置、连接测试）
+- **AI内容填充与审核**：对诗词/诗人缺失字段由 AI 生成候选内容，存入审核表，管理员审核通过后写回原表
+- **诗词AI助手（poetry_chat）**：寻章摘句页面的AI功能模块，包括译文注释、名人点评、创作背景、历史文化背景、AI逐句解析、AI诗词助手对话
+  - **译文注释**：逐句翻译，关键词语注释
+  - **名人点评**：历代名家点评（引用《诗品》《沧浪诗话》《人间词话》等）、文学史地位
+  - **创作背景**：诗人生平、创作缘由、历史背景
+  - **AI逐句解析**：点击诗句展开解释，支持多句同时展开，内存缓存不写库，可关闭
+  - **弹窗交互**：三个功能按钮以向左展开的弹窗形式呈现，覆盖在诗词内容上方，不挤压布局
+  - **搜索式加载**：AI生成过程中以搜索动画替代旋转加载图标
 
 【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 技术方案】
 【章节：业务模块说明 / 7. AI 模块 / 技术方案】
@@ -2671,26 +2710,6 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - AI模型配置存入数据库（ai_model 表），支持动态管理；api_key 部分为占位符，真实密钥从 `secrets/application-secrets.yml` 运行时注入
 - 前端首页集成AI问答组件（右下角悬浮按钮）
 - 前端首页"展风拓潮"模块集成看图写诗、智能分析、对联、藏头诗、平仄校验和OCR功能；「飞花令」「诗词接龙」为两张卡片入口（见第 24 章「游戏模块」）
-
-【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / API 接口】
-【章节：业务模块说明 / 7. AI 模块 / API 接口】
-### API 接口
-
-| 接口 | 说明 | 后端模块 |
-|------|------|----------|
-| POST /api/ai/chat | AI问答（非流式） | sc-moyuan-backend AiController |
-| POST /api/ai/chat/stream | AI流式问答（SSE，返回 `text/event-stream`） | sc-moyuan-backend AiController |
-| POST /api/ai/write-poem | 看图写诗 | sc-moyuan-backend AiController |
-| POST /api/ai/analyze | 智能分析 | sc-moyuan-backend AiController |
-| POST /api/ai/ocr | 图片OCR识别（古籍/书法/碑帖） | sc-moyuan-backend AiController |
-| POST /api/ai/couplet | AI对对联 | sc-moyuan-backend AiController |
-| GET /api/ai/config/{moduleCode} | 获取模块AI配置（提示词模板、回答风格等） | sc-moyuan-backend AiController |
-| POST /api/ai/preview | AI生成预览（不写入数据库） | sc-moyuan-backend AiContentController |
-| POST /api/ai/submit-review | 提交AI内容到审核表 | sc-moyuan-backend AiContentController |
-| POST /api/ai/fill-content | 触发AI填充（直接生成并存库） | sc-moyuan-backend AiContentController |
-| GET /api/ai/fill-status/{targetType}/{targetId} | 查询某目标的AI填充状态 | sc-moyuan-backend AiContentController |
-
-**获取模块AI配置**：根据 moduleCode 返回对应模块的配置信息，包含提示词模板（promptTemplate）、最大回答长度（maxLength）、回答风格（responseStyle）、首次回答长度（firstResponseLength）等。前端用于构建 AI 对话的系统约束。
 
 【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / AI模型管理接口（管理员）】
 【章节：业务模块说明 / 7. AI 模块 / AI模型管理接口（管理员）】
@@ -2707,17 +2726,6 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 | POST /api/admin/ai-models/{id}/set-default | 设置默认模型 | sc-moyuan-backend AiModelConfigController |
 | POST /api/admin/ai-models/{id}/test | 测试连接 | sc-moyuan-backend AiModelConfigController |
 
-【moyuan_business_modules.md · 业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 技术方案】
-【章节：业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 技术方案】
-### 技术方案
-
-- 阶段一为**纯前端 MVP**，不新增后端接口、不改数据库表，复用现有非流式接口 `POST /api/ai/chat`
-- `moduleCode` 必传 `'chat'`（已绑定 DeepSeek）；否则回退智谱默认模型，会因 key 余额不足返回 `429 code 1113`
-- 阶段一后端恒前置自身 `CHAT_SYSTEM_PROMPT`，故角色提示词以「角色设定」前缀注入 user 消息（**非**真正的 system role）；真正的 system role + 多轮上下文属阶段二
-- 加载反馈遵循 loading-patterns 规范：发送按钮内置小转圈 +「生成中」并禁用重复点击、宽度固定；对话流等待期显示居中转圈 +「墨渊正在提笔…」；非流式整段返回（无逐字与停止按钮）
-- 藏头诗 / 平仄校验的任务模板与解析逻辑复用首页现有实现，迁移至能力层
-- 配色沿用墨渊棕金色系（宣纸底 / 铜边 / 棕金强调），禁用 Element Plus 默认蓝
-
 【moyuan_business_modules.md · 业务模块说明 / 26. 全局 AI 小窗与系统知识库模块 / 后端与数据结构】
 【章节：业务模块说明 / 26. 全局 AI 小窗与系统知识库模块 / 后端与数据结构】
 ### 后端与数据结构
@@ -2728,11 +2736,24 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 公开接口：`GET /api/system-knowledge`（只读列表）
 - 后台接口：`GET /api/admin/system-knowledge`、`GET /{id}`、`POST`、`PUT /{id}`、`PUT /{id}/show`、`DELETE /{id}`
 
+【moyuan_business_modules.md · 业务模块说明 / 26. 全局 AI 小窗与系统知识库模块 / API 接口】
+【章节：业务模块说明 / 26. 全局 AI 小窗与系统知识库模块 / API 接口】
+### API 接口
+
+| 接口 | 说明 | 后端模块 |
+|------|------|----------|
+| GET /api/system-knowledge | 公开读取系统知识库条目 | sc-moyuan-backend SystemKnowledgeController |
+| POST /api/ai/chat | 诗词助理 / 网页用法助理对话（`moduleCode` 分别为页面画像值 / `system_chat`） | sc-moyuan-backend AiController |
+
+---
+
+**文档版本**：v3.18
+**最后更新**：2026-11-07（AI 加固收尾同步：第 25 章诗宝阁由「阶段一非流式」改为 SSE 流式 + system 人设多轮上下文 + 服务端会话（Redis，TTL 7 天，localStorage 兜底）+ 停止生成；平仄校验改述为本地确定性引擎 `POST /api/ai/tone-check`（不消耗 AI 额度）；古籍识文标注维护中（`ai.features.ocr-enabled=false`）；接口清单补 `tone-check` 与 3 个会话接口，并注明 `/api/ai/**` 统一限流与入参校验）；此前 v3.17（推荐算法说明补充「四组模型策略（离线制品查表）」与「后台实时看板」；后台控制台推荐指标屏新增缓存覆盖、模型版本、近 7 天切换趋势、切换去向/页面分布与最近事件）；v3.16（推荐算法说明由 UserCF 更新为 ItemCF，诗词行为矩阵同一作品多行为取最大值合并）；v3.15（新增第 26 章「全局 AI 小窗与系统知识库」：双助理、`system_chat` 模块、`system_knowledge` 表、路由画像、意图分流与 FAQ 直答、知识库跳转入口、登录门禁；模块总数 25 → 26）；v3.14（首页「诗境 AI」展开面板新增「前往完整页面」入口，按工具预选诗宝阁角色与能力；韵脚查询/对对联补充为诗宝阁新能力，能力总数 10 → 12；功能卡增加自动横向滑动）；2026-10-19（AI 对话页模块名统一由「诗阁」更名为「诗宝阁」；此前第 25 章「AI 对话页『诗宝阁』」补充对话流消息头像说明：AI 侧统一卡通头像 / 用户侧本人头像，气泡与头像左右对齐；v3.13 补充后端流式接口 `POST /api/ai/chat/stream`（SSE 流式）说明与接口表条目；v3.12 新增第 25 章：6 角色 × 10 能力的角色化统一对话入口，纯前端复用 `POST /api/ai/chat` 非流式接口）
+**维护人员**：墨渊开发团队
+
 【moyuan_system_workflow.md · 系统工作流文档 / 11. AI 能力域 / 11.1 AI 辅助创作与生成（E1）】
 【章节：系统工作流文档 / 11. AI 能力域 / 11.1 AI 辅助创作与生成（E1）】
-### 11.1 AI 辅助创作与生成（E1）
-- **触发入口**：`POST /api/ai/chat|write-poem|analyze|couplet|ocr`；流式入口 `POST /api/ai/chat/stream`（SSE，`AiController.chatStream` → `AiService.streamChat` → `AiModelRegistry.streamByModule` → `OpenAiCompatibleAdapter.streamChat` 用 JDK `HttpClient` 逐行解析上游 SSE，客户端断开经 `emitter.onCompletion` 置取消信号停止消费）。
-- **分步流程**：`AiController` 分发 `AiService` → 各方法内置系统提示词常量 → 文本类 `AiModelRegistry.chat/getModel`、图片类 Base64 后 `AiModelRegistry.vision`；传 `moduleCode` 走 `chatByModule/visionByModule`（按模块选模型+覆盖提示词）→ 按 `model.provider` 定位 `AiModelAdapter`，`RestTemplate` 带 `Bearer apiKey` POST 到 `ai_model.api_url`（messages=system+user、max_tokens 默认 1024）→ 解析 `choices[0].message.content` 返回；失败抛 `BusinessException`。
+provider` 定位 `AiModelAdapter`，`RestTemplate` 带 `Bearer apiKey` POST 到 `ai_model.api_url`（messages=system+user、max_tokens 默认 1024）→ 解析 `choices[0].message.content` 返回；失败抛 `BusinessException`。
 - **注意（代码事实）**：providers 下拉含 qwen/openrouter，但当前**无对应 Adapter**，调用报"不支持的AI提供商"；`OpenAiCompatibleAdapter` 支持 zhipu/deepseek/kimi/mimo，`NvidiaAdapter` 支持 nvidia（vision 抛"暂不支持视觉模型"）。
 - **关键类与方法**：`AiController.*`、`AiServiceImpl.chat/writePoemFromImage/analyzePoem/matchCouplet/ocrImage`、`AiModelRegistry.chat/vision/chatByModule/getModel`、`OpenAiCompatibleAdapter/NvidiaAdapter`。
 - **数据与缓存**：`ai_model`（name/provider/apiUrl/modelId/visionModelId/apiKey/maxTokens/isEnabled/isDefault/modelType）；内存 `AiModelRegistry.modelCache`。
@@ -2749,10 +2770,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 **回答**：在搜索排序规则中，**诗人名精确匹配**的分数更高。具体分值如下：
 
-- **诗人名精确匹配**：0.9 分（说明：诗人名与关键词完全一致）
-- **标题完全匹配**：1.0 分（说明：去除标点后完全一致）
+- **诗人名精确匹配**：**0.9 分**（说明：诗人名与关键词完全一致）
+- **标题完全匹配**：**1.0 分**（说明：去除标点后完全一致）
 
-因此，标题完全匹配的得分（1.0）高于诗人名精确匹配的得分（0.9）。
+因此，**标题完全匹配（1.0 分）** 的分数实际上高于诗人名精确匹配（0.9 分）。
 
 （来源：moyuan_business_modules.md · 业务模块说明 / 8. 搜索模块 / 搜索评分算法）
 
@@ -2877,26 +2898,42 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## H3（hard）诗宝阁和首页 AI 小工具区是什么关系？藏头诗这两处都有吗？
 
-**回答**：诗宝阁与首页 AI 小工具区是并存且互补的关系，两者功能独立但服务同一用户群体。
+**回答**：诗宝阁与首页 AI 小工具区是并存且互补的关系，两者均提供 AI 功能但定位不同。
 
-1. **关系说明**：诗宝阁是统一的角色化对话入口，将创作、鉴赏等分散应用合并为单一页面；首页 AI 小工具区保留快捷玩法入口。两处并存，互不替代（来源：moyuan_business_modules.md·业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 功能说明）。
-2. **藏头诗分布**：藏头诗功能在两处均有提供。首页 AI 小工具区可直接使用；诗宝阁中可通过选择“诗仙·创作”角色并启用“藏头诗”能力来生成（来源：moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/ 诗宝阁 AI 对话（play.bao-ge））。
-3. **使用差异**：首页入口更快捷，适合快速体验；诗宝阁支持多角色切换与复杂能力组合，适合深度创作与交互（来源：moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/ 藏头诗（play.acrostic））。
+- **关系**：诗宝阁是统一的角色化对话入口（`/ai-chat`），支持多角色与能力组合；首页 AI 小工具区保留快捷玩法入口，两处功能并存，互不冲突。（来源：moyuan_business_modules.md·业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 功能说明）
+- **藏头诗分布**：藏头诗功能在两处均有提供。首页 AI 小工具区可直接使用；诗宝阁中“诗仙·创作”角色下也提供该能力，生成结果会高亮每句首字。（来源：moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/ 藏头诗（play.acrostic））
 
 **评级**： 
 
 <details><summary>上下文</summary>
 
 ```
+【moyuan_business_modules.md · 业务模块说明 / 1. 首页模块 / 功能说明】
+【章节：业务模块说明 / 1. 首页模块 / 功能说明】
+### 功能说明
+
+- 轮播图展示精选诗词（Swiper轮播，主轮播+诗文轮播）
+- 导航菜单（朝代、流派、诗人、作品、论坛）
+- 推荐诗人卡片
+- 推荐作品卡片
+- 分类精赏
+- 古诗推选（历史的印痕/为您推荐/搜索/详情弹窗）
+- 当代精选（分页/点赞/收藏/评论）
+- 论坛预览（标题/搜索/滚动字幕/精选板块/热帖）
+- AI功能区域「诗境 AI」（看图写诗/智能分析/诗海拾贝；韵脚查询/对对联/古籍识文/藏头诗/平仄校验/飞花令等工具卡，工具卡自动横向滑动、悬浮暂停；展开面板提供「前往完整页面」入口，统一跳「诗宝阁」并预选角色与能力，飞花令/接龙跳对应游戏页，古籍识文暂无完整页）
+- 响应式布局（4断点：1200/992/768/576px）
+
 【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明】
 【章节：业务模块说明 / 7. AI 模块 / 功能说明】
-可用提供商：智谱AI、DeepSeek、Kimi、千问、小米MiMo、OpenRouter；NVIDIA NIM 已全部禁用/下线）
+### 功能说明
+
+- AI诗词问答（支持多模型切换；调用优先走 `ai_module_config` 模块绑定，未绑定某模块时回退默认模型。可用提供商：智谱AI、DeepSeek、Kimi、千问、小米MiMo、OpenRouter；NVIDIA NIM 已全部禁用/下线）
 - 看图写诗（上传图片，AI生成古诗词，支持视觉模型如 GLM-4V-Flash、DeepSeek-Flash）
 - 智能分析（输入诗句进行深度解析）
 - AI对对联（输入上联，AI生成下联，遵循平仄规则）
 - **藏头诗**（输入 2-8 个藏头字并选择五言/七言，AI 生成藏头诗，每句首字依次对应藏头字；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
-- **平仄格律校验**（粘贴一首绝句/律诗，AI 逐句标注平仄（平声绿底、仄声红底）、判定是否合律、识别所属平水韵韵部并给出总体评价；AI 返回严格 JSON，前端解析失败时回退展示原始文本；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
-- **AI 对话页「诗宝阁」**（`/ai-chat`）：角色化统一对话入口，6 角色（诗仙·创作 / 诗话·鉴赏 / 格律·校正 / 诗友·行令 / 群贤·论诗 / 顾问·问答）× 12 能力（命题作诗 / 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 / 群贤论诗）；阶段一复用 `POST /api/ai/chat`（moduleCode=chat，非流式），阶段二后端已新增 `POST /api/ai/chat/stream`（SSE 流式，见 6.
+- **平仄格律校验**（粘贴一首绝句/律诗，由**本地确定性引擎** `POST /api/ai/tone-check` 逐句标注平仄（平声绿底、仄声红底）、判定是否合律并给出不合律原因；校验规则为句末三平尾/三仄尾、二四六位失替、偶数句押韵，不调用大模型、不消耗 AI 额度）
+- **AI 对话页「诗宝阁」**（`/ai-chat`）：角色化统一对话入口，6 角色（诗仙·创作 / 诗话·鉴赏 / 格律·校正 / 诗友·行令 / 群贤·论诗 / 顾问·问答）× 12 能力（命题作诗 / 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 /
 
 【moyuan_business_modules.md · 业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 功能说明】
 【章节：业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 功能说明】
@@ -2912,9 +2949,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
   - `advisor` 顾问·问答（通识问答，无专属能力）
 - **12 个能力**（Skill）：`compose` 命题作诗、`gather` 集句成诗、`acrostic` 藏头诗、`polish` 润色入律、`tone` 平仄校验、`rhyme` 韵脚查询、`couplet` 对对联、`imagery` 意象典故、`comment` 诗话点评、`feihua` 飞花令、`chain` 诗词接龙、`salon` 群贤论诗
 - **三段式布局**：左「角色栏」+ 中「对话流」+ 底「能力快捷 chips + 输入框」
-- **会话记忆**：按 `roleId` 分存 `localStorage`（键 `moyuan_ai_chat_${roleId}`），切换角色各自恢复；单角色最多保留 40 条（约 20 轮），单条内容上限 4000 字
+- **会话记忆**：按 `roleId` 存服务端 Redis（键 `ai:chat:session:{userId}:{roleId}`，TTL 7 天、最多 40 条），切换角色各自恢复，换设备登录同一账号可继续；本地 `localStorage`（键 `moyuan_ai_chat_${roleId}`）作为降级缓存，Redis 不可用时仍可用。单条内容上限 4000 字
 - **空态引导**：进入页面 / 新建会话后，按角色给出引导语 + 推荐能力 chip
-- **结果渲染**：普通能力渲染为文本气泡；藏头诗高亮每句首字（藏头字）；平仄校验解析 AI 返回的严格 JSON，渲染为平仄标签卡（平底/仄底、押韵标记、逐句简评、总评），解析失败回退展示原始文本
+- **结果渲染**：普通能力渲染为文本气泡，流式逐字追加并自动滚底；藏头诗高亮每句首字（藏头字）；平仄校验改调本地确定性引擎 `POST /api/ai/tone-check`，把返回的逐字平仄与问题列表渲染为平仄标签卡（平底/仄底，三平尾、三仄尾、二四六失替等问题标红），不再依赖大模型输出 JSON
 - **消息头像**：对话流每条消息两侧带圆形头像——AI 侧统一使用墨渊可爱卡通头像（本地静态资源 `/img/ai_chat_avatar.jpg`），用户侧使用本人头像（未登录 / 无头像时回退金色首字母）；用户气泡靠右、头像居其右，AI 气泡靠左、头像居其左，加载态气泡同样带 AI 头像
 
 【moyuan_business_modules.md · 业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 前端路由】
@@ -2933,8 +2970,12 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 | 接口 | 说明 | 后端模块 |
 |------|------|----------|
-| POST /api/ai/chat | 复用现有非流式对话接口（请求 `{ message, moduleCode:'chat' }`，响应 `data.reply`） | sc-moyuan-backend AiController |
-| POST /api/ai/chat/stream | 流式对话接口（请求 `{ moduleCode, messages[], temperature, maxTokens }`，响应 `text/event-stream`，事件 `{"delta":"…"}` … `[DONE]`） | sc-moyuan-backend AiController |
+| POST /api/ai/chat/stream | 主链路。SSE 流式对话（请求 `{ moduleCode, messages[], temperature, maxTokens }`，响应 `text/event-stream`，事件 `{"delta":"…"}` … `[DONE]`；限流/入参错误以 JSON 返回） | sc-moyuan-backend AiController |
+| POST /api/ai/chat | 兜底。非流式对话（请求 `{ message, moduleCode:'chat' }`，响应 `data.reply`），仅在流式遇可重试失败时调用 | sc-moyuan-backend AiController |
+| GET /api/ai/chat/sessions/{roleId} | 读取当前用户在该角色下的会话 | AiChatSessionController |
+| PUT /api/ai/chat/sessions/{roleId} | 保存会话（`{"messages":[…]}`，服务端只保留最近 40 条） | AiChatSessionController |
+| DELETE /api/ai/chat/sessions/{roleId} | 清空该角色会话 | AiChatSessionController |
+| POST /api/ai/tone-check | 平仄校验（本地确定性引擎，不消耗 AI 额度） | sc-moyuan-backend AiController |
 
 【moyuan_business_modules.md · 业务模块说明 / 26. 全局 AI 小窗与系统知识库模块 / 功能说明】
 【章节：业务模块说明 / 26. 全局 AI 小窗与系统知识库模块 / 功能说明】
@@ -2953,21 +2994,6 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - **路由跳转入口**：跳转按钮由前端根据命中的知识条目 `route` 字段直接生成，不依赖模型输出 `[[route]]` 标记，避免幻觉
 - **知识库兜底**：知识库加载失败标记为未加载，用户再次打开小窗时自动补拉一次，避免跳转链接永久失效
 
-【moyuan_business_modules.md · 业务模块说明 / 26. 全局 AI 小窗与系统知识库模块 / API 接口】
-【章节：业务模块说明 / 26. 全局 AI 小窗与系统知识库模块 / API 接口】
-### API 接口
-
-| 接口 | 说明 | 后端模块 |
-|------|------|----------|
-| GET /api/system-knowledge | 公开读取系统知识库条目 | sc-moyuan-backend SystemKnowledgeController |
-| POST /api/ai/chat | 诗词助理 / 网页用法助理对话（`moduleCode` 分别为页面画像值 / `system_chat`） | sc-moyuan-backend AiController |
-
----
-
-**文档版本**：v3.17
-**最后更新**：2026-10-27（推荐算法说明补充「四组模型策略（离线制品查表）」与「后台实时看板」；后台控制台推荐指标屏新增缓存覆盖、模型版本、近 7 天切换趋势、切换去向/页面分布与最近事件）；此前 v3.16（推荐算法说明由 UserCF 更新为 ItemCF，诗词行为矩阵同一作品多行为取最大值合并）；此前 v3.15（新增第 26 章「全局 AI 小窗与系统知识库」：双助理、`system_chat` 模块、`system_knowledge` 表、路由画像、意图分流与 FAQ 直答、知识库跳转入口、登录门禁；模块总数 25 → 26）；v3.14（首页「诗境 AI」展开面板新增「前往完整页面」入口，按工具预选诗宝阁角色与能力；韵脚查询/对对联补充为诗宝阁新能力，能力总数 10 → 12；功能卡增加自动横向滑动）；2026-10-19（AI 对话页模块名统一由「诗阁」更名为「诗宝阁」；此前第 25 章「AI 对话页『诗宝阁』」补充对话流消息头像说明：AI 侧统一卡通头像 / 用户侧本人头像，气泡与头像左右对齐；v3.13 补充阶段二后端流式接口 `POST /api/ai/chat/stream`（SSE 流式）说明与接口表条目；v3.12 新增第 25 章：6 角色 × 10 能力的角色化统一对话入口，阶段一纯前端复用 `POST /api/ai/chat` 非流式接口）
-**维护人员**：墨渊开发团队
-
 【moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / 诗宝阁AI对话（play.bao-ge）】
 【章节：墨渊小助手系统知识库（24 条） / 诗宝阁AI对话（play.bao-ge）】
 ## 诗宝阁AI对话（play.bao-ge）
@@ -2976,12 +3002,16 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 关键词：诗宝阁,AI对话,创作,鉴赏,平仄校验,藏头诗
 - 别名：诗阁,诗宝阁
 - 前端路由：/ai-chat
-- 说明：诗宝阁是统一的 AI 对话页面，AI 以不同角色与能力帮你完成命题作诗、集句成诗、藏头诗、润色入律、平仄校验、意象典故、诗话点评、飞花令、诗词接龙等任务。可在左侧选择角色与能力后直接对话，会话按角色分别保存在本地。入口在顶部导航的「诗宝阁」。
+- 说明：诗宝阁是统一的 AI 对话页面，AI 以不同角色与能力帮你完成命题作诗、集句成诗、藏头诗、润色入律、平仄校验、意象典故、诗话点评、飞花令、诗词接龙等任务。可在左侧选择角色与能力后直接对话，回复以流式方式逐字输出，生成过程中可随时点击「停止」。会话按角色保存在账号下并保留 7 天，换设备登录同一账号可以接着聊。入口在顶部导航的「诗宝阁」。
 - 使用步骤：
-  1. 打开诗宝阁页面\n选择角色与能力\n输入你的需求并发送\n查看 AI 返回的文本、藏头高亮或平仄标注结果
+  1. 打开诗宝阁页面
+  2. 选择角色与能力
+  3. 输入你的需求并发送
+  4. 查看 AI 返回的文本、藏头高亮或平仄标注结果
 - 常见问答：
   - 问：诗宝阁是什么  答：诗宝阁是 AI 对话页面，AI 分角色和能力，可帮你作诗、鉴赏、校验平仄、玩飞花令等。
   - 问：诗宝阁和首页的AI工具有什么区别  答：诗宝阁是统一的角色化对话入口，首页 AI 小工具区保留看图写诗、藏头诗、飞花令等快捷入口，两处并存。
+  - 问：诗宝阁的对话会保存吗  答：会，按角色保存在你的账号下并保留 7 天，换设备登录同一账号也能接着聊。
 
 【moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / 藏头诗（play.acrostic）】
 【章节：墨渊小助手系统知识库（24 条） / 藏头诗（play.acrostic）】
@@ -2993,7 +3023,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/
 - 说明：藏头诗功能可输入 2 至 8 个藏头字并选择五言或七言，由 AI 生成每句首字依次对应藏头字的诗作。入口在首页 AI 小工具区，诗宝阁「诗仙·创作」角色下也提供藏头诗能力。生成结果会高亮每句首字。
 - 使用步骤：
-  1. 打开首页 AI 小工具区或诗宝阁\n输入 2 至 8 个藏头字\n选择五言或七言\n点击生成，查看首字高亮的藏头诗
+  1. 打开首页 AI 小工具区或诗宝阁
+  2. 输入 2 至 8 个藏头字
+  3. 选择五言或七言
+  4. 点击生成，查看首字高亮的藏头诗
 - 常见问答：
   - 问：藏头诗怎么用  答：输入 2 到 8 个藏头字并选择五言或七言，AI 会生成每句首字依次对应藏头字的诗。
 
@@ -3007,7 +3040,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/
 - 说明：首页是站点的总入口，聚合了今日诗词、古诗精赏、当代精选、诗话视野、精选诗人等板块，并提供通往诗云、交流广场、诗宝阁的导航。首页还设有 AI 小工具区，可快捷使用看图写诗、藏头诗、飞花令等玩法。
 - 使用步骤：
-  1. 打开站点默认进入首页\n通过顶部导航切换各板块\n在 AI 小工具区使用各类玩法
+  1. 打开站点默认进入首页
+  2. 通过顶部导航切换各板块
+  3. 在 AI 小工具区使用各类玩法
 - 常见问答：
   - 问：首页有哪些内容  答：首页聚合了今日诗词、古诗精赏、当代精选、诗话视野、精选诗人等板块，还有 AI 小工具区。
 ```
@@ -3015,14 +3050,15 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## H4（hard）游客在首页直接玩飞花令，对局记录会保存到哪里？
 
-**回答**：游客在首页直接玩飞花令，对局记录仅临时保存在 Redis 中，不会写入 MySQL 数据库（来源：moyuan_business_modules.md·业务模块说明/24.游戏模块（飞花令/诗词接龙）/功能说明）。
+**回答**：游客在首页直接玩飞花令，对局记录仅临时保存在 Redis 中，不会写入 MySQL 数据库。
 
-具体机制如下：
-1. **存储位置**：后端按登录态分层处理，游客对局仅存 Redis。
-2. **Redis 键结构**：使用 `game:{gameId}` 与 `game:{gameId}:sentences` 作为键名。
-3. **有效期（TTL）**：记录在 Redis 中的生存时间为 30 分钟，交互期间可续期。
-4. **数据落库规则**：只有登录用户对局及有效诗句才会写入 `game_record` / `game_sentence` 表；游客对局不落 MySQL。
-5. **查询限制**：游客无法回查历史对局记录，仅能查看当前活跃状态（来源：moyuan_business_modules.md·业务模块说明/24.游戏模块（飞花令/诗词接龙）/功能说明）。
+具体说明如下：
+1. **存储位置**：游客与未登录用户共用同一套接口，后端按登录态分层处理，游客对局数据仅存于 Redis（不落 MySQL）。
+2. **保存机制**：对局运行时状态及句子信息存储在 Redis 中，键名为 `game:{gameId}` 与 `game:{gameId}:sentences`，设置 TTL 为 30 分钟，交互期间可续期。
+3. **数据持久化限制**：只有登录用户对局的有效诗句才会写入 `game_record`（对局主表）和 `game_sentence`（有效诗句明细表），游客模式无此持久化操作。
+4. **前端展示**：游客模式下通过 `GuestBadge` 组件展示游客标识，且无法回查历史对局记录；登录态用户方可进入 `/game/feihua` 页面并保存数据。
+
+（来源：moyuan_business_modules.md · 业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙） / 功能说明）
 
 **评级**： 
 
@@ -3133,7 +3169,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/game/feihua
 - 说明：飞花令是与 AI 对句的诗词游戏，你每回合说出一句含指定「令字」的真实古诗词名句，AI 轮流接句，接不上或超时即判负。入口在首页 AI 小工具区的「飞花令」卡片，登录用户点击后进入对局页。有古制严格、标准版、超级飞花令三种模式与三档难度可选。现代诗不参与本游戏。
 - 使用步骤：
-  1. 选择模式与难度\n设定令字（如「花」）\n每回合提交一句含令字的古诗词，单回合限时 30 秒\n与 AI 交替接句，AI 接不上或你超时判负
+  1. 选择模式与难度
+  2. 设定令字（如「花」）
+  3. 每回合提交一句含令字的古诗词，单回合限时 30 秒
+  4. 与 AI 交替接句，AI 接不上或你超时判负
 - 常见问答：
   - 问：飞花令怎么玩  答：每回合提交一句含指定令字的真实古诗词名句，与 AI 交替接句，AI 接不上或你超时则对方判负。
   - 问：在哪里能玩飞花令  答：首页 AI 小工具区有「飞花令」卡片，登录用户点击进入对局页。
@@ -3148,7 +3187,8 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 别名：游客权限
 - 说明：未登录的游客可以浏览诗词、诗人、帖子与文章，也能在首页直接体验飞花令、诗词接龙等小工具（对局仅临时保存）。发布诗词、发帖、评论、点赞、收藏、报修、诗人认证等操作需要登录后才能使用。
 - 使用步骤：
-  1. 未登录时浏览诗词等公开内容\n登录后解锁发布、评论、收藏等操作
+  1. 未登录时浏览诗词等公开内容
+  2. 登录后解锁发布、评论、收藏等操作
 - 常见问答：
   - 问：不登录能用吗  答：不登录可以浏览诗词、诗人、帖子与文章，也能在首页体验飞花令等小工具；发布、评论、收藏等需要登录。
 ```
@@ -3160,8 +3200,8 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 - **字数限制**：输入 2 至 8 个藏头字（来源：moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ 藏头诗（play.acrostic））。
 - **入口位置**：
-  - 首页 AI 小工具区（来源：同上）。
-  - 诗宝阁「诗仙·创作」角色下（来源：同上）。
+  - 首页 AI 小工具区（来源同上）。
+  - 诗宝阁「诗仙·创作」角色下（来源同上）。
 
 **评级**： 
 
@@ -3256,7 +3296,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/
 - 说明：藏头诗功能可输入 2 至 8 个藏头字并选择五言或七言，由 AI 生成每句首字依次对应藏头字的诗作。入口在首页 AI 小工具区，诗宝阁「诗仙·创作」角色下也提供藏头诗能力。生成结果会高亮每句首字。
 - 使用步骤：
-  1. 打开首页 AI 小工具区或诗宝阁\n输入 2 至 8 个藏头字\n选择五言或七言\n点击生成，查看首字高亮的藏头诗
+  1. 打开首页 AI 小工具区或诗宝阁
+  2. 输入 2 至 8 个藏头字
+  3. 选择五言或七言
+  4. 点击生成，查看首字高亮的藏头诗
 - 常见问答：
   - 问：藏头诗怎么用  答：输入 2 到 8 个藏头字并选择五言或七言，AI 会生成每句首字依次对应藏头字的诗。
 
@@ -3270,7 +3313,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/
 - 说明：首页是站点的总入口，聚合了今日诗词、古诗精赏、当代精选、诗话视野、精选诗人等板块，并提供通往诗云、交流广场、诗宝阁的导航。首页还设有 AI 小工具区，可快捷使用看图写诗、藏头诗、飞花令等玩法。
 - 使用步骤：
-  1. 打开站点默认进入首页\n通过顶部导航切换各板块\n在 AI 小工具区使用各类玩法
+  1. 打开站点默认进入首页
+  2. 通过顶部导航切换各板块
+  3. 在 AI 小工具区使用各类玩法
 - 常见问答：
   - 问：首页有哪些内容  答：首页聚合了今日诗词、古诗精赏、当代精选、诗话视野、精选诗人等板块，还有 AI 小工具区。
 
@@ -3284,7 +3329,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poem
 - 说明：寻章摘句即诗词列表页，支持按朝代、分类、诗人筛选，也能用关键词搜索诗词；题库只含古诗，现代诗单独成页。全局搜索能力内嵌在首页与诗词列表页中，没有单独的搜索页。未登录用户也能浏览与搜索。
 - 使用步骤：
-  1. 进入诗词列表页\n通过筛选项或关键词查找诗词\n点开卡片查看诗词详情
+  1. 进入诗词列表页
+  2. 通过筛选项或关键词查找诗词
+  3. 点开卡片查看诗词详情
 - 常见问答：
   - 问：寻章摘句在哪里  答：寻章摘句就是诗词列表页，可在顶部导航进入，支持筛选与关键词搜索。
   - 问：怎么搜索诗词  答：在诗词列表页输入关键词即可搜索，也可按朝代、分类、诗人筛选。
@@ -3293,41 +3340,19 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## H6（hard）诗词接龙开局限定朝代以后，哪些环节会被限制在该朝代内？
 
-**回答**：在诗词接龙游戏中，若开局限定了朝代范围，以下三个核心环节均会被严格限制在该朝代内进行校验：AI 起句、AI 接句以及玩家提交诗句。超出该范围将判定为“诗句真实性校验不通过”并提示越界（来源：moyuan_business_modules.md·业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙）/ 功能说明；moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/ 诗词接龙（play.chain））。
+**回答**：在诗词接龙游戏中，若玩家于开局阶段选定特定朝代范围，以下三个核心环节均会被严格限制在该朝代内进行校验与生成：
 
-具体限制机制如下：
-1. **AI 起句**：仅从选定朝代内的诗词库随机取句，提示词中附加该朝代约束。
-2. **AI 接句**：AI 生成回复时，提示词同样限定该朝代范围。
-3. **玩家提交与真实性校验**：用户作答及 AI 的后续接句，其真伪校验逻辑均被限定在该朝代内执行，禁止跨朝代匹配。
+1. **AI 起句来源**：系统从本地诗词库随机选取的起始诗句，仅限定于所选朝代范围内（来源：moyuan_business_modules.md·业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙）/ 功能说明）。
+2. **AI 接句生成**：AI 在接续用户诗句时，其提示词及生成逻辑均被限定为仅检索该朝代内的诗句（来源：moyuan_business_modules.md·业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙）/ 功能说明）。
+3. **真实性校验范围**：无论是玩家提交的答案，还是 AI 接续的句子，其真伪判定均限定在该朝代内；若诗句超出该朝代范围，系统将判定为「诗句真实性校验不通过」并提示越界（来源：moyuan_business_modules.md·业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙）/ 功能说明）。
 
-若未选择具体朝代（默认模式），则不限定朝代范围；选定后上述三环节均需符合该朝代归属要求（来源：moyuan_business_modules.md·业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙）/ 功能说明）。
+此外，现代诗不参与本游戏，且若未限定朝代，则默认不限朝代范围（来源：moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/ 诗词接龙（play.chain））。
 
 **评级**： 
 
 <details><summary>上下文</summary>
 
 ```
-【moyuan_business_modules.md · 业务模块说明 / 10. 管理模块 / 功能说明】
-【章节：业务模块说明 / 10. 管理模块 / 功能说明】
-### 功能说明
-
-- 管理后台布局（左侧导航 + 右侧内容区域）
-- 控制台（Dashboard）：系统统计数据展示、审核统计数据
-- 用户管理：用户列表、状态管理、创建/编辑/删除用户
-- 诗词管理：诗词列表、状态管理、创建/编辑/删除诗词（支持标题/内容关键字搜索与按创建时间正序/倒序切换）
-- **诗词审核**（新增）：审核用户发布的诗词（列表按 auditStatus 0-待审/1-通过/2-拒绝 筛选，通过或拒绝）
-- **评论管理**（新增）：评论列表、审核评论、删除评论（status 1-正常/0-隐藏）
-- 分类管理：分类列表、创建/编辑/删除分类
-- 朝代管理：朝代列表、创建/编辑/删除朝代
-- 诗人管理：诗人列表、状态管理、创建/编辑/删除诗人（支持姓名关键字搜索与按创建时间正序/倒序切换）
-- 帖子管理：帖子列表、状态管理、创建/编辑/删除帖子
-- **帖子审核**（新增）：审核帖子，通过或拒绝
-- **诗人认证审核**（新增）：审核诗人认证申请，通过或拒绝
-- **AI内容审核**（新增）：审核AI生成的内容，通过或拒绝后写入原表
-- **诗话视野管理**（新增）：诗话视野文章的增删改查、上下架、推荐设置（含草稿）
-- **文件管理**（新增）：文件列表与存储统计、单文件删除、孤儿文件清理
-- **缓存管理**（新增）：一键清除诗人缓存 / 全部业务缓存
-
 【moyuan_business_modules.md · 业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙） / 功能说明】
 【章节：业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙） / 功能说明】
 ### 功能说明
@@ -3339,6 +3364,13 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - **诗词接龙**（`/game/chain`）：以 AI 起句的末字为首字接出下一句名句，AI 再接给用户，交替进行；本地诗词库随机取起句（不调用 LLM）；AI 接不上时用户胜，链长即有效句数。
   - **选择范围**：配置阶段可选「中国古典诗词（不限朝代，默认）」或具体朝代（取自 `dynasty` 表）；选定后 AI 起句仅在该朝代内取句，AI 接句提示词限定该朝代，且**玩家提交与 AI 接句的真实性校验均限定在该朝代内**（超出范围判为「诗句真实性校验不通过」并提示越界）。
 - **回合计时（计时/监测/缓冲三子态，打字即暂停）**：单回合有效答题时长 30 秒。
+
+【moyuan_business_modules.md · 业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙） / 功能说明】
+【章节：业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙） / 功能说明】
+- **回合计时（计时/监测/缓冲三子态，打字即暂停）**：单回合有效答题时长 30 秒。点击「开始挑战」后倒计时**直接开始**（`counting`，30 秒递减）；输入框一旦有变化即**暂停倒计时**并进入 `monitoring`（监测停笔 5 秒），仅当连续 5 秒无改动才恢复递减；30 秒耗尽后自动进入 `buffer`（5 秒缓冲窗口，期内有输入变动仍可提交）；缓冲耗尽仍无改动则由前端自动提交并判超时。有效答题时长上限 30 + 5 = 35 秒；**题面计时均为显示层，可被主动提交（作答/放弃）随时终止**。答错不重置计时，答对推进下一回合并重置计时。
+- **超时判定（后端按上报有效时长）**：前端每次作答请求上报 `activeSeconds`（本回合已消耗的有效秒数），后端 `GameConstants.isTimeout(activeSeconds, wallElapsedMillis)` 优先据此判定（`>= 35` 即超时）；未上报时回退墙钟口径（服务端 `roundStartTime` 毫秒时间戳，阈值 30 秒 + 1 秒网络宽限）。
+- **容错**：每回合初始 2 次重试，累计错误达 3 次判负；空输入不计错误、不消耗重试、不重置计时。
+- **三级真实性校验链**：① 本地 `poem` 表 ngram 全文索引 `MATCH...
 
 【moyuan_business_modules.md · 业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙） / 功能说明】
 【章节：业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙） / 功能说明】
@@ -3416,7 +3448,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/game/chain
 - 说明：诗词接龙由 AI 起句，你接出的诗句首字须与上一句末字相同，再交给 AI 接，交替进行；一方接不上即判负。入口在首页 AI 小工具区的「诗词接龙」卡片，登录后进入对局页。开局可限定朝代范围，起句、AI 接句与你的作答都会在该朝代内校验。现代诗不参与本游戏。
 - 使用步骤：
-  1. 选择朝代范围（默认中国古典诗词不限朝代）\nAI 给出起句，你接出首字等于上句末字的真实古诗名句\n与 AI 交替接句\n接不上或超时判负，链长即有效句数
+  1. 选择朝代范围（默认中国古典诗词不限朝代）
+  2. AI 给出起句，你接出首字等于上句末字的真实古诗名句
+  3. 与 AI 交替接句
+  4. 接不上或超时判负，链长即有效句数
 - 常见问答：
   - 问：诗词接龙怎么玩  答：AI 起句后，你接的诗句首字要和上一句末字相同，AI 再接，交替进行，接不上的一方判负。
   - 问：接龙可以限定朝代吗  答：可以，开局选择具体朝代后，起句、AI 接句与你的作答都会限定在该朝代内校验。
@@ -3425,7 +3460,11 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## H7（hard）诗云页面的配色实验室能调哪些显示参数？一共几套配色方案？
 
-**回答**：诗云页面「配色实验室」可调节以下显示参数：光晕强度、连线可见度、节点尺寸、整体亮度，以及开关「显示诗人姓名」和「诗人按朝代配色」。共支持 7 套配色方案（琥珀星海 / 青玉 / 珊瑚 / 冰川蓝 / 梅子紫 / 苔绿 / 赤陶）。（来源：moyuan_business_modules.md·业务模块说明/23.诗云模块/功能说明；moyuan_system_workflow.md·系统工作流文档/15.前端数据流转层/15.6诗云3D星空（K6））
+**回答**：诗云页面“配色实验室”可调节以下显示参数：光晕强度、连线可见度、节点尺寸、整体亮度（通过画布容器 CSS filter 实现），以及「显示诗人姓名」和「诗人按朝代配色」开关。
+
+- **可调参数**：光晕强度、连线可见度、节点尺寸、整体亮度、显示诗人姓名、诗人按朝代配色（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 功能说明；moyuan_system_workflow.md·系统工作流文档 / 15.6 诗云 3D 星空（K6））
+- **配色方案数量**：共 7 套（琥珀星海、青玉、珊瑚、冰川蓝、梅子紫、苔绿、赤陶）（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 功能说明；moyuan_system_workflow.md·系统工作流文档 / 15.6 诗云 3D 星空（K6））
+- **参数驱动机制**：由 `reactive(viz)` 驱动，`applyVizStyles()` 统一重涂背景、雾效、节点与连线；光晕/连线/尺寸换算基准为 glow/65、line/55、size/100（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 功能说明；moyuan_system_workflow.md·系统工作流文档 / 15.6 诗云 3D 星空（K6））
 
 **评级**： 
 
@@ -3563,7 +3602,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poetry-cloud
 - 说明：诗云是用 3D 星空展示古诗数据的可视化页面，每位诗人是一颗星，其诗作环绕分布，可缩放旋转浏览。点击诗人星可查看诗人信息与代表作品，点击诗作节点可查看诗词详情。页面底部「配色实验室」可切换配色方案并调节光晕、连线、亮度等显示效果。
 - 使用步骤：
-  1. 进入诗云页面\n拖动旋转、滚轮缩放浏览星图\n点击诗人星查看诗人信息与作品\n点击诗作节点查看诗词详情
+  1. 进入诗云页面
+  2. 拖动旋转、滚轮缩放浏览星图
+  3. 点击诗人星查看诗人信息与作品
+  4. 点击诗作节点查看诗词详情
 - 常见问答：
   - 问：诗云是什么  答：诗云是把古诗词数据做成 3D 星空的页面，诗人是星、诗作围绕其分布，可交互浏览。
   - 问：诗云怎么用  答：拖动旋转、滚轮缩放浏览星图，点击诗人或诗作节点查看详情。
@@ -3572,9 +3614,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## H8（hard）AI 评分的分数是怎么从模型输出里解析出来的？解析失败时的兜底分是多少？
 
-**回答**：知识库未收录"AI 评分分数如何从模型输出解析”及“解析失败兜底分数值”这两项具体细节。
+**回答**：知识库未收录该项。
 
-资料中仅提及 AI 评分由 `PoemRatingServiceImpl.requestAiRating` 调用 `aiService.analyzePoem` 执行，且后台配置页面 `/admin/ai-config` 可调整模型与提示词（来源：moyuan_system_workflow.md · 系统工作流文档 / 17. 关键代码速查表；moyuan_business_modules.md · 业务模块说明 / 16. 诗词评分模块 / 功能说明），但未包含解析逻辑代码或异常处理机制的数值定义。
+资料中仅说明 AI 评分由 AI 从意境、格律等维度评价并给出分数，但未提及分数具体如何从模型输出解析、解析失败的兜底分值或相关代码逻辑（来源：moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ 诗词 AI 评分（play.rating））。
 
 **评级**： 
 
@@ -3583,16 +3625,37 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 ```
 【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明】
 【章节：业务模块说明 / 7. AI 模块 / 功能说明】
-- **古籍OCR识文**（上传古诗词图片/书法作品/碑帖，AI精准识别文字内容，保留原文结构，标注印章题款）
-- AI模型配置管理（后台管理，支持CRUD、启用/禁用、默认模型设置、连接测试）
-- **AI内容填充与审核**：对诗词/诗人缺失字段由 AI 生成候选内容，存入审核表，管理员审核通过后写回原表
-- **诗词AI助手（poetry_chat）**：寻章摘句页面的AI功能模块，包括译文注释、名人点评、创作背景、历史文化背景、AI逐句解析、AI诗词助手对话
-  - **译文注释**：逐句翻译，关键词语注释
-  - **名人点评**：历代名家点评（引用《诗品》《沧浪诗话》《人间词话》等）、文学史地位
-  - **创作背景**：诗人生平、创作缘由、历史背景
-  - **AI逐句解析**：点击诗句展开解释，支持多句同时展开，内存缓存不写库，可关闭
-  - **弹窗交互**：三个功能按钮以向左展开的弹窗形式呈现，覆盖在诗词内容上方，不挤压布局
-  - **搜索式加载**：AI生成过程中以搜索动画替代旋转加载图标
+### 功能说明
+
+- AI诗词问答（支持多模型切换；调用优先走 `ai_module_config` 模块绑定，未绑定某模块时回退默认模型。可用提供商：智谱AI、DeepSeek、Kimi、千问、小米MiMo、OpenRouter；NVIDIA NIM 已全部禁用/下线）
+- 看图写诗（上传图片，AI生成古诗词，支持视觉模型如 GLM-4V-Flash、DeepSeek-Flash）
+- 智能分析（输入诗句进行深度解析）
+- AI对对联（输入上联，AI生成下联，遵循平仄规则）
+- **藏头诗**（输入 2-8 个藏头字并选择五言/七言，AI 生成藏头诗，每句首字依次对应藏头字；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
+- **平仄格律校验**（粘贴一首绝句/律诗，由**本地确定性引擎** `POST /api/ai/tone-check` 逐句标注平仄（平声绿底、仄声红底）、判定是否合律并给出不合律原因；校验规则为句末三平尾/三仄尾、二四六位失替、偶数句押韵，不调用大模型、不消耗 AI 额度）
+- **AI 对话页「诗宝阁」**（`/ai-chat`）：角色化统一对话入口，6 角色（诗仙·创作 / 诗话·鉴赏 / 格律·校正 / 诗友·行令 / 群贤·论诗 / 顾问·问答）× 12 能力（命题作诗 / 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 /
+
+【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / AI 内容填充与审核】
+【章节：业务模块说明 / 7. AI 模块 / AI 内容填充与审核】
+### AI 内容填充与审核
+
+- 对诗词和诗人表中暂未收录的字段，提供 AI 填充能力
+- AI 生成的内容不直接写入原表，存入审核表等待管理员审核，审核通过后正式写入原表
+- 防重复生成机制：同一目标的同一字段如有待审核记录则不重复调用 AI
+- 支持字段：
+  - 诗词：`translation`（译文）、`appreciation`（赏析）、`background`（创作背景）
+  - 诗人：`biography`（生平简介）、`life_story`（人物生平）、`influence`（主要影响）、`evaluation`（历史评价）、`anecdotes`（轶事典故）
+- 数据库表：`ai_generated_content`
+- 审核流程：
+
+```
+用户点击"AI填充" → AI生成内容 → 存入审核表(status=0)
+                                        ↓
+管理员进入后台 → AI内容审核页面 → 查看待审核列表
+                                        ↓
+                          审核通过 → 写入原表(poem/poet)
+                          审核拒绝 → 标记已拒绝(status=2)
+```
 
 【moyuan_business_modules.md · 业务模块说明 / 8. 搜索模块 / 搜索评分算法】
 【章节：业务模块说明 / 8. 搜索模块 / 搜索评分算法】
@@ -3612,23 +3675,6 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 | 拼音匹配（基础） | 0.3 | 拼音匹配基础分 |
 | 拼音标题加成 | +0.2 | 拼音匹配标题额外加分 |
 | 拼音诗人加成 | +0.1 | 拼音匹配诗人名额外加分 |
-
-【moyuan_business_modules.md · 业务模块说明 / 8. 搜索模块 / 智能搜索响应】
-【章节：业务模块说明 / 8. 搜索模块 / 智能搜索响应】
-### 智能搜索响应
-
-```json
-{
-  "code": "200",
-  "data": {
-    "list": [...],
-    "total": 100,
-    "searchLevel": "exact",
-    "message": "找到 100 条结果",
-    "suggestExternal": false
-  }
-}
-```
 
 【moyuan_business_modules.md · 业务模块说明 / 8. 搜索模块 / 推荐算法说明】
 【章节：业务模块说明 / 8. 搜索模块 / 推荐算法说明】
@@ -3707,14 +3753,27 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 | 情感 | 诗词的情感表达 |
 | 创新 | 诗词的创新程度 |
 
-【moyuan_system_workflow.md · 系统工作流文档 / 11. AI 能力域 / 11.1 AI 辅助创作与生成（E1）】
-【章节：系统工作流文档 / 11. AI 能力域 / 11.1 AI 辅助创作与生成（E1）】
-### 11.1 AI 辅助创作与生成（E1）
-- **触发入口**：`POST /api/ai/chat|write-poem|analyze|couplet|ocr`；流式入口 `POST /api/ai/chat/stream`（SSE，`AiController.chatStream` → `AiService.streamChat` → `AiModelRegistry.streamByModule` → `OpenAiCompatibleAdapter.streamChat` 用 JDK `HttpClient` 逐行解析上游 SSE，客户端断开经 `emitter.onCompletion` 置取消信号停止消费）。
-- **分步流程**：`AiController` 分发 `AiService` → 各方法内置系统提示词常量 → 文本类 `AiModelRegistry.chat/getModel`、图片类 Base64 后 `AiModelRegistry.vision`；传 `moduleCode` 走 `chatByModule/visionByModule`（按模块选模型+覆盖提示词）→ 按 `model.provider` 定位 `AiModelAdapter`，`RestTemplate` 带 `Bearer apiKey` POST 到 `ai_model.api_url`（messages=system+user、max_tokens 默认 1024）→ 解析 `choices[0].message.content` 返回；失败抛 `BusinessException`。
-- **注意（代码事实）**：providers 下拉含 qwen/openrouter，但当前**无对应 Adapter**，调用报"不支持的AI提供商"；`OpenAiCompatibleAdapter` 支持 zhipu/deepseek/kimi/mimo，`NvidiaAdapter` 支持 nvidia（vision 抛"暂不支持视觉模型"）。
-- **关键类与方法**：`AiController.*`、`AiServiceImpl.chat/writePoemFromImage/analyzePoem/matchCouplet/ocrImage`、`AiModelRegistry.chat/vision/chatByModule/getModel`、`OpenAiCompatibleAdapter/NvidiaAdapter`。
-- **数据与缓存**：`ai_model`（name/provider/apiUrl/modelId/visionModelId/apiKey/maxTokens/isEnabled/isDefault/modelType）；内存 `AiModelRegistry.modelCache`。
+【moyuan_system_workflow.md · 系统工作流文档 / 17. 关键代码速查表】
+【章节：系统工作流文档 / 17. 关键代码速查表】
+## 17. 关键代码速查表
+
+| 关注点 | 文件 |
+|--------|------|
+| 认证入口 / JWT | `controller/AuthController.java`、`util/JwtUtil.java`、`security/JwtAuthenticationFilter.java`、`config/SecurityConfig.java` |
+| 文件上传 | `controller/FileController.java`、`service/impl/FileStorageServiceImpl.java` |
+| 诗人懒加载 / 头像 | `service/impl/PoetServiceImpl.java`、`util/PoetDefaultAvatar.java`、`util/PoetDataExtractor.java` |
+| 推荐 / 搜索 / 押韵 | `service/impl/RecommendationServiceImpl.java`、`service/impl/SmartSearchServiceImpl.java`、`service/impl/RhymeServiceImpl.java` |
+| AI | `service/impl/AiServiceImpl.java`、`ai/AiModelRegistry.java`、`service/impl/AiGeneratedContentServiceImpl.java` |
+| 论坛 / 评论 / 工单 | `service/impl/ForumPostServiceImpl.java`、`service/impl/CommentServiceImpl.java`、`service/impl/RepairOrderServiceImpl.java` |
+| 操作日志 / 访问统计 | `aspect/OperationLogAspect.java`、`aspect/VisitLogAspect.java` |
+| 统一响应 / 异常 | `common/R.java`、`common/ResultCode.java`、`exception/GlobalExceptionHandler.java` |
+| 前端请求 / 存储 | `frontend/src/utils/request.ts`、`frontend/src/utils/storage.ts` |
+| 前端状态 / 守卫 | `frontend/src/stores/*`、`frontend/src/router/guards.ts` |
+
+---
+
+**文档版本**：v1.5
+**最后更新**：2026-10-26（推荐流程由 UserCF 更新为 ItemCF：物品-物品余弦相似度 + Top-50 相似物品加权，诗词行为矩阵同一作品多行为取最大值合并）；此前 v1.4（诗词 AI 评分改为独立 `rating` 模块：`PoemRatingServiceImpl.requestAiRating` 由写死默认模型改为 `aiService.analyzePoem(content, null,
 
 【moyuan_system_workflow.md · 系统工作流文档 / 17. 关键代码速查表】
 【章节：系统工作流文档 / 17. 关键代码速查表】
@@ -3732,7 +3791,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poem/:id
 - 说明：诗词详情页提供 AI 评分，由 AI 从意境、格律、修辞、情感、用词等维度评价诗词并给出分数。进入任意诗词详情页即可查看或请求 AI 评分，用户本人也可以手动给诗词评分。
 - 使用步骤：
-  1. 打开任意诗词详情页\n查看已有评分或请求 AI 评分\n查看 AI 给出的评价与分数
+  1. 打开任意诗词详情页
+  2. 查看已有评分或请求 AI 评分
+  3. 查看 AI 给出的评价与分数
 - 常见问答：
   - 问：AI评分在哪里  答：在诗词详情页可以查看或请求 AI 评分，AI 会多维度评价并给出分数。
 ```
@@ -3740,11 +3801,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## H9（hard）未登录时能查看自己的浏览历史吗？能体验哪些诗词游戏？
 
-**回答**：未登录用户无法查看自己的浏览历史，仅能体验部分诗词游戏。
+**回答**：未登录用户无法查看自己的浏览历史，需登录后才能在个人中心查看并清空记录（来源：moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/ 浏览历史（feature.history）；moyuan_business_modules.md·业务模块说明 / 5. 用户与个人中心域 / 5.2 浏览历史（B2））。
 
-- **浏览历史**：需登录后在个人中心（`/user/profile`）查看；未登录者不可见，且历史记录由服务端保存而非本地存储（来源：moyuan_system_knowledge.md·浏览历史）。
-- **可体验的游戏**：首页可直接体验飞花令、诗词接龙等小工具，但对局仅临时保存（来源：moyuan_system_knowledge.md·游客与登录用户的权限差异）。
-- **不可用的功能**：发布诗词、发帖、评论、点赞、收藏、报修、诗人认证等操作均需登录后才能使用。
+未登录时可体验的诗词游戏包括飞花令和诗词接龙，这些功能仅在首页提供临时保存的对局体验，发布、评论、收藏等操作均需登录后才能进行（来源：moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/ 游客与登录用户的权限差异（account.guest-limit））。
 
 **评级**： 
 
@@ -3859,7 +3918,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poetry-cloud
 - 说明：诗云是用 3D 星空展示古诗数据的可视化页面，每位诗人是一颗星，其诗作环绕分布，可缩放旋转浏览。点击诗人星可查看诗人信息与代表作品，点击诗作节点可查看诗词详情。页面底部「配色实验室」可切换配色方案并调节光晕、连线、亮度等显示效果。
 - 使用步骤：
-  1. 进入诗云页面\n拖动旋转、滚轮缩放浏览星图\n点击诗人星查看诗人信息与作品\n点击诗作节点查看诗词详情
+  1. 进入诗云页面
+  2. 拖动旋转、滚轮缩放浏览星图
+  3. 点击诗人星查看诗人信息与作品
+  4. 点击诗作节点查看诗词详情
 - 常见问答：
   - 问：诗云是什么  答：诗云是把古诗词数据做成 3D 星空的页面，诗人是星、诗作围绕其分布，可交互浏览。
   - 问：诗云怎么用  答：拖动旋转、滚轮缩放浏览星图，点击诗人或诗作节点查看详情。
@@ -3874,7 +3936,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poem
 - 说明：寻章摘句即诗词列表页，支持按朝代、分类、诗人筛选，也能用关键词搜索诗词；题库只含古诗，现代诗单独成页。全局搜索能力内嵌在首页与诗词列表页中，没有单独的搜索页。未登录用户也能浏览与搜索。
 - 使用步骤：
-  1. 进入诗词列表页\n通过筛选项或关键词查找诗词\n点开卡片查看诗词详情
+  1. 进入诗词列表页
+  2. 通过筛选项或关键词查找诗词
+  3. 点开卡片查看诗词详情
 - 常见问答：
   - 问：寻章摘句在哪里  答：寻章摘句就是诗词列表页，可在顶部导航进入，支持筛选与关键词搜索。
   - 问：怎么搜索诗词  答：在诗词列表页输入关键词即可搜索，也可按朝代、分类、诗人筛选。
@@ -3889,7 +3953,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poem
 - 说明：智能检索支持按关键词搜索诗词、诗人与帖子，首页与诗词列表页内嵌了搜索入口。搜索会记录你的历史，登录后还会根据兴趣给出推荐。
 - 使用步骤：
-  1. 在首页或诗词列表页输入关键词\n查看匹配的诗词、诗人或帖子\n点开结果查看详情
+  1. 在首页或诗词列表页输入关键词
+  2. 查看匹配的诗词、诗人或帖子
+  3. 点开结果查看详情
 - 常见问答：
   - 问：怎么搜索  答：在首页或诗词列表页的搜索框输入关键词，即可搜索诗词、诗人与帖子。
 
@@ -3903,7 +3969,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/user/profile
 - 说明：浏览历史记录你访问过的诗词与诗人，登录后可在个人中心查看，也支持清空。历史通过服务端接口保存，不存放在本地。
 - 使用步骤：
-  1. 登录后浏览诗词或诗人\n在个人中心查看浏览历史\n需要时清空历史记录
+  1. 登录后浏览诗词或诗人
+  2. 在个人中心查看浏览历史
+  3. 需要时清空历史记录
 - 常见问答：
   - 问：浏览历史在哪  答：登录后在个人中心可以查看浏览历史，并支持清空。
 
@@ -3916,7 +3984,8 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 别名：游客权限
 - 说明：未登录的游客可以浏览诗词、诗人、帖子与文章，也能在首页直接体验飞花令、诗词接龙等小工具（对局仅临时保存）。发布诗词、发帖、评论、点赞、收藏、报修、诗人认证等操作需要登录后才能使用。
 - 使用步骤：
-  1. 未登录时浏览诗词等公开内容\n登录后解锁发布、评论、收藏等操作
+  1. 未登录时浏览诗词等公开内容
+  2. 登录后解锁发布、评论、收藏等操作
 - 常见问答：
   - 问：不登录能用吗  答：不登录可以浏览诗词、诗人、帖子与文章，也能在首页体验飞花令等小工具；发布、评论、收藏等需要登录。
 ```
@@ -3924,9 +3993,15 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## H10（hard）诗云里诗人节点的大小由什么决定？3D 坐标数据存在哪里？
 
-**回答**：诗云模块中诗人节点大小由其名下诗作数量自适应决定，计算公式为 `starSize = 2.4 + log10(作品数+1) * 1.2`（来源：moyuan_business_modules.md·业务模块说明/23. 诗云模块/数据可视化）。
+**回答**：在诗云模块中，诗人节点大小由其名下诗作数量自适应决定；3D 坐标数据仅内存缓存，不持久化存储。
 
-3D 坐标数据存储在内存 ref 中，具体通过缓存对象 `poetPositionMap` 保存每位诗人的 3D 坐标，不做 localStorage 持久化存储（来源：moyuan_system_workflow.md·系统工作流文档/15. 前端数据流转层/15.6 诗云 3D 星空（K6））。
+1. **诗人节点大小决定因素**：
+   - 随诗人作品数量自适应调整（来源：moyuan_business_modules.md·业务模块说明/23. 诗云模块/数据可视化）。
+   - 计算公式为 `starSize = 2.4 + log10(作品数+1) * 1.2`，并带有 1.8 倍光晕球（来源：moyuan_business_modules.md·业务模块说明/23. 诗云模块/数据可视化）。
+
+2. **3D 坐标数据存储位置**：
+   - 仅内存缓存，不做 localStorage 持久化存储（来源：moyuan_system_workflow.md·系统工作流文档/15. 前端数据流转层/15.6 诗云 3D 星空（K6））。
+   - 具体通过 `poetPositionMap` 在内存中缓存 3D 坐标，同时 `poemCountMap` 缓存每位诗人的诗作数用于计算节点尺寸（来源：moyuan_system_workflow.md·系统工作流文档/15. 前端数据流转层/15.6 诗云 3D 星空（K6））。
 
 **评级**： 
 
@@ -4064,7 +4139,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poetry-cloud
 - 说明：诗云是用 3D 星空展示古诗数据的可视化页面，每位诗人是一颗星，其诗作环绕分布，可缩放旋转浏览。点击诗人星可查看诗人信息与代表作品，点击诗作节点可查看诗词详情。页面底部「配色实验室」可切换配色方案并调节光晕、连线、亮度等显示效果。
 - 使用步骤：
-  1. 进入诗云页面\n拖动旋转、滚轮缩放浏览星图\n点击诗人星查看诗人信息与作品\n点击诗作节点查看诗词详情
+  1. 进入诗云页面
+  2. 拖动旋转、滚轮缩放浏览星图
+  3. 点击诗人星查看诗人信息与作品
+  4. 点击诗作节点查看诗词详情
 - 常见问答：
   - 问：诗云是什么  答：诗云是把古诗词数据做成 3D 星空的页面，诗人是星、诗作围绕其分布，可交互浏览。
   - 问：诗云怎么用  答：拖动旋转、滚轮缩放浏览星图，点击诗人或诗作节点查看详情。
@@ -4075,15 +4153,13 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 **回答**：用户评分范围为 1.0-5.0 分，AI 评分范围同样为 1.0-5.0 分（由 AI 生成后解析）。
 
-**用户评分：**
-*   **评分范围**：1.0-5.0 分。
-*   **调用接口**：`POST /api/poems/{id}/ratings`。
+**用户评分接口：**
+- `POST /api/poems/{id}/ratings`：用于提交用户手动评分。
 
-**AI 评分：**
-*   **评分范围**：1.0-5.0 分（系统兜底值为 3.5）。
-*   **调用接口**：`POST /api/poems/{id}/ratings/ai`。
+**AI 评分接口：**
+- `POST /api/poems/{id}/ratings/ai`：用于请求 AI 对诗词进行评分和分析。
 
-（来源：moyuan_business_modules.md · 业务模块说明 / 2. 诗词模块 / API 接口；moyuan_system_workflow.md · 系统工作流文档 / 8. 诗词内容域 / 8.4 诗词评分（C4）；moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ 诗词 AI 评分（play.rating））
+（来源：moyuan_business_modules.md · 业务模块说明 / 2. 诗词模块 / API 接口；moyuan_system_workflow.md · 系统工作流文档 / 8. 诗词内容域 / 8.4 诗词评分（C4）；moyuan_business_modules.md · 业务模块说明 / 16. 诗词评分模块 / 功能说明）
 
 **评级**： 
 
@@ -4133,6 +4209,21 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - **情感**：诗词的情感表达
 - **创新**：诗词的创新程度
 
+【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / API 接口】
+【章节：业务模块说明 / 7. AI 模块 / API 接口】
+features.ocr-enabled=false` 时返回 `4293`） | sc-moyuan-backend AiController |
+| POST /api/ai/tone-check | 平仄格律校验（本地确定性引擎，不消耗 AI 额度） | sc-moyuan-backend AiController |
+| POST /api/ai/couplet | AI对对联 | sc-moyuan-backend AiController |
+| GET /api/ai/config/{moduleCode} | 获取模块AI配置（提示词模板、回答风格等） | sc-moyuan-backend AiController |
+| POST /api/ai/preview | AI生成预览（不写入数据库） | sc-moyuan-backend AiContentController |
+| POST /api/ai/submit-review | 提交AI内容到审核表 | sc-moyuan-backend AiContentController |
+| POST /api/ai/fill-content | 触发AI填充（直接生成并存库） | sc-moyuan-backend AiContentController |
+| GET /api/ai/fill-status/{targetType}/{targetId} | 查询某目标的AI填充状态 | sc-moyuan-backend AiContentController |
+
+> **调用保护**：上述 `/api/ai/**` 接口统一经 `AiGuardService` 按用户限流（默认 60 次/分、1000 次/天、100 万 token/天，admin 豁免），入参长度与 `maxTokens`/`temperature` 由 `AiInputValidator` 统一校验，超限返回 `4290`，限流返回 `4291`，额度用尽返回 `4292`。详见 `docs/api/endpoints.md`。
+
+**获取模块AI配置**：根据 moduleCode 返回对应模块的配置信息，包含提示词模板（promptTemplate）、最大回答长度（maxLength）、回答风格（responseStyle）、首次回答长度（firstResponseLength）等。前端用于构建 AI 对话的系统约束。
+
 【moyuan_business_modules.md · 业务模块说明 / 16. 诗词评分模块 / 功能说明】
 【章节：业务模块说明 / 16. 诗词评分模块 / 功能说明】
 ### 功能说明
@@ -4173,17 +4264,6 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - **关键类与方法**：`PoemRatingServiceImpl.ratePoem/requestAiRating/parseAiScore/generateSummary/updatePoemAverageScore`、`AiService.analyzePoem`。`PoemRatingController.*`。
 - **数据与缓存**：`poem_rating`（score/comment/rating_type:1用户2AI/ai_model/ai_summary/ai_analysis）、`poem.avg_score/rating_count`。
 
-【moyuan_system_workflow.md · 系统工作流文档 / 12. 论坛与社区域 / 12.2 内容审核流（E6）】
-【章节：系统工作流文档 / 12. 论坛与社区域 / 12.2 内容审核流（E6）】
-verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
-  | 诗人草稿 | `poet_draft.status=0` | `PUT /api/admin/poet-drafts/{id}/review` |
-  | 投稿建议 | `poet_suggestion.status=pending` | `PUT /api/admin/poet-suggestions/{id}/review` |
-- **后台审核列表接口与前端取数约定**：
-  - 列表查询：诗作 `GET /api/admin/poems`（参数 `page`、`size`、`keyword`、`auditStatus`、`sort`；`auditStatus` 0-待审核/1-已通过/2-已拒绝，不传返回全部；`sort` 取 asc-按创建时间正序/desc-倒序，默认 desc）；评论 `GET /api/admin/comments`（参数 `page`、`size`、`status`，1-正常/0-隐藏）；AI 内容 `GET /api/admin/ai-contents`（参数 `page`、`size`、`status`，0-待审核/1-已通过/2-已拒绝）。诗人草稿/建议用 `pageNum`、`pageSize`、`status`。
-  - 审核变更：`PUT /api/admin/poems/{id}/audit` 的 body `{status, reason}` 中 `status` 对应 `auditStatus` 语义（0/1/2，拒绝为 2）；`PUT /api/admin/comments/{id}/audit` 的 `status` 为 1-正常/0-隐藏。
-  - 前端取数：统一响应体为 `{code, message, data}`，Axios 拦截器返回整个响应体，故后台列表页面必须从 `res.data.records` / `res.data.total` 取值（不可写 `res.records`）；诗作审核页状态列与操作判断绑定 `row.auditStatus`，作者/朝代列绑定后端填充的 `poetName` / `dynastyName`（由 `PoemServiceImpl.getAdminPoemList` 调 `populatePoetAndDynasty` 填充），评论页状态列绑定 `row.status`（1-正常/0-隐藏）。
-- **关键类与方法**：`AdminController.
-
 【moyuan_system_workflow.md · 系统工作流文档 / 17. 关键代码速查表】
 【章节：系统工作流文档 / 17. 关键代码速查表】
 4（诗词 AI 评分改为独立 `rating` 模块：`PoemRatingServiceImpl.requestAiRating` 由写死默认模型改为 `aiService.analyzePoem(content, null, "rating")`，`ai_model` 字段记录实际生效模型名；后台新增「AI功能配置」页面（`/admin/ai-config`）可按模块调整模型与提示词；此前 v1.3 补充流式问答入口 `POST /api/ai/chat/stream` 调用链，v1.2 新增首页小游戏区块工作流）
@@ -4200,7 +4280,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poem/:id
 - 说明：诗词详情页提供 AI 评分，由 AI 从意境、格律、修辞、情感、用词等维度评价诗词并给出分数。进入任意诗词详情页即可查看或请求 AI 评分，用户本人也可以手动给诗词评分。
 - 使用步骤：
-  1. 打开任意诗词详情页\n查看已有评分或请求 AI 评分\n查看 AI 给出的评价与分数
+  1. 打开任意诗词详情页
+  2. 查看已有评分或请求 AI 评分
+  3. 查看 AI 给出的评价与分数
 - 常见问答：
   - 问：AI评分在哪里  答：在诗词详情页可以查看或请求 AI 评分，AI 会多维度评价并给出分数。
 ```
@@ -4210,10 +4292,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 **回答**：浏览历史不保存在浏览器本地存储（localStorage），而是通过服务端接口记录。
 
-- **保存位置**：后端数据库表 `user_history`，由 `UserHistoryServiceImpl` 服务处理（来源：moyuan_system_workflow.md·5.2 浏览历史）
-- **前端存储方式**：不会写入 localStorage，收藏、AI 对话及浏览历史均走服务端接口或内存缓存（来源：moyuan_system_workflow.md·15.4 localStorage 使用点汇总）
-- **访问入口**：登录后在个人中心页面（/user/profile）查看与清空历史记录（来源：moyuan_system_knowledge.md·个人中心）
-- **API 路径**：通过 `POST /api/history`、`GET /api/history`、`DELETE /api/history` 进行增删查操作（来源：moyuan_business_modules.md·12.浏览历史模块/API 接口）
+- **保存位置**：后端数据库表 `user_history`，由 `UserHistoryServiceImpl` 服务处理（来源：moyuan_system_workflow.md·5.2 浏览历史（B2））。
+- **前端存储方式**：前端不写入 localStorage，收藏、AI 对话及浏览历史均走服务端接口或内存缓存（来源：moyuan_system_workflow.md·15.4 localStorage 使用点汇总（K4）；moyuan_business_modules.md·诗人模块/功能说明）。
+- **访问入口**：用户需登录后在个人中心页面查看，支持通过 `GET /api/history` 获取、`DELETE /api/history` 清空（来源：moyuan_business_modules.md·12. 浏览历史模块/API 接口；moyuan_system_knowledge.md·浏览历史/说明）。
+- **数据流转**：访问诗词或诗人时经后端记录 target_type/target_id，列表分页返回，关键类为 `HistoryController`（来源：moyuan_system_workflow.md·5.2 浏览历史（B2））。
 
 **评级**： 
 
@@ -4241,23 +4323,6 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - **粒子动画背景**：使用 useParticles composable 实现流行粒子动画效果，粒子颜色为暖色调（#d4af87, #f0e4d7, #c9a06c, #8b7355），适配页面背景
 - **半透明毛玻璃效果**：内容区块（.content-section）背景透明度 0.62，模糊效果 blur(3px)，其他面板透明度 0.85，模糊效果 blur(10px)
 
-【moyuan_business_modules.md · 业务模块说明 / 3. 诗人模块 / 前端组件】
-【章节：业务模块说明 / 3. 诗人模块 / 前端组件】
-### 前端组件
-
-| 组件 | 说明 |
-|------|------|
-| PoetryDetailDialog | 诗词详情弹窗，展示接口盒子 API 返回的赏析内容 |
-| ai-prompt.ts | AI提示词构建工具函数，支持变量替换 |
-
-【moyuan_business_modules.md · 业务模块说明 / 12. 浏览历史模块 / 功能说明】
-【章节：业务模块说明 / 12. 浏览历史模块 / 功能说明】
-### 功能说明
-
-- 记录用户浏览历史
-- 查看浏览历史列表
-- 清空浏览历史
-
 【moyuan_business_modules.md · 业务模块说明 / 12. 浏览历史模块 / API 接口】
 【章节：业务模块说明 / 12. 浏览历史模块 / API 接口】
 ### API 接口
@@ -4280,13 +4345,6 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - **数据与缓存**：`user_history`（前端不落 localStorage，走服务端接口）。
 
 ---
-
-【moyuan_system_workflow.md · 系统工作流文档 / 15. 前端数据流转层 / 15.3 诗词页面 Store 数据流（K3）】
-【章节：系统工作流文档 / 15. 前端数据流转层 / 15.3 诗词页面 Store 数据流（K3）】
-### 15.3 诗词页面 Store 数据流（K3）
-- **分步流程**：`usePoemStore` 的 `fetchPoemList`（`GET /poems`）写 `poemList/total/currentPage/pageSize`；`fetchPoemDetail`（`GET /poems/:id`）合并 `isLiked/isFavorited` 到 `currentPoem`；`fetchModernPoems` 走 `/poems/modern/page`。诗人页无独立 Store，直接 `getPoetList/getPoetById`。
-- **分类/朝代跳转兜底**：无 keyword 且带分类/朝代筛选、本地结果 `total===0` 时，`views/poem/list.vue` 依据流派→代表诗人映射（`GENRE_REPRESENTATIVE_POETS`）改以诗人关键词调 `GET /search/poems/external` 触发全网（接口盒子）搜索兜底，避免空页面。
-- **关键位置**：`stores/poem.ts`、`views/poem/{list,detail}.vue`、`views/poet/{list,detail}.vue`。
 
 【moyuan_system_workflow.md · 系统工作流文档 / 15. 前端数据流转层 / 15.4 localStorage 使用点汇总（K4）】
 【章节：系统工作流文档 / 15. 前端数据流转层 / 15.4 localStorage 使用点汇总（K4）】
@@ -4322,6 +4380,25 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - **诗词卡片跳转**：首页「古诗精赏 / 当代精选」卡片点击经组合式函数 `composables/usePoemCardNavigation.ts` 处理——本地命中直接 `router.push('/poem/{id}')`，未命中回退 `PoetryDetailDialog`（外部诗词弹窗，可由接口盒子实时增强）。
 - **关键位置**：`views/home/index.vue`、`components/{home,business}/*`、`composables/usePoemCardNavigation.ts`、`api/modules/*`。
 
+【moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / 诗宝阁AI对话（play.bao-ge）】
+【章节：墨渊小助手系统知识库（24 条） / 诗宝阁AI对话（play.bao-ge）】
+## 诗宝阁AI对话（play.bao-ge）
+
+- 分类：play
+- 关键词：诗宝阁,AI对话,创作,鉴赏,平仄校验,藏头诗
+- 别名：诗阁,诗宝阁
+- 前端路由：/ai-chat
+- 说明：诗宝阁是统一的 AI 对话页面，AI 以不同角色与能力帮你完成命题作诗、集句成诗、藏头诗、润色入律、平仄校验、意象典故、诗话点评、飞花令、诗词接龙等任务。可在左侧选择角色与能力后直接对话，回复以流式方式逐字输出，生成过程中可随时点击「停止」。会话按角色保存在账号下并保留 7 天，换设备登录同一账号可以接着聊。入口在顶部导航的「诗宝阁」。
+- 使用步骤：
+  1. 打开诗宝阁页面
+  2. 选择角色与能力
+  3. 输入你的需求并发送
+  4. 查看 AI 返回的文本、藏头高亮或平仄标注结果
+- 常见问答：
+  - 问：诗宝阁是什么  答：诗宝阁是 AI 对话页面，AI 分角色和能力，可帮你作诗、鉴赏、校验平仄、玩飞花令等。
+  - 问：诗宝阁和首页的AI工具有什么区别  答：诗宝阁是统一的角色化对话入口，首页 AI 小工具区保留看图写诗、藏头诗、飞花令等快捷入口，两处并存。
+  - 问：诗宝阁的对话会保存吗  答：会，按角色保存在你的账号下并保留 7 天，换设备登录同一账号也能接着聊。
+
 【moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / 个人中心（page.profile）】
 【章节：墨渊小助手系统知识库（24 条） / 个人中心（page.profile）】
 ## 个人中心（page.profile）
@@ -4332,7 +4409,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/user/profile
 - 说明：个人中心可查看与修改个人资料、上传头像、修改密码，并查看我的收藏、我的点赞、我的帖子和浏览历史。诗人认证申请也从个人中心提交。需要登录后进入。
 - 使用步骤：
-  1. 登录后进入个人中心\n修改资料、头像或密码\n查看收藏、点赞、帖子与浏览历史\n需要时提交诗人认证申请
+  1. 登录后进入个人中心
+  2. 修改资料、头像或密码
+  3. 查看收藏、点赞、帖子与浏览历史
+  4. 需要时提交诗人认证申请
 - 常见问答：
   - 问：个人中心在哪里  答：登录后可从用户菜单进入个人中心，管理资料、收藏、历史并提交诗人认证。
 
@@ -4346,7 +4426,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poem
 - 说明：智能检索支持按关键词搜索诗词、诗人与帖子，首页与诗词列表页内嵌了搜索入口。搜索会记录你的历史，登录后还会根据兴趣给出推荐。
 - 使用步骤：
-  1. 在首页或诗词列表页输入关键词\n查看匹配的诗词、诗人或帖子\n点开结果查看详情
+  1. 在首页或诗词列表页输入关键词
+  2. 查看匹配的诗词、诗人或帖子
+  3. 点开结果查看详情
 - 常见问答：
   - 问：怎么搜索  答：在首页或诗词列表页的搜索框输入关键词，即可搜索诗词、诗人与帖子。
 
@@ -4360,7 +4442,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/user/profile
 - 说明：浏览历史记录你访问过的诗词与诗人，登录后可在个人中心查看，也支持清空。历史通过服务端接口保存，不存放在本地。
 - 使用步骤：
-  1. 登录后浏览诗词或诗人\n在个人中心查看浏览历史\n需要时清空历史记录
+  1. 登录后浏览诗词或诗人
+  2. 在个人中心查看浏览历史
+  3. 需要时清空历史记录
 - 常见问答：
   - 问：浏览历史在哪  答：登录后在个人中心可以查看浏览历史，并支持清空。
 ```
@@ -4368,20 +4452,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## E3（easy）飞花令单回合限时多久？有几种模式和几档难度？
 
-**回答**：飞花令单回合有效答题时长为**30 秒**。系统设有古制严格、标准版、超级飞花令三种模式，以及简单、中等、困难三档难度。
+**回答**：飞花令单回合有效答题时长为**30 秒**。系统设有计时/监测/缓冲三子态机制，其中缓冲窗口为 5 秒，有效答题时长上限总计 35 秒（来源：moyuan_business_modules.md·业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙） / 功能说明）。
 
-具体规则如下：
-1. **限时机制**：单回合倒计时直接开始（30 秒递减），输入即暂停进入监测状态；连续停笔 5 秒后恢复递减；耗尽后进入 5 秒缓冲窗口，期内有变动仍可提交。有效答题时长上限为 35 秒（含缓冲）。
-2. **三种模式**：
-   - `ancient`（古制严格）：令字须落在本回合第 N 个汉字位置。
-   - `normal`（标准版）：诗句包含令字即可。
-   - `super`（超级飞花令）：含多关键字（char）或主题（topic）两种子类型。
-3. **三档难度**：
-   - `easy`（简单）：达标 10 句即胜。
-   - `medium`（中等）：达标 20 句即胜。
-   - `hard`（困难）：AI 无句可接则用户胜，无固定目标条数。
-
-（来源：moyuan_business_modules.md·业务模块说明/24.游戏模块（飞花令/诗词接龙）/功能说明；moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/飞花令（play.feihualing））
+关于模式与难度配置如下：
+1. **三种模式**：`ancient`（古制严格，令字须落在本回合第 N 个汉字位置）、`normal`（标准版，诗句包含令字即可）、`super`（超级飞花令，含 `char` 多关键字或 `topic` 主题两种子类型）（来源：moyuan_business_modules.md·业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙
 
 **评级**： 
 
@@ -4394,22 +4468,28 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 | 22 | 联系我们模块 | 用户反馈表单页面 | 前端已实现 |
 | 23 | 诗云模块 | Three.js 3D 星空可视化，诗人—诗作两级层级星图 + 配色实验室 | 前端已实现 |
 | 24 | 游戏模块 | 飞花令 / 诗词接龙对局（模式/难度、回合计时、三级真实性校验、游客模式） | 前端+后端已实现 |
-| 25 | AI 对话页「诗宝阁」 | 角色化统一对话入口：6 角色 × 12 能力，覆盖命题作诗/集句/藏头/润色/平仄校验/韵脚查询/对对联/意象典故/诗话点评/飞花令/接龙/群贤论诗；其中飞花令为设令字后逐句判定（含字/判重/真实性）的对局流程 | 阶段一前端已完成（非流式）、阶段二后端 SSE 已完成（前端流式待接入） |
+| 25 | AI 对话页「诗宝阁」 | 角色化统一对话入口：6 角色 × 12 能力，覆盖命题作诗/集句/藏头/润色/平仄校验/韵脚查询/对对联/意象典故/诗话点评/飞花令/接龙/群贤论诗；其中飞花令为设令字后逐句判定（含字/判重/真实性）的对局流程 | 前端+后端已实现（SSE 流式、多轮上下文、服务端会话） |
 | 26 | 全局 AI 小窗与系统知识库 | 全站悬浮 AI 问答入口：诗词助理 / 网页用法助理双助理，接入 system_knowledge 知识库 | 前端+后端已实现 |
 
 ---
 
-【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 技术方案】
-【章节：业务模块说明 / 7. AI 模块 / 技术方案】
-### 技术方案
+【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明】
+【章节：业务模块说明 / 7. AI 模块 / 功能说明】
+### 功能说明
 
-- 调用大语言模型 API（智谱AI、DeepSeek、Kimi、千问、小米MiMo、OpenRouter；NVIDIA NIM 已下线）
-- 模块绑定：`ai_module_config`（chat / poet_chat / poetry_chat / write_poem / analyze / couplet，以及游戏模块的 feihua_gen_ancient / feihua_gen_normal / feihua_gen_super / feihua_verify / feihua_topic / chain_generate）→ `ai_model`，由 `AiModelRegistry` 按模块解析模型；统一适配层 `OpenAiCompatibleAdapter` / `NvidiaAdapter`
-- 视觉能力：视觉模型用于看图写诗与 OCR 识别；DeepSeek 视觉请求需关闭思考模式（body 顶层 `thinking.type=disabled`）
-- OCR 识别复用视觉模型基础设施，通过专用提示词引导模型精准识别古籍文字
-- AI模型配置存入数据库（ai_model 表），支持动态管理；api_key 部分为占位符，真实密钥从 `secrets/application-secrets.yml` 运行时注入
-- 前端首页集成AI问答组件（右下角悬浮按钮）
-- 前端首页"展风拓潮"模块集成看图写诗、智能分析、对联、藏头诗、平仄校验和OCR功能；「飞花令」「诗词接龙」为两张卡片入口（见第 24 章「游戏模块」）
+- AI诗词问答（支持多模型切换；调用优先走 `ai_module_config` 模块绑定，未绑定某模块时回退默认模型。可用提供商：智谱AI、DeepSeek、Kimi、千问、小米MiMo、OpenRouter；NVIDIA NIM 已全部禁用/下线）
+- 看图写诗（上传图片，AI生成古诗词，支持视觉模型如 GLM-4V-Flash、DeepSeek-Flash）
+- 智能分析（输入诗句进行深度解析）
+- AI对对联（输入上联，AI生成下联，遵循平仄规则）
+- **藏头诗**（输入 2-8 个藏头字并选择五言/七言，AI 生成藏头诗，每句首字依次对应藏头字；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
+- **平仄格律校验**（粘贴一首绝句/律诗，由**本地确定性引擎** `POST /api/ai/tone-check` 逐句标注平仄（平声绿底、仄声红底）、判定是否合律并给出不合律原因；校验规则为句末三平尾/三仄尾、二四六位失替、偶数句押韵，不调用大模型、不消耗 AI 额度）
+- **AI 对话页「诗宝阁」**（`/ai-chat`）：角色化统一对话入口，6 角色（诗仙·创作 / 诗话·鉴赏 / 格律·校正 / 诗友·行令 / 群贤·论诗 / 顾问·问答）× 12 能力（命题作诗 / 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 /
+
+【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明】
+【章节：业务模块说明 / 7. AI 模块 / 功能说明】
+/ 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 / 群贤论诗）；对话走 `POST /api/ai/chat/stream`（SSE 流式，网络类失败自动回退非流式 `POST /api/ai/chat`），请求携带 system 人设 + 最近 12 条历史作为多轮上下文，生成中可停止；会话按角色存服务端 Redis（`GET/PUT/DELETE /api/ai/chat/sessions/{roleId}`，TTL 7 天）并以 localStorage 兜底，详见第 25 章
+- **飞花令 / 诗词接龙**：原为纯前端小工具（复用 `POST /api/ai/chat`），现已升级为**独立游戏模块**（见第 24 章「游戏模块」），拥有专属后端接口 `/api/game/feihua`、`/api/game/chain` 与 `ai_module_config` 游戏模块绑定；首页 AI 区块保留「飞花令」「诗词接龙」两张卡片入口。
+- **古籍OCR识文**（上传古诗词图片/书法作品/碑帖，AI精准识别文字内容，保留原文结构，标注印章题款）——**当前维护中**：后端开关 `ai.features.
 
 【moyuan_business_modules.md · 业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙） / 功能说明】
 【章节：业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙） / 功能说明】
@@ -4449,28 +4529,6 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 | 接龙选择范围 | 不限（默认，中国古典诗词）/ 具体朝代 | 传 `dynastyId` 限定；起句、AI 接句、玩家校验均限定在该朝代内 |
 | 对局结果 | win / lose / giveup | 写入 `game_record.game_result` |
 
-【moyuan_business_modules.md · 业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙） / 前端组件】
-【章节：业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙） / 前端组件】
-### 前端组件
-
-| 组件 | 说明 |
-|------|------|
-| views/game/feihua.vue | 飞花令对局页面 |
-| views/game/chain.vue | 诗词接龙对局页面 |
-| views/game/game-styles.scss | 游戏页面样式 |
-| api/modules/game.ts | 游戏接口封装（含 game.test.ts） |
-| stores/game.ts | 游戏对局状态管理 |
-| components/game/GameStage.vue | 对局主舞台 |
-| components/game/MarkTimer.vue | 回合计时器 |
-| components/game/SealKeyword.vue | 令字/关键字印记 |
-| components/game/PoemSlip.vue | 诗句签（展示句/作者/篇名） |
-| components/game/ChainTrack.vue | 接龙链条轨迹 |
-| components/game/VerdictBanner.vue | 裁判判定横幅 |
-| components/game/ResultScroll.vue | 对局结果卷轴 |
-| components/game/VoiceInputButton.vue | 语音输入按钮 |
-| components/game/GuestBadge.vue | 游客标识 |
-| components/game/GameMiniPanel.vue | 首页内嵌小面板（游客在首页直接开局） |
-
 【moyuan_system_workflow.md · 系统工作流文档 / 10. 搜索与运营域 / 10.1 全文/跨模块智能搜索（C8）】
 【章节：系统工作流文档 / 10. 搜索与运营域 / 10.1 全文/跨模块智能搜索（C8）】
 ### 10.1 全文/跨模块智能搜索（C8）
@@ -4498,7 +4556,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/game/feihua
 - 说明：飞花令是与 AI 对句的诗词游戏，你每回合说出一句含指定「令字」的真实古诗词名句，AI 轮流接句，接不上或超时即判负。入口在首页 AI 小工具区的「飞花令」卡片，登录用户点击后进入对局页。有古制严格、标准版、超级飞花令三种模式与三档难度可选。现代诗不参与本游戏。
 - 使用步骤：
-  1. 选择模式与难度\n设定令字（如「花」）\n每回合提交一句含令字的古诗词，单回合限时 30 秒\n与 AI 交替接句，AI 接不上或你超时判负
+  1. 选择模式与难度
+  2. 设定令字（如「花」）
+  3. 每回合提交一句含令字的古诗词，单回合限时 30 秒
+  4. 与 AI 交替接句，AI 接不上或你超时判负
 - 常见问答：
   - 问：飞花令怎么玩  答：每回合提交一句含指定令字的真实古诗词名句，与 AI 交替接句，AI 接不上或你超时则对方判负。
   - 问：在哪里能玩飞花令  答：首页 AI 小工具区有「飞花令」卡片，登录用户点击进入对局页。
@@ -4508,16 +4569,16 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## E4（easy）诗词评分支持哪些维度？
 
-**回答**：诗词评分支持以下五个维度：格律、意境、用词、情感、创新（来源：moyuan_business_modules.md·业务模块说明 / 2. 诗词模块 / 评分维度；moyuan_business_modules.md·业务模块说明 / 16. 诗词评分模块 / 评分维度）。
+**回答**：诗词评分支持以下五个维度：格律、意境、用词、情感、创新（来源：moyuan_business_modules.md·业务模块说明 / 2. 诗词模块 / 评分维度；moyuan_system_workflow.md·系统工作流文档 / 8. 诗词内容域 / 8.4 诗词评分（C4））。
 
 具体说明如下：
-- **格律**：评估诗词的格律规范性。
-- **意境**：评估诗词的意境表达。
-- **用词**：评估诗词的用词精准度。
-- **情感**：评估诗词的情感表达。
-- **创新**：评估诗词的创新程度。
+- **格律**：指诗词的格律规范性。
+- **意境**：指诗词的意境表达。
+- **用词**：指诗词的用词精准度。
+- **情感**：指诗词的情感表达。
+- **创新**：指诗词的创新程度。
 
-用户评分范围为 1.0-5.0 分，AI 评分同样基于上述维度进行分析（来源：moyuan_business_modules.md·业务模块说明 / 2. 诗词模块 / 功能说明；moyuan_system_workflow.md·系统工作流文档 / 8. 诗词内容域 / 8.4 诗词评分（C4））。
+用户评分范围为 1.0-5.0 分，AI 评分同样基于上述维度进行分析并给出分数（来源：moyuan_business_modules.md·业务模块说明 / 2. 诗词模块 / 功能说明；moyuan_system_workflow.md·系统工作流文档 / 8. 诗词内容域 / 8.4 诗词评分（C4））。
 
 **评级**： 
 
@@ -4677,7 +4738,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poem/:id
 - 说明：诗词详情页提供 AI 评分，由 AI 从意境、格律、修辞、情感、用词等维度评价诗词并给出分数。进入任意诗词详情页即可查看或请求 AI 评分，用户本人也可以手动给诗词评分。
 - 使用步骤：
-  1. 打开任意诗词详情页\n查看已有评分或请求 AI 评分\n查看 AI 给出的评价与分数
+  1. 打开任意诗词详情页
+  2. 查看已有评分或请求 AI 评分
+  3. 查看 AI 给出的评价与分数
 - 常见问答：
   - 问：AI评分在哪里  答：在诗词详情页可以查看或请求 AI 评分，AI 会多维度评价并给出分数。
 ```
@@ -4687,9 +4750,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 **回答**：搜索评分中，标题完全匹配得 1.0 分；内容包含拆分词得 0.2 分。
 
-具体依据如下：
-- **标题完全匹配**：在诗词标题去除标点后与关键词完全一致时，获得最高分 1.0（来源：moyuan_business_modules.md·业务模块说明/8.搜索模块/搜索评分算法）。
-- **内容包含拆分词**：当诗词内容中包含拆分后的单个关键词时，得分为 0.2（来源：moyuan_business_modules.md·业务模块说明/8.搜索模块/搜索评分算法）。
+具体评分规则如下：
+- **标题完全匹配**：去除标点后完全一致时，得分为 1.0（来源：moyuan_business_modules.md·业务模块说明/8.搜索模块/搜索评分算法）。
+- **内容包含拆分词**：诗词内容中包含拆分后的单个关键词时，得分为 0.2（来源：moyuan_business_modules.md·业务模块说明/8.搜索模块/搜索评分算法）。
 
 **评级**： 
 
@@ -4893,7 +4956,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poem/:id
 - 说明：诗词详情页提供 AI 评分，由 AI 从意境、格律、修辞、情感、用词等维度评价诗词并给出分数。进入任意诗词详情页即可查看或请求 AI 评分，用户本人也可以手动给诗词评分。
 - 使用步骤：
-  1. 打开任意诗词详情页\n查看已有评分或请求 AI 评分\n查看 AI 给出的评价与分数
+  1. 打开任意诗词详情页
+  2. 查看已有评分或请求 AI 评分
+  3. 查看 AI 给出的评价与分数
 - 常见问答：
   - 问：AI评分在哪里  答：在诗词详情页可以查看或请求 AI 评分，AI 会多维度评价并给出分数。
 ```
@@ -4903,11 +4968,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 **回答**：智能搜索的建议词、热门词和搜索历史分别使用以下 Redis 键名进行缓存：
 
-1. **搜索建议**：`search:suggestion:{kw}`（来源：moyuan_system_workflow.md·2.5 缓存策略速览；moyuan_business_modules.md·技术方案）
-2. **热门搜索**：`search:hot`（ZSet 结构，逆序返回）（来源：moyuan_system_workflow.md·2.5 缓存策略速览；moyuan_business_modules.md·技术方案）
-3. **搜索历史**：`search:history:{userId}`（List 结构，按用户 ID 区分，最多 20 条，30 天过期）（来源：moyuan_business_modules.md·功能说明；moyuan_system_workflow.md·2.5 缓存策略速览）
-
-注：搜索历史仅对已登录用户保存，且前端 localStorage 中虽有 `moyuan_search_history` 字段，但实际数据流转依赖后端 Redis 存储（来源：moyuan_system_workflow.md·15.4 localStorage 使用点汇总）。
+1. **搜索建议**：`search:suggestion:{kw}`（基于关键词 kw，5 分钟过期）（来源：moyuan_business_modules.md·业务模块说明 / 8. 搜索模块 / 技术方案；moyuan_system_workflow.md·系统工作流文档 / 10.1 全文/跨模块智能搜索（C8））
+2. **热门搜索**：`search:hot`（Redis ZSet 结构，实时统计逆序返回）（来源：moyuan_business_modules.md·业务模块说明 / 8. 搜索模块 / 技术方案；moyuan_system_workflow.md·系统工作流文档 / 10.1 全文/跨模块智能搜索（C8））
+3. **搜索历史**：`search:history:{userId}`（Redis List 结构，按用户 ID 区分，30 天过期，最多 20 条）（来源：moyuan_business_modules.md·业务模块说明 / 8. 搜索模块 / 功能说明；moyuan_system_workflow.md·系统工作流文档 / 10.1 全文/跨模块智能搜索（C8））
 
 **评级**： 
 
@@ -5035,7 +5098,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poem
 - 说明：智能检索支持按关键词搜索诗词、诗人与帖子，首页与诗词列表页内嵌了搜索入口。搜索会记录你的历史，登录后还会根据兴趣给出推荐。
 - 使用步骤：
-  1. 在首页或诗词列表页输入关键词\n查看匹配的诗词、诗人或帖子\n点开结果查看详情
+  1. 在首页或诗词列表页输入关键词
+  2. 查看匹配的诗词、诗人或帖子
+  3. 点开结果查看详情
 - 常见问答：
   - 问：怎么搜索  答：在首页或诗词列表页的搜索框输入关键词，即可搜索诗词、诗人与帖子。
 ```
@@ -5045,8 +5110,8 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 **回答**：登录成功后签发的两种 token 为 access token（访问令牌）和 refresh token（刷新令牌），其有效期如下：
 
-1. **Access Token**：默认有效期为 **24 小时**。该令牌用于后续请求的身份验证，包含随机生成的 `jti` 标识符。
-2. **Refresh Token**：默认有效期为 **7 天**。该令牌用于在 Access Token 过期后自动续期，两者共享相同的 `jti`。
+1. **Access Token**：默认有效期为 **24 小时**。该令牌用于后续请求的自动续期，包含随机生成的 `jti` 标识。
+2. **Refresh Token**：默认有效期为 **7 天**。该令牌用于在 Access Token 过期后换取新的访问令牌，与 Access Token 共享相同的 `jti`。
 
 （来源：moyuan_system_workflow.md · 系统工作流文档 / 4. 认证与权限域 / 4.2 登录与 JWT 签发（A2））
 
@@ -5145,7 +5210,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/user/login
 - 说明：注册时需要填写用户名、密码和邮箱，登录使用用户名与密码。登录后可享受收藏、发布、评论等完整功能。注册成功会直接登录。
 - 使用步骤：
-  1. 进入登录页\n没有账号时切换到注册并填写信息\n登录成功后使用完整功能
+  1. 进入登录页
+  2. 没有账号时切换到注册并填写信息
+  3. 登录成功后使用完整功能
 - 常见问答：
   - 问：怎么注册账号  答：在注册页填写用户名、密码和邮箱即可注册，注册成功会直接登录。
   - 问：怎么登录  答：在登录页输入用户名和密码即可登录。
@@ -5156,13 +5223,13 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 **回答**：报修工单从待处理到已关闭共经过**5 个状态**。
 
-1. **待处理 (0)**：用户提交工单后的初始状态，系统自动生成编号并设为此状态。
-2. **处理中 (1)**：管理员分配处理人后，状态流转至此。
-3. **已解决 (2)**：问题修复完成，状态更新为此，系统记录解决时间。
-4. **拒绝 (4)**：工单被拒绝（注：虽非“已关闭”直接前序，但属于流程中的终止状态之一）。
-5. **已关闭 (3)**：用户主动关闭或管理员操作后，状态流转至此，记录关闭时间。
+1. **待处理 (0)**：用户提交工单后的初始状态，系统自动生成编号并默认优先级为 2。
+2. **处理中 (1)**：管理员分配处理人后，状态由 0 流转至 1。
+3. **已解决 (2)**：问题修复完成后，状态由 1 流转至 2，系统记录解决时间。
+4. **拒绝 (4)**：若工单被拒绝（非标准关闭路径），状态可流转至 4，记录拒绝时间。
+5. **已关闭 (3)**：用户主动关闭或管理员操作后，状态由 2 流转至 3，系统记录关闭时间。
 
-*注：根据资料，状态流转逻辑为 `待处理(0) → 处理中(1) → 已解决(2) → 已关闭(3)`，同时存在 `拒绝 (4)` 作为另一种终止状态（来源：moyuan_business_modules.md · 业务模块说明 / 18. 报修模块 / 工单状态流转；moyuan_system_workflow.md · 系统工作流文档 / 13. 报修工单域 / 13.1 工单全生命周期（E7））。*
+注：部分资料中提及状态 4（拒绝）作为独立状态存在，但在“待处理到已关闭”的主流程描述中，核心流转为 0→1→2→3。具体状态机定义如下：`待处理 (0) → 处理中 (1) → 已解决 (2) → 已关闭 (3)`，同时支持 `拒绝 (4)` 分支（来源：moyuan_business_modules.md · 业务模块说明 / 18. 报修模块 / 工单状态流转；moyuan_system_workflow.md · 系统工作流文档 / 13. 报修工单域 / 13.1 工单全生命周期（E7））。
 
 **评级**： 
 
@@ -5281,7 +5348,10 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 - 前端路由：/repair
 - 说明：报修中心用于提交报修工单，可填写标题、描述、分类与优先级，提交后查看我的报修列表与详情、添加反馈评论、关闭工单并提交满意度评价。需要登录后进入。
 - 使用步骤：
-  1. 登录后进入报修中心\n点击提交报修并填写工单信息\n在列表中查看工单详情与进度\n添加评论、关闭工单并评价
+  1. 登录后进入报修中心
+  2. 点击提交报修并填写工单信息
+  3. 在列表中查看工单详情与进度
+  4. 添加评论、关闭工单并评价
 - 常见问答：
   - 问：怎么报修  答：登录后进入报修中心，点击提交报修，填写标题、描述、分类与优先级后提交。
 ```
@@ -5289,16 +5359,12 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 
 ## E9（easy）诗云星空页面是什么，能做什么交互？
 
-**回答**：诗云星空页面（`/poetry-cloud`）是一个基于 Three.js 的 3D 可视化系统，将中国古诗词数据以“诗人—诗作”两级层级星图形式呈现。每位诗人是一颗发光大节点，其诗作是环绕分布的小节点，同朝代相邻诗人间有贝塞尔曲线连接，支持缩放、旋转和平移浏览（来源：moyuan_business_modules.md·模块总览；moyuan_system_workflow.md·15.6 诗云 3D 星空）。
+**回答**：诗云星空页面（`/poetry-cloud`）是一个基于 Three.js 的 3D 可视化系统，将中国古诗词数据以“诗人—诗作”两级层级星图形式呈现。每位诗人是一颗发光的大节点，其诗作是环绕分布的小节点，支持缩放、旋转与交互浏览。
 
-主要交互功能如下：
-- **相机漫游**：鼠标拖动旋转、滚轮缩放、右键平移、点击星点飞向目标（来源：moyuan_system_workflow.md·15.6）；
-- **节点悬停**：显示 DOM 提示框，标注诗人姓名·朝代·作品数或诗名·作者·朝代·诗体（来源：moyuan_business_modules.md·功能说明）；
-- **点击诗人星**：相机飞向该诗人、右侧滑出信息面板并聚焦其诗作簇（来源：moyuan_system_workflow.md·15.6）；
-- **点击诗作点**：居中弹出详情浮层，含“查看详情”按钮跳转 `/poem/{id}`（来源：moyuan_business_modules.md·功能说明）；
-- **虚空取诗**：点击空白处随机浮现一首诗并生成蓝色新星飞向（来源：moyuan_business_modules.md·功能说明）；
-- **配色实验室**：底部可切换 7 套配色方案，调节光晕、连线可见度、节点尺寸及整体亮度，支持“显示诗人姓名”和“诗人按朝代配色”开关（来源：moyuan_business_modules.md·功能说明）；
-- **朝代筛选**：按朝代过滤诗人与诗词（来源：moyuan_business_modules.md·功能
+- **核心展示**：通过球面螺旋排布展示诗人星系与诗作节点，连线显示诗人作品归属及同朝代赠诗关系（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 功能说明）。
+- **交互操作**：支持鼠标拖动旋转、滚轮缩放、右键平移、点击星点相机飞向；hover 节点显示 DOM 提示框；点击诗人星查看信息面板并聚焦其诗作；点击诗作弹出详情浮层（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 功能说明）。
+- **特色功能**：虚空取诗可随机浮现一首诗并生成蓝色新星飞向；底部“配色实验室”可切换 7 套配色方案并调节光晕、连线可见度等（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 功能说明）。
+- **数据与渲染**：前端加载朝代、诗人、诗作数据，使用 OrbitControls 控制相机，通过松弛迭代优化节点间距，确保小节点可被命中（来源：moyuan_system_workflow.md·系统工作流文档 / 15.6 诗云 3D 星空（K6））。
 
 **评级**： 
 
@@ -5311,7 +5377,7 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 | 22 | 联系我们模块 | 用户反馈表单页面 | 前端已实现 |
 | 23 | 诗云模块 | Three.js 3D 星空可视化，诗人—诗作两级层级星图 + 配色实验室 | 前端已实现 |
 | 24 | 游戏模块 | 飞花令 / 诗词接龙对局（模式/难度、回合计时、三级真实性校验、游客模式） | 前端+后端已实现 |
-| 25 | AI 对话页「诗宝阁」 | 角色化统一对话入口：6 角色 × 12 能力，覆盖命题作诗/集句/藏头/润色/平仄校验/韵脚查询/对对联/意象典故/诗话点评/飞花令/接龙/群贤论诗；其中飞花令为设令字后逐句判定（含字/判重/真实性）的对局流程 | 阶段一前端已完成（非流式）、阶段二后端 SSE 已完成（前端流式待接入） |
+| 25 | AI 对话页「诗宝阁」 | 角色化统一对话入口：6 角色 × 12 能力，覆盖命题作诗/集句/藏头/润色/平仄校验/韵脚查询/对对联/意象典故/诗话点评/飞花令/接龙/群贤论诗；其中飞花令为设令字后逐句判定（含字/判重/真实性）的对局流程 | 前端+后端已实现（SSE 流式、多轮上下文、服务端会话） |
 | 26 | 全局 AI 小窗与系统知识库 | 全站悬浮 AI 问答入口：诗词助理 / 网页用法助理双助理，接入 system_knowledge 知识库 | 前端+后端已实现 |
 
 ---
@@ -5416,7 +5482,10 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 - 前端路由：/poetry-cloud
 - 说明：诗云是用 3D 星空展示古诗数据的可视化页面，每位诗人是一颗星，其诗作环绕分布，可缩放旋转浏览。点击诗人星可查看诗人信息与代表作品，点击诗作节点可查看诗词详情。页面底部「配色实验室」可切换配色方案并调节光晕、连线、亮度等显示效果。
 - 使用步骤：
-  1. 进入诗云页面\n拖动旋转、滚轮缩放浏览星图\n点击诗人星查看诗人信息与作品\n点击诗作节点查看诗词详情
+  1. 进入诗云页面
+  2. 拖动旋转、滚轮缩放浏览星图
+  3. 点击诗人星查看诗人信息与作品
+  4. 点击诗作节点查看诗词详情
 - 常见问答：
   - 问：诗云是什么  答：诗云是把古诗词数据做成 3D 星空的页面，诗人是星、诗作围绕其分布，可交互浏览。
   - 问：诗云怎么用  答：拖动旋转、滚轮缩放浏览星图，点击诗人或诗作节点查看详情。
@@ -5425,17 +5494,15 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 
 ## E10（easy）哪些 AI 功能必须登录后才能用？
 
-**回答**：必须登录才能使用的 AI 功能包括：看图写诗、智能分析（输入诗句解析）、AI 对对联、藏头诗、平仄格律校验、古籍 OCR 识文、AI 内容填充与审核、诗词 AI 助手（poetry_chat）中的译文注释/名人点评/创作背景/AI 逐句解析功能，以及「诗宝阁」角色化统一对话入口。
+**回答**：必须登录才能使用的 AI 功能包括：看图写诗、AI 评分、诗宝阁对话以及平仄格律校验（古籍 OCR 识文目前处于维护中，需同时开启后端开关与前端常量）。游客可在首页直接体验飞花令、诗词接龙小工具。
 
 - **看图写诗**：上传图片生成古诗词，支持视觉模型（来源：moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明）
-- **智能分析**：输入诗句进行深度解析（来源同上）
-- **AI 对对联**：输入上联生成下联，遵循平仄规则（来源同上）
-- **藏头诗**：输入藏头字生成诗歌，复用 POST /api/ai/chat 接口（来源同上）
-- **平仄格律校验**：粘贴绝句/律诗标注平仄、判定合律、识别韵部，返回严格 JSON（来源同上）
-- **古籍 OCR 识文**：上传图片识别文字内容，保留结构并标注印章题款（来源：moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明）
-- **AI 内容填充与审核**：生成缺失字段候选内容存入审核表，需管理员审核通过后写回（来源同上）
-- **诗词 AI 助手（poetry_chat）**：包含译文注释、名人点评、创作背景、AI 逐句解析及弹窗交互功能（来源：moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明）
-- **「诗宝阁」对话页**：角色化统一对话入口，含 6 种角色×12 种能力，复用 POST /
+- **AI 评分**：属于需登录的 AI 能力范畴（来源：moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ AI 功能需要登录（account.ai-login））
+- **诗宝阁对话**：角色化统一对话入口，含创作、鉴赏、格律校正等能力（来源：moyuan_business_modules.md · 业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 功能说明）
+- **平仄格律校验**：粘贴绝句/律诗进行逐句标注与合律判定，由本地确定性引擎处理（来源：moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明）
+- **古籍 OCR 识文**：当前维护中，需同时打开后端开关 `ai.features.ocr-enabled=true` 与前端 `OCR_ENABLED` 常量（来源：moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明）
+
+注：飞花令、诗词接龙小工具游客可直接体验；AI 对话页「诗宝阁」及全局悬浮小窗需登录后使用。
 
 **评级**： 
 
@@ -5444,17 +5511,19 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 ```
 【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明】
 【章节：业务模块说明 / 7. AI 模块 / 功能说明】
-可用提供商：智谱AI、DeepSeek、Kimi、千问、小米MiMo、OpenRouter；NVIDIA NIM 已全部禁用/下线）
+### 功能说明
+
+- AI诗词问答（支持多模型切换；调用优先走 `ai_module_config` 模块绑定，未绑定某模块时回退默认模型。可用提供商：智谱AI、DeepSeek、Kimi、千问、小米MiMo、OpenRouter；NVIDIA NIM 已全部禁用/下线）
 - 看图写诗（上传图片，AI生成古诗词，支持视觉模型如 GLM-4V-Flash、DeepSeek-Flash）
 - 智能分析（输入诗句进行深度解析）
 - AI对对联（输入上联，AI生成下联，遵循平仄规则）
 - **藏头诗**（输入 2-8 个藏头字并选择五言/七言，AI 生成藏头诗，每句首字依次对应藏头字；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
-- **平仄格律校验**（粘贴一首绝句/律诗，AI 逐句标注平仄（平声绿底、仄声红底）、判定是否合律、识别所属平水韵韵部并给出总体评价；AI 返回严格 JSON，前端解析失败时回退展示原始文本；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
-- **AI 对话页「诗宝阁」**（`/ai-chat`）：角色化统一对话入口，6 角色（诗仙·创作 / 诗话·鉴赏 / 格律·校正 / 诗友·行令 / 群贤·论诗 / 顾问·问答）× 12 能力（命题作诗 / 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 / 群贤论诗）；阶段一复用 `POST /api/ai/chat`（moduleCode=chat，非流式），阶段二后端已新增 `POST /api/ai/chat/stream`（SSE 流式，见 6.
+- **平仄格律校验**（粘贴一首绝句/律诗，由**本地确定性引擎** `POST /api/ai/tone-check` 逐句标注平仄（平声绿底、仄声红底）、判定是否合律并给出不合律原因；校验规则为句末三平尾/三仄尾、二四六位失替、偶数句押韵，不调用大模型、不消耗 AI 额度）
+- **AI 对话页「诗宝阁」**（`/ai-chat`）：角色化统一对话入口，6 角色（诗仙·创作 / 诗话·鉴赏 / 格律·校正 / 诗友·行令 / 群贤·论诗 / 顾问·问答）× 12 能力（命题作诗 / 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 /
 
 【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明】
 【章节：业务模块说明 / 7. AI 模块 / 功能说明】
-- **古籍OCR识文**（上传古诗词图片/书法作品/碑帖，AI精准识别文字内容，保留原文结构，标注印章题款）
+- **古籍OCR识文**（上传古诗词图片/书法作品/碑帖，AI精准识别文字内容，保留原文结构，标注印章题款）——**当前维护中**：后端开关 `ai.features.ocr-enabled=false` 时接口返回 `4293`，前端首页入口置灰并提示「维护中」，恢复需同时打开后端开关与前端 `OCR_ENABLED` 常量，并存在 `ocr` 模块的视觉模型绑定
 - AI模型配置管理（后台管理，支持CRUD、启用/禁用、默认模型设置、连接测试）
 - **AI内容填充与审核**：对诗词/诗人缺失字段由 AI 生成候选内容，存入审核表，管理员审核通过后写回原表
 - **诗词AI助手（poetry_chat）**：寻章摘句页面的AI功能模块，包括译文注释、名人点评、创作背景、历史文化背景、AI逐句解析、AI诗词助手对话
@@ -5491,9 +5560,9 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
   - `advisor` 顾问·问答（通识问答，无专属能力）
 - **12 个能力**（Skill）：`compose` 命题作诗、`gather` 集句成诗、`acrostic` 藏头诗、`polish` 润色入律、`tone` 平仄校验、`rhyme` 韵脚查询、`couplet` 对对联、`imagery` 意象典故、`comment` 诗话点评、`feihua` 飞花令、`chain` 诗词接龙、`salon` 群贤论诗
 - **三段式布局**：左「角色栏」+ 中「对话流」+ 底「能力快捷 chips + 输入框」
-- **会话记忆**：按 `roleId` 分存 `localStorage`（键 `moyuan_ai_chat_${roleId}`），切换角色各自恢复；单角色最多保留 40 条（约 20 轮），单条内容上限 4000 字
+- **会话记忆**：按 `roleId` 存服务端 Redis（键 `ai:chat:session:{userId}:{roleId}`，TTL 7 天、最多 40 条），切换角色各自恢复，换设备登录同一账号可继续；本地 `localStorage`（键 `moyuan_ai_chat_${roleId}`）作为降级缓存，Redis 不可用时仍可用。单条内容上限 4000 字
 - **空态引导**：进入页面 / 新建会话后，按角色给出引导语 + 推荐能力 chip
-- **结果渲染**：普通能力渲染为文本气泡；藏头诗高亮每句首字（藏头字）；平仄校验解析 AI 返回的严格 JSON，渲染为平仄标签卡（平底/仄底、押韵标记、逐句简评、总评），解析失败回退展示原始文本
+- **结果渲染**：普通能力渲染为文本气泡，流式逐字追加并自动滚底；藏头诗高亮每句首字（藏头字）；平仄校验改调本地确定性引擎 `POST /api/ai/tone-check`，把返回的逐字平仄与问题列表渲染为平仄标签卡（平底/仄底，三平尾、三仄尾、二四六失替等问题标红），不再依赖大模型输出 JSON
 - **消息头像**：对话流每条消息两侧带圆形头像——AI 侧统一使用墨渊可爱卡通头像（本地静态资源 `/img/ai_chat_avatar.jpg`），用户侧使用本人头像（未登录 / 无头像时回退金色首字母）；用户气泡靠右、头像居其右，AI 气泡靠左、头像居其左，加载态气泡同样带 AI 头像
 
 【moyuan_business_modules.md · 业务模块说明 / 26. 全局 AI 小窗与系统知识库模块 / 功能说明】
@@ -5539,26 +5608,25 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 - 分类：account
 - 关键词：AI功能,登录,权限,使用条件
 - 别名：AI需要登录
-- 说明：AI 相关功能需要登录后才能使用，包括看图写诗、古籍识文、AI 评分以及诗宝阁对话等。首页的飞花令、诗词接龙小工具游客可在首页直接体验。
+- 说明：AI 相关功能需要登录后才能使用，包括看图写诗、AI 评分、诗宝阁对话以及平仄格律校验等；古籍识文目前处于维护中。首页的飞花令、诗词接龙小工具游客可在首页直接体验。
 - 使用步骤：
-  1. 登录账号\n进入 AI 功能入口\n正常使用 AI 能力
+  1. 登录账号
+  2. 进入 AI 功能入口
+  3. 正常使用 AI 能力
 - 常见问答：
-  - 问：AI功能要登录吗  答：需要登录后使用，包括看图写诗、古籍识文、AI 评分与诗宝阁对话等；游客可在首页直接体验飞花令、诗词接龙小工具。
+  - 问：AI功能要登录吗  答：需要登录后使用，包括看图写诗、AI 评分、诗宝阁对话与平仄校验等（古籍识文维护中）；游客可在首页直接体验飞花令、诗词接龙小工具。
 ```
 </details>
 
 ## M1（medium）有人收藏了一首诗、又点赞并浏览了一次，推荐算法分别给这三种行为记几分？
 
-**回答**：在墨渊平台的推荐算法中，用户行为评分标准如下：
+**回答**：推荐算法对三种行为的计分规则如下：
 
-1. **收藏**：记 **5 分**。
-2. **点赞**：记 **3 分**。
-3. **浏览**：记 **1 分**。
+1.  **收藏**：记 **5 分**。
+2.  **点赞**：记 **3 分**。
+3.  **浏览**：记 **1 分**。
 
-具体规则依据来源文件说明：
-- 诗词侧同一用户对同一作品的多行为取**最大值合并，不累加**（即若同时有收藏和点赞，仅按最高分 5 分计算）。
-- 诗人侧同样采用此逻辑，且热门诗人统计中收藏与词收藏各计 5 分，点赞计 3 分，浏览计 1 分。
-- 评分矩阵构建时，收藏权重为 5、点赞为 3、浏览为 1（来源：moyuan_business_modules.md·业务模块说明/8.搜索模块/推荐算法说明；moyuan_system_workflow.md·系统工作流文档/9.诗人内容域/9.2推荐/热门诗人）。
+在构建用户 - 内容评分矩阵时，若同一用户对同一作品存在多行为（如既收藏又点赞），系统取最大值合并，不累加。此规则适用于诗词及诗人推荐场景（来源：moyuan_business_modules.md·业务模块说明/3. 诗人模块/功能说明；moyuan_system_workflow.md·系统工作流文档/8. 诗词内容域/8.3 收藏 / 点赞（C3）；moyuan_system_workflow.md·系统工作流文档/9. 诗人内容域/9.2 推荐 / 热门诗人（C7））。
 
 **评级**： 
 
@@ -5635,17 +5703,6 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
    - 展示近 7 天策略切换趋势、累计切换去向、来源页面分布与最近 10 条切换事件，30 秒轮询 `/api/recommend/stats`
    - 无切换事件时显示空态提示，不填充假数据
 
-【moyuan_business_modules.md · 业务模块说明 / 16. 诗词评分模块 / 功能说明】
-【章节：业务模块说明 / 16. 诗词评分模块 / 功能说明】
-### 功能说明
-
-- 用户评分：用户对诗词进行评分（1.0-5.0分）
-- AI评分：请求AI对诗词进行评分和分析
-- 评分维度：支持多维度评分（格律、意境、用词、情感、创新）
-- 评分统计：诗词平均评分和评分数量
-- 评分详情：展示用户评分和AI评分详情
-- 重新评价：用户已评分后可点击"重新评价"修改评分
-
 【moyuan_business_modules.md · 业务模块说明 / 26. 全局 AI 小窗与系统知识库模块 / API 接口】
 【章节：业务模块说明 / 26. 全局 AI 小窗与系统知识库模块 / API 接口】
 ### API 接口
@@ -5657,8 +5714,8 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 
 ---
 
-**文档版本**：v3.17
-**最后更新**：2026-10-27（推荐算法说明补充「四组模型策略（离线制品查表）」与「后台实时看板」；后台控制台推荐指标屏新增缓存覆盖、模型版本、近 7 天切换趋势、切换去向/页面分布与最近事件）；此前 v3.16（推荐算法说明由 UserCF 更新为 ItemCF，诗词行为矩阵同一作品多行为取最大值合并）；此前 v3.15（新增第 26 章「全局 AI 小窗与系统知识库」：双助理、`system_chat` 模块、`system_knowledge` 表、路由画像、意图分流与 FAQ 直答、知识库跳转入口、登录门禁；模块总数 25 → 26）；v3.14（首页「诗境 AI」展开面板新增「前往完整页面」入口，按工具预选诗宝阁角色与能力；韵脚查询/对对联补充为诗宝阁新能力，能力总数 10 → 12；功能卡增加自动横向滑动）；2026-10-19（AI 对话页模块名统一由「诗阁」更名为「诗宝阁」；此前第 25 章「AI 对话页『诗宝阁』」补充对话流消息头像说明：AI 侧统一卡通头像 / 用户侧本人头像，气泡与头像左右对齐；v3.13 补充阶段二后端流式接口 `POST /api/ai/chat/stream`（SSE 流式）说明与接口表条目；v3.12 新增第 25 章：6 角色 × 10 能力的角色化统一对话入口，阶段一纯前端复用 `POST /api/ai/chat` 非流式接口）
+**文档版本**：v3.18
+**最后更新**：2026-11-07（AI 加固收尾同步：第 25 章诗宝阁由「阶段一非流式」改为 SSE 流式 + system 人设多轮上下文 + 服务端会话（Redis，TTL 7 天，localStorage 兜底）+ 停止生成；平仄校验改述为本地确定性引擎 `POST /api/ai/tone-check`（不消耗 AI 额度）；古籍识文标注维护中（`ai.features.ocr-enabled=false`）；接口清单补 `tone-check` 与 3 个会话接口，并注明 `/api/ai/**` 统一限流与入参校验）；此前 v3.17（推荐算法说明补充「四组模型策略（离线制品查表）」与「后台实时看板」；后台控制台推荐指标屏新增缓存覆盖、模型版本、近 7 天切换趋势、切换去向/页面分布与最近事件）；v3.16（推荐算法说明由 UserCF 更新为 ItemCF，诗词行为矩阵同一作品多行为取最大值合并）；v3.15（新增第 26 章「全局 AI 小窗与系统知识库」：双助理、`system_chat` 模块、`system_knowledge` 表、路由画像、意图分流与 FAQ 直答、知识库跳转入口、登录门禁；模块总数 25 → 26）；v3.14（首页「诗境 AI」展开面板新增「前往完整页面」入口，按工具预选诗宝阁角色与能力；韵脚查询/对对联补充为诗宝阁新能力，能力总数 10 → 12；功能卡增加自动横向滑动）；2026-10-19（AI 对话页模块名统一由「诗阁」更名为「诗宝阁」；此前第 25 章「AI 对话页『诗宝阁』」补充对话流消息头像说明：AI 侧统一卡通头像 / 用户侧本人头像，气泡与头像左右对齐；v3.13 补充后端流式接口 `POST /api/ai/chat/stream`（SSE 流式）说明与接口表条目；v3.12 新增第 25 章：6 角色 × 10 能力的角色化统一对话入口，纯前端复用 `POST /api/ai/chat` 非流式接口）
 **维护人员**：墨渊开发团队
 
 【moyuan_system_workflow.md · 系统工作流文档 / 8. 诗词内容域 / 8.3 收藏 / 点赞（C3）】
@@ -5695,19 +5752,22 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 - **收藏/AI对话/浏览历史**：无 localStorage key，分别走服务端接口/内存/API。
 - **关键位置**：`utils/storage.ts`、`stores/preferences.ts/searchHistory.ts/formDraft.ts/apiCache.ts`。
 
-【moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / 首页（page.home）】
-【章节：墨渊小助手系统知识库（24 条） / 首页（page.home）】
-## 首页（page.home）
+【moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / 个人中心（page.profile）】
+【章节：墨渊小助手系统知识库（24 条） / 个人中心（page.profile）】
+## 个人中心（page.profile）
 
 - 分类：page
-- 关键词：首页,主页,导航,入口
-- 别名：主页
-- 前端路由：/
-- 说明：首页是站点的总入口，聚合了今日诗词、古诗精赏、当代精选、诗话视野、精选诗人等板块，并提供通往诗云、交流广场、诗宝阁的导航。首页还设有 AI 小工具区，可快捷使用看图写诗、藏头诗、飞花令等玩法。
+- 关键词：个人中心,我的,资料,收藏,历史,认证
+- 别名：个人主页,我的页面
+- 前端路由：/user/profile
+- 说明：个人中心可查看与修改个人资料、上传头像、修改密码，并查看我的收藏、我的点赞、我的帖子和浏览历史。诗人认证申请也从个人中心提交。需要登录后进入。
 - 使用步骤：
-  1. 打开站点默认进入首页\n通过顶部导航切换各板块\n在 AI 小工具区使用各类玩法
+  1. 登录后进入个人中心
+  2. 修改资料、头像或密码
+  3. 查看收藏、点赞、帖子与浏览历史
+  4. 需要时提交诗人认证申请
 - 常见问答：
-  - 问：首页有哪些内容  答：首页聚合了今日诗词、古诗精赏、当代精选、诗话视野、精选诗人等板块，还有 AI 小工具区。
+  - 问：个人中心在哪里  答：登录后可从用户菜单进入个人中心，管理资料、收藏、历史并提交诗人认证。
 ```
 </details>
 
@@ -5715,8 +5775,8 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 
 **回答**：用户提交评分后，系统会重新计算平均分；AI 评分解析失败时会自动兜底为 3.5 分。
 
-1. **平均分更新机制**：当用户提交评分（`POST /api/poems/{id}/ratings`）或 AI 完成评分后，系统会调用 `updatePoemAverageScore` 方法，基于最新的评分数据重新计算该诗词的平均分（`avg_score`）和评分数量（`rating_count`），并更新至数据库及缓存中（来源：moyuan_business_modules.md·业务模块说明/16. 诗词评分模块/功能说明；moyuan_system_workflow.md·系统工作流文档/8. 诗词内容域/8.4 诗词评分（C4））。
-2. **AI 评分失败处理**：在 AI 评分流程中，若正则解析分数失败，系统将执行兜底逻辑，直接返回 3.5 分作为最终评分值，确保评分数据始终有效（来源：moyuan_system_workflow.md·系统工作流文档/8. 诗词内容域/8.4 诗词评分（C4））。
+1. **平均分更新机制**：当用户提交评分（`POST /api/poems/{id}/ratings`）或 AI 完成评分后，系统会调用 `updatePoemAverageScore` 方法，基于最新的评分数据重新计算该诗词的 `avg_score`（平均分）和 `rating_count`（评分数量），并将结果存入数据库中的 `poem` 表（来源：moyuan_system_workflow.md·8.4 诗词评分（C4））。
+2. **AI 评分解析失败处理**：在 AI 评分流程中，若正则解析分数失败，系统会自动采用兜底值 3.5 分，随后生成摘要并记录实际生效的模型名到 `ai_model` 字段，最后参与平均分重算（来源：moyuan_system_workflow.md·8.4 诗词评分（C4））。
 
 **评级**： 
 
@@ -5739,6 +5799,22 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 - **内容审核**（新增）：诗词发布后需经过审核
 - **外文诗词页签**（新增）：`/poem?tab=foreign` 展示已入库的 20 首英文名篇（`poem_type='foreign'`）；先读库、库空才实时兜底 PoetryDB（兜底结果不落库），加载超过 5 秒在过场动画上提示「检索耗时较久，请耐心等待…」
 
+【moyuan_business_modules.md · 业务模块说明 / 2. 诗词模块 / API 接口】
+【章节：业务模块说明 / 2. 诗词模块 / API 接口】
+### API 接口
+
+| 接口 | 说明 | 后端模块 |
+|------|------|----------|
+| GET /api/poems | 诗词列表 | backend PoemController |
+| GET /api/poems/modern/page | 分页获取现代诗词（支持筛选和排序） | sc-moyuan-backend PoemController |
+| GET /api/external-poetry/foreign | 外文诗词列表（先读库 `poem_type='foreign'`，库空实时兜底且不落库） | sc-moyuan-backend ExternalPoetryController |
+| GET /api/poems/{id} | 诗词详情 | backend PoemController |
+| GET /api/poems/search | 搜索诗词 | backend PoemController |
+| GET /api/poems/{id}/ratings | 获取诗词评分详情 | sc-moyuan-backend PoemRatingController |
+| POST /api/poems/{id}/ratings | 用户评分（1.0-5.0） | sc-moyuan-backend PoemRatingController |
+| POST /api/poems/{id}/ratings/ai | 请求AI评分 | sc-moyuan-backend PoemRatingController |
+| GET /api/poems/{id}/ratings/ai | 获取AI评分 | sc-moyuan-backend PoemRatingController |
+
 【moyuan_business_modules.md · 业务模块说明 / 2. 诗词模块 / 评分维度】
 【章节：业务模块说明 / 2. 诗词模块 / 评分维度】
 ### 评分维度
@@ -5752,13 +5828,16 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 
 【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明】
 【章节：业务模块说明 / 7. AI 模块 / 功能说明】
-可用提供商：智谱AI、DeepSeek、Kimi、千问、小米MiMo、OpenRouter；NVIDIA NIM 已全部禁用/下线）
-- 看图写诗（上传图片，AI生成古诗词，支持视觉模型如 GLM-4V-Flash、DeepSeek-Flash）
-- 智能分析（输入诗句进行深度解析）
-- AI对对联（输入上联，AI生成下联，遵循平仄规则）
-- **藏头诗**（输入 2-8 个藏头字并选择五言/七言，AI 生成藏头诗，每句首字依次对应藏头字；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
-- **平仄格律校验**（粘贴一首绝句/律诗，AI 逐句标注平仄（平声绿底、仄声红底）、判定是否合律、识别所属平水韵韵部并给出总体评价；AI 返回严格 JSON，前端解析失败时回退展示原始文本；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
-- **AI 对话页「诗宝阁」**（`/ai-chat`）：角色化统一对话入口，6 角色（诗仙·创作 / 诗话·鉴赏 / 格律·校正 / 诗友·行令 / 群贤·论诗 / 顾问·问答）× 12 能力（命题作诗 / 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 / 群贤论诗）；阶段一复用 `POST /api/ai/chat`（moduleCode=chat，非流式），阶段二后端已新增 `POST /api/ai/chat/stream`（SSE 流式，见 6.
+- **古籍OCR识文**（上传古诗词图片/书法作品/碑帖，AI精准识别文字内容，保留原文结构，标注印章题款）——**当前维护中**：后端开关 `ai.features.ocr-enabled=false` 时接口返回 `4293`，前端首页入口置灰并提示「维护中」，恢复需同时打开后端开关与前端 `OCR_ENABLED` 常量，并存在 `ocr` 模块的视觉模型绑定
+- AI模型配置管理（后台管理，支持CRUD、启用/禁用、默认模型设置、连接测试）
+- **AI内容填充与审核**：对诗词/诗人缺失字段由 AI 生成候选内容，存入审核表，管理员审核通过后写回原表
+- **诗词AI助手（poetry_chat）**：寻章摘句页面的AI功能模块，包括译文注释、名人点评、创作背景、历史文化背景、AI逐句解析、AI诗词助手对话
+  - **译文注释**：逐句翻译，关键词语注释
+  - **名人点评**：历代名家点评（引用《诗品》《沧浪诗话》《人间词话》等）、文学史地位
+  - **创作背景**：诗人生平、创作缘由、历史背景
+  - **AI逐句解析**：点击诗句展开解释，支持多句同时展开，内存缓存不写库，可关闭
+  - **弹窗交互**：三个功能按钮以向左展开的弹窗形式呈现，覆盖在诗词内容上方，不挤压布局
+  - **搜索式加载**：AI生成过程中以搜索动画替代旋转加载图标
 
 【moyuan_business_modules.md · 业务模块说明 / 16. 诗词评分模块 / 功能说明】
 【章节：业务模块说明 / 16. 诗词评分模块 / 功能说明】
@@ -5804,16 +5883,6 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 | GET /api/poems/{id}/ratings/ai | 获取AI评分 | sc-moyuan-backend PoemRatingController |
 | GET /api/poems/{id}/ratings/me | 获取当前用户评分 | sc-moyuan-backend PoemRatingController |
 
-【moyuan_business_modules.md · 业务模块说明 / 16. 诗词评分模块 / 前端组件】
-【章节：业务模块说明 / 16. 诗词评分模块 / 前端组件】
-### 前端组件
-
-| 组件 | 说明 |
-|------|------|
-| poem/detail.vue | 诗词详情页（集成评分功能） |
-
----
-
 【moyuan_system_workflow.md · 系统工作流文档 / 8. 诗词内容域 / 8.4 诗词评分（C4）】
 【章节：系统工作流文档 / 8. 诗词内容域 / 8.4 诗词评分（C4）】
 ### 8.4 诗词评分（C4）
@@ -5848,7 +5917,9 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 - 前端路由：/poem/:id
 - 说明：诗词详情页提供 AI 评分，由 AI 从意境、格律、修辞、情感、用词等维度评价诗词并给出分数。进入任意诗词详情页即可查看或请求 AI 评分，用户本人也可以手动给诗词评分。
 - 使用步骤：
-  1. 打开任意诗词详情页\n查看已有评分或请求 AI 评分\n查看 AI 给出的评价与分数
+  1. 打开任意诗词详情页
+  2. 查看已有评分或请求 AI 评分
+  3. 查看 AI 给出的评价与分数
 - 常见问答：
   - 问：AI评分在哪里  答：在诗词详情页可以查看或请求 AI 评分，AI 会多维度评价并给出分数。
 ```
@@ -5856,12 +5927,20 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 
 ## M3（medium）在诗汇论坛发帖、评论、点赞分别要满足什么条件？涉及哪些接口？帖子列表怎么展示置顶与精华？
 
-**回答**：在诗汇论坛发帖、评论、点赞需满足账号登录条件；涉及接口为 `/api/forum/posts`（发布）、`/api/forum/posts/{id}/comments`（评论）、`/api/forum/posts/{id}/like`（点赞）及评论相关接口。帖子列表展示置顶与精华功能由后端模块控制，前端仅支持浏览。
+**回答**：在诗汇论坛发帖、评论、点赞需满足登录条件，涉及多个 API 接口，帖子列表通过状态过滤和排序展示置顶与精华。
 
-1. **发帖条件**：用户需登录；涉及接口 `POST /api/forum/posts`（来源：moyuan_business_modules.md·业务模块说明/5.论坛模块/API 接口）。
-2. **评论条件**：用户需登录；涉及接口 `GET/POST /api/forum/comments` 及 `DELETE/PUT` 操作（来源：moyuan_system_workflow.md·系统工作流文档/12.1 发帖/回帖评论/点赞（E5））。
-3. **点赞条件**：用户需登录；涉及接口 `POST /api/forum/posts/{id}/like` 及评论点赞接口（来源：moyuan_business_modules.md·业务模块说明/5.论坛模块/API 接口）。
-4. **置顶与精华展示**：帖子列表按状态过滤，支持置顶（isTop）和精华推荐，由后端 `ForumController` 处理逻辑，前端仅做展示（来源：moyuan_business_modules.md·业务模块说明/5.论坛模块/功能说明）。
+**1. 发帖、评论、点赞的条件与接口**
+*   **发帖条件**：用户必须登录；支持富文本编辑及图片上传（交流广场模块）。
+    *   **接口**：`POST /api/forum/posts`（来源：moyuan_business_modules.md·业务模块说明/5. 论坛模块/API 接口）
+*   **评论条件**：用户必须登录；支持多级回复。
+    *   **接口**：`POST /api/forum/comments/{id}`（来源：moyuan_business_modules.md·业务模块说明/5. 论坛模块/API 接口）
+*   **点赞条件**：用户必须登录；同一内容不可重复点赞，撞库视为取消并扣减计数。
+    *   **接口**：`POST /api/forum/posts/{id}/like`（来源：moyuan_business_modules.md·业务模块说明/5. 论坛模块/API 接口）
+
+**2. 帖子列表展示置顶与精华的逻辑**
+*   **展示逻辑**：列表按 `status=1` 过滤，结合 `category` 和 `keyword` 进行筛选；再依据 `isTop` 字段进行排序（倒序分页），最后批量填充用户信息。
+    *   **核心机制**：后端模块 `ForumController` 中的 `ForumPostServiceImpl` 执行列表查询与分页逻辑（来源：moyuan_system_workflow.md·系统工作流文档/12. 论坛与社区域/12.1 发帖/回帖评论/点赞（E5））。
+*   **功能支持**：论坛模块明确包含“置顶帖功能”和“精华帖推荐”功能（来源：moyuan_business_modules.md
 
 **评级**： 
 
@@ -5986,7 +6065,10 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 - 前端路由：/forum
 - 说明：诗汇论坛是诗词交流社区，登录后可发布新帖，浏览帖子、评论与点赞。帖子列表支持置顶与精华展示，帖子详情页可查看正文与多级评论。
 - 使用步骤：
-  1. 进入诗汇论坛\n浏览帖子列表或搜索\n登录后点击发布新帖\n在帖子详情中评论、点赞
+  1. 进入诗汇论坛
+  2. 浏览帖子列表或搜索
+  3. 登录后点击发布新帖
+  4. 在帖子详情中评论、点赞
 - 常见问答：
   - 问：论坛在哪里  答：在顶部导航进入诗汇论坛，可浏览帖子、发帖、评论与点赞。
   - 问：论坛怎么发帖  答：登录后进入诗汇论坛，点击发布新帖，编辑标题与内容后提交。
@@ -6001,7 +6083,9 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 - 前端路由：/forum
 - 说明：在诗词、帖子与文章详情页可以对内容点赞与评论，论坛评论支持多级回复。评论需要有账号登录。
 - 使用步骤：
-  1. 打开诗词、帖子或文章详情\n点击点赞或发表评论\n在论坛可对评论进行回复
+  1. 打开诗词、帖子或文章详情
+  2. 点击点赞或发表评论
+  3. 在论坛可对评论进行回复
 - 常见问答：
   - 问：怎么评论  答：在诗词、帖子或文章详情页可以直接发表评论与点赞，论坛评论支持多级回复。
 ```
@@ -6009,11 +6093,11 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 
 ## M4（medium）诗人认证从提交到通过要经历哪些状态？管理员用哪个接口审核？用户从哪里提交？
 
-**回答**：诗人认证从提交到通过需经历“未认证（0）→ 认证中/待审核（2）→ 已认证（1）”三个状态，最终若被拒则为“认证失败（3）”。管理员使用 `PUT /api/admin/poet-profiles/{id}/verify` 接口进行审核，用户登录后进入个人中心页面 `/user/profile` 提交申请。
+**回答**：诗人认证从提交到通过需经历“未认证（0）→ 认证中/待审核（2）→ 已认证（1）”三个状态，若被拒则为“认证失败（3）”。管理员使用 `PUT /api/admin/poet-profiles/{id}/verify` 接口执行审核操作。用户通过个人中心页面提交申请，具体入口为前端路由 `/user/profile` 中的诗人认证功能模块。
 
-- **状态流转**：初始为未认证（0），提交申请后变为认证中（2），审核通过后更新为已认证（1），拒绝则为认证失败（3）。（来源：moyuan_business_modules.md · 业务模块说明 / 4. 诗人认证模块 / 认证状态）
-- **审核接口**：`PUT /api/admin/poet-profiles/{id}/verify`，属于 `sc-moyuan-backend AdminController` 模块，用于执行审核操作。（来源：moyuan_business_modules.md · 业务模块说明 / 4. 诗人认证模块 / API 接口）
-- **提交入口**：用户需登录后访问个人中心页面 `/user/profile`，该页面提供诗人认证申请入口。（来源：moyuan_business_modules.md · 业务模块说明 / 4. 诗人认证模块 / 前端路由；moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ 诗人认证（feature.poet-cert））
+- **状态流转**：初始为未认证（0），提交申请后变为认证中（2），管理员审核通过后更新为已认证（1），拒绝则为认证失败（3）。（来源：moyuan_business_modules.md · 业务模块说明 / 4. 诗人认证模块 / 认证状态）
+- **审核接口**：`PUT /api/admin/poet-profiles/{id}/verify`，属于 `sc-moyuan-backend AdminController` 模块，用于更新认证状态。（来源：moyuan_business_modules.md · 业务模块说明 / 4. 诗人认证模块 / API 接口）
+- **提交入口**：用户登录后进入个人中心（路由 `/user/profile`），在该页面找到诗人认证申请入口进行资料填写并提交。（来源：moyuan_business_modules.md · 业务模块说明 / 9. 用户模块 / 功能说明；moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ 个人中心（page.profile））
 
 **评级**： 
 
@@ -6152,7 +6236,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/user/profile
 - 说明：个人中心可查看与修改个人资料、上传头像、修改密码，并查看我的收藏、我的点赞、我的帖子和浏览历史。诗人认证申请也从个人中心提交。需要登录后进入。
 - 使用步骤：
-  1. 登录后进入个人中心\n修改资料、头像或密码\n查看收藏、点赞、帖子与浏览历史\n需要时提交诗人认证申请
+  1. 登录后进入个人中心
+  2. 修改资料、头像或密码
+  3. 查看收藏、点赞、帖子与浏览历史
+  4. 需要时提交诗人认证申请
 - 常见问答：
   - 问：个人中心在哪里  答：登录后可从用户菜单进入个人中心，管理资料、收藏、历史并提交诗人认证。
 
@@ -6166,7 +6253,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/user/profile
 - 说明：诗人认证可让你申请成为认证诗人，提交笔名、简介、擅长体裁等资料，由管理员审核，通过后获得诗人标识并在用户主页展示。认证申请从个人中心提交，需要登录。
 - 使用步骤：
-  1. 登录后进入个人中心\n提交诗人认证申请并填写资料\n等待管理员审核\n通过后在用户主页展示认证状态
+  1. 登录后进入个人中心
+  2. 提交诗人认证申请并填写资料
+  3. 等待管理员审核
+  4. 通过后在用户主页展示认证状态
 - 常见问答：
   - 问：怎么成为认证诗人  答：登录后在个人中心提交诗人认证申请，填写资料，通过管理员审核后即获得诗人标识。
 ```
@@ -6174,22 +6264,21 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## M5（medium）一份报修工单从创建到关闭再到满意度评价，经历了哪些状态和接口？用户在哪个页面操作？
 
-**回答**：一份报修工单从创建到关闭及满意度评价，经历了“待处理→处理中→已解决→已关闭”的状态流转，并涉及提交、评论、状态更新、关闭及评价等接口。用户主要在“报修中心”页面进行操作。
+**回答**：一份报修工单从创建到关闭及满意度评价，需经历“待处理→处理中→已解决→已关闭”的状态流转，并调用对应 API 接口；用户主要在“报修中心”页面进行操作。
 
-**1. 状态流转过程**
-- **待处理 (0)**：工单创建后初始状态。
-- **处理中 (1)**：管理员分配处理人后进入此状态。
-- **已解决 (2)**：问题修复完成，记录解决时间。
-- **已关闭 (3)**：用户提交满意度评价或管理员关闭后进入此状态。
-- *注：资料中还提及“拒绝 (4)"状态，但常规流程主要涉及上述四个阶段（来源：moyuan_business_modules.md · 业务模块说明 / 18. 报修模块 / 工单状态流转；moyuan_system_workflow.md · 系统工作流文档 / 13.1 工单全生命周期）*。
+**状态流转与接口：**
+- **创建阶段**：生成唯一编号（格式 RO+yyyyMMddHHmmssSSS+随机3位），初始状态为待处理(0)，优先级默认2。
+  - 接口：`POST /api/repair/orders`（提交工单）
+- **派单阶段**：管理员分配处理人，状态转为处理中(1)。
+  - 接口：`PUT /api/admin/repairs/{id}/assign`（分配处理人）
+- **流转阶段**：状态更新为已解决(2)或已关闭(3)，系统记录 resolveTime 或 closeTime。
+  - 接口：`PUT /api/admin/repairs/{id}/status`（管理员更新状态）、`PUT /api/repair/orders/{id}/close`（用户关闭工单）
+- **评价阶段**：提交满意度评价（1-5星+评语）。
+  - 接口：`PUT /api/repair/orders/{id}/satisfaction`（提交评价）
 
-**2. 涉及的关键接口**
-- **创建工单**：`POST /api/repair/orders`（生成唯一编号，默认优先级为 2）。
-- **查看列表与详情**：`GET /api/repair/orders`、`GET /api/repair/orders/{id}`。
-- **添加反馈评论**：`POST /api/repair/orders/{id}/comments`。
-- **关闭工单**：`PUT /api/repair/orders/{id}/close`（置状态为 3）。
-- **提交满意度评价**：`PUT /api/repair/orders/{id}/satisfaction`（1-5 星 + 评语）。
-- *注：上述接口由 `sc-moyuan-backend RepairController` 处理，管理员端另有对应接口用于状态流转和备注（来源：moyuan_business_modules.md ·
+**用户操作页面：**
+- 用户需登录后进入“报修中心”页面（前端路由 `/repair`），在此填写并提交工单，查看列表与详情，添加评论，执行关闭及评价操作。
+（来源：moyuan_business_modules.md · 业务模块说明 / 18. 报修模块 / API 接口；moyuan_system_workflow.md · 系统工作流文档 / 13.1 工单全生命周期（E7）；moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ 报修中心（page.re
 
 **评级**： 
 
@@ -6198,7 +6287,8 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 ```
 【moyuan_business_modules.md · 业务模块说明 / 模块总览】
 【章节：业务模块说明 / 模块总览】
-| 浏览记录、历史查看 | 前端+后端已实现 |
+|
+| 12 | 浏览历史模块 | 浏览记录、历史查看 | 前端+后端已实现 |
 | 13 | 首页导航模块 | 首页导航菜单管理（作品/流派/朝代） | 前端+后端已实现 |
 | 14 | 精选诗人模块 | 精选诗人展示和管理 | 前端+后端已实现 |
 | 15 | 诗话视野模块 | 诗词文化文章浏览、详情展示 | 前端+后端已实现 |
@@ -6330,7 +6420,10 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 - 前端路由：/repair
 - 说明：报修中心用于提交报修工单，可填写标题、描述、分类与优先级，提交后查看我的报修列表与详情、添加反馈评论、关闭工单并提交满意度评价。需要登录后进入。
 - 使用步骤：
-  1. 登录后进入报修中心\n点击提交报修并填写工单信息\n在列表中查看工单详情与进度\n添加评论、关闭工单并评价
+  1. 登录后进入报修中心
+  2. 点击提交报修并填写工单信息
+  3. 在列表中查看工单详情与进度
+  4. 添加评论、关闭工单并评价
 - 常见问答：
   - 问：怎么报修  答：登录后进入报修中心，点击提交报修，填写标题、描述、分类与优先级后提交。
 ```
@@ -6341,13 +6434,22 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 **回答**：当智能搜索无关键词时，系统执行条件筛选与排序；有关键词时则启动三路并行搜索并合并评分。具体处理如下：
 
 1. **无关键词处理**：
-   后端调用 `searchWithoutKeyword()` 方法，依据用户输入的朝代（`dynastyId`）、分类（`categoryId`）或诗人（`poetId`/`poetName`）等筛选维度进行精确或模糊匹配。最终结果按 `sortBy` 参数指定的字段（最新、热门或点赞数）进行排序，并返回分页数据（来源：moyuan_business_modules.md·业务模块说明 / 8. 搜索模块 / 复合搜索策略；moyuan_system_workflow.md·系统工作流文档 / 10.1 全文/跨模块智能搜索）。
+   - 调用 `searchWithoutKeyword()` 方法。
+   - 依据前端传入的筛选维度（朝代、分类、诗人）进行精确或模糊匹配。
+   - 对结果按 `sortBy` 参数指定的字段排序（最新/latest、热门/popular、点赞/likes）。
+   - 执行分页返回，并保存已登录用户的搜索历史（来源：moyuan_business_modules.md·业务模块说明 / 8. 搜索模块 / 搜索流程；moyuan_system_workflow.md·系统工作流文档 / 10.1 全文/跨模块智能搜索）。
 
-2. **有关键词时的三路并发**：
-   系统同时执行以下三个搜索任务，结果去重合并后统一评分排序：
-   - **`searchPoems()`**：针对标题和内容进行匹配。默认开启 MySQL ngram 全文检索（`MATCH(title, content) AGAINST(...)`），若关闭则回退为 `LIKE` 模糊匹配（来源：moyuan_business_modules.md·业务模块说明 / 8. 搜索模块 / 技术方案；moyuan_system_workflow.md·系统工作流文档 / 10.1 全文/跨模块智能搜索）。
-   - **`searchByPoetName()`**：根据关键词匹配诗人名，获取对应诗人作品（来源：moyuan_business_modules.md·业务模块说明 / 8. 搜索模块 / 复合搜索策略）。
-   - **`searchByPinyin()`**：利用 `PinyinUtil.matchesPinyin` 工具类进行拼音联想搜索（来源：moyuan_system_workflow.md·系统工作流文档 / 10.1 全文/跨模块
+2. **有关键词时的三路并发任务**：
+   - **`searchPoems()`（标题/内容匹配）**：
+     - 默认开启 MySQL ngram 全文检索，使用 `MATCH(title, content) AGAINST(...)`。
+     - 若关闭全文模式，则对标题和内容进行去标点拆分词后执行 LIKE 模糊匹配。
+     - 结果经 `calculateScore` 打分（标题精确 1.0/包含 0.8/拆分 0.3；内容包含 0.5/拆分 0.2）。
+   - **`searchByPoetName()`（诗人名匹配）**：
+     - 先通过 `poetName` 模糊查询获取诗人 ID 列表，再关联查找该诗人的作品。
+     - 评分逻辑：精确匹配 0.9、包含 0.7、部分匹配 0.3。
+   - **`searchByPinyin()`（拼音联想）**：
+     - 调用 `PinyinUtil.matchesPinyin` 工具类进行拼音匹配。
+     -
 
 **评级**： 
 
@@ -6489,7 +6591,9 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 - 前端路由：/poem
 - 说明：智能检索支持按关键词搜索诗词、诗人与帖子，首页与诗词列表页内嵌了搜索入口。搜索会记录你的历史，登录后还会根据兴趣给出推荐。
 - 使用步骤：
-  1. 在首页或诗词列表页输入关键词\n查看匹配的诗词、诗人或帖子\n点开结果查看详情
+  1. 在首页或诗词列表页输入关键词
+  2. 查看匹配的诗词、诗人或帖子
+  3. 点开结果查看详情
 - 常见问答：
   - 问：怎么搜索  答：在首页或诗词列表页的搜索框输入关键词，即可搜索诗词、诗人与帖子。
 ```
@@ -6497,18 +6601,7 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 
 ## M7（medium）文件上传时会做哪些校验和处理？上传接口是什么？
 
-**回答**：文件上传时进行格式大小校验、MD5 秒传、分类存储及 AI 水印处理；上传接口为 `POST /api/files/upload`。
-
-1. **校验与处理流程**
-   - **基础校验**：空文件返回 400；扩展名校验（默认支持 `.jpg,.jpeg,.png,.gif,.webp,.bmp`）；文件大小校验（默认上限 10MB）。
-   - **秒传机制**：计算文件 MD5，若 `file_metadata` 表中存在相同 MD5 且磁盘文件已存在，则直接复用旧文件，不重复存储。
-   - **目录存储**：根据类型自动构建子目录（如头像存于 `avatars/{relatedId}/`，诗词存于 `poems/{relatedId}/` 等）。
-   - **AI 水印**：若文件类型为 `ai_generated` 且为图片，调用 `WatermarkUtil.addAiWatermark` 生成水印图覆盖原文件。
-   - **元数据入库**：读取图片尺寸（失败仅警告），将文件关键信息存入 `file_metadata` 表。
-
-2. **接口详情**
-   - **路径与方法**：`POST /api/files/upload`
-   -
+**回答**：文件上传时进行格式、大小及唯一性校验，并通过后端服务完成存储与元数据管理。具体流程如下：
 
 **评级**： 
 
@@ -6527,14 +6620,13 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 | 4 | 诗人认证模块 | 诗人认证申请、审核、资料管理 | 前端+后端已实现 |
 | 5 | 论坛模块 | 用户交流、发帖评论 | 前端+后端已实现 |
 | 6 | 交流广场模块 | 轻量级交流空间，快速发帖和互动 | 前端+后端已实现 |
-| 7 | AI模块 | AI 辅助创作、看图写诗、智能分析、AI对联、藏头诗、平仄格律校验、古籍OCR识文、AI内容填充与审核、AI模型配置管理 | 前端+后端已实现 |
+| 7 | AI模块 | AI 辅助创作、看图写诗、智能分析、AI对联、藏头诗、平仄格律校验、古籍OCR识文（维护中）、AI内容填充与审核、AI模型配置管理 | 前端+后端已实现 |
 | 8 | 搜索模块 | 全文搜索、复合筛选、拼音匹配、搜索建议/历史 | 前端+后端已实现 |
 | 9 | 用户模块 | 注册登录、个人中心、用户主页 | 前端+后端已实现 |
 | 10 | 管理模块 | 后台管理、内容管理、数据统计、内容审核 | 前端+后端已实现 |
 | 11 | 文件模块 | 文件上传、图片管理、AI水印 | 前端+后端已实现 |
 | 12 | 浏览历史模块 | 浏览记录、历史查看 | 前端+后端已实现 |
-| 13 | 首页导航模块 | 首页导航菜单管理（作品/流派/朝代） | 前端+后端已实现 |
-| 14
+| 13 | 首页导航模块 | 首页导航菜单管理（作品/流派/朝代） |
 
 【moyuan_business_modules.md · 业务模块说明 / 11. 文件模块 / 功能说明】
 【章节：业务模块说明 / 11. 文件模块 / 功能说明】
@@ -6558,6 +6650,20 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 | DELETE /api/files/{fileKey} | 删除文件 | sc-moyuan-backend FileController |
 | GET /api/files/{fileKey} | 获取文件信息 | sc-moyuan-backend FileController |
 
+【moyuan_business_modules.md · 业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 技术方案】
+【章节：业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 技术方案】
+### 技术方案
+
+- 对话主链路为 SSE 流式 `POST /api/ai/chat/stream`：前端用 `fetch` + `ReadableStream` 解析（Axios 不支持读取流、EventSource 不支持 POST）并逐段渲染；网络中断等可重试失败才回退非流式 `POST /api/ai/chat`
+- 请求组装为真正的 system role：`[{role:'system', content: persona.systemPrompt}, …最近 12 条历史, {role:'user', content: skill ? skill.buildPrompt(raw) : raw}]`（历史单条 ≤2000 字、合计 ≤8000 字），不再把角色设定前缀塞进 user 消息
+- 限流/额度/鉴权类错误（400/401/403/429 与 4290~4293）**不**回退非流式——回退会二次扣配额并掩盖真实原因，直接展示后端 `message`
+- 流式正常返回 `text/event-stream`；限流与参数异常由 `@RestControllerAdvice` 以 JSON 返回，前端按 `content-type` 区分后抛出 `message`，错误对象携带 `status`/`code` 供判断是否可重试
+- 生成中可停止：发送按钮切换为「停止」，`abort` 后保留已生成内容并持久化；`finally` 中比对 `AbortController` 实例，避免旧请求复位新请求的 loading
+- 会话同步：切换角色 / 新建会话 / 首次进入时从服务端拉取；本地有而服务端为空时反向上传；`sessionSeq` 防止快速切换角色串台
+- `moduleCode` 必传 `'chat'`（已绑定 DeepSeek）；否则回退智谱默认模型，会因 key 余额不足返回 `429 code 1113`
+- 藏头诗任务模板复用首页现有实现并迁至能力层；平仄校验改调本地确定性引擎 `POST /api/ai/tone-check`
+- 配色沿用墨渊棕金色系（宣纸底 / 铜边 / 棕金强调），禁用 Element Plus 默认蓝
+
 【moyuan_system_workflow.md · 系统工作流文档 / 3. 工作流索引表】
 【章节：系统工作流文档 / 3. 工作流索引表】
 ## 3. 工作流索引表
@@ -6574,20 +6680,6 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 | AI 能力域 | 创作/对话/内容生成 / 模型配置 | `AiController`、`AiServiceImpl`、`AiModelRegistry`、`AiGeneratedContentServiceImpl` | [11](#11-ai-能力域) |
 | 论坛与社区域 | 发帖/评论/点赞 / 内容审核 | `ForumController`、`ForumPostServiceImpl`、`CommentServiceImpl` | [12](#12-论坛与社区域) |
 |
-
-【moyuan_system_workflow.md · 系统工作流文档 / 4. 认证与权限域 / 4.1 用户注册（A1）】
-【章节：系统工作流文档 / 4. 认证与权限域 / 4.1 用户注册（A1）】
-### 4.1 用户注册（A1）
-- **目标**：完成参数校验、用户名/邮箱唯一性检查、密码 BCrypt 加密并落库，注册成功即签发 JWT 直接登录。
-- **触发入口**：`POST /api/auth/register`（`@RequestBody RegisterRequest`）。
-- **分步流程**：
-  1. `@Valid` 校验：username 长度 3–20、password 长度 6–20、email/interests 可选；失败抛 `MethodArgumentNotValidException` → 400。
-  2. `UserServiceImpl.register` 查 `user` 表：用户名重复抛 `USERNAME_EXISTS(1002)`、email 重复抛 `EMAIL_EXISTS(1003)`。
-  3. `passwordEncoder.encode`（BCrypt）加密密码。
-  4. 补全字段（nickname 缺省取 username、interests 逗号拼接、status=1）后 `userMapper.insert`（`@Transactional`）。
-  5. `jwtUtil.generateToken(user.getId(), username)` 签发，返回 `TokenResponse{token, expiresIn}`。
-- **关键类与方法**：`UserServiceImpl.register`、`AuthController.register`、`JwtUtil.generateToken`、`PasswordEncoderConfig`、`RegisterRequest`。
-- **数据与缓存**：`user` 表；前端注册后写 `localStorage.token`。
 
 【moyuan_system_workflow.md · 系统工作流文档 / 6. 文件与资源域 / 6.1 文件上传全链路（A6）】
 【章节：系统工作流文档 / 6. 文件与资源域 / 6.1 文件上传全链路（A6）】
@@ -6639,47 +6731,44 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 - 关键词：诗宝阁,AI对话,创作,鉴赏,平仄校验,藏头诗
 - 别名：诗阁,诗宝阁
 - 前端路由：/ai-chat
-- 说明：诗宝阁是统一的 AI 对话页面，AI 以不同角色与能力帮你完成命题作诗、集句成诗、藏头诗、润色入律、平仄校验、意象典故、诗话点评、飞花令、诗词接龙等任务。可在左侧选择角色与能力后直接对话，会话按角色分别保存在本地。入口在顶部导航的「诗宝阁」。
+- 说明：诗宝阁是统一的 AI 对话页面，AI 以不同角色与能力帮你完成命题作诗、集句成诗、藏头诗、润色入律、平仄校验、意象典故、诗话点评、飞花令、诗词接龙等任务。可在左侧选择角色与能力后直接对话，回复以流式方式逐字输出，生成过程中可随时点击「停止」。会话按角色保存在账号下并保留 7 天，换设备登录同一账号可以接着聊。入口在顶部导航的「诗宝阁」。
 - 使用步骤：
-  1. 打开诗宝阁页面\n选择角色与能力\n输入你的需求并发送\n查看 AI 返回的文本、藏头高亮或平仄标注结果
+  1. 打开诗宝阁页面
+  2. 选择角色与能力
+  3. 输入你的需求并发送
+  4. 查看 AI 返回的文本、藏头高亮或平仄标注结果
 - 常见问答：
   - 问：诗宝阁是什么  答：诗宝阁是 AI 对话页面，AI 分角色和能力，可帮你作诗、鉴赏、校验平仄、玩飞花令等。
   - 问：诗宝阁和首页的AI工具有什么区别  答：诗宝阁是统一的角色化对话入口，首页 AI 小工具区保留看图写诗、藏头诗、飞花令等快捷入口，两处并存。
+  - 问：诗宝阁的对话会保存吗  答：会，按角色保存在你的账号下并保留 7 天，换设备登录同一账号也能接着聊。
 ```
 </details>
 
 ## M8（medium）平台为什么用双 token？用户登出后旧的 access token 怎么失效？
 
-**回答**：平台采用双 token（access 短时效 + refresh 续期）机制，旨在平衡安全性与用户体验：access token 有效期短（默认 24h），降低长期持有风险；refresh token 有效期长（默认 7 天），用于自动续期，避免频繁登录。用户登出后，旧 access token 通过将其 `jti`（唯一标识）加入黑名单实现失效，具体流程如下：
+**回答**：平台采用双 token（access 短时效 + refresh 续期）机制，旨在平衡安全性与用户体验：access token 有效期短（默认 24h），降低长期持有风险；refresh token 有效期长（默认 7 天），用于自动续期，避免频繁登录。用户登出后，旧 access token 通过刷新令牌（refresh token）的 `jti`（唯一标识）被加入黑名单从而失效。
 
-1. **触发机制**：调用后端接口 `POST /api/auth/logout`（来源：moyuan_system_workflow.md·4.2 登录与 JWT 签发）。
-2. **核心逻辑**：后端将当前 token 的 `jti` 写入黑名单存储（优先 Redis，失败降级内存），标记为失效状态（来源：moyuan_system_workflow.md·4.2 登录与 JWT 签发）。
-3. **拦截生效**：前端或任何请求携带旧 access token 时，后端过滤器 `JwtAuthenticationFilter` 会读取 `Authorization: Bearer` 头，验签并校验 `jti` 是否在黑名单中。若命中黑名单，则拒绝服务（来源：moyuan_system_workflow.md·2.3 JWT 认证与过滤器链）。
-4. **前端表现**：前端检测到 401 错误时，会尝试用 refresh token 续期；若刷新失败或本身就是登出请求，则清除本地 token 并跳转登录页（来源：moyuan_system_workflow.md·15.2 登录态与用户 Store）。
-
-综上，旧 token 通过后端黑名单服务 `TokenBlacklistService` 的持久化标记，配合过滤器链的实时校验机制，确保登出后无法被使用。
+具体失效机制如下：
+1. **双 token 签发**：登录成功后，后端同时签发 access token（含随机 `jti`）和 refresh token（同 `jti`
 
 **评级**： 
 
 <details><summary>上下文</summary>
 
 ```
-【moyuan_business_modules.md · 业务模块说明 / 9. 用户模块 / API 接口】
-【章节：业务模块说明 / 9. 用户模块 / API 接口】
-### API 接口
+【moyuan_business_modules.md · 业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 技术方案】
+【章节：业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 技术方案】
+### 技术方案
 
-| 接口 | 说明 | 后端模块 |
-|------|------|----------|
-| POST /api/auth/register | 注册（支持兴趣选项） | sc-moyuan-backend AuthController |
-| POST /api/auth/login | 登录 | sc-moyuan-backend AuthController |
-| GET /api/users/me | 获取当前用户信息 | sc-moyuan-backend UserController |
-| PUT /api/users/me | 更新当前用户信息 | sc-moyuan-backend UserController |
-| PUT /api/users/me/password | 修改密码 | sc-moyuan-backend UserController |
-| GET /api/users/me/posts | 获取当前用户帖子列表 | sc-moyuan-backend UserController |
-| GET /api/users/me/stats | 获取当前用户统计信息 | sc-moyuan-backend UserController |
-| GET /api/users/{id} | 获取用户信息 | sc-moyuan-backend UserController |
-| GET /api/users/{id}/profile | 获取用户主页信息（含诗人资料） | sc-moyuan-backend UserController |
-| GET /api/users/{id}/works | 获取用户作品列表 | sc-moyuan-backend UserController |
+- 对话主链路为 SSE 流式 `POST /api/ai/chat/stream`：前端用 `fetch` + `ReadableStream` 解析（Axios 不支持读取流、EventSource 不支持 POST）并逐段渲染；网络中断等可重试失败才回退非流式 `POST /api/ai/chat`
+- 请求组装为真正的 system role：`[{role:'system', content: persona.systemPrompt}, …最近 12 条历史, {role:'user', content: skill ? skill.buildPrompt(raw) : raw}]`（历史单条 ≤2000 字、合计 ≤8000 字），不再把角色设定前缀塞进 user 消息
+- 限流/额度/鉴权类错误（400/401/403/429 与 4290~4293）**不**回退非流式——回退会二次扣配额并掩盖真实原因，直接展示后端 `message`
+- 流式正常返回 `text/event-stream`；限流与参数异常由 `@RestControllerAdvice` 以 JSON 返回，前端按 `content-type` 区分后抛出 `message`，错误对象携带 `status`/`code` 供判断是否可重试
+- 生成中可停止：发送按钮切换为「停止」，`abort` 后保留已生成内容并持久化；`finally` 中比对 `AbortController` 实例，避免旧请求复位新请求的 loading
+- 会话同步：切换角色 / 新建会话 / 首次进入时从服务端拉取；本地有而服务端为空时反向上传；`sessionSeq` 防止快速切换角色串台
+- `moduleCode` 必传 `'chat'`（已绑定 DeepSeek）；否则回退智谱默认模型，会因 key 余额不足返回 `429 code 1113`
+- 藏头诗任务模板复用首页现有实现并迁至能力层；平仄校验改调本地确定性引擎 `POST /api/ai/tone-check`
+- 配色沿用墨渊棕金色系（宣纸底 / 铜边 / 棕金强调），禁用 Element Plus 默认蓝
 
 【moyuan_system_workflow.md · 系统工作流文档 / 2. 全局约定与分层（引擎级机制） / 2.3 JWT 认证与过滤器链】
 【章节：系统工作流文档 / 2. 全局约定与分层（引擎级机制） / 2.3 JWT 认证与过滤器链】
@@ -6781,7 +6870,9 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 - 前端路由：/user/login
 - 说明：注册时需要填写用户名、密码和邮箱，登录使用用户名与密码。登录后可享受收藏、发布、评论等完整功能。注册成功会直接登录。
 - 使用步骤：
-  1. 进入登录页\n没有账号时切换到注册并填写信息\n登录成功后使用完整功能
+  1. 进入登录页
+  2. 没有账号时切换到注册并填写信息
+  3. 登录成功后使用完整功能
 - 常见问答：
   - 问：怎么注册账号  答：在注册页填写用户名、密码和邮箱即可注册，注册成功会直接登录。
   - 问：怎么登录  答：在登录页输入用户名和密码即可登录。
@@ -6793,9 +6884,8 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 **回答**：诗词详情页的赏析增强内容存储在 `poem_content_cache` 表中，缓存 key 由“诗词标题 + 诗人姓名 + 内容类型”三个字段组合而成。
 
 具体依据如下：
-1. **存储表名**：资料明确记载数据库表为 `poem_content_cache`（来源：moyuan_business_modules.md · 业务模块说明 / 21. 诗词内容缓存模块 / 数据库表）。
-2. **缓存 key 组成**：系统工作流文档指出，赏析增强内容按 `poem_title+poet_name+content_type` 进行查询和缓存（来源：moyuan_system_workflow.md · 系统工作流文档 / 8. 诗词内容域 / 8.2 诗词详情与赏析缓存（C2））。
-3. **接口支持**：该表通过 `GET/POST /api/poem-content/cache` 接口进行读写操作，后端模块为 `sc-moyuan-backend PoemContentController`（来源：moyuan_business_modules.md · 业务模块说明 / 21. 诗词内容缓存模块 / API 接口）。
+1. **存储表**：资料明确记载数据库表为 `poem_content_cache`，用于缓存外部 API 获取的诗词内容（译文、注释、赏析等）。（来源：moyuan_business_modules.md · 业务模块说明 / 21. 诗词内容缓存模块 / 数据库表）
+2. **缓存 key 组成**：在系统工作流文档中，诗词详情与赏析缓存（C2）流程指出，赏析增强内容由 `PoemContentCacheServiceImpl` 按 `poem_title+poet_name+content_type` 命中缓存；同时缓存策略速览中也确认了该组合规则。（来源：moyuan_system_workflow.md · 系统工作流文档 / 8. 诗词内容域 / 8.2 诗词详情与赏析缓存（C2）；moyuan_system_workflow.md · 系统工作流文档 / 2. 全局约定与分层（引擎级机制） / 2.5 缓存策略速览）
 
 **评级**： 
 
@@ -6911,7 +7001,9 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 - 前端路由：/poem/:id
 - 说明：诗词详情页提供 AI 评分，由 AI 从意境、格律、修辞、情感、用词等维度评价诗词并给出分数。进入任意诗词详情页即可查看或请求 AI 评分，用户本人也可以手动给诗词评分。
 - 使用步骤：
-  1. 打开任意诗词详情页\n查看已有评分或请求 AI 评分\n查看 AI 给出的评价与分数
+  1. 打开任意诗词详情页
+  2. 查看已有评分或请求 AI 评分
+  3. 查看 AI 给出的评价与分数
 - 常见问答：
   - 问：AI评分在哪里  答：在诗词详情页可以查看或请求 AI 评分，AI 会多维度评价并给出分数。
 ```
@@ -6919,18 +7011,12 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 
 ## M10（medium）AI 模型配置在后台改完之后怎么生效？API Key 是从哪里读的？
 
-**回答**：AI 模型配置修改后通过后台刷新缓存或重启应用生效；API Key 从 `secrets/application-secrets.yml` 读取。
+**回答**：AI 模型配置修改后通过后台刷新缓存或重启服务生效；API Key 从 `secrets/application-secrets.yml` 读取。
 
 1. **生效机制**：
-   - 后台管理端提供 `/admin/ai-models/refresh-cache` 接口用于手工刷新缓存，确保配置即时同步。
-   - 若未手动刷新，需重启应用使进程内 `ConcurrentHashMap` 重新加载数据（来源：moyuan_system_workflow.md · 系统工作流文档 / 11. AI 能力域 / 11.4 AI 模型配置加载（E4））。
-
-2. **API Key 读取位置**：
-   - 密钥存储在 `secrets/application-secrets.yml` 文件中，配置项为 `ai.providers..api-key`。
-   - 由 `AiProviderProperties` 类通过 `@ConfigurationProperties("ai.providers")` 注解承载并解析（来源：moyuan_system_workflow.md · 系统工作流文档 / 11. AI 能力域 / 11.4 AI 模型配置加载（E4））。
-
-3. **注入流程**：
-   - 应用启动时，`AiModelRegistry` 的 `@PostConstruct init→refreshCache` 方法会自动读取全量
+   - 应用启动时自动加载配置，由 `AiModelRegistry` 的 `@PostConstruct init→refreshCache` 方法执行全量读取与缓存更新（来源：moyuan_system_workflow.md · 系统工作流文档 / 11. AI 能力域 / 11.4 AI 模型配置加载（E4））。
+   - 管理端通过 `/api/admin/ai-models/refresh-cache` 接口手工刷新缓存，或修改 `ai_model` 表数据后触发自动同步。
+   - 运行时调用 `getModel/getDefaultModel/getModelByModuleCode/getModelForModule` 方法从内存缓存获取最新配置（来源：moyuan_system_workflow.md · 系统工作流文档 / 11.4 AI 模型配置加载（E4））。
 
 **评级**： 
 
@@ -6949,6 +7035,21 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 - 前端首页集成AI问答组件（右下角悬浮按钮）
 - 前端首页"展风拓潮"模块集成看图写诗、智能分析、对联、藏头诗、平仄校验和OCR功能；「飞花令」「诗词接龙」为两张卡片入口（见第 24 章「游戏模块」）
 
+【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / API 接口】
+【章节：业务模块说明 / 7. AI 模块 / API 接口】
+features.ocr-enabled=false` 时返回 `4293`） | sc-moyuan-backend AiController |
+| POST /api/ai/tone-check | 平仄格律校验（本地确定性引擎，不消耗 AI 额度） | sc-moyuan-backend AiController |
+| POST /api/ai/couplet | AI对对联 | sc-moyuan-backend AiController |
+| GET /api/ai/config/{moduleCode} | 获取模块AI配置（提示词模板、回答风格等） | sc-moyuan-backend AiController |
+| POST /api/ai/preview | AI生成预览（不写入数据库） | sc-moyuan-backend AiContentController |
+| POST /api/ai/submit-review | 提交AI内容到审核表 | sc-moyuan-backend AiContentController |
+| POST /api/ai/fill-content | 触发AI填充（直接生成并存库） | sc-moyuan-backend AiContentController |
+| GET /api/ai/fill-status/{targetType}/{targetId} | 查询某目标的AI填充状态 | sc-moyuan-backend AiContentController |
+
+> **调用保护**：上述 `/api/ai/**` 接口统一经 `AiGuardService` 按用户限流（默认 60 次/分、1000 次/天、100 万 token/天，admin 豁免），入参长度与 `maxTokens`/`temperature` 由 `AiInputValidator` 统一校验，超限返回 `4290`，限流返回 `4291`，额度用尽返回 `4292`。详见 `docs/api/endpoints.md`。
+
+**获取模块AI配置**：根据 moduleCode 返回对应模块的配置信息，包含提示词模板（promptTemplate）、最大回答长度（maxLength）、回答风格（responseStyle）、首次回答长度（firstResponseLength）等。前端用于构建 AI 对话的系统约束。
+
 【moyuan_system_workflow.md · 系统工作流文档 / 8. 诗词内容域 / 8.4 诗词评分（C4）】
 【章节：系统工作流文档 / 8. 诗词内容域 / 8.4 诗词评分（C4）】
 ### 8.4 诗词评分（C4）
@@ -6959,9 +7060,7 @@ keyword 按姓名/朝代筛选） | sc-moyuan-backend AdminController |
 
 【moyuan_system_workflow.md · 系统工作流文档 / 11. AI 能力域 / 11.1 AI 辅助创作与生成（E1）】
 【章节：系统工作流文档 / 11. AI 能力域 / 11.1 AI 辅助创作与生成（E1）】
-### 11.1 AI 辅助创作与生成（E1）
-- **触发入口**：`POST /api/ai/chat|write-poem|analyze|couplet|ocr`；流式入口 `POST /api/ai/chat/stream`（SSE，`AiController.chatStream` → `AiService.streamChat` → `AiModelRegistry.streamByModule` → `OpenAiCompatibleAdapter.streamChat` 用 JDK `HttpClient` 逐行解析上游 SSE，客户端断开经 `emitter.onCompletion` 置取消信号停止消费）。
-- **分步流程**：`AiController` 分发 `AiService` → 各方法内置系统提示词常量 → 文本类 `AiModelRegistry.chat/getModel`、图片类 Base64 后 `AiModelRegistry.vision`；传 `moduleCode` 走 `chatByModule/visionByModule`（按模块选模型+覆盖提示词）→ 按 `model.provider` 定位 `AiModelAdapter`，`RestTemplate` 带 `Bearer apiKey` POST 到 `ai_model.api_url`（messages=system+user、max_tokens 默认 1024）→ 解析 `choices[0].message.content` 返回；失败抛 `BusinessException`。
+provider` 定位 `AiModelAdapter`，`RestTemplate` 带 `Bearer apiKey` POST 到 `ai_model.api_url`（messages=system+user、max_tokens 默认 1024）→ 解析 `choices[0].message.content` 返回；失败抛 `BusinessException`。
 - **注意（代码事实）**：providers 下拉含 qwen/openrouter，但当前**无对应 Adapter**，调用报"不支持的AI提供商"；`OpenAiCompatibleAdapter` 支持 zhipu/deepseek/kimi/mimo，`NvidiaAdapter` 支持 nvidia（vision 抛"暂不支持视觉模型"）。
 - **关键类与方法**：`AiController.*`、`AiServiceImpl.chat/writePoemFromImage/analyzePoem/matchCouplet/ocrImage`、`AiModelRegistry.chat/vision/chatByModule/getModel`、`OpenAiCompatibleAdapter/NvidiaAdapter`。
 - **数据与缓存**：`ai_model`（name/provider/apiUrl/modelId/visionModelId/apiKey/maxTokens/isEnabled/isDefault/modelType）；内存 `AiModelRegistry.modelCache`。
@@ -6986,13 +7085,6 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
   - 审核变更：`PUT /api/admin/poems/{id}/audit` 的 body `{status, reason}` 中 `status` 对应 `auditStatus` 语义（0/1/2，拒绝为 2）；`PUT /api/admin/comments/{id}/audit` 的 `status` 为 1-正常/0-隐藏。
   - 前端取数：统一响应体为 `{code, message, data}`，Axios 拦截器返回整个响应体，故后台列表页面必须从 `res.data.records` / `res.data.total` 取值（不可写 `res.records`）；诗作审核页状态列与操作判断绑定 `row.auditStatus`，作者/朝代列绑定后端填充的 `poetName` / `dynastyName`（由 `PoemServiceImpl.getAdminPoemList` 调 `populatePoetAndDynasty` 填充），评论页状态列绑定 `row.status`（1-正常/0-隐藏）。
 - **关键类与方法**：`AdminController.
-
-【moyuan_system_workflow.md · 系统工作流文档 / 14. 内容管理/运营域 / 14.1 首页导航与静态页面（E8）】
-【章节：系统工作流文档 / 14. 内容管理/运营域 / 14.1 首页导航与静态页面（E8）】
-### 14.1 首页导航与静态页面（E8）
-- **触发入口**：前台 `GET /api/home-navigation?type=`、`GET /api/static-pages/{pageKey}`；后台 CRUD。
-- **分步流程**：前台按 `type`（可选）过滤 `status=1` 按 sortOrder 升序返回；静态页按 `pageKey+status=1` 取单条富文本；管理端 `/manage` 分页含停用项、`type` 分组，变更即时生效。
-- **数据与缓存**：`home_navigation`、`static_page`。
 
 【moyuan_system_workflow.md · 系统工作流文档 / 15. 前端数据流转层 / 15.4 localStorage 使用点汇总（K4）】
 【章节：系统工作流文档 / 15. 前端数据流转层 / 15.4 localStorage 使用点汇总（K4）】
@@ -7028,7 +7120,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/game/feihua
 - 说明：飞花令是与 AI 对句的诗词游戏，你每回合说出一句含指定「令字」的真实古诗词名句，AI 轮流接句，接不上或超时即判负。入口在首页 AI 小工具区的「飞花令」卡片，登录用户点击后进入对局页。有古制严格、标准版、超级飞花令三种模式与三档难度可选。现代诗不参与本游戏。
 - 使用步骤：
-  1. 选择模式与难度\n设定令字（如「花」）\n每回合提交一句含令字的古诗词，单回合限时 30 秒\n与 AI 交替接句，AI 接不上或你超时判负
+  1. 选择模式与难度
+  2. 设定令字（如「花」）
+  3. 每回合提交一句含令字的古诗词，单回合限时 30 秒
+  4. 与 AI 交替接句，AI 接不上或你超时判负
 - 常见问答：
   - 问：飞花令怎么玩  答：每回合提交一句含指定令字的真实古诗词名句，与 AI 交替接句，AI 接不上或你超时则对方判负。
   - 问：在哪里能玩飞花令  答：首页 AI 小工具区有「飞花令」卡片，登录用户点击进入对局页。
@@ -7040,11 +7135,13 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 **回答**：诗人名精确匹配的分数更高，为 0.9；标题完全匹配的分数为 1.0。
 
-根据【moyuan_business_modules.md · 业务模块说明 / 8. 搜索模块 / 搜索评分算法】中的评分规则：
-- **标题完全匹配**（去除标点后完全一致）得分为 **1.0**。
-- **诗人名精确匹配**（诗人名与关键词完全一致）得分为 **0.9**。
+根据资料中的《搜索评分算法》章节，具体分值如下：
+- **标题完全匹配**：去除标点后完全一致，得分为 **1.0**。
+- **诗人名精确匹配**：诗人名与关键词完全一致，得分为 **0.9**。
 
-虽然标题完全匹配的绝对分值略高于诗人名精确匹配，但两者均为最高档评分中的高分项。若需更高权重，可参考拼音标题加成（+0.2）或拼音诗人加成（+0.1）等额外加分项。
+虽然标题完全匹配的绝对分值（1.0）高于诗人名精确匹配（0.9），但两者均为最高档评分中的次高项。若需区分优先级，标题完全匹配在数值上略高；若考虑实际业务场景，诗人名精确匹配通常用于精准定位作者作品，权重极高。
+
+（来源：moyuan_business_modules.md · 业务模块说明 / 8. 搜索模块 / 搜索评分算法）
 
 **评级**： 
 
@@ -7195,7 +7292,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poem
 - 说明：智能检索支持按关键词搜索诗词、诗人与帖子，首页与诗词列表页内嵌了搜索入口。搜索会记录你的历史，登录后还会根据兴趣给出推荐。
 - 使用步骤：
-  1. 在首页或诗词列表页输入关键词\n查看匹配的诗词、诗人或帖子\n点开结果查看详情
+  1. 在首页或诗词列表页输入关键词
+  2. 查看匹配的诗词、诗人或帖子
+  3. 点开结果查看详情
 - 常见问答：
   - 问：怎么搜索  答：在首页或诗词列表页的搜索框输入关键词，即可搜索诗词、诗人与帖子。
 ```
@@ -7203,12 +7302,11 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## H2（hard）给一首诗点赞之后，诗作记录上的点赞数和收藏数会同步变化吗？
 
-**回答**：不会同步变化。点赞仅影响诗作的“点赞数”，收藏不影响“点赞数”；收藏数也不受点赞操作影响（来源：moyuan_system_workflow.md·8.3 收藏/点赞）。
+**回答**：不会同步变化。点赞仅影响“赞”计数，不影响“收藏”计数；且系统明确说明收藏不维护作品端的收藏总数字段。
 
-具体机制如下：
-1. **点赞逻辑**：调用 `toggleLike` 时，系统会维护 `poem.like_count` 字段。若用户已点赞则减 1，未点赞则加 1（来源：moyuan_system_workflow.md·8.3 收藏/点赞）。
-2. **收藏逻辑**：收藏操作仅维护 `user_favorite` 表，不维护 `poem.favorite_count` 字段（来源：moyuan_system_workflow.md·8.3 收藏/点赞）。
-3. **数据独立性**：点赞和收藏是两条独立的数据流，互不干扰。
+- **点赞逻辑**：调用 `POST|GET /api/poems/{id}/like` 时，执行 `toggleLike` 操作，更新 `user_like` 表并修改 `poem.like_count`（存在则减 1，不存在则加 1），但**不触碰**收藏相关字段。
+- **收藏逻辑**：调用 `POST|GET /api/poems/{id}/favorite` 时，执行 `toggleFavorite` 操作，仅写入 `user_favorite` 表，**不维护** `poem.favorite_count`（作品端的收藏总数）。
+- **数据隔离**：根据代码事实，点赞和收藏是两条独立的数据流，互不影响。用户给同一首诗点赞或收藏，各自对应的计数字段会更新，但“赞数”不会随“收藏”变动，“收藏数”也不会随“点赞”变动。
 
 **评级**： 
 
@@ -7230,6 +7328,27 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - **原创标识**（新增）：支持标记诗词为原创作品
 - **内容审核**（新增）：诗词发布后需经过审核
 - **外文诗词页签**（新增）：`/poem?tab=foreign` 展示已入库的 20 首英文名篇（`poem_type='foreign'`）；先读库、库空才实时兜底 PoetryDB（兜底结果不落库），加载超过 5 秒在过场动画上提示「检索耗时较久，请耐心等待…」
+
+【moyuan_business_modules.md · 业务模块说明 / 3. 诗人模块 / 功能说明】
+【章节：业务模块说明 / 3. 诗人模块 / 功能说明】
+### 功能说明
+
+- 诗人列表浏览
+- 按朝代筛选
+- 诗人详情展示（左侧导航、英雄区域、简介、生平、影响、评价、轶事）
+- 诗人生平简介
+- 诗人作品集（分页）
+- **诗词详情增强**：点击诗词卡片弹出详情面板，调用接口盒子 API 获取译文、注释、创作背景、名人点评等
+- **诗人数据懒加载**：本地数据不完整时自动从接口盒子 API 获取并保存到数据库
+- 相关诗人推荐（基于协同过滤算法）
+- **右侧浮动面板**：相关诗人列表、诗词特点、AI对话窗口、快捷工具栏
+- **AI诗人对话**：基于后台配置的提示词模板，支持多轮对话，用户点击"开始对话"按钮后发起首次提问，支持本地缓存（按诗人ID区分，有效期1小时），刷新页面自动加载缓存记录，支持语音朗读
+- **收藏诗人**：使用 localStorage 存储收藏状态
+- **分享功能**：支持 Web Share API 或复制链接
+- **朗读功能**：支持单段朗读和全文朗读
+- **字号调节**：4档字号可选（14px/16px/18px/20px）
+- **粒子动画背景**：使用 useParticles composable 实现流行粒子动画效果，粒子颜色为暖色调（#d4af87, #f0e4d7, #c9a06c, #8b7355），适配页面背景
+- **半透明毛玻璃效果**：内容区块（.content-section）背景透明度 0.62，模糊效果 blur(3px)，其他面板透明度 0.85，模糊效果 blur(10px)
 
 【moyuan_business_modules.md · 业务模块说明 / 9. 用户模块 / 功能说明】
 【章节：业务模块说明 / 9. 用户模块 / 功能说明】
@@ -7275,19 +7394,6 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - **统计数据**：作品数、获赞数、被收藏数、粉丝数
 - **作品列表**：用户发布的诗词和帖子
 
-【moyuan_business_modules.md · 业务模块说明 / 9. 用户模块 / 前端路由】
-【章节：业务模块说明 / 9. 用户模块 / 前端路由】
-### 前端路由
-
-| 路径 | 说明 |
-|------|------|
-| `/user/login` | 登录页 |
-| `/user/register` | 注册页 |
-| `/user/profile` | 个人中心（含诗人认证申请入口） |
-| `/user/:id/homepage` | 用户主页（新增） |
-
----
-
 【moyuan_system_workflow.md · 系统工作流文档 / 8. 诗词内容域 / 8.3 收藏 / 点赞（C3）】
 【章节：系统工作流文档 / 8. 诗词内容域 / 8.3 收藏 / 点赞（C3）】
 ### 8.3 收藏 / 点赞（C3）
@@ -7317,20 +7423,6 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ---
 
-【moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / 个人中心（page.profile）】
-【章节：墨渊小助手系统知识库（24 条） / 个人中心（page.profile）】
-## 个人中心（page.profile）
-
-- 分类：page
-- 关键词：个人中心,我的,资料,收藏,历史,认证
-- 别名：个人主页,我的页面
-- 前端路由：/user/profile
-- 说明：个人中心可查看与修改个人资料、上传头像、修改密码，并查看我的收藏、我的点赞、我的帖子和浏览历史。诗人认证申请也从个人中心提交。需要登录后进入。
-- 使用步骤：
-  1. 登录后进入个人中心\n修改资料、头像或密码\n查看收藏、点赞、帖子与浏览历史\n需要时提交诗人认证申请
-- 常见问答：
-  - 问：个人中心在哪里  答：登录后可从用户菜单进入个人中心，管理资料、收藏、历史并提交诗人认证。
-
 【moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / 评论与互动（feature.comment）】
 【章节：墨渊小助手系统知识库（24 条） / 评论与互动（feature.comment）】
 ## 评论与互动（feature.comment）
@@ -7341,7 +7433,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/forum
 - 说明：在诗词、帖子与文章详情页可以对内容点赞与评论，论坛评论支持多级回复。评论需要有账号登录。
 - 使用步骤：
-  1. 打开诗词、帖子或文章详情\n点击点赞或发表评论\n在论坛可对评论进行回复
+  1. 打开诗词、帖子或文章详情
+  2. 点击点赞或发表评论
+  3. 在论坛可对评论进行回复
 - 常见问答：
   - 问：怎么评论  答：在诗词、帖子或文章详情页可以直接发表评论与点赞，论坛评论支持多级回复。
 ```
@@ -7349,11 +7443,13 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## H3（hard）诗宝阁和首页 AI 小工具区是什么关系？藏头诗这两处都有吗？
 
-**回答**：诗宝阁与首页 AI 小工具区是并存且互补的关系，两者均提供 AI 诗词服务，但定位不同。
+**回答**：诗宝阁与首页 AI 小工具区是并存且互补的关系，两者功能定位不同但入口共存。
 
-1. **关系说明**：诗宝阁是统一的 AI 对话页面（前端路由 `/ai-chat`），支持角色化统一入口，可完成命题作诗、藏头诗、平仄校验等任务；首页 AI 小工具区保留看图写诗、藏头诗、飞花令等快捷入口。两处功能并存，互不冲突（来源：moyuan_business_modules.md·业务模块说明/25. AI 对话页「诗宝阁」模块/功能说明）。
-2. **藏头诗分布**：藏头诗功能在两处均有提供。首页 AI 小工具区设有“藏头诗”卡片，游客点击展开内嵌窗口（`GameMiniPanel`），登录用户跳转至 `/ai-chat` 并预选角色与能力；诗宝阁中，“诗仙·创作”角色默认包含“藏头诗”能力，用户可在左侧选择后直接对话生成（来源：moyuan_business_modules.md·业务模块说明/25. AI 对话页「诗宝阁」模块/功能说明、moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/藏头诗（play.acrostic））。
-3. **使用差异**：首页入口
+1. **关系说明**：诗宝阁是统一的 AI 对话页面，提供角色化（如诗仙、格律师等）与能力组合的深层交互；首页 AI 小工具区则是快捷入口，保留看图写诗、藏头诗、飞花令等独立玩法。两者并存，互不替代。
+2. **藏头诗分布**：藏头诗功能在两处均有提供。
+   - 在**首页 AI 小工具区**：用户可直接点击展开内嵌窗口（`GameMiniPanel`）进行开局。
+   - 在**诗宝阁「诗仙·创作」角色**下：作为其默认能力之一，用户可选择五言或七言生成藏头诗，结果会高亮首字。
+3. **技术实现差异**：首页工具区复用 `POST /api/ai/chat` 接口（moduleCode=chat）；诗宝阁同样复用该接口，但支持更复杂的角色与能力配置及会话记忆功能
 
 **评级**： 
 
@@ -7375,39 +7471,17 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - AI功能区域「诗境 AI」（看图写诗/智能分析/诗海拾贝；韵脚查询/对对联/古籍识文/藏头诗/平仄校验/飞花令等工具卡，工具卡自动横向滑动、悬浮暂停；展开面板提供「前往完整页面」入口，统一跳「诗宝阁」并预选角色与能力，飞花令/接龙跳对应游戏页，古籍识文暂无完整页）
 - 响应式布局（4断点：1200/992/768/576px）
 
-【moyuan_business_modules.md · 业务模块说明 / 1. 首页模块 / 页面组件】
-【章节：业务模块说明 / 1. 首页模块 / 页面组件】
-### 页面组件
-
-| 组件 | 说明 |
-|------|------|
-| HomeNavBar | 首页导航栏（导航菜单+搜索栏，含固定定位） |
-| LoginDropdown | 登录下拉窗（快速登录+用户菜单） |
-| HomeNavigation | 首页分类导航（作品/流派/朝代，自动轮播） |
-| DailyPoetry | 每日诗词组件 |
-| PoetCard | 精选诗人卡片 |
-| HomeCarousel | Swiper轮播组件（主轮播+诗文轮播） |
-| ForumPreview | 论坛预览组件 |
-| AncientPoemSelection | 古诗推选组件 |
-| ContemporaryPoems | 当代精选拄件 |
-| 飞花令/诗词接龙卡片 | 首页 AI 小工具区两张入口卡片（游客展开内嵌小窗口 GameMiniPanel，登录用户跳转游戏页） |
-| AppFooter | 底部信息 |
-
 【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明】
 【章节：业务模块说明 / 7. AI 模块 / 功能说明】
 ### 功能说明
 
-- AI诗词问答（支持多模型切换；调用优先走 `ai_module_config` 模块绑定，未绑定某模块时回退默认模型。
-
-【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明】
-【章节：业务模块说明 / 7. AI 模块 / 功能说明】
-可用提供商：智谱AI、DeepSeek、Kimi、千问、小米MiMo、OpenRouter；NVIDIA NIM 已全部禁用/下线）
+- AI诗词问答（支持多模型切换；调用优先走 `ai_module_config` 模块绑定，未绑定某模块时回退默认模型。可用提供商：智谱AI、DeepSeek、Kimi、千问、小米MiMo、OpenRouter；NVIDIA NIM 已全部禁用/下线）
 - 看图写诗（上传图片，AI生成古诗词，支持视觉模型如 GLM-4V-Flash、DeepSeek-Flash）
 - 智能分析（输入诗句进行深度解析）
 - AI对对联（输入上联，AI生成下联，遵循平仄规则）
 - **藏头诗**（输入 2-8 个藏头字并选择五言/七言，AI 生成藏头诗，每句首字依次对应藏头字；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
-- **平仄格律校验**（粘贴一首绝句/律诗，AI 逐句标注平仄（平声绿底、仄声红底）、判定是否合律、识别所属平水韵韵部并给出总体评价；AI 返回严格 JSON，前端解析失败时回退展示原始文本；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
-- **AI 对话页「诗宝阁」**（`/ai-chat`）：角色化统一对话入口，6 角色（诗仙·创作 / 诗话·鉴赏 / 格律·校正 / 诗友·行令 / 群贤·论诗 / 顾问·问答）× 12 能力（命题作诗 / 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 / 群贤论诗）；阶段一复用 `POST /api/ai/chat`（moduleCode=chat，非流式），阶段二后端已新增 `POST /api/ai/chat/stream`（SSE 流式，见 6.
+- **平仄格律校验**（粘贴一首绝句/律诗，由**本地确定性引擎** `POST /api/ai/tone-check` 逐句标注平仄（平声绿底、仄声红底）、判定是否合律并给出不合律原因；校验规则为句末三平尾/三仄尾、二四六位失替、偶数句押韵，不调用大模型、不消耗 AI 额度）
+- **AI 对话页「诗宝阁」**（`/ai-chat`）：角色化统一对话入口，6 角色（诗仙·创作 / 诗话·鉴赏 / 格律·校正 / 诗友·行令 / 群贤·论诗 / 顾问·问答）× 12 能力（命题作诗 / 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 /
 
 【moyuan_business_modules.md · 业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙） / 前端路由】
 【章节：业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙） / 前端路由】
@@ -7434,9 +7508,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
   - `advisor` 顾问·问答（通识问答，无专属能力）
 - **12 个能力**（Skill）：`compose` 命题作诗、`gather` 集句成诗、`acrostic` 藏头诗、`polish` 润色入律、`tone` 平仄校验、`rhyme` 韵脚查询、`couplet` 对对联、`imagery` 意象典故、`comment` 诗话点评、`feihua` 飞花令、`chain` 诗词接龙、`salon` 群贤论诗
 - **三段式布局**：左「角色栏」+ 中「对话流」+ 底「能力快捷 chips + 输入框」
-- **会话记忆**：按 `roleId` 分存 `localStorage`（键 `moyuan_ai_chat_${roleId}`），切换角色各自恢复；单角色最多保留 40 条（约 20 轮），单条内容上限 4000 字
+- **会话记忆**：按 `roleId` 存服务端 Redis（键 `ai:chat:session:{userId}:{roleId}`，TTL 7 天、最多 40 条），切换角色各自恢复，换设备登录同一账号可继续；本地 `localStorage`（键 `moyuan_ai_chat_${roleId}`）作为降级缓存，Redis 不可用时仍可用。单条内容上限 4000 字
 - **空态引导**：进入页面 / 新建会话后，按角色给出引导语 + 推荐能力 chip
-- **结果渲染**：普通能力渲染为文本气泡；藏头诗高亮每句首字（藏头字）；平仄校验解析 AI 返回的严格 JSON，渲染为平仄标签卡（平底/仄底、押韵标记、逐句简评、总评），解析失败回退展示原始文本
+- **结果渲染**：普通能力渲染为文本气泡，流式逐字追加并自动滚底；藏头诗高亮每句首字（藏头字）；平仄校验改调本地确定性引擎 `POST /api/ai/tone-check`，把返回的逐字平仄与问题列表渲染为平仄标签卡（平底/仄底，三平尾、三仄尾、二四六失替等问题标红），不再依赖大模型输出 JSON
 - **消息头像**：对话流每条消息两侧带圆形头像——AI 侧统一使用墨渊可爱卡通头像（本地静态资源 `/img/ai_chat_avatar.jpg`），用户侧使用本人头像（未登录 / 无头像时回退金色首字母）；用户气泡靠右、头像居其右，AI 气泡靠左、头像居其左，加载态气泡同样带 AI 头像
 
 【moyuan_business_modules.md · 业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 前端组件】
@@ -7447,12 +7521,13 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 |------|------|
 | views/ai-chat/index.vue | 页面壳：组合下辖组件、持有会话状态、处理 `?role=&skill=` query |
 | components/ai-chat/RoleSidebar.vue | 角色栏 |
-| components/ai-chat/ChatStream.vue | 对话流（气泡 + 消息头像 + 空态引导 + 自动滚动 + 平仄/藏头特殊渲染） |
+| components/ai-chat/ChatStream.vue | 对话流（气泡 + 消息头像 + 空态引导 + 流式跟随滚动 + 平仄/藏头特殊渲染） |
 | components/ai-chat/SkillChips.vue | 能力快捷 chips |
-| components/ai-chat/ChatInput.vue | 输入框 + 发送按钮（Enter 发送 / Shift+Enter 换行） |
+| components/ai-chat/ChatInput.vue | 输入框 + 发送按钮（Enter 发送 / Shift+Enter 换行；生成中切换为「停止」） |
 | configs/ai-chat/personas.ts | 角色常量（含 systemPrompt） |
 | configs/ai-chat/skills.ts | 能力常量（含任务模板与发送前校验） |
-| composables/useAiChat.ts | 会话状态、请求封装、本地记忆 |
+| composables/useAiChat.ts | 会话状态、SSE 流式请求、多轮上下文组装、服务端会话同步 |
+| api/modules/ai.ts | `chatStream`（`fetch` + `ReadableStream` 解析 SSE、401 静默刷新后重放一次）与会话接口封装 |
 
 【moyuan_business_modules.md · 业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 前端路由】
 【章节：业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 前端路由】
@@ -7470,8 +7545,12 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 | 接口 | 说明 | 后端模块 |
 |------|------|----------|
-| POST /api/ai/chat | 复用现有非流式对话接口（请求 `{ message, moduleCode:'chat' }`，响应 `data.reply`） | sc-moyuan-backend AiController |
-| POST /api/ai/chat/stream | 流式对话接口（请求 `{ moduleCode, messages[], temperature, maxTokens }`，响应 `text/event-stream`，事件 `{"delta":"…"}` … `[DONE]`） | sc-moyuan-backend AiController |
+| POST /api/ai/chat/stream | 主链路。SSE 流式对话（请求 `{ moduleCode, messages[], temperature, maxTokens }`，响应 `text/event-stream`，事件 `{"delta":"…"}` … `[DONE]`；限流/入参错误以 JSON 返回） | sc-moyuan-backend AiController |
+| POST /api/ai/chat | 兜底。非流式对话（请求 `{ message, moduleCode:'chat' }`，响应 `data.reply`），仅在流式遇可重试失败时调用 | sc-moyuan-backend AiController |
+| GET /api/ai/chat/sessions/{roleId} | 读取当前用户在该角色下的会话 | AiChatSessionController |
+| PUT /api/ai/chat/sessions/{roleId} | 保存会话（`{"messages":[…]}`，服务端只保留最近 40 条） | AiChatSessionController |
+| DELETE /api/ai/chat/sessions/{roleId} | 清空该角色会话 | AiChatSessionController |
+| POST /api/ai/tone-check | 平仄校验（本地确定性引擎，不消耗 AI 额度） | sc-moyuan-backend AiController |
 
 【moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / 诗宝阁AI对话（play.bao-ge）】
 【章节：墨渊小助手系统知识库（24 条） / 诗宝阁AI对话（play.bao-ge）】
@@ -7481,12 +7560,16 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 关键词：诗宝阁,AI对话,创作,鉴赏,平仄校验,藏头诗
 - 别名：诗阁,诗宝阁
 - 前端路由：/ai-chat
-- 说明：诗宝阁是统一的 AI 对话页面，AI 以不同角色与能力帮你完成命题作诗、集句成诗、藏头诗、润色入律、平仄校验、意象典故、诗话点评、飞花令、诗词接龙等任务。可在左侧选择角色与能力后直接对话，会话按角色分别保存在本地。入口在顶部导航的「诗宝阁」。
+- 说明：诗宝阁是统一的 AI 对话页面，AI 以不同角色与能力帮你完成命题作诗、集句成诗、藏头诗、润色入律、平仄校验、意象典故、诗话点评、飞花令、诗词接龙等任务。可在左侧选择角色与能力后直接对话，回复以流式方式逐字输出，生成过程中可随时点击「停止」。会话按角色保存在账号下并保留 7 天，换设备登录同一账号可以接着聊。入口在顶部导航的「诗宝阁」。
 - 使用步骤：
-  1. 打开诗宝阁页面\n选择角色与能力\n输入你的需求并发送\n查看 AI 返回的文本、藏头高亮或平仄标注结果
+  1. 打开诗宝阁页面
+  2. 选择角色与能力
+  3. 输入你的需求并发送
+  4. 查看 AI 返回的文本、藏头高亮或平仄标注结果
 - 常见问答：
   - 问：诗宝阁是什么  答：诗宝阁是 AI 对话页面，AI 分角色和能力，可帮你作诗、鉴赏、校验平仄、玩飞花令等。
   - 问：诗宝阁和首页的AI工具有什么区别  答：诗宝阁是统一的角色化对话入口，首页 AI 小工具区保留看图写诗、藏头诗、飞花令等快捷入口，两处并存。
+  - 问：诗宝阁的对话会保存吗  答：会，按角色保存在你的账号下并保留 7 天，换设备登录同一账号也能接着聊。
 
 【moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / 藏头诗（play.acrostic）】
 【章节：墨渊小助手系统知识库（24 条） / 藏头诗（play.acrostic）】
@@ -7498,7 +7581,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/
 - 说明：藏头诗功能可输入 2 至 8 个藏头字并选择五言或七言，由 AI 生成每句首字依次对应藏头字的诗作。入口在首页 AI 小工具区，诗宝阁「诗仙·创作」角色下也提供藏头诗能力。生成结果会高亮每句首字。
 - 使用步骤：
-  1. 打开首页 AI 小工具区或诗宝阁\n输入 2 至 8 个藏头字\n选择五言或七言\n点击生成，查看首字高亮的藏头诗
+  1. 打开首页 AI 小工具区或诗宝阁
+  2. 输入 2 至 8 个藏头字
+  3. 选择五言或七言
+  4. 点击生成，查看首字高亮的藏头诗
 - 常见问答：
   - 问：藏头诗怎么用  答：输入 2 到 8 个藏头字并选择五言或七言，AI 会生成每句首字依次对应藏头字的诗。
 
@@ -7512,7 +7598,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/
 - 说明：首页是站点的总入口，聚合了今日诗词、古诗精赏、当代精选、诗话视野、精选诗人等板块，并提供通往诗云、交流广场、诗宝阁的导航。首页还设有 AI 小工具区，可快捷使用看图写诗、藏头诗、飞花令等玩法。
 - 使用步骤：
-  1. 打开站点默认进入首页\n通过顶部导航切换各板块\n在 AI 小工具区使用各类玩法
+  1. 打开站点默认进入首页
+  2. 通过顶部导航切换各板块
+  3. 在 AI 小工具区使用各类玩法
 - 常见问答：
   - 问：首页有哪些内容  答：首页聚合了今日诗词、古诗精赏、当代精选、诗话视野、精选诗人等板块，还有 AI 小工具区。
 ```
@@ -7522,13 +7610,13 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 **回答**：游客在首页直接玩飞花令，对局记录仅临时保存在 Redis 中，不会写入 MySQL 数据库。
 
-具体说明如下：
-1. **存储位置**：游客与登录用户共用同一套接口，但后端按登录态分层处理。游客对局的对局状态及有效诗句仅存于 Redis（键为 `game:{gameId}` 与 `game:{gameId}:sentences`），不落 MySQL。
-2. **数据特性**：由于未写入持久化数据库，游客的对局记录无法回查，且对局结束后数据会被清除。
-3. **对比差异**：仅登录用户的对局才会将有效诗句写入 `game_record` 和 `game_sentence` 表，并支持通过 `/api/game/feihua/state` 接口恢复状态。
-4. **前端表现**：游客在首页点击「飞花令」卡片时，会展开内嵌小窗口（`GameMiniPanel`）直接开局，该组件不触发跳转至 `/game/feihua` 页面。
+具体结论如下：
+1. **存储位置**：游客对局的记录仅存于 Redis（键为 `game:{gameId}` 与 `game:{gameId}:sentences`），不落 MySQL。
+2. **保存机制**：后端按登录态分层处理，游客模式下的对局数据不持久化到 `game_record` 或 `game_sentence` 表。
+3. **查询限制**：由于未写入数据库，游客对局无法进行历史回查，仅在当前会话期间（TTL 30 分钟）通过 Redis 维持状态。
+4. **对比差异**：登录用户的对局才会将有效诗句写入 `game_record` / `game_sentence` 表并支持回查。
 
-（来源：moyuan_business_modules.md · 业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙） / 功能说明；moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / 游客与登录用户的权限差异（account.guest-limit））
+（来源：moyuan_business_modules.md · 业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙）/ 功能说明）
 
 **评级**： 
 
@@ -7627,7 +7715,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/game/feihua
 - 说明：飞花令是与 AI 对句的诗词游戏，你每回合说出一句含指定「令字」的真实古诗词名句，AI 轮流接句，接不上或超时即判负。入口在首页 AI 小工具区的「飞花令」卡片，登录用户点击后进入对局页。有古制严格、标准版、超级飞花令三种模式与三档难度可选。现代诗不参与本游戏。
 - 使用步骤：
-  1. 选择模式与难度\n设定令字（如「花」）\n每回合提交一句含令字的古诗词，单回合限时 30 秒\n与 AI 交替接句，AI 接不上或你超时判负
+  1. 选择模式与难度
+  2. 设定令字（如「花」）
+  3. 每回合提交一句含令字的古诗词，单回合限时 30 秒
+  4. 与 AI 交替接句，AI 接不上或你超时判负
 - 常见问答：
   - 问：飞花令怎么玩  答：每回合提交一句含指定令字的真实古诗词名句，与 AI 交替接句，AI 接不上或你超时则对方判负。
   - 问：在哪里能玩飞花令  答：首页 AI 小工具区有「飞花令」卡片，登录用户点击进入对局页。
@@ -7641,12 +7732,16 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 关键词：诗宝阁,AI对话,创作,鉴赏,平仄校验,藏头诗
 - 别名：诗阁,诗宝阁
 - 前端路由：/ai-chat
-- 说明：诗宝阁是统一的 AI 对话页面，AI 以不同角色与能力帮你完成命题作诗、集句成诗、藏头诗、润色入律、平仄校验、意象典故、诗话点评、飞花令、诗词接龙等任务。可在左侧选择角色与能力后直接对话，会话按角色分别保存在本地。入口在顶部导航的「诗宝阁」。
+- 说明：诗宝阁是统一的 AI 对话页面，AI 以不同角色与能力帮你完成命题作诗、集句成诗、藏头诗、润色入律、平仄校验、意象典故、诗话点评、飞花令、诗词接龙等任务。可在左侧选择角色与能力后直接对话，回复以流式方式逐字输出，生成过程中可随时点击「停止」。会话按角色保存在账号下并保留 7 天，换设备登录同一账号可以接着聊。入口在顶部导航的「诗宝阁」。
 - 使用步骤：
-  1. 打开诗宝阁页面\n选择角色与能力\n输入你的需求并发送\n查看 AI 返回的文本、藏头高亮或平仄标注结果
+  1. 打开诗宝阁页面
+  2. 选择角色与能力
+  3. 输入你的需求并发送
+  4. 查看 AI 返回的文本、藏头高亮或平仄标注结果
 - 常见问答：
   - 问：诗宝阁是什么  答：诗宝阁是 AI 对话页面，AI 分角色和能力，可帮你作诗、鉴赏、校验平仄、玩飞花令等。
   - 问：诗宝阁和首页的AI工具有什么区别  答：诗宝阁是统一的角色化对话入口，首页 AI 小工具区保留看图写诗、藏头诗、飞花令等快捷入口，两处并存。
+  - 问：诗宝阁的对话会保存吗  答：会，按角色保存在你的账号下并保留 7 天，换设备登录同一账号也能接着聊。
 
 【moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / 游客与登录用户的权限差异（account.guest-limit）】
 【章节：墨渊小助手系统知识库（24 条） / 游客与登录用户的权限差异（account.guest-limit）】
@@ -7657,7 +7752,8 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 别名：游客权限
 - 说明：未登录的游客可以浏览诗词、诗人、帖子与文章，也能在首页直接体验飞花令、诗词接龙等小工具（对局仅临时保存）。发布诗词、发帖、评论、点赞、收藏、报修、诗人认证等操作需要登录后才能使用。
 - 使用步骤：
-  1. 未登录时浏览诗词等公开内容\n登录后解锁发布、评论、收藏等操作
+  1. 未登录时浏览诗词等公开内容
+  2. 登录后解锁发布、评论、收藏等操作
 - 常见问答：
   - 问：不登录能用吗  答：不登录可以浏览诗词、诗人、帖子与文章，也能在首页体验飞花令等小工具；发布、评论、收藏等需要登录。
 ```
@@ -7665,12 +7761,12 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## H5（hard）藏头诗最多能藏几个字？除了首页还能从哪里进入？
 
-**回答**：藏头诗最多能藏 8 个字；除首页外，还可从诗宝阁的「诗仙·创作」角色下进入。
+**回答**：藏头诗最多能藏 8 个字。除首页外，还可从诗宝阁的「诗仙·创作」角色下进入。
 
-- **字数上限**：输入 2 至 8 个藏头字（来源：moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ 藏头诗（play.acrostic））。
-- **首页入口**：位于首页 AI 小工具区（来源：moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ 藏头诗（play.acrostic）；moyuan_business_modules.md · 业务模块说明 / 1. 首页模块 / 功能说明）。
-- **诗宝阁入口**：在「诗仙·创作」角色下提供该能力（来源：moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ 藏头诗（play.acrostic）；moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明）。
-- **其他入口**：无其他独立页面入口，统一复用对话或工具区（来源：
+1. **字数限制**：输入 2 至 8 个藏头字（来源：moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ 藏头诗（play.acrostic））。
+2. **入口位置**：
+   - 首页 AI 小工具区（来源：moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ 藏头诗（play.acrostic）；moyuan_business_modules.md · 业务模块说明 / 1. 首页模块 / 功能说明）。
+   - 诗宝阁「诗仙·创作」角色下（来源：moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ 藏头诗（play.acrostic）；moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明）。
 
 **评级**： 
 
@@ -7696,36 +7792,13 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 【章节：业务模块说明 / 7. AI 模块 / 功能说明】
 ### 功能说明
 
-- AI诗词问答（支持多模型切换；调用优先走 `ai_module_config` 模块绑定，未绑定某模块时回退默认模型。
-
-【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明】
-【章节：业务模块说明 / 7. AI 模块 / 功能说明】
-可用提供商：智谱AI、DeepSeek、Kimi、千问、小米MiMo、OpenRouter；NVIDIA NIM 已全部禁用/下线）
+- AI诗词问答（支持多模型切换；调用优先走 `ai_module_config` 模块绑定，未绑定某模块时回退默认模型。可用提供商：智谱AI、DeepSeek、Kimi、千问、小米MiMo、OpenRouter；NVIDIA NIM 已全部禁用/下线）
 - 看图写诗（上传图片，AI生成古诗词，支持视觉模型如 GLM-4V-Flash、DeepSeek-Flash）
 - 智能分析（输入诗句进行深度解析）
 - AI对对联（输入上联，AI生成下联，遵循平仄规则）
 - **藏头诗**（输入 2-8 个藏头字并选择五言/七言，AI 生成藏头诗，每句首字依次对应藏头字；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
-- **平仄格律校验**（粘贴一首绝句/律诗，AI 逐句标注平仄（平声绿底、仄声红底）、判定是否合律、识别所属平水韵韵部并给出总体评价；AI 返回严格 JSON，前端解析失败时回退展示原始文本；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
-- **AI 对话页「诗宝阁」**（`/ai-chat`）：角色化统一对话入口，6 角色（诗仙·创作 / 诗话·鉴赏 / 格律·校正 / 诗友·行令 / 群贤·论诗 / 顾问·问答）× 12 能力（命题作诗 / 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 / 群贤论诗）；阶段一复用 `POST /api/ai/chat`（moduleCode=chat，非流式），阶段二后端已新增 `POST /api/ai/chat/stream`（SSE 流式，见 6.
-
-【moyuan_business_modules.md · 业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 功能说明】
-【章节：业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 功能说明】
-### 功能说明
-
-- **角色化统一对话入口**：把原先分散的创作类 / 鉴赏类 AI 小应用合并为单一对话页面——AI 赋角色（Persona）决定「谁在说话」，能力（Skill）决定「这次做什么任务」，两者正交组合，复用同一套对话流
-- **6 个角色**：
-  - `creator` 诗仙·创作（洒脱豪迈，默认能力：命题作诗 / 集句成诗 / 藏头诗）
-  - `critic` 诗话·鉴赏（仿宋人诗话，默认能力：意象典故 / 诗话点评）
-  - `judge` 格律·校正（精研平水韵，默认能力：平仄校验 / 润色入律）
-  - `friend` 诗友·行令（默认能力：飞花令 / 诗词接龙）
-  - `salon` 群贤·论诗（默认能力：群贤论诗）
-  - `advisor` 顾问·问答（通识问答，无专属能力）
-- **12 个能力**（Skill）：`compose` 命题作诗、`gather` 集句成诗、`acrostic` 藏头诗、`polish` 润色入律、`tone` 平仄校验、`rhyme` 韵脚查询、`couplet` 对对联、`imagery` 意象典故、`comment` 诗话点评、`feihua` 飞花令、`chain` 诗词接龙、`salon` 群贤论诗
-- **三段式布局**：左「角色栏」+ 中「对话流」+ 底「能力快捷 chips + 输入框」
-- **会话记忆**：按 `roleId` 分存 `localStorage`（键 `moyuan_ai_chat_${roleId}`），切换角色各自恢复；单角色最多保留 40 条（约 20 轮），单条内容上限 4000 字
-- **空态引导**：进入页面 / 新建会话后，按角色给出引导语 + 推荐能力 chip
-- **结果渲染**：普通能力渲染为文本气泡；藏头诗高亮每句首字（藏头字）；平仄校验解析 AI 返回的严格 JSON，渲染为平仄标签卡（平底/仄底、押韵标记、逐句简评、总评），解析失败回退展示原始文本
-- **消息头像**：对话流每条消息两侧带圆形头像——AI 侧统一使用墨渊可爱卡通头像（本地静态资源 `/img/ai_chat_avatar.jpg`），用户侧使用本人头像（未登录 / 无头像时回退金色首字母）；用户气泡靠右、头像居其右，AI 气泡靠左、头像居其左，加载态气泡同样带 AI 头像
+- **平仄格律校验**（粘贴一首绝句/律诗，由**本地确定性引擎** `POST /api/ai/tone-check` 逐句标注平仄（平声绿底、仄声红底）、判定是否合律并给出不合律原因；校验规则为句末三平尾/三仄尾、二四六位失替、偶数句押韵，不调用大模型、不消耗 AI 额度）
+- **AI 对话页「诗宝阁」**（`/ai-chat`）：角色化统一对话入口，6 角色（诗仙·创作 / 诗话·鉴赏 / 格律·校正 / 诗友·行令 / 群贤·论诗 / 顾问·问答）× 12 能力（命题作诗 / 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 /
 
 【moyuan_business_modules.md · 业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 前端组件】
 【章节：业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 前端组件】
@@ -7735,12 +7808,13 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 |------|------|
 | views/ai-chat/index.vue | 页面壳：组合下辖组件、持有会话状态、处理 `?role=&skill=` query |
 | components/ai-chat/RoleSidebar.vue | 角色栏 |
-| components/ai-chat/ChatStream.vue | 对话流（气泡 + 消息头像 + 空态引导 + 自动滚动 + 平仄/藏头特殊渲染） |
+| components/ai-chat/ChatStream.vue | 对话流（气泡 + 消息头像 + 空态引导 + 流式跟随滚动 + 平仄/藏头特殊渲染） |
 | components/ai-chat/SkillChips.vue | 能力快捷 chips |
-| components/ai-chat/ChatInput.vue | 输入框 + 发送按钮（Enter 发送 / Shift+Enter 换行） |
+| components/ai-chat/ChatInput.vue | 输入框 + 发送按钮（Enter 发送 / Shift+Enter 换行；生成中切换为「停止」） |
 | configs/ai-chat/personas.ts | 角色常量（含 systemPrompt） |
 | configs/ai-chat/skills.ts | 能力常量（含任务模板与发送前校验） |
-| composables/useAiChat.ts | 会话状态、请求封装、本地记忆 |
+| composables/useAiChat.ts | 会话状态、SSE 流式请求、多轮上下文组装、服务端会话同步 |
+| api/modules/ai.ts | `chatStream`（`fetch` + `ReadableStream` 解析 SSE、401 静默刷新后重放一次）与会话接口封装 |
 
 【moyuan_business_modules.md · 业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 前端路由】
 【章节：业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 前端路由】
@@ -7758,14 +7832,20 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 | 接口 | 说明 | 后端模块 |
 |------|------|----------|
-| POST /api/ai/chat | 复用现有非流式对话接口（请求 `{ message, moduleCode:'chat' }`，响应 `data.reply`） | sc-moyuan-backend AiController |
-| POST /api/ai/chat/stream | 流式对话接口（请求 `{ moduleCode, messages[], temperature, maxTokens }`，响应 `text/event-stream`，事件 `{"delta":"…"}` … `[DONE]`） | sc-moyuan-backend AiController |
+| POST /api/ai/chat/stream | 主链路。SSE 流式对话（请求 `{ moduleCode, messages[], temperature, maxTokens }`，响应 `text/event-stream`，事件 `{"delta":"…"}` … `[DONE]`；限流/入参错误以 JSON 返回） | sc-moyuan-backend AiController |
+| POST /api/ai/chat | 兜底。非流式对话（请求 `{ message, moduleCode:'chat' }`，响应 `data.reply`），仅在流式遇可重试失败时调用 | sc-moyuan-backend AiController |
+| GET /api/ai/chat/sessions/{roleId} | 读取当前用户在该角色下的会话 | AiChatSessionController |
+| PUT /api/ai/chat/sessions/{roleId} | 保存会话（`{"messages":[…]}`，服务端只保留最近 40 条） | AiChatSessionController |
+| DELETE /api/ai/chat/sessions/{roleId} | 清空该角色会话 | AiChatSessionController |
+| POST /api/ai/tone-check | 平仄校验（本地确定性引擎，不消耗 AI 额度） | sc-moyuan-backend AiController |
 
-【moyuan_system_workflow.md · 系统工作流文档 / 9. 诗人内容域 / 9.1 诗人详情与懒加载 / 头像分配（已收录，完整见下文）】
-【章节：系统工作流文档 / 9. 诗人内容域 / 9.1 诗人详情与懒加载 / 头像分配（已收录，完整见下文）】
-头像池共 11 张（`cn_ancient_male`×3、`cn_ancient_female`×1、`cn_modern_male/female`×1、`west_classical_male/female`×1、`west_romantic_male/female`×1、`west_modern_female`×1）；`poet.style` 字段经 `docs/database/migration_003_poet_style.sql` 新增，外部诗人 API 暂无流派字段。
-- **关键类与方法**：`PoetServiceImpl.getPoetDetail/isPoetInfoIncomplete/fetchAndSavePoetData`、`PoetDataExtractor`、`PoetDefaultAvatar.getAvatar`。
-- **数据与缓存**：`poet`（biography/year_info/birthplace/pseudonym/life_story/influence/anecdotes/avatar）；缓存 `poets::detail:{id}`。
+【moyuan_system_workflow.md · 系统工作流文档 / 8. 诗词内容域 / 8.3 收藏 / 点赞（C3）】
+【章节：系统工作流文档 / 8. 诗词内容域 / 8.3 收藏 / 点赞（C3）】
+### 8.3 收藏 / 点赞（C3）
+- **触发入口**：`POST|GET /api/poems/{id}/like`、`POST|GET /api/poems/{id}/favorite`、`GET /api/poems/favorites`。
+- **分步流程**：点赞 `toggleLike`（`@Transactional`）按 `user_id+target_id+target_type=POEM` 计数 `user_like`：存在则删记录且 `like_count-1`（`gt 0` 保护），否则插入并 `+1`；状态查询 `isLike/isFavorite` 计数判定；`getFavorites` 取收藏 ID 集后 `in` 查 poem 并填充。
+- **注意（代码事实）**：收藏 `UserServiceImpl.toggleFavorite` **只写 `user_favorite` 表，不维护 `poem.favorite_count`**；点赞会维护 `poem.like_count`。
+- **数据与缓存**：`user_like`、`user_favorite`、`poem.like_count`。
 
 【moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / 诗宝阁AI对话（play.bao-ge）】
 【章节：墨渊小助手系统知识库（24 条） / 诗宝阁AI对话（play.bao-ge）】
@@ -7775,12 +7855,16 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 关键词：诗宝阁,AI对话,创作,鉴赏,平仄校验,藏头诗
 - 别名：诗阁,诗宝阁
 - 前端路由：/ai-chat
-- 说明：诗宝阁是统一的 AI 对话页面，AI 以不同角色与能力帮你完成命题作诗、集句成诗、藏头诗、润色入律、平仄校验、意象典故、诗话点评、飞花令、诗词接龙等任务。可在左侧选择角色与能力后直接对话，会话按角色分别保存在本地。入口在顶部导航的「诗宝阁」。
+- 说明：诗宝阁是统一的 AI 对话页面，AI 以不同角色与能力帮你完成命题作诗、集句成诗、藏头诗、润色入律、平仄校验、意象典故、诗话点评、飞花令、诗词接龙等任务。可在左侧选择角色与能力后直接对话，回复以流式方式逐字输出，生成过程中可随时点击「停止」。会话按角色保存在账号下并保留 7 天，换设备登录同一账号可以接着聊。入口在顶部导航的「诗宝阁」。
 - 使用步骤：
-  1. 打开诗宝阁页面\n选择角色与能力\n输入你的需求并发送\n查看 AI 返回的文本、藏头高亮或平仄标注结果
+  1. 打开诗宝阁页面
+  2. 选择角色与能力
+  3. 输入你的需求并发送
+  4. 查看 AI 返回的文本、藏头高亮或平仄标注结果
 - 常见问答：
   - 问：诗宝阁是什么  答：诗宝阁是 AI 对话页面，AI 分角色和能力，可帮你作诗、鉴赏、校验平仄、玩飞花令等。
   - 问：诗宝阁和首页的AI工具有什么区别  答：诗宝阁是统一的角色化对话入口，首页 AI 小工具区保留看图写诗、藏头诗、飞花令等快捷入口，两处并存。
+  - 问：诗宝阁的对话会保存吗  答：会，按角色保存在你的账号下并保留 7 天，换设备登录同一账号也能接着聊。
 
 【moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / 藏头诗（play.acrostic）】
 【章节：墨渊小助手系统知识库（24 条） / 藏头诗（play.acrostic）】
@@ -7792,7 +7876,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/
 - 说明：藏头诗功能可输入 2 至 8 个藏头字并选择五言或七言，由 AI 生成每句首字依次对应藏头字的诗作。入口在首页 AI 小工具区，诗宝阁「诗仙·创作」角色下也提供藏头诗能力。生成结果会高亮每句首字。
 - 使用步骤：
-  1. 打开首页 AI 小工具区或诗宝阁\n输入 2 至 8 个藏头字\n选择五言或七言\n点击生成，查看首字高亮的藏头诗
+  1. 打开首页 AI 小工具区或诗宝阁
+  2. 输入 2 至 8 个藏头字
+  3. 选择五言或七言
+  4. 点击生成，查看首字高亮的藏头诗
 - 常见问答：
   - 问：藏头诗怎么用  答：输入 2 到 8 个藏头字并选择五言或七言，AI 会生成每句首字依次对应藏头字的诗。
 
@@ -7806,7 +7893,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/
 - 说明：首页是站点的总入口，聚合了今日诗词、古诗精赏、当代精选、诗话视野、精选诗人等板块，并提供通往诗云、交流广场、诗宝阁的导航。首页还设有 AI 小工具区，可快捷使用看图写诗、藏头诗、飞花令等玩法。
 - 使用步骤：
-  1. 打开站点默认进入首页\n通过顶部导航切换各板块\n在 AI 小工具区使用各类玩法
+  1. 打开站点默认进入首页
+  2. 通过顶部导航切换各板块
+  3. 在 AI 小工具区使用各类玩法
 - 常见问答：
   - 问：首页有哪些内容  答：首页聚合了今日诗词、古诗精赏、当代精选、诗话视野、精选诗人等板块，还有 AI 小工具区。
 
@@ -7820,21 +7909,38 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/user/profile
 - 说明：收藏功能可把喜欢的诗词加入收藏，登录后在个人中心的「我的收藏」中查看。诗词卡片上提供收藏按钮。
 - 使用步骤：
-  1. 登录后打开诗词\n点击收藏按钮\n在个人中心查看我的收藏
+  1. 登录后打开诗词
+  2. 点击收藏按钮
+  3. 在个人中心查看我的收藏
 - 常见问答：
   - 问：怎么收藏诗词  答：登录后在诗词卡片上点击收藏按钮，即可在个人中心的我的收藏中查看。
+
+【moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / 游客与登录用户的权限差异（account.guest-limit）】
+【章节：墨渊小助手系统知识库（24 条） / 游客与登录用户的权限差异（account.guest-limit）】
+## 游客与登录用户的权限差异（account.guest-limit）
+
+- 分类：account
+- 关键词：游客,未登录,权限,差异,登录
+- 别名：游客权限
+- 说明：未登录的游客可以浏览诗词、诗人、帖子与文章，也能在首页直接体验飞花令、诗词接龙等小工具（对局仅临时保存）。发布诗词、发帖、评论、点赞、收藏、报修、诗人认证等操作需要登录后才能使用。
+- 使用步骤：
+  1. 未登录时浏览诗词等公开内容
+  2. 登录后解锁发布、评论、收藏等操作
+- 常见问答：
+  - 问：不登录能用吗  答：不登录可以浏览诗词、诗人、帖子与文章，也能在首页体验飞花令等小工具；发布、评论、收藏等需要登录。
 ```
 </details>
 
 ## H6（hard）诗词接龙开局限定朝代以后，哪些环节会被限制在该朝代内？
 
-**回答**：在诗词接龙游戏中，若开局限定朝代范围，以下三个核心环节均会被严格限制在该朝代内进行校验：
+**回答**：在诗词接龙游戏中，若开局限定朝代范围，以下三个核心环节均会被严格限制在该朝代内进行校验：AI 起句、AI 接句以及玩家提交诗句。超出该范围将判定为“诗句真实性校验不通过”并提示越界（来源：moyuan_business_modules.md·业务模块说明/24.游戏模块（飞花令/诗词接龙）/功能说明；moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/诗词接龙（play.chain））。
 
-1. **AI 起句**：仅从选定朝代的诗词库中抽取首句。
-2. **AI 接句**：提示词会限定该朝代，确保 AI 生成的诗句符合该朝代特征。
-3. **玩家提交与真实性校验**：用户作答及系统对诗句真实性的判断均限定在该朝代范围内，超出范围将判定为“诗句真实性校验不通过”并提示越界。
+具体限制环节如下：
+1. **AI 起句**：选定朝代后，AI 生成首句仅在该朝代库内随机选取。
+2. **AI 接句**：AI 回复用户的诗句时，提示词会限定该朝代范围，确保接句符合设定。
+3. **玩家提交校验**：用户作答的真实性校验逻辑同样绑定该朝代，非该朝代的诗句无法通过验证。
 
-（来源：moyuan_business_modules.md · 业务模块说明 / 24. 游戏模块（飞花令 / 诗词接龙）/ 功能说明；moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ 诗词接龙（play.chain））
+此外，游戏机制规定现代诗不参与本游戏，且起句、AI 接句与玩家作答均需在限定朝代内完成（来源：moyuan_business_modules.md·业务模块说明/24.游戏模块（飞花令/诗词接龙）/功能说明）。
 
 **评级**： 
 
@@ -7857,26 +7963,11 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - **内容审核**（新增）：诗词发布后需经过审核
 - **外文诗词页签**（新增）：`/poem?tab=foreign` 展示已入库的 20 首英文名篇（`poem_type='foreign'`）；先读库、库空才实时兜底 PoetryDB（兜底结果不落库），加载超过 5 秒在过场动画上提示「检索耗时较久，请耐心等待…」
 
-【moyuan_business_modules.md · 业务模块说明 / 10. 管理模块 / 功能说明】
-【章节：业务模块说明 / 10. 管理模块 / 功能说明】
-### 功能说明
-
-- 管理后台布局（左侧导航 + 右侧内容区域）
-- 控制台（Dashboard）：系统统计数据展示、审核统计数据
-- 用户管理：用户列表、状态管理、创建/编辑/删除用户
-- 诗词管理：诗词列表、状态管理、创建/编辑/删除诗词（支持标题/内容关键字搜索与按创建时间正序/倒序切换）
-- **诗词审核**（新增）：审核用户发布的诗词（列表按 auditStatus 0-待审/1-通过/2-拒绝 筛选，通过或拒绝）
-- **评论管理**（新增）：评论列表、审核评论、删除评论（status 1-正常/0-隐藏）
-- 分类管理：分类列表、创建/编辑/删除分类
-- 朝代管理：朝代列表、创建/编辑/删除朝代
-- 诗人管理：诗人列表、状态管理、创建/编辑/删除诗人（支持姓名关键字搜索与按创建时间正序/倒序切换）
-- 帖子管理：帖子列表、状态管理、创建/编辑/删除帖子
-- **帖子审核**（新增）：审核帖子，通过或拒绝
-- **诗人认证审核**（新增）：审核诗人认证申请，通过或拒绝
-- **AI内容审核**（新增）：审核AI生成的内容，通过或拒绝后写入原表
-- **诗话视野管理**（新增）：诗话视野文章的增删改查、上下架、推荐设置（含草稿）
-- **文件管理**（新增）：文件列表与存储统计、单文件删除、孤儿文件清理
-- **缓存管理**（新增）：一键清除诗人缓存 / 全部业务缓存
+【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明】
+【章节：业务模块说明 / 7. AI 模块 / 功能说明】
+/ 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 / 群贤论诗）；对话走 `POST /api/ai/chat/stream`（SSE 流式，网络类失败自动回退非流式 `POST /api/ai/chat`），请求携带 system 人设 + 最近 12 条历史作为多轮上下文，生成中可停止；会话按角色存服务端 Redis（`GET/PUT/DELETE /api/ai/chat/sessions/{roleId}`，TTL 7 天）并以 localStorage 兜底，详见第 25 章
+- **飞花令 / 诗词接龙**：原为纯前端小工具（复用 `POST /api/ai/chat`），现已升级为**独立游戏模块**（见第 24 章「游戏模块」），拥有专属后端接口 `/api/game/feihua`、`/api/game/chain` 与 `ai_module_config` 游戏模块绑定；首页 AI 区块保留「飞花令」「诗词接龙」两张卡片入口。
+- **古籍OCR识文**（上传古诗词图片/书法作品/碑帖，AI精准识别文字内容，保留原文结构，标注印章题款）——**当前维护中**：后端开关 `ai.features.
 
 【moyuan_business_modules.md · 业务模块说明 / 23. 诗云模块 / 功能说明】
 【章节：业务模块说明 / 23. 诗云模块 / 功能说明】
@@ -7971,7 +8062,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/game/chain
 - 说明：诗词接龙由 AI 起句，你接出的诗句首字须与上一句末字相同，再交给 AI 接，交替进行；一方接不上即判负。入口在首页 AI 小工具区的「诗词接龙」卡片，登录后进入对局页。开局可限定朝代范围，起句、AI 接句与你的作答都会在该朝代内校验。现代诗不参与本游戏。
 - 使用步骤：
-  1. 选择朝代范围（默认中国古典诗词不限朝代）\nAI 给出起句，你接出首字等于上句末字的真实古诗名句\n与 AI 交替接句\n接不上或超时判负，链长即有效句数
+  1. 选择朝代范围（默认中国古典诗词不限朝代）
+  2. AI 给出起句，你接出首字等于上句末字的真实古诗名句
+  3. 与 AI 交替接句
+  4. 接不上或超时判负，链长即有效句数
 - 常见问答：
   - 问：诗词接龙怎么玩  答：AI 起句后，你接的诗句首字要和上一句末字相同，AI 再接，交替进行，接不上的一方判负。
   - 问：接龙可以限定朝代吗  答：可以，开局选择具体朝代后，起句、AI 接句与你的作答都会限定在该朝代内校验。
@@ -7980,7 +8074,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## H7（hard）诗云页面的配色实验室能调哪些显示参数？一共几套配色方案？
 
-**回答**：诗云页面「配色实验室」可调节以下显示参数：光晕强度、连线可见度、节点尺寸、整体亮度，以及开关「显示诗人姓名」和「诗人按朝代配色」。共提供 7 套配色方案（琥珀星海 / 青玉 / 珊瑚 / 冰川蓝 / 梅子紫 / 苔绿 / 赤陶）。（来源：moyuan_business_modules.md · 业务模块说明 / 23. 诗云模块 / 功能说明；moyuan_system_workflow.md · 系统工作流文档 / 15.6 诗云 3D 星空（K6）；moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条）/ 诗云星空（play.poetry-cloud））
+**回答**：诗云页面「配色实验室」可调节以下显示参数：光晕强度、连线可见度、节点尺寸、整体亮度，以及「显示诗人姓名」「诗人按朝代配色」开关。（来源：moyuan_business_modules.md·业务模块说明/23. 诗云模块/功能说明）
+
+一共提供 7 套配色方案，分别为：琥珀星海、青玉、珊瑚、冰川蓝、梅子紫、苔绿、赤陶。（来源：moyuan_business_modules.md·业务模块说明/23. 诗云模块/功能说明；moyuan_system_workflow.md·系统工作流文档/15.
 
 **评级**： 
 
@@ -7993,7 +8089,7 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 | 22 | 联系我们模块 | 用户反馈表单页面 | 前端已实现 |
 | 23 | 诗云模块 | Three.js 3D 星空可视化，诗人—诗作两级层级星图 + 配色实验室 | 前端已实现 |
 | 24 | 游戏模块 | 飞花令 / 诗词接龙对局（模式/难度、回合计时、三级真实性校验、游客模式） | 前端+后端已实现 |
-| 25 | AI 对话页「诗宝阁」 | 角色化统一对话入口：6 角色 × 12 能力，覆盖命题作诗/集句/藏头/润色/平仄校验/韵脚查询/对对联/意象典故/诗话点评/飞花令/接龙/群贤论诗；其中飞花令为设令字后逐句判定（含字/判重/真实性）的对局流程 | 阶段一前端已完成（非流式）、阶段二后端 SSE 已完成（前端流式待接入） |
+| 25 | AI 对话页「诗宝阁」 | 角色化统一对话入口：6 角色 × 12 能力，覆盖命题作诗/集句/藏头/润色/平仄校验/韵脚查询/对对联/意象典故/诗话点评/飞花令/接龙/群贤论诗；其中飞花令为设令字后逐句判定（含字/判重/真实性）的对局流程 | 前端+后端已实现（SSE 流式、多轮上下文、服务端会话） |
 | 26 | 全局 AI 小窗与系统知识库 | 全站悬浮 AI 问答入口：诗词助理 / 网页用法助理双助理，接入 system_knowledge 知识库 | 前端+后端已实现 |
 
 ---
@@ -8075,16 +8171,16 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ---
 
-【moyuan_business_modules.md · 业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 技术方案】
-【章节：业务模块说明 / 25. AI 对话页「诗宝阁」模块 / 技术方案】
-### 技术方案
-
-- 阶段一为**纯前端 MVP**，不新增后端接口、不改数据库表，复用现有非流式接口 `POST /api/ai/chat`
-- `moduleCode` 必传 `'chat'`（已绑定 DeepSeek）；否则回退智谱默认模型，会因 key 余额不足返回 `429 code 1113`
-- 阶段一后端恒前置自身 `CHAT_SYSTEM_PROMPT`，故角色提示词以「角色设定」前缀注入 user 消息（**非**真正的 system role）；真正的 system role + 多轮上下文属阶段二
-- 加载反馈遵循 loading-patterns 规范：发送按钮内置小转圈 +「生成中」并禁用重复点击、宽度固定；对话流等待期显示居中转圈 +「墨渊正在提笔…」；非流式整段返回（无逐字与停止按钮）
-- 藏头诗 / 平仄校验的任务模板与解析逻辑复用首页现有实现，迁移至能力层
-- 配色沿用墨渊棕金色系（宣纸底 / 铜边 / 棕金强调），禁用 Element Plus 默认蓝
+【moyuan_system_workflow.md · 系统工作流文档 / 12. 论坛与社区域 / 12.2 内容审核流（E6）】
+【章节：系统工作流文档 / 12. 论坛与社区域 / 12.2 内容审核流（E6）】
+verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
+  | 诗人草稿 | `poet_draft.status=0` | `PUT /api/admin/poet-drafts/{id}/review` |
+  | 投稿建议 | `poet_suggestion.status=pending` | `PUT /api/admin/poet-suggestions/{id}/review` |
+- **后台审核列表接口与前端取数约定**：
+  - 列表查询：诗作 `GET /api/admin/poems`（参数 `page`、`size`、`keyword`、`auditStatus`、`sort`；`auditStatus` 0-待审核/1-已通过/2-已拒绝，不传返回全部；`sort` 取 asc-按创建时间正序/desc-倒序，默认 desc）；评论 `GET /api/admin/comments`（参数 `page`、`size`、`status`，1-正常/0-隐藏）；AI 内容 `GET /api/admin/ai-contents`（参数 `page`、`size`、`status`，0-待审核/1-已通过/2-已拒绝）。诗人草稿/建议用 `pageNum`、`pageSize`、`status`。
+  - 审核变更：`PUT /api/admin/poems/{id}/audit` 的 body `{status, reason}` 中 `status` 对应 `auditStatus` 语义（0/1/2，拒绝为 2）；`PUT /api/admin/comments/{id}/audit` 的 `status` 为 1-正常/0-隐藏。
+  - 前端取数：统一响应体为 `{code, message, data}`，Axios 拦截器返回整个响应体，故后台列表页面必须从 `res.data.records` / `res.data.total` 取值（不可写 `res.records`）；诗作审核页状态列与操作判断绑定 `row.auditStatus`，作者/朝代列绑定后端填充的 `poetName` / `dynastyName`（由 `PoemServiceImpl.getAdminPoemList` 调 `populatePoetAndDynasty` 填充），评论页状态列绑定 `row.status`（1-正常/0-隐藏）。
+- **关键类与方法**：`AdminController.
 
 【moyuan_system_workflow.md · 系统工作流文档 / 15. 前端数据流转层 / 15.6 诗云 3D 星空（K6）】
 【章节：系统工作流文档 / 15. 前端数据流转层 / 15.6 诗云 3D 星空（K6）】
@@ -8106,7 +8202,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poetry-cloud
 - 说明：诗云是用 3D 星空展示古诗数据的可视化页面，每位诗人是一颗星，其诗作环绕分布，可缩放旋转浏览。点击诗人星可查看诗人信息与代表作品，点击诗作节点可查看诗词详情。页面底部「配色实验室」可切换配色方案并调节光晕、连线、亮度等显示效果。
 - 使用步骤：
-  1. 进入诗云页面\n拖动旋转、滚轮缩放浏览星图\n点击诗人星查看诗人信息与作品\n点击诗作节点查看诗词详情
+  1. 进入诗云页面
+  2. 拖动旋转、滚轮缩放浏览星图
+  3. 点击诗人星查看诗人信息与作品
+  4. 点击诗作节点查看诗词详情
 - 常见问答：
   - 问：诗云是什么  答：诗云是把古诗词数据做成 3D 星空的页面，诗人是星、诗作围绕其分布，可交互浏览。
   - 问：诗云怎么用  答：拖动旋转、滚轮缩放浏览星图，点击诗人或诗作节点查看详情。
@@ -8115,28 +8214,30 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## H8（hard）AI 评分的分数是怎么从模型输出里解析出来的？解析失败时的兜底分是多少？
 
-**回答**：AI 评分的分数解析采用正则提取方式，解析失败时默认返回 3.5 分作为兜底值。
+**回答**：AI 评分的分数解析及兜底分值如下：
 
-具体解析流程如下：
-1. **触发入口**：调用 `POST .../ratings/ai` 接口请求 AI 生成评分（来源：moyuan_system_workflow.md·8.4 诗词评分）。
-2. **模型调用**：通过 `AiService.analyzePoem(content, null, "rating")` 方法，走独立 `rating` 模块配置，不再写死默认模型（来源：moyuan_system_workflow.md·8.4 诗词评分）。
-3. **解析逻辑**：AI 返回严格 JSON 格式结果后，系统使用正则表达式解析分数字段；若解析失败，则直接回退至固定值 3.5（来源：moyuan_system_workflow.md·8.4 诗词评分）。
-4. **数据落库**：将提取或兜底的分数存入 `poem_rating` 表，并记录实际生效的模型名到 `ai_model` 字段（来源：moyuan_system_workflow.md·8.4 诗词评分）。
+1. **解析方式**：调用 AI 服务时，通过 `aiService.analyzePoem` 方法处理内容，利用正则表达式解析模型返回的分数结果。
+2. **兜底分值**：若正则解析失败，系统会自动使用 **3.5** 分作为默认值进行兜底（来源：moyuan_system_workflow.md·8.4 诗词评分）。
 
 **评级**： 
 
 <details><summary>上下文</summary>
 
 ```
-【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / 功能说明】
-【章节：业务模块说明 / 7. AI 模块 / 功能说明】
-可用提供商：智谱AI、DeepSeek、Kimi、千问、小米MiMo、OpenRouter；NVIDIA NIM 已全部禁用/下线）
-- 看图写诗（上传图片，AI生成古诗词，支持视觉模型如 GLM-4V-Flash、DeepSeek-Flash）
-- 智能分析（输入诗句进行深度解析）
-- AI对对联（输入上联，AI生成下联，遵循平仄规则）
-- **藏头诗**（输入 2-8 个藏头字并选择五言/七言，AI 生成藏头诗，每句首字依次对应藏头字；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
-- **平仄格律校验**（粘贴一首绝句/律诗，AI 逐句标注平仄（平声绿底、仄声红底）、判定是否合律、识别所属平水韵韵部并给出总体评价；AI 返回严格 JSON，前端解析失败时回退展示原始文本；复用 `POST /api/ai/chat`，moduleCode=chat，不新增后端接口）
-- **AI 对话页「诗宝阁」**（`/ai-chat`）：角色化统一对话入口，6 角色（诗仙·创作 / 诗话·鉴赏 / 格律·校正 / 诗友·行令 / 群贤·论诗 / 顾问·问答）× 12 能力（命题作诗 / 集句成诗 / 藏头诗 / 润色入律 / 平仄校验 / 韵脚查询 / 对对联 / 意象典故 / 诗话点评 / 飞花令 / 诗词接龙 / 群贤论诗）；阶段一复用 `POST /api/ai/chat`（moduleCode=chat，非流式），阶段二后端已新增 `POST /api/ai/chat/stream`（SSE 流式，见 6.
+【moyuan_business_modules.md · 业务模块说明 / 7. AI 模块 / API 接口】
+【章节：业务模块说明 / 7. AI 模块 / API 接口】
+### API 接口
+
+| 接口 | 说明 | 后端模块 |
+|------|------|----------|
+| POST /api/ai/chat/stream | AI流式问答（SSE，返回 `text/event-stream`；主链路） | sc-moyuan-backend AiController |
+| POST /api/ai/chat | AI问答（非流式，流式遇可重试失败时兜底） | sc-moyuan-backend AiController |
+| GET /api/ai/chat/sessions/{roleId} | 读取当前用户该角色会话（Redis，TTL 7 天） | AiChatSessionController |
+| PUT /api/ai/chat/sessions/{roleId} | 保存会话（服务端最多保留 40 条） | AiChatSessionController |
+| DELETE /api/ai/chat/sessions/{roleId} | 清空该角色会话 | AiChatSessionController |
+| POST /api/ai/write-poem | 看图写诗（图片 ≤10MB，jpeg/png/gif/webp） | sc-moyuan-backend AiController |
+| POST /api/ai/analyze | 智能分析 | sc-moyuan-backend AiController |
+| POST /api/ai/ocr | 图片OCR识别（**当前维护中**，`ai.features.
 
 【moyuan_business_modules.md · 业务模块说明 / 26. 全局 AI 小窗与系统知识库模块 / 功能说明】
 【章节：业务模块说明 / 26. 全局 AI 小窗与系统知识库模块 / 功能说明】
@@ -8181,9 +8282,7 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 【moyuan_system_workflow.md · 系统工作流文档 / 11. AI 能力域 / 11.1 AI 辅助创作与生成（E1）】
 【章节：系统工作流文档 / 11. AI 能力域 / 11.1 AI 辅助创作与生成（E1）】
-### 11.1 AI 辅助创作与生成（E1）
-- **触发入口**：`POST /api/ai/chat|write-poem|analyze|couplet|ocr`；流式入口 `POST /api/ai/chat/stream`（SSE，`AiController.chatStream` → `AiService.streamChat` → `AiModelRegistry.streamByModule` → `OpenAiCompatibleAdapter.streamChat` 用 JDK `HttpClient` 逐行解析上游 SSE，客户端断开经 `emitter.onCompletion` 置取消信号停止消费）。
-- **分步流程**：`AiController` 分发 `AiService` → 各方法内置系统提示词常量 → 文本类 `AiModelRegistry.chat/getModel`、图片类 Base64 后 `AiModelRegistry.vision`；传 `moduleCode` 走 `chatByModule/visionByModule`（按模块选模型+覆盖提示词）→ 按 `model.provider` 定位 `AiModelAdapter`，`RestTemplate` 带 `Bearer apiKey` POST 到 `ai_model.api_url`（messages=system+user、max_tokens 默认 1024）→ 解析 `choices[0].message.content` 返回；失败抛 `BusinessException`。
+provider` 定位 `AiModelAdapter`，`RestTemplate` 带 `Bearer apiKey` POST 到 `ai_model.api_url`（messages=system+user、max_tokens 默认 1024）→ 解析 `choices[0].message.content` 返回；失败抛 `BusinessException`。
 - **注意（代码事实）**：providers 下拉含 qwen/openrouter，但当前**无对应 Adapter**，调用报"不支持的AI提供商"；`OpenAiCompatibleAdapter` 支持 zhipu/deepseek/kimi/mimo，`NvidiaAdapter` 支持 nvidia（vision 抛"暂不支持视觉模型"）。
 - **关键类与方法**：`AiController.*`、`AiServiceImpl.chat/writePoemFromImage/analyzePoem/matchCouplet/ocrImage`、`AiModelRegistry.chat/vision/chatByModule/getModel`、`OpenAiCompatibleAdapter/NvidiaAdapter`。
 - **数据与缓存**：`ai_model`（name/provider/apiUrl/modelId/visionModelId/apiKey/maxTokens/isEnabled/isDefault/modelType）；内存 `AiModelRegistry.modelCache`。
@@ -8204,7 +8303,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poem/:id
 - 说明：诗词详情页提供 AI 评分，由 AI 从意境、格律、修辞、情感、用词等维度评价诗词并给出分数。进入任意诗词详情页即可查看或请求 AI 评分，用户本人也可以手动给诗词评分。
 - 使用步骤：
-  1. 打开任意诗词详情页\n查看已有评分或请求 AI 评分\n查看 AI 给出的评价与分数
+  1. 打开任意诗词详情页
+  2. 查看已有评分或请求 AI 评分
+  3. 查看 AI 给出的评价与分数
 - 常见问答：
   - 问：AI评分在哪里  答：在诗词详情页可以查看或请求 AI 评分，AI 会多维度评价并给出分数。
 ```
@@ -8212,24 +8313,47 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ## H9（hard）未登录时能查看自己的浏览历史吗？能体验哪些诗词游戏？
 
-**回答**：未登录用户**不能**查看自己的浏览历史，仅能体验部分诗词游戏。
+**回答**：未登录用户无法查看自己的浏览历史，但可体验部分诗词游戏。
 
-- **浏览历史权限**：需登录后在个人中心（`/user/profile`）查看与清空；未登录者无法访问该功能（来源：moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/ 浏览历史（feature.history））。
-- **可体验的游戏**：首页 AI 小工具区的「飞花令」与「诗词接龙」，游客点击即可展开内嵌窗口直接开局（来源：moyuan_system_workflow.md·系统工作流文档 / 15. 前端数据流转层 / 15.5 首页数据组装（K5））。
-- **游戏限制**：对局仅临时保存，无法查看历史记录；发布、收藏等操作仍需登录（来源：moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/ 游客与登录用户的权限差异（account.guest-limit））。
+- **浏览历史**：需登录后在个人中心（`/user/profile`）查看；历史记录由服务端保存，不存本地，未登录者不可见（来源：moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/ 浏览历史（feature.history）；moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/ 个人中心（page.profile））。
+- **诗词游戏**：未登录用户可在首页直接体验飞花令、诗词接龙等小工具，但对局仅临时保存，无法进入正式对局页；发布、评论、收藏等操作需登录后才能使用（来源：moyuan_system_knowledge.md·墨渊小助手系统知识库（24 条）/ 游客与登录用户的权限差异（account.guest-limit））。
 
 **评级**： 
 
 <details><summary>上下文</summary>
 
 ```
-【moyuan_business_modules.md · 业务模块说明 / 12. 浏览历史模块 / 功能说明】
-【章节：业务模块说明 / 12. 浏览历史模块 / 功能说明】
+【moyuan_business_modules.md · 业务模块说明 / 2. 诗词模块 / 功能说明】
+【章节：业务模块说明 / 2. 诗词模块 / 功能说明】
 ### 功能说明
 
-- 记录用户浏览历史
-- 查看浏览历史列表
-- 清空浏览历史
+- 诗词列表浏览（分页、筛选）
+- 按朝代筛选（先秦、汉朝、唐朝、宋朝等）
+- 按分类筛选（古体诗、近体诗、词、曲等）
+- 按诗人筛选
+- 诗词详情展示
+- 诗词译文、名人点评、创作背景
+- 点赞、收藏功能
+- **诗词评分**（新增）：用户评分（1.0-5.0分）和AI评分
+- **原创标识**（新增）：支持标记诗词为原创作品
+- **内容审核**（新增）：诗词发布后需经过审核
+- **外文诗词页签**（新增）：`/poem?tab=foreign` 展示已入库的 20 首英文名篇（`poem_type='foreign'`）；先读库、库空才实时兜底 PoetryDB（兜底结果不落库），加载超过 5 秒在过场动画上提示「检索耗时较久，请耐心等待…」
+
+【moyuan_business_modules.md · 业务模块说明 / 2. 诗词模块 / API 接口】
+【章节：业务模块说明 / 2. 诗词模块 / API 接口】
+### API 接口
+
+| 接口 | 说明 | 后端模块 |
+|------|------|----------|
+| GET /api/poems | 诗词列表 | backend PoemController |
+| GET /api/poems/modern/page | 分页获取现代诗词（支持筛选和排序） | sc-moyuan-backend PoemController |
+| GET /api/external-poetry/foreign | 外文诗词列表（先读库 `poem_type='foreign'`，库空实时兜底且不落库） | sc-moyuan-backend ExternalPoetryController |
+| GET /api/poems/{id} | 诗词详情 | backend PoemController |
+| GET /api/poems/search | 搜索诗词 | backend PoemController |
+| GET /api/poems/{id}/ratings | 获取诗词评分详情 | sc-moyuan-backend PoemRatingController |
+| POST /api/poems/{id}/ratings | 用户评分（1.0-5.0） | sc-moyuan-backend PoemRatingController |
+| POST /api/poems/{id}/ratings/ai | 请求AI评分 | sc-moyuan-backend PoemRatingController |
+| GET /api/poems/{id}/ratings/ai | 获取AI评分 | sc-moyuan-backend PoemRatingController |
 
 【moyuan_system_workflow.md · 系统工作流文档 / 5. 用户与个人中心域 / 5.2 浏览历史（B2）】
 【章节：系统工作流文档 / 5. 用户与个人中心域 / 5.2 浏览历史（B2）】
@@ -8242,47 +8366,6 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 ---
 
-【moyuan_system_workflow.md · 系统工作流文档 / 15. 前端数据流转层 / 15.3 诗词页面 Store 数据流（K3）】
-【章节：系统工作流文档 / 15. 前端数据流转层 / 15.3 诗词页面 Store 数据流（K3）】
-### 15.3 诗词页面 Store 数据流（K3）
-- **分步流程**：`usePoemStore` 的 `fetchPoemList`（`GET /poems`）写 `poemList/total/currentPage/pageSize`；`fetchPoemDetail`（`GET /poems/:id`）合并 `isLiked/isFavorited` 到 `currentPoem`；`fetchModernPoems` 走 `/poems/modern/page`。诗人页无独立 Store，直接 `getPoetList/getPoetById`。
-- **分类/朝代跳转兜底**：无 keyword 且带分类/朝代筛选、本地结果 `total===0` 时，`views/poem/list.vue` 依据流派→代表诗人映射（`GENRE_REPRESENTATIVE_POETS`）改以诗人关键词调 `GET /search/poems/external` 触发全网（接口盒子）搜索兜底，避免空页面。
-- **关键位置**：`stores/poem.ts`、`views/poem/{list,detail}.vue`、`views/poet/{list,detail}.vue`。
-
-【moyuan_system_workflow.md · 系统工作流文档 / 15. 前端数据流转层 / 15.4 localStorage 使用点汇总（K4）】
-【章节：系统工作流文档 / 15. 前端数据流转层 / 15.4 localStorage 使用点汇总（K4）】
-### 15.4 localStorage 使用点汇总（K4）
-> **代码事实核对**：收藏、AI 对话、浏览历史**并未真正写入 localStorage**（收藏走服务端、AI 聊天在内存 ref、历史走 `/history` API）。真实落盘 key 如下：
-- `token`/`refreshToken`（登录态双 token，user Store 直接写）
-- `lastAdminUsername`（admin 记录）
-- `home_nav_animation_config`（首页导航动画配置）
-- `moyuan_token`（storage 封装的登录 token，带过期结构）
-- `moyuan_user_preferences`（theme/language/fontSize/pageSize/sidebarCollapsed）
-- `moyuan_search_history`（上限 20 条）
-- `moyuan_form_draft_poem/forum/comment`
-- `moyuan_sort_preferences`（{poem,poet,forum}）
-- `moyuan_cache_dynasties/categories/poets`（筛选下拉，1h）
-- `moyuan_cache_external_poem_`（外部诗词详情，24h）
-- `moyuan_cache_`（外部搜索结果缓存）
-- **收藏/AI对话/浏览历史**：无 localStorage key，分别走服务端接口/内存/API。
-- **关键位置**：`utils/storage.ts`、`stores/preferences.ts/searchHistory.ts/formDraft.ts/apiCache.ts`。
-
-【moyuan_system_workflow.md · 系统工作流文档 / 15. 前端数据流转层 / 15.5 首页数据组装（K5）】
-【章节：系统工作流文档 / 15. 前端数据流转层 / 15.5 首页数据组装（K5）】
-### 15.5 首页数据组装（K5）
-- **轮播图**：静态 `/img/lb_*.jpg`、`/img/lb_shiwen_*.png`，无后端。
-- **今日诗词**：`DailyPoetry` → 后端 `GET /api/external-poetry/jinrishici` 代理（`v2.jinrishici.com/one.json`，后端 60 分钟进程内缓存，前端不再直连）。
-- **首页导航**：`GET /home-navigation`。
-- **精选诗人**：`getRandomPoetFeatured(8)`，去重取 4 位，每 20s 轮换。
-- **论坛预览**：`GET /forum/posts?pageSize=5`。
-- **古诗精赏**：本地 json + `GET /search/poems` + `/search/poems/recommended`。
-- **当代精选**：本地 json + like/favorite/comment 接口。
-- **AI 区块**：`/ai/write-poem`、`/ai/analyze`、`/ai/couplet`、`/ai/ocr`、`/ai/chat`（藏头诗、平仄格律校验，复用 `POST /api/ai/chat` 并传 `moduleCode=chat`，不新增后端接口）、`/rhyme/*`；"诗海拾贝"本地 json。
-- **小游戏区块**：首页 AI 小工具区「飞花令」「诗词接龙」两张卡片——游客点击展开内嵌小窗口（`GameMiniPanel`）直接开局，登录用户跳转 `/game/feihua`、`/game/chain`；后端为独立游戏模块（`/api/game/feihua`、`/api/game/chain`，见 `modules.md` 第 24 章）。
-- **诗话视野**：`GET /vision/articles`。
-- **诗词卡片跳转**：首页「古诗精赏 / 当代精选」卡片点击经组合式函数 `composables/usePoemCardNavigation.ts` 处理——本地命中直接 `router.push('/poem/{id}')`，未命中回退 `PoetryDetailDialog`（外部诗词弹窗，可由接口盒子实时增强）。
-- **关键位置**：`views/home/index.vue`、`components/{home,business}/*`、`composables/usePoemCardNavigation.ts`、`api/modules/*`。
-
 【moyuan_system_knowledge.md · 墨渊小助手系统知识库（24 条） / 飞花令（play.feihualing）】
 【章节：墨渊小助手系统知识库（24 条） / 飞花令（play.feihualing）】
 ## 飞花令（play.feihualing）
@@ -8293,7 +8376,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/game/feihua
 - 说明：飞花令是与 AI 对句的诗词游戏，你每回合说出一句含指定「令字」的真实古诗词名句，AI 轮流接句，接不上或超时即判负。入口在首页 AI 小工具区的「飞花令」卡片，登录用户点击后进入对局页。有古制严格、标准版、超级飞花令三种模式与三档难度可选。现代诗不参与本游戏。
 - 使用步骤：
-  1. 选择模式与难度\n设定令字（如「花」）\n每回合提交一句含令字的古诗词，单回合限时 30 秒\n与 AI 交替接句，AI 接不上或你超时判负
+  1. 选择模式与难度
+  2. 设定令字（如「花」）
+  3. 每回合提交一句含令字的古诗词，单回合限时 30 秒
+  4. 与 AI 交替接句，AI 接不上或你超时判负
 - 常见问答：
   - 问：飞花令怎么玩  答：每回合提交一句含指定令字的真实古诗词名句，与 AI 交替接句，AI 接不上或你超时则对方判负。
   - 问：在哪里能玩飞花令  答：首页 AI 小工具区有「飞花令」卡片，登录用户点击进入对局页。
@@ -8309,7 +8395,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poem
 - 说明：寻章摘句即诗词列表页，支持按朝代、分类、诗人筛选，也能用关键词搜索诗词；题库只含古诗，现代诗单独成页。全局搜索能力内嵌在首页与诗词列表页中，没有单独的搜索页。未登录用户也能浏览与搜索。
 - 使用步骤：
-  1. 进入诗词列表页\n通过筛选项或关键词查找诗词\n点开卡片查看诗词详情
+  1. 进入诗词列表页
+  2. 通过筛选项或关键词查找诗词
+  3. 点开卡片查看诗词详情
 - 常见问答：
   - 问：寻章摘句在哪里  答：寻章摘句就是诗词列表页，可在顶部导航进入，支持筛选与关键词搜索。
   - 问：怎么搜索诗词  答：在诗词列表页输入关键词即可搜索，也可按朝代、分类、诗人筛选。
@@ -8324,7 +8412,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/user/profile
 - 说明：个人中心可查看与修改个人资料、上传头像、修改密码，并查看我的收藏、我的点赞、我的帖子和浏览历史。诗人认证申请也从个人中心提交。需要登录后进入。
 - 使用步骤：
-  1. 登录后进入个人中心\n修改资料、头像或密码\n查看收藏、点赞、帖子与浏览历史\n需要时提交诗人认证申请
+  1. 登录后进入个人中心
+  2. 修改资料、头像或密码
+  3. 查看收藏、点赞、帖子与浏览历史
+  4. 需要时提交诗人认证申请
 - 常见问答：
   - 问：个人中心在哪里  答：登录后可从用户菜单进入个人中心，管理资料、收藏、历史并提交诗人认证。
 
@@ -8338,7 +8429,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poem
 - 说明：智能检索支持按关键词搜索诗词、诗人与帖子，首页与诗词列表页内嵌了搜索入口。搜索会记录你的历史，登录后还会根据兴趣给出推荐。
 - 使用步骤：
-  1. 在首页或诗词列表页输入关键词\n查看匹配的诗词、诗人或帖子\n点开结果查看详情
+  1. 在首页或诗词列表页输入关键词
+  2. 查看匹配的诗词、诗人或帖子
+  3. 点开结果查看详情
 - 常见问答：
   - 问：怎么搜索  答：在首页或诗词列表页的搜索框输入关键词，即可搜索诗词、诗人与帖子。
 
@@ -8352,7 +8445,9 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/user/profile
 - 说明：浏览历史记录你访问过的诗词与诗人，登录后可在个人中心查看，也支持清空。历史通过服务端接口保存，不存放在本地。
 - 使用步骤：
-  1. 登录后浏览诗词或诗人\n在个人中心查看浏览历史\n需要时清空历史记录
+  1. 登录后浏览诗词或诗人
+  2. 在个人中心查看浏览历史
+  3. 需要时清空历史记录
 - 常见问答：
   - 问：浏览历史在哪  答：登录后在个人中心可以查看浏览历史，并支持清空。
 
@@ -8365,7 +8460,8 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 别名：游客权限
 - 说明：未登录的游客可以浏览诗词、诗人、帖子与文章，也能在首页直接体验飞花令、诗词接龙等小工具（对局仅临时保存）。发布诗词、发帖、评论、点赞、收藏、报修、诗人认证等操作需要登录后才能使用。
 - 使用步骤：
-  1. 未登录时浏览诗词等公开内容\n登录后解锁发布、评论、收藏等操作
+  1. 未登录时浏览诗词等公开内容
+  2. 登录后解锁发布、评论、收藏等操作
 - 常见问答：
   - 问：不登录能用吗  答：不登录可以浏览诗词、诗人、帖子与文章，也能在首页体验飞花令等小工具；发布、评论、收藏等需要登录。
 ```
@@ -8375,7 +8471,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 
 **回答**：诗云模块中诗人节点大小由其名下诗作数量自适应决定，具体计算公式为 `starSize = 2.4 + log10(作品数+1) * 1.2`（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 数据可视化）。
 
-3D 坐标数据存储在内存 ref 中，具体为缓存 `poetPositionMap` 的内存对象，不保存至 localStorage（来源：moyuan_system_workflow.md·系统工作流文档 / 15. 前端数据流转层 / 15.6 诗云 3D 星空（K6））。
+3D 坐标数据存储在内存 ref 中，不保存至 localStorage。具体细节如下：
+- **存储位置**：使用 `poetPositionMap` 缓存每位诗人的 3D 坐标，以及 `poemCountMap` 缓存诗作数量用于计算节点尺寸（来源：moyuan_system_workflow.md·系统工作流文档 / 15.6 诗云 3D 星空（K6））。
+- **数据生成**：诗人星位置通过黄金角球面螺旋算法生成，坐标经 `initScene` 初始化并缓存于内存（来源：moyuan_business_modules.md·业务模块说明 / 23. 诗云模块 / 数据可视化；moyuan_system_workflow.md·系统工作流文档 / 15.6 诗云 3D 星空（K6））。
+- **生命周期**：组件卸载时通过 `onUnmounted` 释放 geometry/material 并清理内存缓存，确保无持久化存储（来源：moyuan_system_workflow.md·系统工作流文档 / 15.6 诗云 3D 星空（K6））。
 
 **评级**： 
 
@@ -8513,7 +8612,10 @@ verified_status=0` | `PUT /api/admin/poet-profiles/{id}/verify` |
 - 前端路由：/poetry-cloud
 - 说明：诗云是用 3D 星空展示古诗数据的可视化页面，每位诗人是一颗星，其诗作环绕分布，可缩放旋转浏览。点击诗人星可查看诗人信息与代表作品，点击诗作节点可查看诗词详情。页面底部「配色实验室」可切换配色方案并调节光晕、连线、亮度等显示效果。
 - 使用步骤：
-  1. 进入诗云页面\n拖动旋转、滚轮缩放浏览星图\n点击诗人星查看诗人信息与作品\n点击诗作节点查看诗词详情
+  1. 进入诗云页面
+  2. 拖动旋转、滚轮缩放浏览星图
+  3. 点击诗人星查看诗人信息与作品
+  4. 点击诗作节点查看诗词详情
 - 常见问答：
   - 问：诗云是什么  答：诗云是把古诗词数据做成 3D 星空的页面，诗人是星、诗作围绕其分布，可交互浏览。
   - 问：诗云怎么用  答：拖动旋转、滚轮缩放浏览星图，点击诗人或诗作节点查看详情。

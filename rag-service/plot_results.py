@@ -45,6 +45,7 @@ def main():
     )
     ax1.set_ylabel("检索质量（二值相关）")
     ax1.set_ylim(0, 1.05)
+    ax1.set_xlim(-0.55, len(keys) - 0.42)
     ax1.set_xticks(list(x))
     ax1.set_xticklabels(labels, fontsize=9)
     for bar in list(bars1) + list(bars2):
@@ -66,7 +67,8 @@ def main():
     for i, value in zip(x, latency):
         ax2.annotate(
             f"{value:.0f}ms", (i, value), textcoords="offset points",
-            xytext=(0, 9), ha="center", fontsize=8, color="#C44E52",
+            xytext=(17, 0), ha="left", va="center", fontsize=8, color="#C44E52",
+            bbox=dict(boxstyle="round,pad=0.18", fc="white", ec="none", alpha=0.85),
         )
     ax2.legend(loc="lower left", fontsize=9)
 
