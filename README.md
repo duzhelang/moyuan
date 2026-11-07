@@ -1079,6 +1079,7 @@ A: 管理员可以在后台管理页面配置 AI 模型：
 ## 更新日志
 
 ### v1.16.0 (2026-11-08)
+- ✅ 新增内容风控评测（150 条人工标注样本，生产链路实测）：二分类 Acc 0.840 / P 1.000 / R 0.700 / F1 0.824，误报率 0、漏报率 0.300，三分类一致率 0.680；含模型异常降级验证与实验数据（`experiments/风控实验_20261108/`）
 - ✅ `init.sql` 升级至 v3.7：审核流水线三表 `audit_reviewer` / `audit_rule` / `audit_ticket` 从根目录 `audit_pipeline.sql` 合并进权威建表脚本，建表总数 35→44
 - ✅ 同步确认指标日志四表（`api_request_metric` / `search_log` / `ai_call_log` / `security_event`）与举报/通知两表（`user_report` / `user_notification`）已在 `init.sql` 内
 - ✅ 数据库文档、架构文档、开发指南与实体映射同步至 44 张表 / 43 个实体
