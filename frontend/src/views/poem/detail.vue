@@ -11,6 +11,7 @@ import { getComments, createComment, likeComment } from '@/api/modules/forum'
 import { addHistory } from '@/api/modules/history'
 import { fillAiContent, getFillStatus, previewAiContent, submitForReview } from '@/api/modules/ai'
 import LoginPrompt from '@/components/common/LoginPrompt.vue'
+import ReportDialog from '@/components/common/ReportDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -43,6 +44,35 @@ const currentRating = ref<any>(null)
 const reRateDialogVisible = ref(false)
 
 const loginPromptVisible = ref(false)
+
+const reportVisible = ref(false)
+const reportType = ref<'poem' | 'comment'>('comment')
+const reportId = ref(0)
+const reportTitle = ref('')
+
+const openPoemReport = () => {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录后再举报')
+    router.push({ name: 'Login', query: { redirect: route.fullPath } })
+    return
+  }
+  reportType.value = 'poem'
+  reportId.value = poemId.value
+  reportTitle.value = poem.value?.title || ''
+  reportVisible.value = true
+}
+
+const openCommentReport = (comment: Comment) => {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录后再举报')
+    router.push({ name: 'Login', query: { redirect: route.fullPath } })
+    return
+  }
+  reportType.value = 'comment'
+  reportId.value = comment.id
+  reportTitle.value = comment.content?.slice(0, 20) || ''
+  reportVisible.value = true
+}
 
 const fillStatusMap = ref<Record<string, any>>({})
 const fillingField = ref('')
@@ -463,6 +493,10 @@ onMounted(async () => {
             <el-icon><View /></el-icon>
             {{ poem.viewCount }} 次浏览
           </span>
+          <el-button text class="poem-report-btn" @click="openPoemReport">
+            <el-icon><Warning /></el-icon>
+            举报
+          </el-button>
         </div>
       </el-card>
 
@@ -830,6 +864,10 @@ onMounted(async () => {
                 <el-icon><ChatDotRound /></el-icon>
                 回复
               </el-button>
+              <el-button text size="small" @click="openCommentReport(comment)">
+                <el-icon><Warning /></el-icon>
+                举报
+              </el-button>
             </div>
           </div>
         </div>
@@ -849,6 +887,13 @@ onMounted(async () => {
     <LoginPrompt
       v-model:visible="loginPromptVisible"
       message="AI对话功能需要登录后才能使用"
+    />
+
+    <ReportDialog
+      v-model="reportVisible"
+      :target-type="reportType"
+      :target-id="reportId"
+      :target-title="reportTitle"
     />
   </div>
 </template>
@@ -1079,6 +1124,11 @@ onMounted(async () => {
   .view-count {
     font-family: $font-family-title;
     color: $text-color-secondary;
+  }
+
+  .poem-report-btn {
+    margin-left: auto;
+    color: #b45f4d;
   }
 }
 

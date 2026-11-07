@@ -6,6 +6,7 @@ import type { ForumPost, Comment } from '@/types/model'
 import { getForumPostById, likeForumPost, getComments, createComment, likeComment } from '@/api/modules/forum'
 import { addHistory } from '@/api/modules/history'
 import { useUserStore } from '@/stores/user'
+import ReportDialog from '@/components/common/ReportDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -20,6 +21,23 @@ const commentSize = ref(10)
 
 const newComment = ref('')
 const submittingComment = ref(false)
+
+const reportVisible = ref(false)
+const reportType = ref<'post' | 'comment'>('post')
+const reportId = ref(0)
+const reportTitle = ref('')
+
+const openReport = (type: 'post' | 'comment', id: number, title: string) => {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录后再举报')
+    router.push({ name: 'Login', query: { redirect: route.fullPath } })
+    return
+  }
+  reportType.value = type
+  reportId.value = id
+  reportTitle.value = title
+  reportVisible.value = true
+}
 
 const postId = computed(() => Number(route.params.id))
 
@@ -150,6 +168,10 @@ onMounted(() => {
             <el-icon><ChatDotRound /></el-icon>
             {{ post.commentCount }} 条评论
           </span>
+          <el-button text class="report-btn" @click="openReport('post', post.id, post.title)">
+            <el-icon><Warning /></el-icon>
+            举报
+          </el-button>
         </div>
       </el-card>
       
@@ -206,6 +228,10 @@ onMounted(() => {
                 <el-icon><ChatDotRound /></el-icon>
                 回复
               </el-button>
+              <el-button text size="small" @click="openReport('comment', comment.id, comment.content?.slice(0, 20) || '')">
+                <el-icon><Warning /></el-icon>
+                举报
+              </el-button>
             </div>
           </div>
         </div>
@@ -221,6 +247,13 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <ReportDialog
+      v-model="reportVisible"
+      :target-type="reportType"
+      :target-id="reportId"
+      :target-title="reportTitle"
+    />
   </div>
 </template>
 
@@ -343,6 +376,11 @@ onMounted(() => {
       box-shadow: $box-shadow;
     }
   }
+}
+
+.report-btn {
+  margin-left: auto;
+  color: #b45f4d;
 }
 
 .view-count,

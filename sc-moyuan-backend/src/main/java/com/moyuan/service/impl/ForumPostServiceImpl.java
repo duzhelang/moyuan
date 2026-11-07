@@ -16,7 +16,9 @@ import com.moyuan.exception.BusinessException;
 import com.moyuan.mapper.ForumPostMapper;
 import com.moyuan.mapper.UserLikeMapper;
 import com.moyuan.mapper.UserMapper;
+import com.moyuan.service.AiModerationService;
 import com.moyuan.service.ForumPostService;
+import com.moyuan.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,8 @@ public class ForumPostServiceImpl extends ServiceImpl<ForumPostMapper, ForumPost
     private final ForumPostMapper forumPostMapper;
     private final UserLikeMapper userLikeMapper;
     private final UserMapper userMapper;
+    private final AiModerationService aiModerationService;
+    private final NotificationService notificationService;
 
     private void fillUserInfo(List<ForumPost> posts) {
         if (posts == null || posts.isEmpty()) return;
@@ -92,6 +96,10 @@ public class ForumPostServiceImpl extends ServiceImpl<ForumPostMapper, ForumPost
     @Override
     @Transactional
     public ForumPost createPost(Long userId, ForumPostCreateRequest request) {
+        // 发布前先过 AI 风控；模型异常会自行降级为低风险，不阻断发布
+        AiModerationService.ModerationResult moderation =
+                aiModerationService.analyze("post", request.getTitle(), request.getContent());
+
         ForumPost post = new ForumPost();
         post.setTitle(request.getTitle());
         post.setContent(request.getContent());
@@ -103,7 +111,14 @@ public class ForumPostServiceImpl extends ServiceImpl<ForumPostMapper, ForumPost
         post.setIsTop(0);
         post.setIsFeatured(0);
         post.setStatus(1);
+        if (moderation.isHigh()) {
+            // 高风险内容先限制展示，等待人工复核
+            post.setStatus(2);
+            post.setAuditReason("AI风控：" + moderation.reason());
+            post.setAuditTime(java.time.LocalDateTime.now());
+        }
         forumPostMapper.insert(post);
+        aiModerationService.handleRisk("post", post.getId(), userId, moderation);
         return post;
     }
 
@@ -185,5 +200,10 @@ public class ForumPostServiceImpl extends ServiceImpl<ForumPostMapper, ForumPost
         post.setAuditReason(reason);
         post.setAuditTime(java.time.LocalDateTime.now());
         forumPostMapper.updateById(post);
+        notificationService.push(post.getUserId(), "audit_result",
+                status == 1 ? "帖子审核通过" : "帖子未通过审核",
+                (status == 1 ? "你发布的帖子已通过审核。" : "你发布的帖子未通过审核。")
+                        + (StringUtils.hasText(reason) ? "原因：" + reason : ""),
+                "post", postId, "/forum/" + postId);
     }
 }

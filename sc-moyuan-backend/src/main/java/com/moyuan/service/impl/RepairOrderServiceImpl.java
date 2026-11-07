@@ -25,6 +25,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
@@ -34,6 +35,9 @@ public class RepairOrderServiceImpl extends ServiceImpl<RepairOrderMapper, Repai
 
     private final RepairCommentMapper repairCommentMapper;
     private final UserMapper userMapper;
+
+    /** 报修只受理系统 Bug 类问题：故障、功能异常、界面异常、数据异常、其他系统问题 */
+    private static final Set<String> REPAIR_CATEGORIES = Set.of("system", "function", "ui", "data", "other");
 
     private String generateOrderNo() {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
@@ -131,6 +135,10 @@ public class RepairOrderServiceImpl extends ServiceImpl<RepairOrderMapper, Repai
     @Override
     @Transactional
     public RepairOrder createOrder(Long userId, RepairOrderCreateRequest request) {
+        if (!StringUtils.hasText(request.getCategory())
+                || !REPAIR_CATEGORIES.contains(request.getCategory())) {
+            throw new BusinessException("报修仅受理系统 Bug 类问题，请选择系统故障、功能异常、界面异常或数据异常");
+        }
         RepairOrder order = new RepairOrder();
         order.setOrderNo(generateOrderNo());
         order.setTitle(request.getTitle());
@@ -240,6 +248,15 @@ public class RepairOrderServiceImpl extends ServiceImpl<RepairOrderMapper, Repai
         RepairOrder order = this.baseMapper.selectById(orderId);
         if (order == null) {
             throw new BusinessException(ResultCode.REPAIR_ORDER_NOT_FOUND);
+        }
+        // 报修处理人只能是管理员或审核员，避免把系统 Bug 工单派给普通用户
+        User assignee = userMapper.selectById(assigneeId);
+        if (assignee == null || assignee.getStatus() == null || assignee.getStatus() != 1) {
+            throw new BusinessException("处理人不存在或已被禁用");
+        }
+        // 报修是系统 Bug 工单，由管理员统一处理；审核员专注内容审核
+        if (!"admin".equalsIgnoreCase(assignee.getRole())) {
+            throw new BusinessException("处理人必须是管理员");
         }
         order.setAssigneeId(assigneeId);
         if (order.getStatus() == 0) {

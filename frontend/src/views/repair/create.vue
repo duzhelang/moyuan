@@ -23,11 +23,11 @@ const form = reactive({
 })
 
 const categoryOptions = [
-  { value: 'system', label: '系统故障' },
-  { value: 'function', label: '功能异常' },
-  { value: 'ui', label: '界面问题' },
-  { value: 'data', label: '数据问题' },
-  { value: 'other', label: '其他' }
+  { value: 'system', label: '系统故障（页面打不开/报错）' },
+  { value: 'function', label: '功能异常（按钮失效/流程卡住）' },
+  { value: 'ui', label: '界面显示异常' },
+  { value: 'data', label: '数据异常（内容/统计错误）' },
+  { value: 'other', label: '其他系统问题' }
 ]
 
 const priorityOptions = [
@@ -191,6 +191,14 @@ const handleLogout = async () => {
     </div>
 
     <el-card class="form-card">
+      <el-alert
+        type="info"
+        :closable="false"
+        show-icon
+        title="报修仅受理系统 Bug，不受理用户举报"
+        description="页面报错、功能失效、界面显示异常、数据错误等系统问题可在此提交；帖子、评论、用户违规等用户之间的举报，请在对应内容旁的「举报」入口提交，处理结果会通过站内通知告知。"
+        class="scope-tip"
+      />
       <el-form
         ref="formRef"
         :model="form"
@@ -211,7 +219,7 @@ const handleLogout = async () => {
           <el-input
             v-model="form.description"
             type="textarea"
-            placeholder="请详细描述您遇到的问题"
+            placeholder="请描述：在哪个页面、做了什么操作、出现了什么异常，便于快速定位"
             :rows="6"
             maxlength="2000"
             show-word-limit
@@ -330,6 +338,10 @@ const handleLogout = async () => {
 
 .form-card {
   border-radius: 8px;
+}
+
+.scope-tip {
+  margin-bottom: 18px;
 }
 
 .form-tip {

@@ -4,12 +4,16 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import UserMenuDropdown from '@/components/common/UserMenuDropdown.vue'
+import { usePermission } from '@/composables/usePermission'
+import { getUnreadCount } from '@/api/modules/notification'
 
 const router = useRouter()
 const userStore = useUserStore()
+const { roleName } = usePermission()
 const currentTime = ref('')
 const mobileMenuVisible = ref(false)
 const isMobile = ref(window.innerWidth <= 768)
+const unreadCount = ref(0)
 
 const asset = (path: string) => path
 
@@ -26,9 +30,23 @@ const updateTime = () => {
 }
 
 let timeTimer: ReturnType<typeof setInterval> | null = null
+let notificationTimer: ReturnType<typeof setInterval> | null = null
 
 const checkMobile = () => {
   isMobile.value = window.innerWidth <= 768
+}
+
+const fetchUnreadCount = async () => {
+  if (!userStore.isLoggedIn) {
+    unreadCount.value = 0
+    return
+  }
+  try {
+    const res = await getUnreadCount()
+    unreadCount.value = res.data?.count || 0
+  } catch {
+    // 未读数属于增强信息，失败静默
+  }
 }
 
 onMounted(() => {
@@ -38,10 +56,13 @@ onMounted(() => {
   if (userStore.isLoggedIn && !userStore.userInfo) {
     userStore.fetchUserInfo()
   }
+  fetchUnreadCount()
+  notificationTimer = setInterval(fetchUnreadCount, 60000)
 })
 
 onUnmounted(() => {
   if (timeTimer) clearInterval(timeTimer)
+  if (notificationTimer) clearInterval(notificationTimer)
   window.removeEventListener('resize', checkMobile)
 })
 
@@ -73,7 +94,12 @@ const goToRegister = () => {
 
 const goToAdmin = () => {
   mobileMenuVisible.value = false
-  router.push('/admin/dashboard')
+  router.push(userStore.userInfo?.role === 'reviewer' ? '/admin/audit-pipeline' : '/admin/dashboard')
+}
+
+const goToNotifications = () => {
+  mobileMenuVisible.value = false
+  router.push('/notifications')
 }
 
 const goToCreatePoem = () => {
@@ -108,6 +134,11 @@ const goToCreatePoem = () => {
         <div class="contact-item" @click="router.push('/contact')">
           <span class="contact-text">联系我们</span>
         </div>
+        <div class="notification-entry" v-if="userStore.isLoggedIn && userStore.userInfo" title="站内通知" @click="goToNotifications">
+          <el-badge :value="unreadCount" :max="99" :hidden="unreadCount === 0">
+            <el-icon :size="20"><Bell /></el-icon>
+          </el-badge>
+        </div>
         <div class="divider"></div>
         <div class="user-actions">
           <template v-if="userStore.isLoggedIn && userStore.userInfo">
@@ -140,7 +171,7 @@ const goToCreatePoem = () => {
           </el-avatar>
           <div class="mobile-user-info">
             <span class="mobile-user-name">{{ userStore.userInfo?.nickname || userStore.username }}</span>
-            <span class="mobile-user-role">{{ userStore.userInfo?.role === 'admin' ? '管理员' : '用户' }}</span>
+            <span class="mobile-user-role">{{ roleName }}</span>
           </div>
         </div>
         
@@ -155,9 +186,17 @@ const goToCreatePoem = () => {
             <el-icon><Edit /></el-icon>
             <span>发布新诗</span>
           </div>
-          <div class="mobile-menu-item" @click="goToAdmin" v-if="userStore.userInfo?.role === 'admin'">
+          <div class="mobile-menu-item" @click="goToNotifications" v-if="userStore.isLoggedIn && userStore.userInfo">
+            <el-icon><Bell /></el-icon>
+            <span>站内通知{{ unreadCount > 0 ? `（${unreadCount}）` : '' }}</span>
+          </div>
+          <div
+            class="mobile-menu-item"
+            @click="goToAdmin"
+            v-if="userStore.userInfo?.role === 'admin' || userStore.userInfo?.role === 'reviewer'"
+          >
             <el-icon><Setting /></el-icon>
-            <span>后台管理</span>
+            <span>{{ userStore.userInfo?.role === 'reviewer' ? '审核工作台' : '后台管理' }}</span>
           </div>
         </div>
         
@@ -331,6 +370,24 @@ const goToCreatePoem = () => {
   to {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+  }
+}
+
+.notification-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #f5f5f5;
+  transition: color 0.2s ease, transform 0.2s ease;
+
+  &:hover {
+    color: #fff;
+    transform: scale(1.08);
+  }
+
+  :deep(.el-badge__content) {
+    border: none;
   }
 }
 

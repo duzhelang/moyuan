@@ -2,7 +2,7 @@
 import { ref, onMounted, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
-import { getAdminRepairs, getAdminRepairDetail, updateRepairStatus, assignRepairOrder, addRepairInternalComment, getRepairStats, getAdminRepairComments } from '@/api/modules/admin'
+import { getAdminRepairs, getAdminRepairDetail, updateRepairStatus, assignRepairOrder, addRepairInternalComment, getRepairStats, getAdminRepairComments, getUserList } from '@/api/modules/admin'
 
 const tableData = ref<any[]>([])
 const total = ref(0)
@@ -29,11 +29,11 @@ const statusOptions = [
 
 const categoryOptions = [
   { value: '', label: '全部' },
-  { value: 'system', label: '系统故障' },
+  { value: 'system', label: '系统故障（页面报错）' },
   { value: 'function', label: '功能异常' },
-  { value: 'ui', label: '界面问题' },
-  { value: 'data', label: '数据问题' },
-  { value: 'other', label: '其他' }
+  { value: 'ui', label: '界面显示异常' },
+  { value: 'data', label: '数据异常' },
+  { value: 'other', label: '其他系统问题' }
 ]
 
 const priorityOptions = [
@@ -45,11 +45,11 @@ const priorityOptions = [
 ]
 
 const categoryMap: Record<string, string> = {
-  system: '系统故障',
+  system: '系统故障（页面报错）',
   function: '功能异常',
-  ui: '界面问题',
-  data: '数据问题',
-  other: '其他'
+  ui: '界面显示异常',
+  data: '数据异常',
+  other: '其他系统问题'
 }
 
 const priorityMap: Record<number, { text: string; type: string }> = {
@@ -82,6 +82,18 @@ const assignDialogVisible = ref(false)
 const assignForm = reactive({
   assigneeId: null as number | null
 })
+const assigneeOptions = ref<any[]>([])
+
+const loadAssigneeOptions = async () => {
+  try {
+    const res = await getUserList({ page: 1, size: 200 })
+    assigneeOptions.value = (res.data.records || []).filter(
+      (u: any) => u.status === 1 && u.role === 'admin'
+    )
+  } catch (error) {
+    console.error('获取处理人列表失败', error)
+  }
+}
 
 const internalCommentDialogVisible = ref(false)
 const internalCommentForm = reactive({
@@ -186,11 +198,14 @@ const handleOpenAssign = (row: any) => {
   currentDetail.value = row
   assignForm.assigneeId = row.assigneeId || null
   assignDialogVisible.value = true
+  if (!assigneeOptions.value.length) {
+    loadAssigneeOptions()
+  }
 }
 
 const handleAssign = async () => {
   if (!assignForm.assigneeId) {
-    ElMessage.warning('请输入处理人ID')
+    ElMessage.warning('请选择处理人')
     return
   }
   try {
@@ -233,6 +248,7 @@ const handleInternalComment = async () => {
 onMounted(() => {
   fetchData()
   fetchStats()
+  loadAssigneeOptions()
 })
 </script>
 
@@ -451,10 +467,24 @@ onMounted(() => {
       </template>
     </el-dialog>
 
-    <el-dialog v-model="assignDialogVisible" title="分配处理人" width="400px">
+    <el-dialog v-model="assignDialogVisible" title="分配处理人" width="440px">
+      <el-alert
+        type="info"
+        :closable="false"
+        show-icon
+        title="报修工单为系统 Bug 类问题，由管理员统一处理"
+        class="assign-tip"
+      />
       <el-form label-width="80px">
-        <el-form-item label="处理人ID">
-          <el-input-number v-model="assignForm.assigneeId" :min="1" style="width: 100%" />
+        <el-form-item label="处理人">
+          <el-select v-model="assignForm.assigneeId" placeholder="选择处理人" filterable style="width: 100%">
+            <el-option
+              v-for="u in assigneeOptions"
+              :key="u.id"
+              :label="`${u.nickname || u.username}（管理员）`"
+              :value="u.id"
+            />
+          </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -490,6 +520,10 @@ onMounted(() => {
   padding: 0;
 }
 
+.assign-tip {
+  margin-bottom: 14px;
+}
+
 .page-title {
   font-size: 20px;
   font-weight: 600;
@@ -508,26 +542,26 @@ onMounted(() => {
 .stat-value {
   font-size: 32px;
   font-weight: 700;
-  color: #303133;
+  color: var(--adm-text);
   line-height: 1.2;
 }
 
 .stat-label {
   font-size: 14px;
-  color: #909399;
+  color: var(--adm-text-muted);
   margin-top: 8px;
 }
 
 .stat-pending .stat-value {
-  color: #e6a23c;
+  color: var(--adm-warn);
 }
 
 .stat-processing .stat-value {
-  color: #409eff;
+  color: var(--adm-primary);
 }
 
 .stat-resolved .stat-value {
-  color: #67c23a;
+  color: var(--adm-ok);
 }
 
 .search-card {
@@ -555,7 +589,7 @@ onMounted(() => {
 }
 
 .internal-comment {
-  background-color: #fdf6ec;
+  background-color: color-mix(in srgb, var(--adm-warn) 12%, transparent);
 }
 
 .comment-header {
@@ -567,7 +601,7 @@ onMounted(() => {
 
 .comment-user {
   font-weight: 600;
-  color: #333;
+  color: var(--adm-text);
 }
 
 .comment-content {
@@ -577,7 +611,7 @@ onMounted(() => {
 
 .no-comments {
   text-align: center;
-  color: #909399;
+  color: var(--adm-text-muted);
   padding: 20px 0;
 }
 </style>

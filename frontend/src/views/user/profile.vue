@@ -7,10 +7,18 @@ import type { FormInstance, FormRules, UploadProps, UploadFile } from 'element-p
 import { getMyFavorites, favoritePoem } from '@/api/modules/poem'
 import { getMyPosts, getUserStats } from '@/api/modules/user'
 import { getHistory, clearHistory } from '@/api/modules/history'
+import { usePermission } from '@/composables/usePermission'
 import type { Poem, ForumPost } from '@/types/model'
 
 const router = useRouter()
 const userStore = useUserStore()
+const { currentRole, roleName } = usePermission()
+const roleTagType = computed(() => {
+  if (currentRole.value === 'admin') return 'danger'
+  if (currentRole.value === 'reviewer') return 'warning'
+  if (currentRole.value === 'poet') return 'success'
+  return 'primary'
+})
 
 const formRef = ref<FormInstance>()
 const loading = ref(false)
@@ -434,8 +442,8 @@ onMounted(() => {
             </el-upload>
             <h3 class="username">{{ userStore.userInfo?.nickname || userStore.username }}</h3>
             <p class="user-role">
-              <el-tag :type="userStore.userInfo?.role === 'admin' ? 'danger' : 'primary'" size="small">
-                {{ userStore.userInfo?.role === 'admin' ? '管理员' : '普通用户' }}
+              <el-tag :type="roleTagType" size="small">
+                {{ roleName }}
               </el-tag>
             </p>
             <p class="user-bio">{{ form.bio || '这个人很懒，什么都没留下' }}</p>

@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { ForumPost } from '@/types/model'
 import { getForumPostList } from '@/api/modules/forum'
 import { useParticles } from '@/composables/useParticles'
+import { useUserStore } from '@/stores/user'
+import ReportDialog from '@/components/common/ReportDialog.vue'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 const particleCanvasRef = ref<HTMLCanvasElement | null>(null)
 useParticles(particleCanvasRef, {
@@ -58,6 +61,20 @@ const goToDetail = (id: number) => {
 
 const goToCreate = () => {
   router.push('/forum/create')
+}
+
+const reportVisible = ref(false)
+const reportTarget = reactive({ id: 0, title: '' })
+
+const openReport = (post: ForumPost) => {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录后再举报')
+    router.push({ name: 'Login', query: { redirect: '/forum' } })
+    return
+  }
+  reportTarget.id = post.id
+  reportTarget.title = post.title
+  reportVisible.value = true
 }
 
 onMounted(() => {
@@ -160,6 +177,10 @@ onMounted(() => {
               <el-icon><ChatDotRound /></el-icon>
               {{ post.commentCount }}
             </span>
+            <span class="meta-item report-link" @click.stop="openReport(post)">
+              <el-icon><Warning /></el-icon>
+              举报
+            </span>
           </div>
         </div>
       </div>
@@ -174,6 +195,13 @@ onMounted(() => {
         />
       </div>
     </div>
+
+    <ReportDialog
+      v-model="reportVisible"
+      target-type="post"
+      :target-id="reportTarget.id"
+      :target-title="reportTarget.title"
+    />
   </div>
 </template>
 
@@ -471,6 +499,15 @@ onMounted(() => {
 
   &:hover {
     color: $primary-color;
+  }
+}
+
+.report-link {
+  margin-left: auto;
+  cursor: pointer;
+
+  &:hover {
+    color: #d4583f;
   }
 }
 

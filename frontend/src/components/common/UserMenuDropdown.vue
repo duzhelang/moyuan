@@ -41,7 +41,7 @@ const handleUserCommand = (command: string) => {
       router.push('/poem/create')
       break
     case 'admin':
-      router.push('/admin/dashboard')
+      router.push(userStore.userInfo?.role === 'reviewer' ? '/admin/audit-pipeline' : '/admin/dashboard')
       break
     case 'logout':
       handleLogout()
@@ -86,9 +86,13 @@ const handleUserCommand = (command: string) => {
           <el-icon><Edit /></el-icon>
           发布新诗
         </el-dropdown-item>
-        <el-dropdown-item v-if="userStore.userInfo?.role === 'admin'" divided command="admin">
+        <el-dropdown-item
+          v-if="userStore.userInfo?.role === 'admin' || userStore.userInfo?.role === 'reviewer'"
+          divided
+          command="admin"
+        >
           <el-icon><Setting /></el-icon>
-          后台管理
+          {{ userStore.userInfo?.role === 'reviewer' ? '审核工作台' : '后台管理' }}
         </el-dropdown-item>
         <el-dropdown-item divided command="logout">
           <el-icon><SwitchButton /></el-icon>
