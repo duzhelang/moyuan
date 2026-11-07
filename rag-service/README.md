@@ -36,6 +36,10 @@ python build_index.py
 python app.py
 ```
 
+> 后端联调时不必手动执行第 3 步：Spring Boot 启动时会先探测 8010，未监听则自动执行 `python app.py`
+> （配置项 `moyuan.rag-service.*`，测试 profile 不启用）。首次启动需导入依赖，约 30 秒后就绪，
+> 子进程日志写入后端工作目录下的 `logs/rag-service.log`。
+
 前端开发时 Vite 已把 `/rag` 代理到 `http://127.0.0.1:8010`，管理员页面入口：
 `/admin/ai-models` 的「知识问答（本地模型）」标签页（旧地址 `/admin/rag-config` 会自动跳转）。
 
@@ -60,9 +64,10 @@ python app.py
 ## 已验证
 
 - 8 个跨三文件问题：要点覆盖 100%，来源覆盖 100%
-- 35 题评测集（10 Easy / 10 Medium / 10 Hard / 5 拒答）四组对比：
-  仅向量 NDCG@8 0.721 → 仅 BM25 0.735 → 混合无重排 0.743 → 混合+重排 0.864，
-  重排代价约 +9.2 秒/题；结果见 `eval/results/retrieval_groups.md` 与 `fig_retrieval.png`
+- 35 题评测集（10 Easy / 10 Medium / 10 Hard / 5 拒答，qrels 两轮人工复核后共 90 条相关块）四组对比：
+  仅向量 NDCG@8 0.764 → 仅 BM25 0.758 → 混合无重排 0.797 → 混合+重排 0.925，
+  重排代价约 +9.1 秒/题；生成层 A/D 要点覆盖 0.713 / 0.798、拒答正确率均 40%、平均耗时 29 / 31 秒；
+  结果见 `eval/results/retrieval_groups.md` 与 `fig_retrieval.png`
 - 评分问题端到端回答：两种评分方式、1.0-5.0、四个接口、入口 `/poem/:id`
 - FastAPI 健康/模型/配置接口通过；切换预留模型会返回明确拒绝
 - 前端 `aiChat` 单测 14/14 通过；小窗已接入 RAG，服务不可用时自动回退原链路

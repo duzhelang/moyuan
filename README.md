@@ -57,7 +57,7 @@
 | JUnit 5 + Mockito | 5.10.x | 后端测试框架 |
 | H2 | 2.x | 测试内存数据库 |
 
-### 问答服务技术栈（可选）
+### 问答服务技术栈（可选，本地由后端自动托管）
 
 | 技术 | 用途 |
 |------|------|
@@ -177,7 +177,7 @@
 - **智能问答**：诗词相关问题解答（`POST /api/ai/chat` 非流式 / `POST /api/ai/chat/stream` SSE 流式）
 - **AI 对话页「诗宝阁」**：角色化统一对话入口（6 角色 × 12 能力），复用 `POST /api/ai/chat`（阶段一）/ `POST /api/ai/chat/stream`（阶段二 SSE 流式）
 - **全局 AI 小窗**：全站页面可唤起，内置「诗词助理」与「网页用法助理」；后者走 `system_chat` 模块并检索 `system_knowledge` 系统知识库，支持 FAQ 直答与页面跳转入口
-- **知识问答服务（RAG，可选）**：独立 Python FastAPI 服务（`/rag`，127.0.0.1:8010），章节切分 + `bge-small` 向量与 BM25 混合召回 + `bge-reranker-base` 重排 + Ollama 本地模型（`qwen3.5:4b`）生成；小窗优先调用，服务不可用时自动回退原链路；管理员在「AI模型管理 → 知识问答（本地模型）」标签页可切换嵌入/生成模型
+- **知识问答服务（RAG，可选）**：独立 Python FastAPI 服务（`/rag`，127.0.0.1:8010），章节切分 + `bge-small` 向量与 BM25 混合召回 + `bge-reranker-base` 重排 + Ollama 本地模型（`qwen3.5:4b`）生成；本地开发由后端启动时自动拉起，小窗优先调用，服务不可用时自动回退原链路；管理员在「AI模型管理 → 知识问答（本地模型）」标签页可切换嵌入/生成模型
 - **看图写诗**：基于图片生成诗词（视觉模型）
 - **古籍识文（OCR）**：图片文字识别（当前维护中：后端 `ai.features.ocr-enabled=false`，前端入口置灰，待视觉模型绑定后恢复）
 - **智能分析**：诗词内容分析解读
@@ -292,9 +292,11 @@ npm run dev
 
 前端服务启动后，访问 http://localhost:5173 查看效果（前端通过 Vite 代理将 `/api`、`/uploads` 转发到后端 `http://localhost:8085`，可用环境变量 `VITE_BACKEND_URL` 覆盖）。
 
-### 5.1 启动知识问答服务（可选）
+### 5.1 知识问答服务（RAG，后端默认自动托管）
 
 知识问答服务是独立的 Python 服务，仅「网页用法助理」使用；**不启动也不影响其他功能**，小窗会自动回退到原关键词检索链路。
+
+首次需安装依赖并建索引；之后**启动后端会自动拉起该服务**（异步探测 8010，约 30 秒就绪），无需再单独开终端。
 
 ```bash
 # 前置：本机已安装 Ollama 并拉取生成模型
@@ -303,19 +305,21 @@ ollama pull qwen3.5:4b
 # 进入问答服务目录
 cd rag-service
 
-# 安装依赖（首次）
+# 安装依赖（仅首次）
 pip install -r requirements.txt
 
-# 1) 导出语料（docs 文档 + system_knowledge 24 条）
+# 1) 导出语料（docs 文档 + system_knowledge 24 条，仅首次或知识库变更后）
 python corpus_export.py
-# 2) 构建索引（默认 bge-small，输出到 data/index/bge-small/）
+# 2) 构建索引（默认 bge-small，输出到 data/index/bge-small/，仅首次或语料变更后）
 python build_index.py
-# 3) 启动服务（127.0.0.1:8010）
-python app.py
+
+# 3) 启动后端即可，Spring Boot 会自动执行 python app.py
+#    如需关闭托管：RAG_AUTO_START=false
+#    子进程日志：sc-moyuan-backend/logs/rag-service.log
 ```
 
-验证：`curl http://127.0.0.1:8010/rag/health` 返回 `status=ok`；管理员登录后可在「后台 → AI功能 → AI模型管理 → 知识问答（本地模型）」（`/admin/ai-models?tab=rag`）切换嵌入/生成模型。
-Vite 已配置 `/rag` 代理到 8010，可用环境变量 `VITE_RAG_URL` 覆盖。
+验证：`curl http://127.0.0.1:8010/rag/health` 应返回 `status=ok`、`index_ready=true`；管理员登录后可在「后台 → AI功能 → AI模型管理 → 知识问答（本地模型）」（`/admin/ai-models?tab=rag`）切换嵌入/生成模型。
+Vite 已配置 `/rag` 代理到 8010，可用环境变量 `VITE_RAG_URL` 覆盖。后台控制台的链路卡展示 RAG 进程状态；未启动时小窗仍可正常回答（走回退链路，不带来源标注）。
 
 ### 6. 默认账号
 
@@ -385,7 +389,7 @@ moyuan-master2/
 │   │   │       └── secrets/                  # 敏感配置（已 gitignore）
 │   │   └── test/                # 测试代码（H2）
 │   └── pom.xml                  # Maven 配置
-├── rag-service/                 # Python 知识问答服务（FastAPI，可选，127.0.0.1:8010）
+├── rag-service/                 # Python 知识问答服务（FastAPI，127.0.0.1:8010；后端启动时自动托管拉起）
 │   ├── app.py                   # 接口层（/rag/health、/models、/config、/ask、/ask/stream）
 │   ├── rag_engine.py            # 混合检索（向量+BM25+RRF+重排+邻居扩展）
 │   ├── build_index.py           # 按嵌入模型建索引（data/index/<embed_key>/）
@@ -1045,6 +1049,21 @@ A: 管理员可以在后台管理页面配置 AI 模型：
 
 ## 更新日志
 
+### v1.15.0 (2026-11-08)
+- ✅ 后台控制台升级为数据大屏布局：新增顶部指挥条（今日 PV/UV、待审积压、节点在线、健康状态、刷新时间）、六项资源总览大数字、四张访问统计走势卡，趋势图与运营待办默认同屏展示
+- ✅ 后台系统监测页改为运维诊断看板：四块可下钻计分板（接口可用性 / AI 链路 / 安全事件 / 节点在线）、实时探活节点网格、双列诊断面板、异常事件时间线
+- ✅ 运营待办卡片放大并差异化：3×2 大数字格子、积压进度条、状态标签与直达入口，底部汇总积压结论；资源总览移除无业务含义的归一化进度条
+- ✅ 后台标签导航仅在打开 2 个及以上标签时显示，只有「控制台」时不再占用首屏高度
+- ✅ RAG 服务改由后端启动时自动托管：`RagServiceLauncher` 异步探测 8010，未监听自动执行 `python app.py`（约 30 秒就绪），已在运行则复用，后端关闭只回收自己拉起的进程；日志写入 `logs/rag-service.log`，`test` profile 不启用，生产可用 `RAG_AUTO_START=false` 关闭
+- ✅ RAG 健康探测单独放宽到 3000ms（`moyuan.health.rag-timeout-ms`），避免 `/rag/health` 连带探测 Ollama 时被 800ms 阈值误判为断连
+
+### v1.14.0 (2026-11-08)
+- ✅ 后台新增四套主题：宣纸墨韵（浅色）、夜墨金线（深色）、砚石墨白（中性）、双境自动；顶栏可切换，选择存 `localStorage`，启动前预置主题避免闪白
+- ✅ 双境自动：运营视图使用宣纸浅色，评测视图使用夜墨深色；手动选择主题时以手动值为准
+- ✅ 主题 token（`--adm-*`）统一映射 Element Plus 变量，后台卡片、表格、表单、分页、弹层与 teleport 弹窗自动跟随；图表配色改从 CSS 变量读取，切换主题即时重绘
+- ✅ 引入本地打包思源宋体（Noto Serif SC 400/600/700），仅用于后台标题与侧栏品牌字
+- ✅ 后台页面硬编码颜色迁移为主题变量，深色下不再出现白块与深色文字不可读问题
+
 ### v1.13.0 (2026-11-07)
 - ✅ AI 调用保护：新增 `AiGuardService`（单用户 60 次/分、1000 次/天、100 万 token/天，admin 豁免，Redis 计数异常降级内存）与 `AiInputValidator`（各接口字数上限、流式消息角色白名单/条数/总长、`maxTokens` 与 `temperature` 区间）；仅作用于 `/api/ai/**`，游戏 / 韵脚 / RAG 内部调用不受影响
 - ✅ 新错误码：`4290` 入参超长、`4291` 频率限制、`4292` 额度用尽、`4293` 功能维护中
@@ -1229,6 +1248,6 @@ A: 管理员可以在后台管理页面配置 AI 模型：
 
 ---
 
-**文档版本**：v2.13
-**最后更新**：2026-11-07（后台「知识问答配置」合并进「AI模型管理」：新增「知识问答（本地模型）」标签页，抽离 `RagConfigPanel` 组件，旧地址 `/admin/rag-config` 自动跳转；本地模型与外部 API 的存储逻辑保持不变）
+**文档版本**：v2.14
+**最后更新**：2026-11-08（后台控制台/系统监测数据大屏化、标签栏单标签隐藏、运营待办卡片升级、资源总览移除归一化进度条；RAG 服务改由后端启动自动托管并提供独立 3000ms 健康超时）；此前 v2.13（后台「知识问答配置」合并进「AI模型管理」：新增「知识问答（本地模型）」标签页，抽离 `RagConfigPanel` 组件，旧地址 `/admin/rag-config` 自动跳转；本地模型与外部 API 的存储逻辑保持不变）
 **维护人员**：墨渊开发团队
