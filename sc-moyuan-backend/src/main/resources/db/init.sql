@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS `user` (
   `birthday` DATE DEFAULT NULL COMMENT '生日',
   `bio` VARCHAR(500) DEFAULT NULL COMMENT '个人简介',
   `interests` VARCHAR(500) DEFAULT NULL COMMENT '兴趣选项（逗号分隔）',
-  `role` VARCHAR(20) NOT NULL DEFAULT 'user' COMMENT '角色：user-普通用户，admin-管理员',
+  `role` VARCHAR(20) NOT NULL DEFAULT 'user' COMMENT '角色：user普通用户 / poet认证诗人 / reviewer审核员 / admin管理员',
   `poet_verified` TINYINT NOT NULL DEFAULT 0 COMMENT '诗人认证状态：0-未认证，1-已认证，2-认证中',
   `poet_profile_id` BIGINT DEFAULT NULL COMMENT '诗人资料ID',
   `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
@@ -495,7 +495,7 @@ INSERT IGNORE INTO `poem` (`title`, `content`, `poet_id`, `dynasty_id`, `categor
 ('回首一九已成空', '回首一九已成空，展望二零佳意浓。\n世事岂敢轻年少，天意哪可断前程。\n唐猊又着战意显，三尺重出徙侣从。\n烂柯沉木枉悲夫，夫且若怡也可容。', 1, 13, 47, '常平逼王', 1, 1, 'modern'),
 ('沉影迷叠千层障', '沉影迷叠千层障，乱云归处是它乡。\n酒酣仍识昔日客，心迷难辨眼前芳。\n纵把凡锦比仙缎，不需经年多思量。\n一笑即随羊角去，九风还作万华芳。', 1, 13, 47, '常平逼王', 1, 1, 'modern'),
 ('一剪梅.无题', '一别三秋未招摇，\n山也迢迢，水也昭昭。\n何人再添新衣袍，\n笑意盈绕，喜上眉梢。\n忆昔花开岁月好，\n蜂字飘摇，蝶字舞蹈。\n而今方知云未晓，\n风又飘飘，雨又萧萧。', 1, 13, 9, '常平逼王', 1, 1, 'modern'),
-('清平乐.情(道姑)', '幽情迷朦，三年怀一梦，一遭尘世皆为恒，无怨无悔无憎。\n来日打马南屏，忆昔紫夜流萤，纵剑吴钩霜雪，锦夜孤灯长明。', 1, 13, 10, '初芒', 1, 1, 'modern'),
+('清平乐.情(道姑)', '幽情迷朦，三年怀一梦，一遭尘世皆为恒，无怨无悔无憎。\n来日打马南屏，忆昔紫夜流萤，纵剑吴钩霜雪，锦夜孤灯长明。', 1, 13, 10, '常平逼王', 1, 1, 'modern'),
 ('钗头凤·世情薄', '世情薄，人情恶，雨送黄昏花易落。晓风干，泪痕残，欲笺心事，独语斜阑。难，难，难！\n人成各，今非昨，病魂常似秋千索。角声寒，夜阑珊，怕人寻问，咽泪装欢。瞒，瞒，瞒！', 3, 8, 9, '唐婉词', 1, 1, 'classical'),
 ('钗头凤·红酥手', '红酥手，黄縢酒，满城春色宫墙柳。东风恶，欢情薄。一怀愁绪，几年离索。错、错、错。\n春如旧，人空瘦，泪痕红浥鲛绡透。桃花落，闲池阁。山盟虽在，锦书难托。莫、莫、莫。', 2, 8, 9, '陆游词', 1, 1, 'classical'),
 ('长相思·一重山', '一重山，两重山，山远天高烟水寒，相思枫叶丹。\n菊花开，菊花残，塞雁高飞人未还，一帘风月闲。', 4, 7, 9, '李煜词', 1, 1, 'classical'),
@@ -659,7 +659,7 @@ LIMIT 1;
 -- 初始数据：测试用户
 -- ============================================================
 INSERT IGNORE INTO `user` (`username`, `password`, `email`, `nickname`, `role`, `status`) VALUES
-('admin', '$2b$12$kMElb/13aTqGl9pfrD4CqOfA8rVJ3ahUcRBPfTHihcQ4D6.5gKWB6', 'admin@moyuan.com', '系统管理员', 'admin', 1),
+('admin', '$2a$10$WJj6mQAQMY9OfJdoYbefquZtWh6B0r0Dm7Wg2EY2EP4XPBLD9.8Zy', 'admin@moyuan.com', '系统管理员', 'admin', 1),
 ('test', '$2b$10$7WF/nU54ij0NgOYQzcbvWOIUsfCBQ28BeEq9rc.buaUcl0zaR.9PO', 'test@moyuan.com', '测试用户', 'user', 1),
 ('text', '$2b$10$7WF/nU54ij0NgOYQzcbvWOIUsfCBQ28BeEq9rc.buaUcl0zaR.9PO', 'text@moyuan.com', '文本用户', 'user', 1);
 
@@ -778,6 +778,75 @@ CREATE TABLE IF NOT EXISTS `visit_log` (
   KEY `idx_visit_log_visit_date` (`visit_date`),
   KEY `idx_visit_log_ip` (`ip`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='访问日志表';
+
+-- ============================================================
+-- 接口调用指标表（管理端错误率 / P95 / 慢接口）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `api_request_metric` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `method` VARCHAR(10) DEFAULT NULL COMMENT 'HTTP 方法',
+  `path` VARCHAR(200) NOT NULL COMMENT '接口路径（不含查询串）',
+  `status_code` INT NOT NULL COMMENT 'HTTP 状态码',
+  `duration_ms` INT NOT NULL COMMENT '耗时（毫秒）',
+  `user_id` BIGINT DEFAULT NULL COMMENT '用户ID（未登录为 NULL）',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发生时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_arm_create_time` (`create_time`),
+  KEY `idx_arm_path` (`path`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='接口调用指标（错误率/P95 数据源）';
+
+-- ============================================================
+-- 搜索埋点表（管理端搜索无结果率 / 搜不到的关键词）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `search_log` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `keyword` VARCHAR(120) NOT NULL COMMENT '搜索关键词（已 trim，超长截断）',
+  `result_count` INT NOT NULL DEFAULT 0 COMMENT '命中结果数，0 表示搜不到',
+  `route` VARCHAR(32) DEFAULT NULL COMMENT '命中路径：ngram/like/pinyin/pingze/global',
+  `source` VARCHAR(20) NOT NULL DEFAULT 'smart' COMMENT '来源：smart / global',
+  `user_id` BIGINT DEFAULT NULL COMMENT '用户ID（未登录为 NULL）',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发生时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_sl_create_time` (`create_time`),
+  KEY `idx_sl_keyword` (`keyword`),
+  KEY `idx_sl_result` (`result_count`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='搜索埋点（无结果率数据源）';
+
+-- ============================================================
+-- AI 调用日志表（管理端 AI 失败率 / 首字延迟）
+-- 说明：业务异常返回 HTTP 200，失败必须显式记录
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `ai_call_log` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `endpoint` VARCHAR(32) NOT NULL COMMENT 'chat/chat_stream/analyze/write_poem/ocr/couplet',
+  `model` VARCHAR(64) DEFAULT NULL COMMENT '模型标识或模块编码',
+  `module_code` VARCHAR(64) DEFAULT NULL COMMENT 'AI 模块编码',
+  `status` VARCHAR(16) NOT NULL COMMENT 'success / error',
+  `error_msg` VARCHAR(255) DEFAULT NULL COMMENT '失败原因（截断）',
+  `duration_ms` INT NOT NULL DEFAULT 0 COMMENT '总耗时（毫秒）',
+  `ttft_ms` INT DEFAULT NULL COMMENT '首字延迟（毫秒），仅流式有值',
+  `user_id` BIGINT DEFAULT NULL COMMENT '用户ID',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发生时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_acl_create_time` (`create_time`),
+  KEY `idx_acl_endpoint` (`endpoint`),
+  KEY `idx_acl_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 调用日志（失败率/首字延迟数据源）';
+
+-- ============================================================
+-- 安全事件表（登录失败 / 越权 403 / 限流）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `security_event` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `type` VARCHAR(24) NOT NULL COMMENT 'login_fail / forbidden / rate_limit',
+  `detail` VARCHAR(255) DEFAULT NULL COMMENT '事件详情',
+  `ip` VARCHAR(64) DEFAULT NULL COMMENT '来源 IP',
+  `user_id` BIGINT DEFAULT NULL COMMENT '用户ID',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发生时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_se_create_time` (`create_time`),
+  KEY `idx_se_type` (`type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='安全事件（登录失败/越权/限流）';
 
 -- ============================================================
 -- 文件元数据表
@@ -1486,3 +1555,61 @@ CREATE TABLE IF NOT EXISTS `recommendation_event` (
   PRIMARY KEY (`id`),
   KEY `idx_re_user_time` (`user_id`, `create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='推荐策略切换事件表';
+
+-- ============================================================
+-- 33. 用户举报表（用户对用户/内容违规，区别于系统报修）
+-- reporter_id = 0 表示系统/AI 自动风控生成
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `user_report` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `reporter_id` BIGINT NOT NULL DEFAULT 0 COMMENT '举报人ID，0-系统/AI自动风控',
+  `target_type` VARCHAR(20) NOT NULL COMMENT '举报对象类型：post-帖子,comment-评论,poem-诗词,user-用户',
+  `target_id` BIGINT NOT NULL COMMENT '举报对象ID',
+  `target_user_id` BIGINT DEFAULT NULL COMMENT '被举报内容作者/被举报用户ID',
+  `reason_type` VARCHAR(30) NOT NULL COMMENT '原因类型：spam-垃圾广告,abuse-辱骂攻击,porn-色情低俗,plagiarism-抄袭,illegal-违法违规,ai_auto-AI风控,other-其他',
+  `reason` VARCHAR(1000) DEFAULT NULL COMMENT '举报/风险说明',
+  `evidence` TEXT DEFAULT NULL COMMENT '证据（截图URL或多条说明）',
+  `status` VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT '状态：pending-待处理,processing-处理中,accepted-已采纳,rejected-已驳回',
+  `handle_note` VARCHAR(500) DEFAULT NULL COMMENT '处理说明',
+  `handler_id` BIGINT DEFAULT NULL COMMENT '处理人ID',
+  `handled_at` DATETIME DEFAULT NULL COMMENT '处理时间',
+  `ai_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '是否AI自动风控生成：0-否，1-是',
+  `ai_risk_level` VARCHAR(20) DEFAULT NULL COMMENT 'AI风险等级：low/medium/high',
+  `ai_reason` VARCHAR(1000) DEFAULT NULL COMMENT 'AI风险判定说明',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_report_reporter_target` (`reporter_id`, `target_type`, `target_id`),
+  KEY `idx_report_status` (`status`),
+  KEY `idx_report_target` (`target_type`, `target_id`),
+  KEY `idx_report_target_user` (`target_user_id`),
+  KEY `idx_report_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户举报表（用户对用户/内容违规，区别于系统报修）';
+
+-- ============================================================
+-- 34. 站内通知表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `user_notification` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id` BIGINT NOT NULL COMMENT '接收用户ID',
+  `type` VARCHAR(30) NOT NULL COMMENT '通知类型：audit_result-审核结果,report_result-举报结果,system-系统通知',
+  `title` VARCHAR(200) NOT NULL COMMENT '标题',
+  `content` VARCHAR(1000) DEFAULT NULL COMMENT '正文',
+  `biz_type` VARCHAR(30) DEFAULT NULL COMMENT '业务类型：post/comment/poem/report 等',
+  `biz_id` BIGINT DEFAULT NULL COMMENT '业务ID',
+  `link` VARCHAR(255) DEFAULT NULL COMMENT '前端跳转链接',
+  `is_read` TINYINT NOT NULL DEFAULT 0 COMMENT '是否已读：0-未读，1-已读',
+  `read_at` DATETIME DEFAULT NULL COMMENT '阅读时间',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_notification_user_read` (`user_id`, `is_read`),
+  KEY `idx_notification_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='站内通知表';
+
+-- AI内容风控模块配置（model_id 为空时使用系统默认模型）
+INSERT IGNORE INTO `ai_module_config`
+(`module_code`, `module_name`, `require_vision`, `model_id`, `description`, `prompt_template`, `max_response_length`, `response_style`, `first_response_length`, `enable_markdown`)
+VALUES
+('content_moderation', 'AI内容风控', 0, NULL, '对用户发布的帖子、评论等 UGC 内容做自动风险识别，只输出严格 JSON',
+ '你是内容安全审核员。请判断用户发布的内容是否存在违规风险，只输出一个 JSON 对象，不要输出任何解释、前缀或 Markdown 代码块。\nJSON 字段：\n- riskLevel：low / medium / high（high 表示明显违法违规或严重有害）\n- categories：字符串数组，可选值 spam（广告引流/垃圾信息）、abuse（辱骂攻击/人身攻击）、porn（色情低俗）、plagiarism（抄袭洗稿）、illegal（违法犯罪）、politics（政治敏感）、other（其他）\n- reason：一句话中文说明判定依据，不超过 80 字\n判定从严：无风险时 riskLevel=low 且 categories=[]。',
+ 300, 'concise', 300, 0);
