@@ -1,5 +1,5 @@
 -- ============================================================
--- 版本：v3.7（全量合并版）
+-- 版本：v3.8（全量合并版）
 -- 日期：2026-11-08
 -- 说明：全量合并所有表结构和初始数据，删除过渡迁移脚本
 --       所有建表使用 IF NOT EXISTS，数据使用 INSERT IGNORE
@@ -21,6 +21,9 @@
 --             api_request_metric / search_log / ai_call_log / security_event 与
 --             20261108 举报/通知两表 user_report / user_notification 已在本脚本内。
 --             合并后建表总数 44 张，本文档即权威定义。
+--       v3.8：新增 recommendation_interaction 推荐线上曝光/点击互动表（线上 CTR 统计）；
+--             追加举报 3 条、报修 3 条、通知 2 条演示种子数据（均带「【示例数据】」前缀）；
+--             建表总数 45 张。
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS `moyuan` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -1624,6 +1627,26 @@ CREATE TABLE IF NOT EXISTS `recommendation_event` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='推荐策略切换事件表';
 
 -- ============================================================
+-- 推荐线上互动表（曝光 / 点击埋点）
+-- 说明：一次推荐结果使用同一 batch_id；唯一键保证同批次同作品同事件只记一次。
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `recommendation_interaction` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `batch_id` VARCHAR(64) NOT NULL COMMENT '推荐批次号（曝光与点击共用）',
+  `user_id` BIGINT NOT NULL COMMENT '用户 id（JWT 解出）',
+  `page` VARCHAR(32) NOT NULL DEFAULT 'home' COMMENT '页面标识',
+  `strategy` VARCHAR(32) NOT NULL DEFAULT 'rule' COMMENT '推荐策略',
+  `item_id` BIGINT NOT NULL COMMENT '作品 ID',
+  `event_type` VARCHAR(20) NOT NULL COMMENT '事件类型：impression / click',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_ri_batch_item_event` (`batch_id`, `item_id`, `event_type`),
+  KEY `idx_ri_create_time` (`create_time`),
+  KEY `idx_ri_strategy` (`strategy`),
+  KEY `idx_ri_page` (`page`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='推荐曝光/点击互动表';
+
+-- ============================================================
 -- 33. 用户举报表（用户对用户/内容违规，区别于系统报修）
 -- reporter_id = 0 表示系统/AI 自动风控生成
 -- ============================================================
@@ -1680,3 +1703,78 @@ VALUES
 ('content_moderation', 'AI内容风控', 0, NULL, '对用户发布的帖子、评论等 UGC 内容做自动风险识别，只输出严格 JSON',
  '你是内容安全审核员。请判断用户发布的内容是否存在违规风险，只输出一个 JSON 对象，不要输出任何解释、前缀或 Markdown 代码块。\nJSON 字段：\n- riskLevel：low / medium / high（high 表示明显违法违规或严重有害）\n- categories：字符串数组，可选值 spam（广告引流/垃圾信息）、abuse（辱骂攻击/人身攻击）、porn（色情低俗）、plagiarism（抄袭洗稿）、illegal（违法犯罪）、politics（政治敏感）、other（其他）\n- reason：一句话中文说明判定依据，不超过 80 字\n判定从严：无风险时 riskLevel=low 且 categories=[]。',
  300, 'concise', 300, 0);
+
+-- ============================================================
+-- 演示种子数据：举报 / 报修 / 通知
+-- 用途：让后台「举报管理」「报修管理」与首页异常待办有可演示的完整链路。
+-- 识别方式：reason / title / description 均带「【示例数据】」前缀，可按前缀清理。
+-- ============================================================
+SET @demo_user = COALESCE((SELECT id FROM `user` WHERE username = 'test' LIMIT 1), (SELECT MIN(id) FROM `user`));
+SET @demo_admin = COALESCE((SELECT id FROM `user` WHERE username = 'admin' LIMIT 1), (SELECT MIN(id) FROM `user`));
+SET @demo_poem1 = (SELECT id FROM `poem` ORDER BY id LIMIT 1);
+SET @demo_poem2 = (SELECT id FROM `poem` ORDER BY id LIMIT 1 OFFSET 1);
+SET @demo_poem3 = (SELECT id FROM `poem` ORDER BY id LIMIT 1 OFFSET 2);
+
+INSERT IGNORE INTO `user_report`
+(`reporter_id`, `target_type`, `target_id`, `reason_type`, `reason`, `status`, `ai_flag`, `ai_risk_level`, `ai_reason`, `create_time`)
+VALUES
+(@demo_user, 'poem', @demo_poem1, 'abuse', '【示例数据】用户举报：诗词引用内容含人身攻击。', 'pending', 0, NULL, NULL, NOW() - INTERVAL 2 DAY),
+(0, 'poem', @demo_poem2, 'ai_auto', '【示例数据】AI 风控自动识别：正文含不适宜内容。', 'pending', 1, 'high', '【示例数据】风险等级 high：疑似低俗表述', NOW() - INTERVAL 1 DAY),
+(@demo_user, 'poem', @demo_poem3, 'spam', '【示例数据】用户举报：疑似广告引流。', 'accepted', 0, NULL, NULL, NOW() - INTERVAL 5 DAY);
+
+UPDATE `user_report`
+SET `handler_id` = @demo_admin,
+    `handled_at` = NOW() - INTERVAL 4 DAY,
+    `handle_note` = '【示例数据】已核实并隐藏相关内容'
+WHERE `reporter_id` = @demo_user
+  AND `target_type` = 'poem'
+  AND `target_id` = @demo_poem3
+  AND `status` = 'accepted'
+  AND `handle_note` IS NULL;
+
+INSERT IGNORE INTO `repair_order`
+(`order_no`, `title`, `description`, `category`, `priority`, `status`, `user_id`, `assignee_id`, `resolve_content`, `resolve_time`, `create_time`)
+VALUES
+('DEMO-20261108-001', '【示例数据】诗词详情页译文偶发空白',
+ '【示例数据】部分诗词详情页切换标签后译文区域为空，刷新后恢复。',
+ 'data', 3, 0, @demo_user, NULL, NULL, NULL, NOW() - INTERVAL 2 DAY),
+('DEMO-20261108-002', '【示例数据】头像上传偶发 413',
+ '【示例数据】上传 2MB 以上头像时偶发 413，提示信息不明确。',
+ 'function', 2, 1, @demo_user, @demo_admin, NULL, NULL, NOW() - INTERVAL 1 DAY),
+('DEMO-20261108-003', '【示例数据】首页推荐卡片窄屏错位',
+ '【示例数据】在 375px 宽度下推荐卡片间距异常，文字出现截断。',
+ 'ui', 1, 2, @demo_user, @demo_admin, '【示例数据】已调整响应式断点并发布', NOW() - INTERVAL 3 HOUR, NOW() - INTERVAL 4 DAY);
+
+INSERT INTO `repair_comment` (`repair_order_id`, `user_id`, `content`, `is_internal`, `create_time`)
+SELECT o.id, @demo_admin, '【示例数据】已定位到上传体积超限，正在调整校验提示。', 1, NOW() - INTERVAL 20 HOUR
+FROM `repair_order` o
+WHERE o.order_no = 'DEMO-20261108-002'
+  AND NOT EXISTS (SELECT 1 FROM `repair_comment` c WHERE c.repair_order_id = o.id);
+
+INSERT INTO `user_notification`
+(`user_id`, `type`, `title`, `content`, `biz_type`, `biz_id`, `link`, `is_read`, `create_time`)
+SELECT @demo_user, 'report_result', '【示例数据】举报已受理',
+       '你提交的广告引流举报已核实并处理，感谢反馈。', 'report', r.id, '/notifications', 0, NOW() - INTERVAL 4 DAY
+FROM `user_report` r
+WHERE r.reporter_id = @demo_user AND r.target_id = @demo_poem3
+  AND NOT EXISTS (SELECT 1 FROM `user_notification` n WHERE n.title = '【示例数据】举报已受理');
+
+INSERT INTO `user_notification`
+(`user_id`, `type`, `title`, `content`, `biz_type`, `biz_id`, `link`, `is_read`, `create_time`)
+SELECT @demo_user, 'system', '【示例数据】报修处理中',
+       '你的报修工单「头像上传偶发 413」已进入处理中，处理人：系统管理员。',
+       'repair', o.id, '/repairs', 0, NOW() - INTERVAL 20 HOUR
+FROM `repair_order` o
+WHERE o.order_no = 'DEMO-20261108-002'
+  AND NOT EXISTS (SELECT 1 FROM `user_notification` n WHERE n.title = '【示例数据】报修处理中');
+
+-- 推荐线上效果演示：1 个批次 6 次曝光 + 1 次点击，让后台「推荐与实验」直接可见 CTR
+INSERT IGNORE INTO `recommendation_interaction`
+(`batch_id`, `user_id`, `page`, `strategy`, `item_id`, `event_type`, `create_time`)
+SELECT 'demo-20261108-home-rule', @demo_user, 'home', 'rule', p.id, 'impression', NOW() - INTERVAL 1 DAY
+FROM (SELECT id FROM `poem` ORDER BY id LIMIT 6) p;
+
+INSERT IGNORE INTO `recommendation_interaction`
+(`batch_id`, `user_id`, `page`, `strategy`, `item_id`, `event_type`, `create_time`)
+SELECT 'demo-20261108-home-rule', @demo_user, 'home', 'rule', p.id, 'click', NOW() - INTERVAL 1 DAY
+FROM (SELECT id FROM `poem` ORDER BY id LIMIT 1 OFFSET 1) p;
