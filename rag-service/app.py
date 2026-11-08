@@ -114,12 +114,42 @@ def resolve_request(req: AskRequest):
 def health():
     runtime = config.load_runtime_config()
     status = model_registry.index_status(runtime["embed"])
+    meta = model_registry.read_index_meta(runtime["embed"])
+    corpus_dir = config.CORPUS_DIR
+    corpus_files = [p for p in corpus_dir.glob("*") if p.is_file()] if corpus_dir.exists() else []
+    corpus_bytes = sum(p.stat().st_size for p in corpus_files)
+    index_dir = config.index_dir(runtime["embed"])
+    index_files = [p for p in index_dir.glob("*") if p.is_file()] if index_dir.exists() else []
+    index_bytes = sum(p.stat().st_size for p in index_files)
+    index_details = [
+        {"name": p.name, "bytes": p.stat().st_size}
+        for p in sorted(index_files, key=lambda x: x.name)
+    ]
+    chunk_map = meta.get("各文件文本块数", {}) or {}
+    details = [
+        {
+            "name": p.name,
+            "bytes": p.stat().st_size,
+            "chunks": int(chunk_map.get(p.name, 0)),
+        }
+        for p in sorted(corpus_files, key=lambda x: x.name)
+    ]
     return {
         "status": "ok",
         "embed": runtime["embed"],
+        "embed_label": meta.get("模型名称", runtime["embed"]),
         "generation": runtime["generation"],
         "index_ready": status["ready"],
         "chunks": status["chunks"],
+        "index_dim": status.get("index_dim", 0),
+        "index_files": len(index_files),
+        "index_details": index_details,
+        "corpus_files": len(corpus_files),
+        "corpus_bytes": corpus_bytes,
+        "corpus_words": int(meta.get("语料总字数", 0)),
+        "corpus_details": details,
+        "index_bytes": index_bytes,
+        "built_at": meta.get("构建时间", ""),
         "ollama": model_registry.ollama_available(),
     }
 

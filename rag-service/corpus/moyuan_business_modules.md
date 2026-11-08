@@ -25,7 +25,7 @@
 | 15 | 诗话视野模块 | 诗词文化文章浏览、详情展示 | 前端+后端已实现 |
 | 16 | 诗词评分模块 | 诗词用户评分和AI评分 | 前端+后端已实现 |
 | 17 | 韵律查询模块 | 平水韵韵脚查询、同韵字查询 | 前端+后端已实现 |
-| 18 | 报修模块 | 用户报修工单提交、进度跟踪、满意度评价 | 前端+后端已实现 |
+| 18 | 报修模块 | 系统 Bug 工单：用户提交（报错/功能异常/界面/数据问题）、进度跟踪、满意度评价；处理人仅限管理员或审核员 | 前端+后端已实现 |
 | 19 | 静态页面模块 | 网站静态页面管理（使用条款、隐私政策等） | 前端+后端已实现 |
 | 20 | 诗人草稿模块 | 诗人资料编辑草稿、审核流程 | 前端+后端已实现 |
 | 21 | 诗词内容缓存模块 | 诗词外部获取内容的缓存管理 | 前端+后端已实现 |
@@ -34,6 +34,8 @@
 | 24 | 游戏模块 | 飞花令 / 诗词接龙对局（模式/难度、回合计时、三级真实性校验、游客模式） | 前端+后端已实现 |
 | 25 | AI 对话页「诗宝阁」 | 角色化统一对话入口：6 角色 × 12 能力，覆盖命题作诗/集句/藏头/润色/平仄校验/韵脚查询/对对联/意象典故/诗话点评/飞花令/接龙/群贤论诗；其中飞花令为设令字后逐句判定（含字/判重/真实性）的对局流程 | 前端+后端已实现（SSE 流式、多轮上下文、服务端会话） |
 | 26 | 全局 AI 小窗与系统知识库 | 全站悬浮 AI 问答入口：诗词助理 / 网页用法助理双助理，接入 system_knowledge 知识库 | 前端+后端已实现 |
+| 27 | 举报管理模块 | 用户对用户/内容违规举报（帖子/评论/诗词/用户）、AI 自动风控建单、后台处理与内容隐藏/删除；与系统 Bug 报修严格区分 | 前端+后端已实现 |
+| 28 | 站内通知模块 | 审核结果、举报处理结果与系统通知；Header 铃铛未读数 + 通知页 | 前端+后端已实现 |
 
 ---
 
@@ -351,7 +353,7 @@
 ### 技术方案
 
 - 调用大语言模型 API（智谱AI、DeepSeek、Kimi、千问、小米MiMo、OpenRouter；NVIDIA NIM 已下线）
-- 模块绑定：`ai_module_config`（chat / poet_chat / poetry_chat / write_poem / analyze / couplet，以及游戏模块的 feihua_gen_ancient / feihua_gen_normal / feihua_gen_super / feihua_verify / feihua_topic / chain_generate）→ `ai_model`，由 `AiModelRegistry` 按模块解析模型；统一适配层 `OpenAiCompatibleAdapter` / `NvidiaAdapter`
+- 模块绑定：`ai_module_config`（chat / poet_chat / poetry_chat / write_poem / analyze / couplet / system_chat / content_moderation，以及游戏模块的 feihua_gen_ancient / feihua_gen_normal / feihua_gen_super / feihua_verify / feihua_topic / chain_generate）→ `ai_model`，由 `AiModelRegistry` 按模块解析模型；统一适配层 `OpenAiCompatibleAdapter` / `NvidiaAdapter`。其中 `content_moderation`（AI内容风控）用于帖子/评论发布前的风险识别，`model_id` 为空时回退默认模型，模型与提示词均可在后台「AI功能配置」页维护
 - 视觉能力：视觉模型用于看图写诗与 OCR 识别；DeepSeek 视觉请求需关闭思考模式（body 顶层 `thinking.type=disabled`）
 - OCR 识别复用视觉模型基础设施，通过专用提示词引导模型精准识别古籍文字
 - AI模型配置存入数据库（ai_model 表），支持动态管理；api_key 部分为占位符，真实密钥从 `secrets/application-secrets.yml` 运行时注入
@@ -670,8 +672,11 @@
 
 ### 功能说明
 
-- 管理后台布局（左侧导航 + 右侧内容区域）
-- 控制台（Dashboard）：系统统计数据展示、审核统计数据
+- 管理后台布局（左侧导航 + 右侧内容区域）；标签栏仅在打开 2 个及以上标签时显示，只有控制台时不占首屏高度
+- 控制台（Dashboard）：1+3 总控布局——顶部全局结论条（红黄绿状态、优先关注事项、待处理总数、异常节点、举报/报修、AI 失败率）、六项资源总览大数字、四张访问统计走势卡、资源分布（内容/AI/存储/运行四域，已上移至首屏之后）、访问/发布趋势图、运营待办双页签（审核积压 / 异常处置：举报、报修、AI 失败、安全事件、接口错误）、体检指标条与链路健康
+- 系统监测：可用性、AI 链路、安全审计、运维资源四组诊断，30 秒探活与异常时间线
+- 用户分析：访问/增长/搜索行为 + 用户结构（角色分布、近 7/30 日活跃、回访率、沉默用户）
+- 推荐与实验：离线 NDCG/召回指标 + 线上曝光、点击、CTR 与分策略效果（每 30 秒刷新）
 - 用户管理：用户列表、状态管理、创建/编辑/删除用户
 - 诗词管理：诗词列表、状态管理、创建/编辑/删除诗词（支持标题/内容关键字搜索与按创建时间正序/倒序切换）
 - **诗词审核**（新增）：审核用户发布的诗词（列表按 auditStatus 0-待审/1-通过/2-拒绝 筛选，通过或拒绝）
@@ -687,10 +692,23 @@
 - **文件管理**（新增）：文件列表与存储统计、单文件删除、孤儿文件清理
 - **缓存管理**（新增）：一键清除诗人缓存 / 全部业务缓存
 
+### 角色权责
+
+| 角色 | 权责边界 |
+|------|---------|
+| 管理员 admin | 审核员的上级。负责审核建单、分派、改派、规则配置、审核员团队管理；可协审任意未归档工单（含审核员处理中，接手后由管理员完成审核），但不进入自动派单池 |
+| 审核员 reviewer | 审核执行者。只处理分派给自己或主动认领的工单，可转交/退回；仅可访问审核相关后台页 |
+| 认证诗人 poet | 通过认证的普通用户。可维护诗人档案、投稿，无后台审核权限 |
+| 普通用户 user | 浏览互动、提交内容建议、提交系统 Bug 报修 |
+| 游客 guest | 未登录，仅浏览公开内容，不能提交报修 |
+
+审核员登录后台时使用精简侧边栏：「审核任务」组包含审核流水线、审核记录；「内容审核」组包含诗词审核、诗人认证审核、诗人内容审核、AI内容审核、评论管理、帖子管理。隐藏数据监控、用户、内容、社区、AI、系统管理等管理员分类；管理员仍看到完整后台菜单。
+
 ### 后台菜单结构
 
+- 数据与监控：控制台、系统监测、用户分析、推荐与实验
 - 内容管理：诗词管理、分类管理、朝代管理、诗人管理、精选诗人管理、首页导航管理、**诗话视野管理**
-- 审核管理：诗词审核、**诗人认证审核**、诗人内容审核、AI内容审核、**评论管理**
+- 审核管理：**审核流水线**（管理员调度台 / 审核员个人工作台）、诗词审核、**诗人认证审核**、诗人内容审核、AI内容审核、**评论管理**
 - 系统管理：操作日志、静态页面管理、**文件管理**、**缓存管理**
 
 ### API 接口
@@ -746,10 +764,25 @@
 | GET | /api/admin/repairs | 获取报修列表（管理员） | sc-moyuan-backend AdminController |
 | GET | /api/admin/repairs/{id} | 获取报修详情（管理员） | sc-moyuan-backend AdminController |
 | PUT | /api/admin/repairs/{id}/status | 更新报修状态（管理员） | sc-moyuan-backend AdminController |
-| PUT | /api/admin/repairs/{id}/assign | 分配处理人（管理员） | sc-moyuan-backend AdminController |
+| PUT | /api/admin/repairs/{id}/assign | 分配处理人（仅管理员） | sc-moyuan-backend AdminController |
 | POST | /api/admin/repairs/{id}/comments | 添加内部备注（管理员） | sc-moyuan-backend AdminController |
 | GET | /api/admin/repairs/{id}/comments | 获取报修评论列表（管理员） | sc-moyuan-backend AdminController |
 | GET | /api/admin/repairs/stats | 获取报修统计数据（管理员） | sc-moyuan-backend AdminController |
+| GET | /api/admin/audit-pipeline/board | 审核看板（管理员看全组，审核员看自己） | sc-moyuan-backend AuditPipelineController |
+| GET | /api/admin/audit-pipeline/records | 审核记录与绩效统计（审核员仅本人，管理员可筛选审核员） | sc-moyuan-backend AuditPipelineController |
+| POST | /api/admin/audit-pipeline/scan | 扫描补建工单（管理员） | sc-moyuan-backend AuditPipelineController |
+| POST | /api/admin/audit-pipeline/assign-pending | 一键分派待处理工单（管理员） | sc-moyuan-backend AuditPipelineController |
+| POST | /api/admin/audit-pipeline/{id}/claim | 认领/协审工单 | sc-moyuan-backend AuditPipelineController |
+| POST | /api/admin/audit-pipeline/{id}/transfer | 改派/转交工单 | sc-moyuan-backend AuditPipelineController |
+| POST | /api/admin/audit-pipeline/{id}/return | 退回待分派池 | sc-moyuan-backend AuditPipelineController |
+| GET | /api/admin/audit-pipeline/rules | 分派规则列表（管理员） | sc-moyuan-backend AuditPipelineController |
+| POST | /api/admin/audit-pipeline/rules | 新增/更新分派规则（管理员） | sc-moyuan-backend AuditPipelineController |
+| DELETE | /api/admin/audit-pipeline/rules/{id} | 删除分派规则（管理员） | sc-moyuan-backend AuditPipelineController |
+| GET | /api/admin/audit-pipeline/reviewers | 审核员列表（管理员/审核员） | sc-moyuan-backend AuditPipelineController |
+| GET | /api/admin/audit-pipeline/reviewer-candidates | 审核员候选账号（管理员） | sc-moyuan-backend AuditPipelineController |
+| POST | /api/admin/audit-pipeline/reviewers | 登记审核员（管理员） | sc-moyuan-backend AuditPipelineController |
+| PUT | /api/admin/audit-pipeline/reviewers/{id} | 编辑审核员（管理员） | sc-moyuan-backend AuditPipelineController |
+| DELETE | /api/admin/audit-pipeline/reviewers/{id} | 删除审核员（管理员） | sc-moyuan-backend AuditPipelineController |
 | GET | /api/admin/static-pages | 获取静态页面列表（管理端） | sc-moyuan-backend AdminController |
 | GET | /api/admin/static-pages/{id} | 获取静态页面详情（管理端） | sc-moyuan-backend AdminController |
 | PUT | /api/admin/static-pages/{id} | 更新静态页面内容（管理端） | sc-moyuan-backend AdminController |
@@ -1496,6 +1529,98 @@ file:
 
 ---
 
-**文档版本**：v3.18
-**最后更新**：2026-11-07（AI 加固收尾同步：第 25 章诗宝阁由「阶段一非流式」改为 SSE 流式 + system 人设多轮上下文 + 服务端会话（Redis，TTL 7 天，localStorage 兜底）+ 停止生成；平仄校验改述为本地确定性引擎 `POST /api/ai/tone-check`（不消耗 AI 额度）；古籍识文标注维护中（`ai.features.ocr-enabled=false`）；接口清单补 `tone-check` 与 3 个会话接口，并注明 `/api/ai/**` 统一限流与入参校验）；此前 v3.17（推荐算法说明补充「四组模型策略（离线制品查表）」与「后台实时看板」；后台控制台推荐指标屏新增缓存覆盖、模型版本、近 7 天切换趋势、切换去向/页面分布与最近事件）；v3.16（推荐算法说明由 UserCF 更新为 ItemCF，诗词行为矩阵同一作品多行为取最大值合并）；v3.15（新增第 26 章「全局 AI 小窗与系统知识库」：双助理、`system_chat` 模块、`system_knowledge` 表、路由画像、意图分流与 FAQ 直答、知识库跳转入口、登录门禁；模块总数 25 → 26）；v3.14（首页「诗境 AI」展开面板新增「前往完整页面」入口，按工具预选诗宝阁角色与能力；韵脚查询/对对联补充为诗宝阁新能力，能力总数 10 → 12；功能卡增加自动横向滑动）；2026-10-19（AI 对话页模块名统一由「诗阁」更名为「诗宝阁」；此前第 25 章「AI 对话页『诗宝阁』」补充对话流消息头像说明：AI 侧统一卡通头像 / 用户侧本人头像，气泡与头像左右对齐；v3.13 补充后端流式接口 `POST /api/ai/chat/stream`（SSE 流式）说明与接口表条目；v3.12 新增第 25 章：6 角色 × 10 能力的角色化统一对话入口，纯前端复用 `POST /api/ai/chat` 非流式接口）
+## 27. Python 知识问答服务（RAG）模块
+
+### 功能说明
+
+- 为「网页用法助理」提供基于知识库的检索增强问答（RAG），以独立 Python FastAPI 进程运行，代码不并入 Java 后端
+- 语料：`docs/business/modules.md`、`docs/business/system-workflow.md`、`system_knowledge` 条目（导出为 Markdown；固定 3 个来源，`EXTRA_DOC_DIRS` 默认置空，保持论文评测基线）
+- 检索：Markdown 章节切分 → `bge-small-zh-v1.5` 向量召回 + jieba/BM25 关键词召回 → RRF 融合 → `bge-reranker-base` 重排 → 同章节邻居扩展
+- 生成：`ollama` Python 客户端直连本地模型（默认 `qwen3.5:4b`，备用 `maternion/minicpm5:2b-q8_0`），不走 LlamaIndex 生成层
+- 小窗接入：`stores/aiChat.ts` 的 `answerBySystem()` 在 FAQ 直答之后、原关键词检索之前调用 RAG（SSE 流式）；服务不可用、超时或拒答时自动回退原「关键词检索 + `/api/ai/chat`」链路，因此 RAG 未启动不影响小窗基本可用
+
+### 启动与托管
+
+- 本地开发默认由 Spring Boot 自动托管：`config/RagServiceLauncher` 在后端启动后异步探测 `127.0.0.1:8010`，未监听则执行 `python app.py`，约 30 秒就绪；已在运行则复用，后端关闭时只回收自己拉起的进程
+- 配置项 `moyuan.rag-service.*`（`auto-start` / `python` / `work-dir` / `script` / `log-file`），可用 `RAG_AUTO_START=false` 关闭；`test` profile 不启用
+- 首次仍需手动准备：安装依赖、`python corpus_export.py` 导出语料、`python build_index.py` 建索引；之后无需再单独启动服务
+- 健康探测：后台 `SystemHealthController` 对 RAG 使用独立超时 `moyuan.health.rag-timeout-ms`（默认 3000ms），避免 `/rag/health` 连带探测 Ollama 超过数据库探活的 800ms 阈值而被误判为断连
+- 向量库可视化：后台「资源分布 → 存储资源」展示 RAG 向量库状态（嵌入模型、维度、文本块数、索引文件与体积、构建时间），并列出全部语料来源文件（块数/体积）与索引构成（`chunks.json`、`embeddings.npy`、`tokens.json`、`meta.json`）
+
+### 前端组件
+
+| 组件 | 说明 |
+|------|------|
+| components/admin/RagConfigPanel.vue | 「知识问答（本地模型）」配置面板（嵌入/生成模型、重排开关、送入块数、索引状态） |
+| views/admin/ai-models.vue | AI 模型管理页；`?tab=rag` 承载知识问答配置，旧地址 `/admin/rag-config` 自动跳转 |
+| api/modules/rag.ts | RAG 接口封装：3 秒健康探测（30 秒缓存）、同步问答、配置读写 |
+
+### API 接口
+
+| 接口 | 说明 | 后端模块 |
+|------|------|----------|
+| GET /rag/health | 当前嵌入/生成模型、索引是否就绪、索引块数、Ollama 可用性 | rag-service（FastAPI，8010） |
+| GET /rag/models、GET/PUT /rag/config | 模型清单与运行时配置读写 | rag-service |
+| POST /rag/ask、POST /rag/ask/stream | 同步问答 / SSE 流式问答（`meta → delta → done`） | rag-service |
+
+---
+
+## 28. 举报管理模块
+
+### 功能说明
+
+- **职责区分**：系统/AI 自身错误（页面报错、功能失效、数据异常等）走「报修模块」`repair_order`；用户对用户/内容的违规行为走「举报」`user_report`，两者互不混用
+- 用户可在帖子列表/详情、评论（帖子与诗词）、等入口提交举报，原因包含垃圾广告、辱骂攻击、色情低俗、抄袭洗稿、违法违规、其他
+- 同一用户对同一对象只能举报一次（唯一键 `reporter_id + target_type + target_id`）
+- **AI 自动风控**：帖子/评论发布前调用 AI 内容风控模块（`ai_module_config.module_code = content_moderation`），命中中/高风险自动生成 `reporter_id = 0` 的举报单；高风险同时限制内容可见性（帖子 status=2、评论 status=0），并通知作者转人工复核；模型异常一律降级为低风险，不阻断发布
+- **风控配置管理**：`content_moderation` 模块可在后台「AI 功能 → AI 功能配置」页维护模型、角色设定与提示词模板；`model_id` 为空表示使用系统默认模型（页面显示「默认模型」），保存后自动刷新 AI 缓存即时生效，无需改代码或重启
+- 后台「举报管理」支持统计、状态/对象类型/来源（用户/AI）/关键词筛选；处理时可选择处理中/举报成立/举报不成立，举报成立且对象为帖子/评论时可隐藏或删除内容
+- 处理结果自动推送站内通知给举报人和被举报人
+- **风控效果评测（2026-11-08）**：150 条人工标注样本在生产链路实测（`AiModerationService.analyze`，走默认模型 deepseek-chat），二分类 Acc 0.840 / P 1.000 / R 0.700 / F1 0.824，误报率 0、漏报率 0.300；三分类完全一致率 0.680；实验记录与数据见 `experiments/风控实验_20261108/`（`moderation_experiment_record.md`、`moderation_samples.csv`、`moderation_result.csv`、`moderation_summary.md`）
+
+### 前端组件
+
+| 组件 | 说明 |
+|------|------|
+| components/common/ReportDialog.vue | 统一举报弹窗（原因、说明、证据、重复举报检测） |
+| views/admin/reports.vue | 后台举报管理（统计 + 筛选 + AI 标记 + 处理弹窗） |
+| api/modules/report.ts | 举报接口封装 |
+
+### API 接口
+
+| 接口 | 说明 | 后端模块 |
+|------|------|----------|
+| POST /api/reports | 提交举报 | ReportController |
+| GET /api/reports/mine、GET /api/reports/check | 我的举报 / 是否已举报 | ReportController |
+| GET /api/admin/reports、GET /api/admin/reports/stats、PUT /api/admin/reports/{id}/handle | 后台举报列表/统计/处理（管理员、审核员） | AdminReportController |
+
+---
+
+## 29. 站内通知模块
+
+### 功能说明
+
+- 通知类型：`audit_result` 审核结果、`report_result` 举报结果、`system` 系统通知
+- 触发点：审核流水线回写审核结果（评论、诗人认证）、帖子审核、举报处理结果、AI 高风险内容限制展示
+- 前端 Header 铃铛展示未读数（60 秒轮询），点击进入 `/notifications`；支持全部/未读筛选、单条已读、全部已读，并按 `link` 跳转到对应内容
+
+### 前端组件
+
+| 组件 | 说明 |
+|------|------|
+| views/user/notifications.vue | 站内通知页 |
+| components/common/AppHeader.vue | 通知铃铛与未读数 |
+| api/modules/notification.ts | 通知接口封装 |
+
+### API 接口
+
+| 接口 | 说明 | 后端模块 |
+|------|------|----------|
+| GET /api/notifications、GET /api/notifications/unread-count | 通知分页 / 未读数 | NotificationController |
+| PUT /api/notifications/{id}/read、PUT /api/notifications/read-all | 标记已读 / 全部已读 | NotificationController |
+
+---
+
+**文档版本**：v3.23
+**最后更新**：2026-11-08（控制台升级为 1+3 总控：全局结论条、资源分布上移、运营待办双页签（审核积压/异常处置）；举报/报修新增演示种子数据；用户分析补角色/活跃/回访；推荐补线上曝光/点击/CTR 与分策略效果；此前 v3.22（控制台「内容结构」升级为「资源分布」：内容/AI/存储/运行四域切换、5 分钟自动刷新、项目资源下钻；不含宿主机 CPU/内存等系统指标；v3.21：第 28 章补充风控效果评测：150 条样本实测 Acc 0.840 / P 1.000 / R 0.700、三分类一致率 0.680，数据见 `experiments/风控实验_20261108/`）；此前 v3.20（新增第 28 章「举报管理模块」与第 29 章「站内通知模块」：举报与系统报修职责区分、AI 内容风控自动建单与高风险限流、后台举报处理、审核/举报结果站内通知；模块总数 27 → 29）；此前 v3.19（第 10 章补充控制台数据大屏与系统监测看板、标签栏单标签隐藏；新增第 27 章「Python 知识问答服务（RAG）模块」：服务链路、后端自动托管启动、RAG 独立健康超时与前端配置入口；模块总数 26 → 27）；此前 v3.18（审核流水线拆分管理员调度台/审核员工作台；明确五角色权责；报修定位为系统 Bug 工单，处理人限管理员/审核员）；2026-11-07（AI 加固收尾同步：第 25 章诗宝阁由「阶段一非流式」改为 SSE 流式 + system 人设多轮上下文 + 服务端会话（Redis，TTL 7 天，localStorage 兜底）+ 停止生成；平仄校验改述为本地确定性引擎 `POST /api/ai/tone-check`（不消耗 AI 额度）；古籍识文标注维护中（`ai.features.ocr-enabled=false`）；接口清单补 `tone-check` 与 3 个会话接口，并注明 `/api/ai/**` 统一限流与入参校验）；此前 v3.17（推荐算法说明补充「四组模型策略（离线制品查表）」与「后台实时看板」；后台控制台推荐指标屏新增缓存覆盖、模型版本、近 7 天切换趋势、切换去向/页面分布与最近事件）；v3.16（推荐算法说明由 UserCF 更新为 ItemCF，诗词行为矩阵同一作品多行为取最大值合并）；v3.15（新增第 26 章「全局 AI 小窗与系统知识库」：双助理、`system_chat` 模块、`system_knowledge` 表、路由画像、意图分流与 FAQ 直答、知识库跳转入口、登录门禁；模块总数 25 → 26）；v3.14（首页「诗境 AI」展开面板新增「前往完整页面」入口，按工具预选诗宝阁角色与能力；韵脚查询/对对联补充为诗宝阁新能力，能力总数 10 → 12；功能卡增加自动横向滑动）；2026-10-19（AI 对话页模块名统一由「诗阁」更名为「诗宝阁」；此前第 25 章「AI 对话页『诗宝阁』」补充对话流消息头像说明：AI 侧统一卡通头像 / 用户侧本人头像，气泡与头像左右对齐；v3.13 补充后端流式接口 `POST /api/ai/chat/stream`（SSE 流式）说明与接口表条目；v3.12 新增第 25 章：6 角色 × 10 能力的角色化统一对话入口，纯前端复用 `POST /api/ai/chat` 非流式接口）
 **维护人员**：墨渊开发团队

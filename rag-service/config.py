@@ -17,11 +17,17 @@ os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = BASE_DIR.parent
 
-# ---------------- 语料范围：两份业务文档 + 小助手系统知识库 ----------------
+# ---------------- 语料范围：业务文档 + 本地文档目录 + 小助手系统知识库 ----------------
 DOC_SOURCES = [
     PROJECT_DIR / "docs" / "business" / "modules.md",
     PROJECT_DIR / "docs" / "business" / "system-workflow.md",
 ]
+# 已回退为仅 3 个生成语料，保持论文实验口径不变。
+# 如需扩展，可在此加入 docs 子目录（导出时统一加 local__ 前缀，避免覆盖生成文件）；
+# 注意：扩充语料会改变检索评测基线，需重新标注与重跑实验。
+EXTRA_DOC_DIRS = []
+# 用户自备本地文件投放目录（默认保持为空，不参与建索引）
+LOCAL_DOC_DIR = BASE_DIR / "corpus_local"
 SYSTEM_KNOWLEDGE_SQL = (
     PROJECT_DIR / "sc-moyuan-backend" / "src" / "main" / "resources" / "db" / "init.sql"
 )
@@ -95,6 +101,8 @@ VECTOR_TOP_K = 12
 BM25_TOP_K = 12
 RRF_K = 60
 RERANK_TOP_K = 8
+# 重排候选池上限：进入 CrossEncoder 的候选数（原硬编码 30，实验可覆盖）
+RERANK_POOL = 30
 NEIGHBOR_WINDOW = 1
 MAX_CONTEXT_CHUNKS = 12
 MAX_CONTEXT_CHARS = 5500

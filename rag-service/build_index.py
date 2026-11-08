@@ -21,12 +21,24 @@ from llama_index.core.node_parser import SentenceSplitter
 import config
 import model_registry
 
-# 语料文件（顺序即引用编号顺序）
-FILE_LABELS = [
+# 语料文件：3 个生成文件 + corpus_export 追加的本地文档（local__ 前缀）
+GENERATED_FILES = [
     "moyuan_business_modules.md",
     "moyuan_system_workflow.md",
     "moyuan_system_knowledge.md",
 ]
+
+
+def corpus_file_labels():
+    labels = list(GENERATED_FILES)
+    labels += sorted(
+        path.name
+        for path in config.CORPUS_DIR.glob("local__*")
+        if path.is_file() and path.suffix.lower() in {".md", ".txt"}
+    )
+    return labels
+
+
 HEADING_RE = re.compile(r"^(#{1,3})\s+(.*)$")
 HTML_RE = re.compile(r"<[^>]+>")
 
@@ -107,7 +119,7 @@ def main():
 
     # 1. 读取并切分语料
     chunks, stats = [], {}
-    for name in FILE_LABELS:
+    for name in corpus_file_labels():
         path = config.CORPUS_DIR / name
         if not path.exists():
             raise SystemExit(f"语料缺失：{path}\n请先运行 python corpus_export.py")

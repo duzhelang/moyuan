@@ -16,6 +16,8 @@
 | `ask.py` | 命令行问答 |
 | `evaluate.py` + `eval/questions.json` | 旧版 8 题要点/来源覆盖回归 |
 | `evaluate_retrieval.py` | 四组检索对比（A 仅向量 / B 仅 BM25 / C 混合无重排 / D 混合+重排） |
+| `evaluate_rerank_budget.py` | 重排候选池折中实验（池 8/12/16/20/24/30，固定 top-8） |
+| `plot_rerank_budget.py` | 重排折中双轴图：NDCG@8 / Recall@8 与平均检索耗时 |
 | `evaluate_generation.py` | 生成层对比（A / D 两组，含拒答与事实一致率） |
 | `annotate.py` + `eval/questions_v2.json` + `eval/qrels.json` | 35 题评测集与 qrels 标注辅助 |
 | `plot_results.py` | 论文双轴图：左 NDCG@8、右平均耗时 |
@@ -36,6 +38,13 @@ python build_index.py
 python app.py
 ```
 
+语料范围（`config.py` 可调整）：
+
+- 固定 3 个来源：`docs/business/modules.md`、`docs/business/system-workflow.md`、`system_knowledge` 24 条
+- `EXTRA_DOC_DIRS` 默认置空，保持论文实验的语料口径稳定；扩充语料会改变检索评测基线，需重新标注与重跑实验
+- 文档增删后需重新执行第 1、2 步；后台「资源分布 → 存储资源」会展示语料来源明细与索引文件构成
+- 第 2 步完成后必须重启 RAG 服务（或重启后端让其托管重启），否则进程内存中的旧索引不会刷新
+
 > 后端联调时不必手动执行第 3 步：Spring Boot 启动时会先探测 8010，未监听则自动执行 `python app.py`
 > （配置项 `moyuan.rag-service.*`，测试 profile 不启用）。首次启动需导入依赖，约 30 秒后就绪，
 > 子进程日志写入后端工作目录下的 `logs/rag-service.log`。
@@ -47,7 +56,7 @@ python app.py
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/rag/health` | 服务、索引、Ollama 状态 |
+| GET | `/rag/health` | 服务、索引、Ollama 状态；另返回 `embed_label`、`index_dim`、`index_files`/`index_details`、`corpus_files`/`corpus_details`、`corpus_bytes`、`corpus_words`、`index_bytes`、`built_at` 供后台资源分布使用 |
 | GET | `/rag/models` | 模型清单与索引状态 |
 | GET | `/rag/config` | 当前生效配置 |
 | PUT | `/rag/config` | 管理员切换嵌入/生成模型、重排、top_k |
@@ -68,6 +77,9 @@ python app.py
   仅向量 NDCG@8 0.764 → 仅 BM25 0.758 → 混合无重排 0.797 → 混合+重排 0.925，
   重排代价约 +9.1 秒/题；生成层 A/D 要点覆盖 0.713 / 0.798、拒答正确率均 40%、平均耗时 29 / 31 秒；
   结果见 `eval/results/retrieval_groups.md` 与 `fig_retrieval.png`
+- 重排候选池折中（30 道可答题、固定 top-8）：池 8/12/16/20/24/30 的 NDCG@8 为
+  0.888/0.908/0.913/0.921/0.925/0.925，MRR@8 各档均为 0.956；池 20 相对池 30 质量只差
+  0.004，耗时由 8 298 ms 降至 6 642 ms；结果见 `eval/results/rerank_budget.md` 与 `fig_rerank_budget.png`
 - 评分问题端到端回答：两种评分方式、1.0-5.0、四个接口、入口 `/poem/:id`
 - FastAPI 健康/模型/配置接口通过；切换预留模型会返回明确拒绝
 - 前端 `aiChat` 单测 14/14 通过；小窗已接入 RAG，服务不可用时自动回退原链路

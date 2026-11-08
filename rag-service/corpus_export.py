@@ -14,6 +14,42 @@ CORPUS_FILES = [
     (config.DOC_SOURCES[1], "moyuan_system_workflow.md"),
 ]
 
+EXTRA_EXTENSIONS = {".md", ".txt"}
+
+
+def export_extra_docs():
+    """把 docs 指定目录与 corpus_local 的本地文件复制进 corpus（统一 local__ 前缀）。"""
+    # 清理上一轮导出的本地副本，避免已删除的文件残留
+    for stale in config.CORPUS_DIR.glob("local__*"):
+        if stale.is_file():
+            stale.unlink()
+
+    exported, skipped = 0, set()
+    for directory in config.EXTRA_DOC_DIRS:
+        if not directory.exists():
+            continue
+        for path in sorted(directory.rglob("*")):
+            if path.suffix.lower() not in EXTRA_EXTENSIONS or not path.is_file():
+                continue
+            resolved = path.resolve()
+            if resolved in skipped or resolved in {s.resolve() for s, _ in CORPUS_FILES}:
+                continue
+            skipped.add(resolved)
+            rel = path.relative_to(config.PROJECT_DIR).as_posix().replace("/", "__")
+            target = config.CORPUS_DIR / f"local__{rel}"
+            shutil.copy2(path, target)
+            exported += 1
+
+    if config.LOCAL_DOC_DIR.exists():
+        for path in sorted(config.LOCAL_DOC_DIR.rglob("*")):
+            if path.suffix.lower() not in EXTRA_EXTENSIONS or not path.is_file():
+                continue
+            rel = path.relative_to(config.LOCAL_DOC_DIR).as_posix().replace("/", "__")
+            target = config.CORPUS_DIR / f"local__user__{rel}"
+            shutil.copy2(path, target)
+            exported += 1
+    return exported
+
 
 def extract_insert_block(sql: str, table: str) -> str:
     """截取指定表的 INSERT ... VALUES 语句（到分号结束）。"""
@@ -174,6 +210,10 @@ def main():
     out = config.CORPUS_DIR / "moyuan_system_knowledge.md"
     out.write_text(text, encoding="utf-8")
     print(f"已导出 moyuan_system_knowledge.md（{len(items)} 条，{len(text)} 字）")
+
+    # 3. 追加本地文档（docs 指定目录 + corpus_local 投放目录）
+    count = export_extra_docs()
+    print(f"已追加本地文档 {count} 个（前缀 local__）")
 
 
 if __name__ == "__main__":

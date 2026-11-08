@@ -133,6 +133,7 @@ data: {"elapsed":3.2}
 ## 7. 语料与索引
 
 - 语料：`docs/business/modules.md`、`docs/business/system-workflow.md`、`system_knowledge` 24 条。
+  `EXTRA_DOC_DIRS` 默认置空，固定 3 个来源以保持评测基线；扩充语料需重新标注、重跑实验。
 - `system_knowledge` 第一版从 `init.sql` 导出；第二版改从 `GET /api/system-knowledge` 或 MySQL 直读，保证后台改动能生效。
 - 索引目录：`rag-service/data/index/<embed_key>/`，`meta.json` 记录维度、块数、模型路径。
 - 本期只构建：`data/index/bge-small/`。

@@ -114,9 +114,10 @@ class RagEngine:
         return len(pa) >= 3 and pa[:-1] == pb[:-1]
 
     # ---------------- 检索主流程 ----------------
-    def retrieve(self, question, rerank_top_k=None, min_score=None):
+    def retrieve(self, question, rerank_top_k=None, min_score=None, rerank_pool=None):
         started = time.perf_counter()
         top_n = rerank_top_k or self.rerank_top_k
+        pool_size = rerank_pool or config.RERANK_POOL
         queries = split_questions(question)
         merged = {}
         use_vector = self.retrieval_mode in ("vector", "hybrid")
@@ -182,7 +183,7 @@ class RagEngine:
             return result
 
         # 1) 重排：候选过多时先截断，再按“问题—文本块”相关性排序
-        pool = candidates[:30]
+        pool = candidates[:pool_size]
         if self.reranker:
             t0 = time.perf_counter()
             pairs = [[question, self.chunks[i]["text"]] for i, _ in pool]
