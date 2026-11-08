@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { TodoItem } from '@/types/admin-dashboard'
 
@@ -9,8 +9,24 @@ const props = withDefaults(defineProps<{ items?: TodoItem[] }>(), {
 
 const router = useRouter()
 
-const list = computed(() => props.items)
+const activeKind = ref<'audit' | 'alert'>('audit')
+
+const groups = computed(() => {
+  const audit = props.items.filter((i) => (i.kind || 'audit') === 'audit')
+  const alert = props.items.filter((i) => i.kind === 'alert')
+  return [
+    { key: 'audit' as const, label: '审核积压', items: audit },
+    { key: 'alert' as const, label: '异常处置', items: alert }
+  ].filter((g) => g.items.length > 0)
+})
+
+const list = computed(() =>
+  props.items.filter((i) => (i.kind || 'audit') === activeKind.value)
+)
+const allTotal = computed(() => props.items.reduce((sum, i) => sum + i.count, 0))
 const total = computed(() => list.value.reduce((sum, i) => sum + i.count, 0))
+const groupCount = (items: TodoItem[]) => items.reduce((sum, i) => sum + i.count, 0)
+
 const hasAlert = computed(() =>
   list.value.some((i) => i.status === 'down' || i.status === 'warn')
 )
@@ -43,12 +59,31 @@ const go = (item: TodoItem) => {
     <div class="tp-head">
       <div class="tp-title-box">
         <span class="tp-title">运营待办</span>
-        <span class="tp-note">审核积压 · 点击直达处理页</span>
+        <span class="tp-note">
+          {{ activeKind === 'audit' ? '审核积压 · 点击直达处理页' : '异常处置 · 举报 / 报修 / AI / 安全' }}
+        </span>
       </div>
       <div class="tp-total">
         <b>{{ total }}</b>
-        <span>待处理</span>
+        <span>{{ activeKind === 'audit' ? '待审核' : '待处置' }}</span>
       </div>
+    </div>
+
+    <div class="tp-tabs" role="tablist">
+      <button
+        v-for="group in groups"
+        :key="group.key"
+        type="button"
+        class="tp-tab"
+        :class="{ active: activeKind === group.key }"
+        role="tab"
+        :aria-selected="activeKind === group.key"
+        @click="activeKind = group.key"
+      >
+        {{ group.label }}
+        <b>{{ groupCount(group.items) }}</b>
+      </button>
+      <span class="tp-all">全部 {{ allTotal }}</span>
     </div>
 
     <div v-if="segments.length" class="tp-stack" aria-hidden="true">
@@ -65,6 +100,7 @@ const go = (item: TodoItem) => {
         :key="item.key"
         class="tp-tile"
         :class="[item.status, { linkable: !!item.link }]"
+        :title="item.note || ''"
         @click="go(item)"
       >
         <div class="tile-head">
@@ -187,6 +223,51 @@ const go = (item: TodoItem) => {
     font-size: 11px;
     color: var(--adm-text-muted);
   }
+}
+
+.tp-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.tp-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: 1px solid var(--adm-border-soft);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--adm-text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.18s;
+
+  b {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &:hover {
+    color: var(--adm-primary);
+    border-color: var(--adm-primary);
+  }
+
+  &.active {
+    color: var(--adm-on-primary);
+    background: var(--adm-primary);
+    border-color: var(--adm-primary);
+  }
+}
+
+.tp-all {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--adm-text-faint);
+  font-variant-numeric: tabular-nums;
 }
 
 /** 构成条：一眼看出积压集中在哪一类 */

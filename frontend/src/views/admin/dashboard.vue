@@ -1,19 +1,23 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   getAdminStats,
   getAdminStatsTrend,
   getAuditStats,
+  getRepairStats,
   getSystemHealth,
   getSystemMetrics,
   getSearchMetrics,
   getAiMetrics,
   getSecurityMetrics,
   getVisitStats,
-  getVisitTrend
+  getVisitTrend,
+  getHotPoems
 } from '@/api/modules/admin'
+import { getReportStats } from '@/api/modules/report'
 import type {
   AiMetrics,
+  HotPoem,
   SearchMetrics,
   SecurityMetrics,
   SystemHealthNode,
@@ -22,7 +26,7 @@ import type {
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
-import { LineChart, PieChart, BarChart } from 'echarts/charts'
+import { LineChart, BarChart } from 'echarts/charts'
 import {
   TitleComponent,
   TooltipComponent,
@@ -31,14 +35,27 @@ import {
 } from 'echarts/components'
 import HealthChain from '@/components/admin/HealthChain.vue'
 import MetricsBar from '@/components/admin/MetricsBar.vue'
+import ResourceDistribution from '@/components/admin/ResourceDistribution.vue'
 import Sparkline from '@/components/admin/Sparkline.vue'
 import TodoTimeline from '@/components/admin/TodoTimeline.vue'
+import AdminEmptyState from '@/components/admin/AdminEmptyState.vue'
+import AdminDemoToggle from '@/components/admin/AdminDemoToggle.vue'
+import { useAdminDemo } from '@/composables/useAdminDemo'
+import {
+  buildDemoStatsTrend,
+  buildDemoVisitTrend,
+  demoHotPoems,
+  demoMetricsItems,
+  demoTodoItems,
+  demoVisitStats
+} from '@/configs/admin/demoData'
 import { readChartInk, readChartPalette, useAdminTheme } from '@/composables/useAdminTheme'
 import type { ChainNode, MetricItem, TodoItem } from '@/types/admin-dashboard'
 
-use([CanvasRenderer, LineChart, PieChart, BarChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent])
+use([CanvasRenderer, LineChart, BarChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent])
 
 const { resolvedTheme } = useAdminTheme()
+const { demoMode } = useAdminDemo()
 
 /** 图表配色跟随主题，切换主题时 computed 自动重算 */
 const palette = computed(() => {
@@ -83,16 +100,21 @@ const visitTrendData = ref<{ dates: string[]; visits: number[]; uniqueVisitors: 
   visits: [],
   uniqueVisitors: []
 })
+/** 访问趋势范围：7 / 30 天，90 天数据量大且暂无需求，不做 */
+const visitRange = ref<7 | 30>(7)
 
 /** 访问卡走势专用：30 天窗口，够画「本周累计」和「本月波动」 */
 const sparkTrend = ref<{ dates: string[]; visits: number[] }>({ dates: [], visits: [] })
 
 const auditStats = ref<Record<string, number>>({})
+const reportStats = ref<Record<string, number>>({})
+const repairStats = ref<Record<string, number>>({})
 const healthNodes = ref<ChainNode[]>([])
 const apiMetrics = ref<SystemMetrics | null>(null)
 const searchMetrics = ref<SearchMetrics | null>(null)
 const aiMetrics = ref<AiMetrics | null>(null)
 const securityMetrics = ref<SecurityMetrics | null>(null)
+const hotPoems = ref<HotPoem[]>([])
 const updatedAt = ref('—')
 
 const statDetails = computed<Record<string, any>>(() => stats.value.details || {})
@@ -174,6 +196,7 @@ const pendingTotal = computed(() => {
  * 其余两项等 AI 调用日志与登录统计接入。
  */
 const metricsItems = computed<MetricItem[]>(() => {
+  if (demoMode.value) return demoMetricsItems
   const m = apiMetrics.value
   const hasData = !!m && m.available && m.total > 0
   const errRate = hasData ? ((m as SystemMetrics).errorRate * 100).toFixed(2) + '%' : '—'
@@ -249,6 +272,31 @@ const lastUv = computed(() => {
   const arr = visitTrendData.value.uniqueVisitors
   return arr.length ? arr[arr.length - 1] : 0
 })
+
+/** 内容增长是否有真实新增；没有时显示空态，避免一条贴底的空线 */
+const hasContentGrowth = computed(
+  () =>
+    sumOf(trendData.value.users) + sumOf(trendData.value.poems) + sumOf(trendData.value.posts) > 0
+)
+
+/** 切换访问趋势范围并重新拉取，7 / 30 天共用同一接口 */
+const setVisitRange = async (days: 7 | 30) => {
+  if (visitRange.value === days) return
+  visitRange.value = days
+  if (demoMode.value) {
+    visitTrendData.value = buildDemoVisitTrend(days)
+    return
+  }
+  visitLoading.value = true
+  try {
+    const res = await getVisitTrend(days)
+    visitTrendData.value = res.data
+  } catch (error) {
+    console.error('获取访问趋势失败', error)
+  } finally {
+    visitLoading.value = false
+  }
+}
 
 /**
  * 前端访问节点：后端探测不到浏览器，用访问日志的真实数据拼出来，
@@ -332,25 +380,104 @@ const healthText = computed(() => {
   return '运行正常'
 })
 
+/** 演示模式下顶部状态只表达「演示中」，不覆盖真实探活结果，也不参与后端判断 */
+const displayHealthLevel = computed(() => (demoMode.value ? 'ok' : healthLevel.value))
+const displayHealthText = computed(() => (demoMode.value ? '演示模式' : healthText.value))
+
 /** health 接口失败时返回空数组，组件自动回落到占位链路 */
 const chainNodes = computed<ChainNode[]>(() =>
   healthNodes.value.length ? [webChainNode.value, ...healthNodes.value] : []
 )
 
-const nodeOnline = computed(
-  () => chainNodes.value.filter((n) => n.status !== 'down').length
-)
-
-/** 顶栏速览：四个最常看的数，进页面第一眼就能拿到 */
-const quickFacts = computed(() => [
-  { label: '今日 PV', value: String(visitStats.value.todayVisits || 0) },
-  { label: '今日 UV', value: String(lastUv.value) },
-  { label: '待审积压', value: String(pendingTotal.value) },
-  {
-    label: '节点在线',
-    value: chainNodes.value.length ? `${nodeOnline.value}/${chainNodes.value.length}` : '—'
+/**
+ * 全局结论层：先把「有没有问题、先处理什么」用一句话说清楚，
+ * 再让下面的资源/趋势/链路作为证据，而不是把数字平铺给读者自己判断。
+ */
+const globalVerdict = computed(() => {
+  if (demoMode.value) {
+    return {
+      level: 'ok' as const,
+      title: '演示模式 · 全局运行平稳',
+      summary: '当前展示的是演示数据，只影响本页图表与数字展示，不会写入后端；点击顶部按钮可恢复真实数据。',
+      pendingActions: 12,
+      facts: [
+        { label: '待处理总数', value: '12' },
+        { label: '异常节点', value: '0/5' },
+        { label: '举报 / 报修', value: '0 / 0' },
+        { label: 'AI 失败率', value: '0.8%' }
+      ]
+    }
   }
-])
+  const downNodes = healthNodes.value.filter((n) => n.status === 'down')
+  const warnNodes = healthNodes.value.filter((n) => n.status === 'warn')
+  const ai = aiMetrics.value
+  const api = apiMetrics.value
+  const issues: string[] = []
+  let level: 'ok' | 'warn' | 'down' = 'ok'
+
+  if (downNodes.length) {
+    issues.push(`${downNodes.map((n) => n.name).join('、')} 未连接`)
+    level = 'down'
+  } else if (warnNodes.length) {
+    issues.push(`${warnNodes.map((n) => n.name).join('、')} 响应降级`)
+    level = 'warn'
+  }
+  if (api && api.available && api.total > 0 && api.errorRate >= 0.05) {
+    issues.push(`接口错误率 ${(api.errorRate * 100).toFixed(1)}%`)
+    level = api.errorRate >= 0.1 ? 'down' : 'warn'
+  }
+  if (ai && ai.available && ai.total > 0 && ai.errorRate >= 0.3) {
+    issues.push(`AI 失败率 ${(ai.errorRate * 100).toFixed(1)}%`)
+    level = ai.errorRate >= 0.5 ? 'down' : 'warn'
+  }
+  if ((securityMetrics.value?.total || 0) > 0) {
+    issues.push(`安全事件 ${securityMetrics.value?.total} 起`)
+    level = level === 'down' ? 'down' : 'warn'
+  }
+  if ((reportStats.value.pending || 0) > 0) {
+    issues.push(`举报待处理 ${reportStats.value.pending}`)
+    level = level === 'down' ? 'down' : 'warn'
+  }
+  if ((repairStats.value.pending || 0) > 0) {
+    issues.push(`报修待处理 ${repairStats.value.pending}`)
+    level = level === 'down' ? 'down' : 'warn'
+  }
+  if (pendingTotal.value >= 20) {
+    issues.push(`审核积压 ${pendingTotal.value}`)
+    level = level === 'down' ? 'down' : 'warn'
+  }
+
+  const pendingActions =
+    pendingTotal.value +
+    (reportStats.value.pending || 0) +
+    (repairStats.value.pending || 0)
+
+  return {
+    level,
+    title:
+      level === 'down'
+        ? '存在风险，需要立即处理'
+        : level === 'warn'
+          ? '需要关注，建议优先处置'
+          : '全局运行平稳',
+    summary: issues.length
+      ? `优先关注：${issues.slice(0, 3).join('；')}`
+      : '链路、内容、举报与报修均无高优异常，可继续按运营节奏推进。',
+    pendingActions,
+    facts: [
+      { label: '待处理总数', value: `${pendingActions}` },
+      { label: '异常节点', value: `${downNodes.length + warnNodes.length}/${healthNodes.value.length || 0}` },
+      { label: '举报 / 报修', value: `${reportStats.value.pending || 0} / ${repairStats.value.pending || 0}` },
+      {
+        label: 'AI 失败率',
+        value:
+          ai && ai.available && ai.total > 0
+            ? `${(ai.errorRate * 100).toFixed(1)}%`
+            : '—'
+      }
+    ]
+  }
+})
 
 /**
  * 资源总览：每格只保留「图标 + 标签 + 大数字 + 近 7 天变化」，
@@ -419,22 +546,27 @@ const visitCards = [
   { key: 'totalVisits', label: '总访问量', icon: 'TrendCharts', tone: 3, tip: '自系统记录访问日志以来的累计接口访问次数' }
 ]
 
-/** 与后端 /admin/audit/stats 的 6 个 key 一一对应，逐个可点下钻 */
+/** 审核积压 + 异常处置：统一到「运营待办」两个页签 */
 const todoItems = computed<TodoItem[]>(() => {
+  if (demoMode.value) return demoTodoItems
   const s = auditStats.value
   const build = (
     key: string,
     label: string,
     count: number | undefined,
-    link: string
+    link: string,
+    kind: 'audit' | 'alert' = 'audit',
+    note = ''
   ): TodoItem => ({
     key,
     label,
     count: count || 0,
-    status: (count || 0) >= 10 ? 'warn' : 'ok',
-    link
+    status: (count || 0) > 0 ? 'warn' : 'ok',
+    link,
+    kind,
+    note
   })
-  return [
+  const auditItems: TodoItem[] = [
     build('poem', '诗词待审', s.poems, '/admin/poem-audit'),
     build('comment', '评论待审', s.comments, '/admin/comments'),
     build('poetProfile', '诗人认证', s.poetProfiles, '/admin/poet-profiles'),
@@ -442,19 +574,25 @@ const todoItems = computed<TodoItem[]>(() => {
     build('poetDraft', '正文修订', s.poetDrafts, '/admin/poet-suggestions'),
     build('poetSuggestion', '内容建议', s.poetSuggestions, '/admin/poet-suggestions')
   ]
-})
+  // 审核类阈值保持原口径：>=10 才标红；这里统一覆盖为 warn / ok
+  auditItems.forEach((item) => {
+    item.status = item.count >= 10 ? 'warn' : 'ok'
+  })
 
-/** 柱状渐变：用 8 位十六进制叠加透明度，ECharts 可直接识别 */
-const barFade = (hex: string) => ({
-  type: 'linear' as const,
-  x: 0,
-  y: 0,
-  x2: 0,
-  y2: 1,
-  colorStops: [
-    { offset: 0, color: hex },
-    { offset: 1, color: `${hex}2e` }
+  const alertItems: TodoItem[] = [
+    build('reportPending', '举报待处理', reportStats.value.pending, '/admin/reports', 'alert',
+      '用户举报与 AI 风控自动建单中尚未处理的数量'),
+    build('repairPending', '报修待处理', repairStats.value.pending, '/admin/repairs', 'alert',
+      '系统 Bug 工单中待处理的数量，处理中工单见报修管理页'),
+    build('aiFailed', 'AI 失败 · 24h', aiMetrics.value?.errorCount, '/admin/monitor', 'alert',
+      '近 24 小时 AI 调用失败次数，连续失败需检查模型密钥与网络'),
+    build('securityEvent', '安全事件 · 24h', securityMetrics.value?.total, '/admin/monitor', 'alert',
+      '登录失败、越权 403、限流等安全事件合计'),
+    build('apiError', '接口错误 · 24h', apiMetrics.value?.errorCount, '/admin/monitor', 'alert',
+      '近 24 小时 HTTP 5xx / 业务失败请求数')
   ]
+
+  return [...auditItems, ...alertItems]
 })
 
 const lineChartOption = computed(() => ({
@@ -529,64 +667,10 @@ const lineChartOption = computed(() => ({
   ]
 }))
 
-const pieChartOption = computed(() => {
-  const pieData = [
-    { name: '用户', value: stats.value.userCount || 0, itemStyle: { color: palette.value[0] } },
-    { name: '诗词', value: stats.value.poemCount || 0, itemStyle: { color: palette.value[1] } },
-    { name: '帖子', value: stats.value.postCount || 0, itemStyle: { color: palette.value[2] } },
-    { name: '分类', value: stats.value.categoryCount || 0, itemStyle: { color: palette.value[3] } },
-    { name: '朝代', value: stats.value.dynastyCount || 0, itemStyle: { color: palette.value[4] } },
-    { name: '诗人', value: stats.value.poetCount || 0, itemStyle: { color: palette.value[5] } }
-  ]
-  return {
-    tooltip: { ...tooltipStyle.value, trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-    series: [
-      {
-        type: 'pie',
-        radius: ['50%', '76%'],
-        center: ['50%', '50%'],
-        avoidLabelOverlap: false,
-        itemStyle: { borderRadius: 5, borderColor: chartInk.value.surface, borderWidth: 2 },
-        label: { show: false },
-        emphasis: {
-          label: {
-            show: true,
-            fontSize: 12,
-            fontWeight: 'bold',
-            color: chartInk.value.text,
-            formatter: '{b}\n{c}'
-          }
-        },
-        labelLine: { show: false },
-        data: pieData
-      }
-    ]
-  }
-})
-
-/** 饼图右侧的明细行：名称 / 数量 / 占比，颜色随主题 */
-const pieRows = computed(() => {
-  const rows = [
-    { name: '诗词', value: stats.value.poemCount || 0, color: palette.value[1] },
-    { name: '诗人', value: stats.value.poetCount || 0, color: palette.value[5] },
-    { name: '用户', value: stats.value.userCount || 0, color: palette.value[0] },
-    { name: '帖子', value: stats.value.postCount || 0, color: palette.value[2] },
-    { name: '分类', value: stats.value.categoryCount || 0, color: palette.value[3] },
-    { name: '朝代', value: stats.value.dynastyCount || 0, color: palette.value[4] }
-  ]
-  const max = Math.max(1, ...rows.map((r) => r.value))
-  const total = rows.reduce((sum, r) => sum + r.value, 0) || 1
-  return rows.map((r) => ({
-    ...r,
-    ratio: (r.value / total) * 100,
-    bar: (r.value / max) * 100
-  }))
-})
-
 const visitChartOption = computed(() => ({
   tooltip: tooltipStyle.value,
   legend: {
-    data: ['访问量', '独立访客'],
+    data: ['访问量 PV', '独立访客 UV'],
     top: 0,
     right: 0,
     itemWidth: 10,
@@ -597,7 +681,7 @@ const visitChartOption = computed(() => ({
   grid: { left: 2, right: 8, bottom: 2, top: 30, containLabel: true },
   xAxis: {
     type: 'category',
-    boundaryGap: true,
+    boundaryGap: false,
     data: visitTrendData.value.dates,
     axisLine: { lineStyle: { color: chartInk.value.border } },
     axisTick: { show: false },
@@ -612,20 +696,40 @@ const visitChartOption = computed(() => ({
   },
   series: [
     {
-      name: '访问量',
-      type: 'bar',
+      name: '访问量 PV',
+      type: 'line',
+      smooth: true,
+      showSymbol: false,
       data: visitTrendData.value.visits,
-      barWidth: '46%',
-      itemStyle: { color: barFade(palette.value[0]), borderRadius: [3, 3, 0, 0] }
+      color: palette.value[0],
+      lineStyle: { width: 2 },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0,
+          y: 0,
+          x2: 0,
+          y2: 1,
+          colorStops: [
+            { offset: 0, color: `${palette.value[0]}2e` },
+            { offset: 1, color: `${palette.value[0]}05` }
+          ]
+        }
+      },
+      markPoint: {
+        symbolSize: 7,
+        label: { show: false },
+        data: [{ type: 'max' }]
+      }
     },
     {
-      name: '独立访客',
+      name: '独立访客 UV',
       type: 'line',
       smooth: true,
       showSymbol: false,
       data: visitTrendData.value.uniqueVisitors,
       color: palette.value[3],
-      lineStyle: { width: 1.8 }
+      lineStyle: { width: 1.6, type: 'dashed' }
     }
   ]
 }))
@@ -649,7 +753,7 @@ const loadAll = async () => {
     (async () => {
       try {
         const res = await getAdminStatsTrend()
-        trendData.value = res.data
+        trendData.value = demoMode.value ? buildDemoStatsTrend(7) : res.data
       } catch (error) {
         console.error('获取趋势数据失败', error)
       } finally {
@@ -660,12 +764,17 @@ const loadAll = async () => {
       try {
         const [visitRes, trendRes, sparkRes] = await Promise.all([
           getVisitStats(),
-          getVisitTrend(7),
+          getVisitTrend(visitRange.value),
           getVisitTrend(30)
         ])
-        visitStats.value = visitRes.data
-        visitTrendData.value = trendRes.data
-        sparkTrend.value = sparkRes.data
+        visitStats.value = demoMode.value ? demoVisitStats : visitRes.data
+        visitTrendData.value = demoMode.value
+          ? buildDemoVisitTrend(visitRange.value)
+          : trendRes.data
+        const demoSpark = buildDemoVisitTrend(30)
+        sparkTrend.value = demoMode.value
+          ? { dates: demoSpark.dates, visits: demoSpark.visits }
+          : sparkRes.data
       } catch (error) {
         console.error('获取访问统计数据失败', error)
       } finally {
@@ -678,6 +787,22 @@ const loadAll = async () => {
         auditStats.value = res.data || {}
       } catch (error) {
         console.error('获取审核统计失败', error)
+      }
+    })(),
+    (async () => {
+      try {
+        const res = await getReportStats()
+        reportStats.value = res.data || {}
+      } catch (error) {
+        console.error('获取举报统计失败', error)
+      }
+    })(),
+    (async () => {
+      try {
+        const res = await getRepairStats()
+        repairStats.value = res.data || {}
+      } catch (error) {
+        console.error('获取报修统计失败', error)
       }
     })(),
     (async () => {
@@ -724,6 +849,15 @@ const loadAll = async () => {
         console.error('获取安全指标失败', error)
         securityMetrics.value = null
       }
+    })(),
+    (async () => {
+      try {
+        const res = await getHotPoems(30, 5)
+        hotPoems.value = demoMode.value ? demoHotPoems : res.data || []
+      } catch (error) {
+        console.error('获取热门诗词失败', error)
+        hotPoems.value = []
+      }
     })()
   ]
 
@@ -732,6 +866,10 @@ const loadAll = async () => {
 }
 
 let timer: ReturnType<typeof setInterval> | undefined
+
+watch(demoMode, () => {
+  loadAll()
+})
 
 onMounted(() => {
   loadAll()
@@ -754,20 +892,30 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="head-facts">
-        <div v-for="fact in quickFacts" :key="fact.label" class="fact">
-          <span class="fact-label">{{ fact.label }}</span>
-          <b class="fact-value">{{ fact.value }}</b>
-        </div>
-      </div>
-
       <div class="head-side">
-        <span class="status-pill" :class="healthLevel">
-          <i class="dot"></i>{{ healthText }}
+        <AdminDemoToggle />
+        <span class="status-pill" :class="displayHealthLevel">
+          <i class="dot"></i>{{ displayHealthText }}
         </span>
         <span class="head-time"><i class="live-dot"></i>{{ updatedAt }}</span>
       </div>
     </header>
+
+    <section class="verdict-band" :class="globalVerdict.level">
+      <div class="verdict-main">
+        <span class="verdict-led"></span>
+        <div class="verdict-text">
+          <b>{{ globalVerdict.title }}</b>
+          <p>{{ globalVerdict.summary }}</p>
+        </div>
+      </div>
+      <div class="verdict-facts">
+        <div v-for="fact in globalVerdict.facts" :key="fact.label" class="verdict-fact">
+          <span>{{ fact.label }}</span>
+          <b>{{ fact.value }}</b>
+        </div>
+      </div>
+    </section>
 
     <section class="panel hero-panel">
       <div class="panel-head">
@@ -850,6 +998,9 @@ onUnmounted(() => {
             <div class="access-num">
               {{ visitLoading ? '...' : (visitStats[card.key as keyof typeof visitStats] || 0) }}
             </div>
+            <div v-if="card.key === 'todayVisits'" class="access-uv">
+              独立访客 UV {{ visitLoading ? '…' : lastUv }}
+            </div>
             <div class="spark-foot">
               <span class="spark-range">{{ visitSpark[card.key]?.range }}</span>
               <span
@@ -872,11 +1023,29 @@ onUnmounted(() => {
       </el-tooltip>
     </section>
 
-    <div class="main-grid">
+    <div class="charts-row">
       <section v-loading="visitLoading" class="panel trend-panel">
         <div class="panel-head">
-          <span class="panel-title">访问趋势 · 近 7 天</span>
-          <span class="panel-note">请求量 PV / 独立访客 UV</span>
+          <span class="panel-title">访问趋势 · 近 {{ visitRange }} 天</span>
+          <div class="trend-head-side">
+            <span class="panel-note">请求量 PV / 独立访客 UV</span>
+            <div class="range-switch" role="group" aria-label="访问趋势时间范围">
+              <button
+                class="range-btn"
+                :class="{ active: visitRange === 7 }"
+                @click="setVisitRange(7)"
+              >
+                7 天
+              </button>
+              <button
+                class="range-btn"
+                :class="{ active: visitRange === 30 }"
+                @click="setVisitRange(30)"
+              >
+                30 天
+              </button>
+            </div>
+          </div>
         </div>
         <v-chart class="trend-chart" :option="visitChartOption" autoresize />
       </section>
@@ -886,37 +1055,46 @@ onUnmounted(() => {
           <span class="panel-title">内容增长 · 近 7 天</span>
           <span class="panel-note">用户 / 诗词 / 帖子每日新增</span>
         </div>
-        <v-chart class="trend-chart" :option="lineChartOption" autoresize />
+        <v-chart v-if="hasContentGrowth" class="trend-chart" :option="lineChartOption" autoresize />
+        <AdminEmptyState
+          v-else
+          title="近 7 天暂无新增"
+          note="用户、诗词、帖子产生新增后，这里会自动出现增长曲线。"
+        />
       </section>
+    </div>
 
+    <section class="panel hot-panel">
+      <div class="panel-head">
+        <span class="panel-title">热门诗词 · 近 30 天</span>
+        <span class="panel-note">收藏 ×3 + 浏览 · 只统计真实互动</span>
+      </div>
+      <div v-if="hotPoems.length" class="hot-row">
+        <div v-for="(poem, index) in hotPoems" :key="poem.id" class="hot-item">
+          <span class="hot-rank" :class="{ top: index < 3 }">{{ index + 1 }}</span>
+          <div class="hot-meta">
+            <span class="hot-title" :title="poem.title">{{ poem.title }}</span>
+            <span class="hot-sub">收藏 {{ poem.favorites }} · 浏览 {{ poem.views }}</span>
+          </div>
+          <span class="hot-score">{{ poem.score }}</span>
+        </div>
+      </div>
+      <AdminEmptyState
+        v-else
+        title="暂无热门诗词"
+        note="产生收藏或浏览记录后，这里会按真实互动自动排序。"
+      />
+    </section>
+
+    <div class="split-row">
+      <ResourceDistribution class="resource-band" />
       <TodoTimeline :items="todoItems" />
     </div>
 
     <MetricsBar :items="metricsItems" />
 
-    <div class="lower-grid">
+    <div class="health-band">
       <HealthChain :nodes="chainNodes" />
-
-      <section v-loading="loading" class="panel structure-panel">
-        <div class="panel-head">
-          <span class="panel-title">内容结构</span>
-          <span class="panel-note">资源分布占比</span>
-        </div>
-        <div class="structure-body">
-          <v-chart class="structure-pie" :option="pieChartOption" autoresize />
-          <div class="structure-list">
-            <div v-for="row in pieRows" :key="row.name" class="s-row">
-              <span class="s-dot" :style="{ background: row.color }"></span>
-              <span class="s-name">{{ row.name }}</span>
-              <span class="s-bar">
-                <i :style="{ width: row.bar + '%', background: row.color }"></i>
-              </span>
-              <span class="s-val">{{ row.value }}</span>
-              <span class="s-pct">{{ row.ratio.toFixed(1) }}%</span>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
   </div>
 </template>
@@ -1015,6 +1193,7 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     gap: 14px;
+    margin-left: auto;
     flex-shrink: 0;
   }
 
@@ -1076,6 +1255,113 @@ onUnmounted(() => {
     70%,
     100% {
       box-shadow: 0 0 0 5px transparent;
+    }
+  }
+
+  // ---------------- 全局结论条 ----------------
+  .verdict-band {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 14px;
+    padding: 12px 18px;
+    border: 1px solid var(--adm-border-soft);
+    border-radius: 10px;
+    background: linear-gradient(
+      100deg,
+      color-mix(in srgb, var(--adm-ok) 8%, transparent) 0%,
+      var(--adm-surface) 48%
+    );
+    flex-wrap: wrap;
+
+    &.warn {
+      background: linear-gradient(
+        100deg,
+        color-mix(in srgb, var(--adm-warn) 10%, transparent) 0%,
+        var(--adm-surface) 48%
+      );
+    }
+
+    &.down {
+      background: linear-gradient(
+        100deg,
+        color-mix(in srgb, var(--adm-down) 12%, transparent) 0%,
+        var(--adm-surface) 48%
+      );
+    }
+  }
+
+  .verdict-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .verdict-led {
+    width: 10px;
+    height: 10px;
+    margin-top: 4px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--adm-ok);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--adm-ok) 18%, transparent);
+
+    .warn & {
+      background: var(--adm-warn);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--adm-warn) 18%, transparent);
+    }
+
+    .down & {
+      background: var(--adm-down);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--adm-down) 18%, transparent);
+    }
+  }
+
+  .verdict-text {
+    min-width: 0;
+
+    b {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      color: var(--adm-text);
+    }
+
+    p {
+      margin: 4px 0 0;
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--adm-text-muted);
+    }
+  }
+
+  .verdict-facts {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+
+  .verdict-fact {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 66px;
+
+    span {
+      font-size: 10.5px;
+      letter-spacing: 0.5px;
+      color: var(--adm-text-faint);
+    }
+
+    b {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--adm-text);
+      font-variant-numeric: tabular-nums;
     }
   }
 
@@ -1354,6 +1640,147 @@ onUnmounted(() => {
     }
   }
 
+  // ---------------- 热门诗词 ----------------
+  .hot-panel {
+    margin-top: 14px;
+  }
+
+  .hot-row {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+    padding: 0 14px 14px;
+
+    @media (max-width: 1200px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    @media (max-width: 640px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .hot-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--adm-border-soft);
+    border-radius: 8px;
+    background: var(--adm-surface-muted);
+  }
+
+  .hot-rank {
+    width: 20px;
+    height: 20px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--adm-text-muted);
+    background: var(--adm-surface);
+    font-variant-numeric: tabular-nums;
+
+    &.top {
+      color: var(--adm-on-primary);
+      background: var(--adm-primary);
+    }
+  }
+
+  .hot-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .hot-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--adm-text);
+  }
+
+  .hot-sub {
+    font-size: 10px;
+    color: var(--adm-text-faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hot-score {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--adm-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  // ---------------- 趋势分析双栏 ----------------
+  .charts-row,
+  .split-row {
+    display: grid;
+    grid-template-columns: minmax(0, 2.05fr) minmax(0, 1fr);
+    gap: 14px;
+    margin-top: 14px;
+
+    @media (max-width: 1200px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .split-row .resource-band {
+    margin-top: 0;
+  }
+
+  .trend-head-side {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  .range-switch {
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--adm-border-soft);
+    border-radius: 12px;
+    background: var(--adm-surface-muted);
+  }
+
+  .range-btn {
+    padding: 2px 9px;
+    border: none;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--adm-text-muted);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+
+    &:hover {
+      color: var(--adm-primary);
+    }
+
+    &.active {
+      color: var(--adm-on-primary);
+      background: var(--adm-primary);
+    }
+  }
+
+  .access-uv {
+    margin-top: 2px;
+    font-size: 11px;
+    color: var(--adm-text-faint);
+    font-variant-numeric: tabular-nums;
+  }
+
   .trend-panel {
     display: flex;
     flex-direction: column;
@@ -1366,119 +1793,18 @@ onUnmounted(() => {
     padding: 0 10px 8px;
   }
 
-  // ---------------- 底部：链路 + 结构 ----------------
-  .lower-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
-    gap: 14px;
+  // ---------------- 资源底座 + 链路 ----------------
+  .resource-band {
     margin-top: 14px;
+  }
 
-    @media (max-width: 1200px) {
-      grid-template-columns: 1fr;
-    }
+  .health-band {
+    margin-top: 14px;
 
     :deep(.chain-card) {
       margin-bottom: 0;
-      height: 100%;
       border-radius: 10px;
     }
-  }
-
-  .structure-panel {
-    display: flex;
-    flex-direction: column;
-    padding-bottom: 8px;
-  }
-
-  .structure-body {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 0 18px 6px;
-    flex: 1;
-
-    @media (max-width: 1200px) {
-      flex-direction: column;
-      gap: 4px;
-    }
-  }
-
-  .structure-pie {
-    width: 170px;
-    height: 178px;
-    flex-shrink: 0;
-
-    @media (max-width: 1200px) {
-      width: 100%;
-      max-width: 320px;
-    }
-  }
-
-  .structure-list {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-  }
-
-  .s-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 0;
-    font-size: 12px;
-    border-bottom: 1px dashed var(--adm-border-soft);
-
-    &:last-child {
-      border-bottom: none;
-    }
-  }
-
-  .s-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 2px;
-    flex-shrink: 0;
-  }
-
-  .s-name {
-    width: 36px;
-    color: var(--adm-text-2);
-    flex-shrink: 0;
-  }
-
-  .s-bar {
-    flex: 1;
-    height: 5px;
-    background: var(--adm-surface-muted);
-    border-radius: 3px;
-    overflow: hidden;
-    min-width: 36px;
-
-    i {
-      display: block;
-      height: 100%;
-      border-radius: 3px;
-      opacity: 0.75;
-    }
-  }
-
-  .s-val {
-    width: 52px;
-    text-align: right;
-    color: var(--adm-text);
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
-    flex-shrink: 0;
-  }
-
-  .s-pct {
-    width: 44px;
-    text-align: right;
-    color: var(--adm-text-muted);
-    font-variant-numeric: tabular-nums;
-    flex-shrink: 0;
   }
 }
 </style>

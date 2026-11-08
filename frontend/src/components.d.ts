@@ -8,6 +8,8 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AdminBreadcrumb: typeof import('./components/admin/AdminBreadcrumb.vue')['default']
+    AdminDemoToggle: typeof import('./components/admin/AdminDemoToggle.vue')['default']
+    AdminEmptyState: typeof import('./components/admin/AdminEmptyState.vue')['default']
     AdminThemeSwitch: typeof import('./components/admin/AdminThemeSwitch.vue')['default']
     AiAssistantSwitch: typeof import('./components/common/AiAssistantSwitch.vue')['default']
     AiChatFab: typeof import('./components/common/AiChatFab.vue')['default']
@@ -26,6 +28,7 @@ declare module 'vue' {
     ElAlert: typeof import('element-plus/es')['ElAlert']
     ElAside: typeof import('element-plus/es')['ElAside']
     ElAvatar: typeof import('element-plus/es')['ElAvatar']
+    ElBadge: typeof import('element-plus/es')['ElBadge']
     ElButton: typeof import('element-plus/es')['ElButton']
     ElButtonGroup: typeof import('element-plus/es')['ElButtonGroup']
     ElCard: typeof import('element-plus/es')['ElCard']
@@ -93,6 +96,7 @@ declare module 'vue' {
     LoginDropdown: typeof import('./components/business/LoginDropdown.vue')['default']
     LoginPrompt: typeof import('./components/common/LoginPrompt.vue')['default']
     MarkTimer: typeof import('./components/game/MarkTimer.vue')['default']
+    MetricCard: typeof import('./components/admin/MetricCard.vue')['default']
     MetricsBar: typeof import('./components/admin/MetricsBar.vue')['default']
     PingZeAnnotation: typeof import('./components/poem/PingZeAnnotation.vue')['default']
     PoemCard: typeof import('./components/business/PoemCard.vue')['default']
@@ -107,6 +111,7 @@ declare module 'vue' {
     RecommendPanel: typeof import('./components/recommend/RecommendPanel.vue')['default']
     RecommendStrategySwitch: typeof import('./components/recommend/RecommendStrategySwitch.vue')['default']
     ReportDialog: typeof import('./components/common/ReportDialog.vue')['default']
+    ResourceDistribution: typeof import('./components/admin/ResourceDistribution.vue')['default']
     ResultScroll: typeof import('./components/game/ResultScroll.vue')['default']
     RoleSidebar: typeof import('./components/ai-chat/RoleSidebar.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

@@ -39,4 +39,8 @@ export interface TodoItem {
   hint?: string
   /** 点击下钻的业务页路由 */
   link?: string
+  /** 待办分组：审核积压 / 异常处置，缺省按审核积压处理 */
+  kind?: 'audit' | 'alert'
+  /** 悬浮说明：补充口径或处置建议 */
+  note?: string
 }
