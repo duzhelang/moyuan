@@ -213,6 +213,8 @@ public class RecommendationServiceImpl implements RecommendationService {
                             poem.put("content", content);
                             poem.put("author", author);
                             poem.put("dynasty", item.get("dynasty"));
+                            // 原文一并透传：朝代归一在落库层统一做，未识别时可回查
+                            poem.put("dynastyRaw", item.get("dynasty"));
                             poem.put("source", "external");
                             poem.put("recommendScore", 0.5);
                             poem.put("recommendReason", "古诗词库推荐");

@@ -3,6 +3,7 @@ package com.moyuan.controller;
 import com.moyuan.common.R;
 import com.moyuan.common.ResultCode;
 import com.moyuan.dto.request.RecommendEventRequest;
+import com.moyuan.dto.request.RecommendInteractionRequest;
 import com.moyuan.dto.response.RecommendModelsResponseDTO;
 import com.moyuan.dto.response.RecommendResponseDTO;
 import com.moyuan.dto.response.RecommendStatsDTO;
@@ -63,6 +64,14 @@ public class RecommendController {
     public R<Void> recordEvent(@Valid @RequestBody RecommendEventRequest request) {
         Long userId = SecurityUtil.getCurrentUserId();
         mlRecommendationService.recordEvent(userId, request.getPage(), request.getFrom(), request.getTo());
+        return R.success();
+    }
+
+    @Operation(summary = "推荐线上曝光/点击埋点（失败静默）")
+    @PostMapping("/interactions")
+    public R<Void> recordInteractions(@Valid @RequestBody RecommendInteractionRequest request) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        mlRecommendationService.recordInteractions(userId, request);
         return R.success();
     }
 

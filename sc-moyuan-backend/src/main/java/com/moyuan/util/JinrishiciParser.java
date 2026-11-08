@@ -54,6 +54,9 @@ public final class JinrishiciParser {
         item.put("content", content);
         item.put("author", origin.get("author") == null ? "" : String.valueOf(origin.get("author")));
         item.put("dynasty", origin.get("dynasty") == null ? "" : String.valueOf(origin.get("dynasty")));
+        // 保留原始写法（今日诗词返回「唐代」「宋代」这类带后缀的值），由 DynastyNameResolver 做归一，
+        // 不要在这一层丢掉原文，否则未识别的朝代无法回查补别名
+        item.put("dynastyRaw", origin.get("dynasty") == null ? "" : String.valueOf(origin.get("dynasty")));
         return item;
     }
 }

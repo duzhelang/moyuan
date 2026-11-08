@@ -1,5 +1,6 @@
 package com.moyuan.service;
 
+import com.moyuan.dto.request.RecommendInteractionRequest;
 import com.moyuan.dto.response.RecommendModelsResponseDTO;
 import com.moyuan.dto.response.RecommendResponseDTO;
 import com.moyuan.dto.response.RecommendStatsDTO;
@@ -25,6 +26,9 @@ public interface MlRecommendationService {
 
     /** 记录策略切换埋点（userId 由调用方从 JWT 解出）。 */
     void recordEvent(Long userId, String page, String fromStrategy, String toStrategy);
+
+    /** 记录推荐线上曝光/点击（userId 由调用方从 JWT 解出）。 */
+    void recordInteractions(Long userId, RecommendInteractionRequest request);
 
     /** 实时统计：缓存行数/覆盖用户、切换事件总数/今日数/最近时间，供管理端指标屏展示。 */
     RecommendStatsDTO getLiveStats();

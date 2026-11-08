@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.moyuan.dto.request.RecommendInteractionRequest;
 import com.moyuan.dto.response.RecommendItemDTO;
 import com.moyuan.dto.response.RecommendModelDTO;
 import com.moyuan.dto.response.RecommendModelsResponseDTO;
@@ -19,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -47,6 +49,7 @@ public class MlRecommendationServiceImpl implements MlRecommendationService {
     private final RecommendationModelVersionMapper modelVersionMapper;
     private final RecommendationCacheMapper recommendationCacheMapper;
     private final RecommendationEventMapper recommendationEventMapper;
+    private final RecommendationInteractionMapper recommendationInteractionMapper;
     private final RecommendationService recommendationService;
     private final PoemMapper poemMapper;
     private final PoetMapper poetMapper;
@@ -168,6 +171,34 @@ public class MlRecommendationServiceImpl implements MlRecommendationService {
     }
 
     @Override
+    public void recordInteractions(Long userId, RecommendInteractionRequest request) {
+        if (userId == null || request == null || request.getBatchId() == null) {
+            return;
+        }
+        String eventType = request.getEventType();
+        if (!"impression".equals(eventType) && !"click".equals(eventType)) {
+            return;
+        }
+        String strategy = request.getStrategy() == null || request.getStrategy().isBlank()
+                ? "rule" : request.getStrategy();
+        if (!"rule".equals(strategy) && !MODEL_STRATEGIES.contains(strategy)) {
+            return;
+        }
+        List<Long> itemIds = request.getItemIds() == null ? List.of() : request.getItemIds().stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .limit(20)
+                .collect(Collectors.toList());
+        if (itemIds.isEmpty()) {
+            return;
+        }
+        String batchId = request.getBatchId().length() > 64
+                ? request.getBatchId().substring(0, 64) : request.getBatchId();
+        String page = request.getPage() == null || request.getPage().isBlank() ? "home" : request.getPage();
+        recommendationInteractionMapper.batchInsert(batchId, userId, page, strategy, eventType, itemIds);
+    }
+
+    @Override
     public RecommendStatsDTO getLiveStats() {
         RecommendStatsDTO stats = new RecommendStatsDTO();
         stats.setCacheRows(recommendationCacheMapper.selectCount(null));
@@ -259,7 +290,72 @@ public class MlRecommendationServiceImpl implements MlRecommendationService {
                     item.setToStrategy(event.getToStrategy());
                     return item;
                 }).collect(Collectors.toList()));
+
+        // 线上效果：近 7 天曝光/点击/CTR、分策略与每日趋势
+        LocalDateTime onlineSince = today.minusDays(6).atStartOfDay();
+        Map<String, Object> onlineTotal = recommendationInteractionMapper.aggregateTotal(onlineSince);
+        long impressions = mapLong(onlineTotal, "impressions");
+        long clicks = mapLong(onlineTotal, "clicks");
+        stats.setOnlineImpressions(impressions);
+        stats.setOnlineClicks(clicks);
+        stats.setOnlineUsers(mapLong(onlineTotal, "users"));
+        stats.setOnlineCtr(impressions > 0 ? Math.round(clicks * 1000.0 / impressions) / 10.0 : 0.0);
+
+        List<RecommendStatsDTO.InteractionStrategyStat> byStrategyOnline = new ArrayList<>();
+        for (Map<String, Object> row : recommendationInteractionMapper.aggregateByStrategy(onlineSince)) {
+            RecommendStatsDTO.InteractionStrategyStat item = new RecommendStatsDTO.InteractionStrategyStat();
+            item.setStrategy(mapString(row, "strategy"));
+            item.setImpressions(mapLong(row, "impressions"));
+            item.setClicks(mapLong(row, "clicks"));
+            item.setCtr(item.getImpressions() > 0
+                    ? Math.round(item.getClicks() * 1000.0 / item.getImpressions()) / 10.0 : 0.0);
+            byStrategyOnline.add(item);
+        }
+        stats.setOnlineByStrategy(byStrategyOnline);
+
+        Map<String, long[]> onlineDaily = new LinkedHashMap<>();
+        for (int i = 6; i >= 0; i--) {
+            onlineDaily.put(today.minusDays(i).format(fmt), new long[]{0L, 0L});
+        }
+        for (Map<String, Object> row : recommendationInteractionMapper.aggregateDaily(onlineSince)) {
+            String date = mapString(row, "date");
+            long[] arr = onlineDaily.get(date);
+            if (arr != null) {
+                arr[0] += mapLong(row, "impressions");
+                arr[1] += mapLong(row, "clicks");
+            }
+        }
+        stats.setOnlineTrend(onlineDaily.entrySet().stream().map(e -> {
+            RecommendStatsDTO.InteractionDayStat item = new RecommendStatsDTO.InteractionDayStat();
+            item.setDate(e.getKey());
+            item.setImpressions(e.getValue()[0]);
+            item.setClicks(e.getValue()[1]);
+            return item;
+        }).collect(Collectors.toList()));
         return stats;
+    }
+
+    private long mapLong(Map<String, Object> row, String key) {
+        Object value = mapValue(row, key);
+        return value instanceof Number number ? number.longValue() : 0L;
+    }
+
+    private String mapString(Map<String, Object> row, String key) {
+        Object value = mapValue(row, key);
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    /** 聚合 SQL 在不同 MySQL 版本下可能返回大小写不同的列名，这里做忽略大小写取值。 */
+    private Object mapValue(Map<String, Object> row, String key) {
+        if (row == null) {
+            return null;
+        }
+        for (Map.Entry<String, Object> entry : row.entrySet()) {
+            if (entry.getKey().equalsIgnoreCase(key)) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 
     /** 名称计数转列表并按次数降序，空键归入"未知"。 */

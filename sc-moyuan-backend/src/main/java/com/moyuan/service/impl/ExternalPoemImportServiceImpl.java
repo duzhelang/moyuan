@@ -1,10 +1,9 @@
 package com.moyuan.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.moyuan.entity.Dynasty;
 import com.moyuan.entity.Poem;
 import com.moyuan.entity.Poet;
-import com.moyuan.service.DynastyService;
+import com.moyuan.service.DynastyNameResolver;
 import com.moyuan.service.ExternalPoemImportService;
 import com.moyuan.service.PoemService;
 import com.moyuan.service.PoetService;
@@ -38,12 +37,15 @@ public class ExternalPoemImportServiceImpl implements ExternalPoemImportService 
     private static final int STATUS_PENDING = 0;
     private static final int AUDIT_APPROVED = 1;
     private static final int AUDIT_PENDING = 0;
-    /** 静默收录的待审核外部诗上限；达到后暂停收录，后台审核通过后自动释放容量 */
+    /** 静默收录的待审核外部诗上限；达到后暂停收录，审核消耗容量后自动恢复 */
     private static final int MAX_PENDING_COLLECT = 100;
+    /** 标题含间隔号（如「浣溪沙·红桥」）按词归类，其余按古体诗；外部收录无分类信息，只能按题面初判 */
+    private static final Long DEFAULT_CATEGORY_CI = 9L;
+    private static final Long DEFAULT_CATEGORY_ANCIENT = 7L;
 
     private final PoemService poemService;
     private final PoetService poetService;
-    private final DynastyService dynastyService;
+    private final DynastyNameResolver dynastyNameResolver;
     private final CacheManager cacheManager;
 
     @Override
@@ -56,6 +58,8 @@ public class ExternalPoemImportServiceImpl implements ExternalPoemImportService 
         Long dynastyId = resolveDynastyId(dynasty);
         Poet poet = resolvePoet(author, dynastyId, STATUS_PUBLISHED);
         Long poetId = poet == null ? null : poet.getId();
+        // 上游没给朝代时，继承诗人主档已有的朝代（诗人是历史数据时才有值）
+        Long effectiveDynastyId = dynastyId != null || poet == null ? dynastyId : poet.getDynastyId();
         // 诗人此前若由静默收录创建为"隐藏"，用户显式导入时将其一并公开
         if (poet != null && !Integer.valueOf(STATUS_PUBLISHED).equals(poet.getStatus())) {
             poet.setStatus(STATUS_PUBLISHED);
@@ -71,8 +75,8 @@ public class ExternalPoemImportServiceImpl implements ExternalPoemImportService 
                 existing.setPoetId(poetId);
                 changed = true;
             }
-            if (existing.getDynastyId() == null && dynastyId != null) {
-                existing.setDynastyId(dynastyId);
+            if (existing.getDynastyId() == null && effectiveDynastyId != null) {
+                existing.setDynastyId(effectiveDynastyId);
                 changed = true;
             }
             // 静默收录的记录处于"待审核"；用户显式导入时应将其公开，保持诗人详情页原有可见效果。
@@ -97,7 +101,8 @@ public class ExternalPoemImportServiceImpl implements ExternalPoemImportService 
             return result;
         }
 
-        Poem newPoem = buildPoem(trimmedTitle, content, poetId, dynastyId, STATUS_PUBLISHED, AUDIT_APPROVED);
+        Poem newPoem = buildPoem(trimmedTitle, content, author, poetId, effectiveDynastyId,
+                STATUS_PUBLISHED, AUDIT_APPROVED, noteOfUnresolved(dynasty, effectiveDynastyId));
         poemService.save(newPoem);
         clearPoemCache();
         result.put("id", newPoem.getId());
@@ -133,17 +138,24 @@ public class ExternalPoemImportServiceImpl implements ExternalPoemImportService 
                 String content = item.get("content") == null ? "" : String.valueOf(item.get("content"));
                 String author = item.get("author") == null ? "" : String.valueOf(item.get("author"));
                 String dynasty = item.get("dynasty") == null ? "" : String.valueOf(item.get("dynasty"));
+                // dynastyRaw 保留上游原文，dynasty 可能是上游已粗归一过的值；两者任一有值即可参与解析
+                String dynastyRaw = item.get("dynastyRaw") == null ? dynasty : String.valueOf(item.get("dynastyRaw"));
 
-                Long dynastyId = resolveDynastyId(dynasty);
+                Long dynastyId = resolveDynastyId(dynastyRaw);
+                if (dynastyId == null) {
+                    dynastyId = resolveDynastyId(dynasty);
+                }
                 Poet poet = resolvePoet(author, dynastyId, STATUS_PENDING);
                 Long poetId = poet == null ? null : poet.getId();
+                Long effectiveDynastyId = dynastyId != null || poet == null ? dynastyId : poet.getDynastyId();
 
                 // 已收录（无论待审核还是已上架）则跳过，保证幂等不重复
                 if (findExisting(trimmedTitle, poetId) != null) {
                     continue;
                 }
                 // 待审核记录不进入 status=1 的公开列表，因此无需清理诗词列表缓存
-                poemService.save(buildPoem(trimmedTitle, content, poetId, dynastyId, STATUS_PENDING, AUDIT_PENDING));
+                poemService.save(buildPoem(trimmedTitle, content, author, poetId, effectiveDynastyId,
+                        STATUS_PENDING, AUDIT_PENDING, noteOfUnresolved(dynastyRaw, effectiveDynastyId)));
                 collected++;
             } catch (Exception e) {
                 log.warn("外部诗词静默收录单条失败，已跳过: title={}, error={}", item.get("title"), e.getMessage());
@@ -159,17 +171,29 @@ public class ExternalPoemImportServiceImpl implements ExternalPoemImportService 
     private int countPendingExternal() {
         LambdaQueryWrapper<Poem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Poem::getSource, SOURCE_EXTERNAL)
-                .eq(Poem::getAuditStatus, AUDIT_PENDING);
+                .eq(Poem::getAuditStatus, AUDIT_PENDING)
+                // 显式排除软删除：@TableLogic 目前会自动追加 deleted=0，
+                // 但上限直接决定"还收不收"，一旦逻辑删除配置变更就可能永久卡死收录，这里写好双保险
+                .eq(Poem::getDeleted, 0);
         return Math.toIntExact(poemService.count(wrapper));
     }
 
-    /** 新建诗词实体，统一填充各模式共用的默认字段 */
-    private Poem buildPoem(String title, String content, Long poetId, Long dynastyId, int status, int auditStatus) {
+    /**
+     * 新建诗词实体，统一填充各模式共用的默认字段。
+     *
+     * <p>author 必须落库：列表页与详情页读的是 poem.author，只写 poet_id 会导致作者显示为空；
+     * category_id 也不能留空，否则审核页分类列一片空白。</p>
+     */
+    private Poem buildPoem(String title, String content, String author, Long poetId, Long dynastyId,
+                           int status, int auditStatus, String importNote) {
         Poem poem = new Poem();
         poem.setTitle(title);
         poem.setContent(content != null ? content.trim() : "");
+        poem.setAuthor(StringUtils.hasText(author) ? author.trim() : null);
         poem.setPoetId(poetId);
         poem.setDynastyId(dynastyId);
+        poem.setCategoryId(defaultCategoryOf(title));
+        poem.setImportNote(importNote);
         poem.setSource(SOURCE_EXTERNAL);
         poem.setViewCount(0);
         poem.setLikeCount(0);
@@ -180,6 +204,20 @@ public class ExternalPoemImportServiceImpl implements ExternalPoemImportService 
         poem.setPoemType(POEM_TYPE_ANCIENT);
         poem.setAuditStatus(auditStatus);
         return poem;
+    }
+
+    /** 题型初判：题面带间隔号（`浣溪沙·红桥`）按词归类，其余按古体诗 */
+    private Long defaultCategoryOf(String title) {
+        return title != null && title.contains("·") ? DEFAULT_CATEGORY_CI : DEFAULT_CATEGORY_ANCIENT;
+    }
+
+    /** 朝代没解析出来时留一条可追溯备注，后台能按此清单补别名 */
+    private String noteOfUnresolved(String dynastyRaw, Long dynastyId) {
+        if (dynastyId != null || !StringUtils.hasText(dynastyRaw)) {
+            return null;
+        }
+        String raw = dynastyRaw.trim();
+        return raw.isEmpty() ? null : "朝代未识别：" + (raw.length() > 60 ? raw.substring(0, 60) : raw);
     }
 
     /** 按标题 + 诗人查重；诗人未解析到时退化为"标题 + 诗人为空" */
@@ -195,15 +233,9 @@ public class ExternalPoemImportServiceImpl implements ExternalPoemImportService 
         return poemService.getOne(wrapper);
     }
 
-    /** 朝代按名称精确匹配，不新建朝代 */
+    /** 朝代名走归一化解析（别名表 + 名称表），不新建朝代 */
     private Long resolveDynastyId(String dynasty) {
-        if (!StringUtils.hasText(dynasty)) {
-            return null;
-        }
-        LambdaQueryWrapper<Dynasty> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Dynasty::getName, dynasty.trim()).last("LIMIT 1");
-        Dynasty entity = dynastyService.getOne(wrapper);
-        return entity == null ? null : entity.getId();
+        return dynastyNameResolver.resolve(dynasty);
     }
 
     /**

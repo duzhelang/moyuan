@@ -31,6 +31,8 @@ public class Poem {
     private Integer auditStatus;
     private LocalDateTime auditTime;
     private String auditReason;
+    /** 收录备注：记录朝代未识别等上游数据问题，便于后台排查 */
+    private String importNote;
     private BigDecimal avgScore;
     private Integer ratingCount;
     @TableField(exist = false)

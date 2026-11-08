@@ -40,6 +40,19 @@ public class RecommendStatsDTO {
     /** 最近 10 条切换事件 */
     private List<EventItem> recentEvents;
 
+    /** 近 7 天推荐曝光数 */
+    private Long onlineImpressions;
+    /** 近 7 天推荐点击数 */
+    private Long onlineClicks;
+    /** 近 7 天线上点击率（0-100） */
+    private Double onlineCtr;
+    /** 近 7 天有曝光/点击的去重用户数 */
+    private Long onlineUsers;
+    /** 近 7 天分策略线上效果 */
+    private List<InteractionStrategyStat> onlineByStrategy;
+    /** 近 7 天每日曝光/点击趋势 */
+    private List<InteractionDayStat> onlineTrend;
+
     @Data
     public static class ModelStat {
         private String strategy;
@@ -71,5 +84,20 @@ public class RecommendStatsDTO {
         private String page;
         private String fromStrategy;
         private String toStrategy;
+    }
+
+    @Data
+    public static class InteractionStrategyStat {
+        private String strategy;
+        private Long impressions;
+        private Long clicks;
+        private Double ctr;
+    }
+
+    @Data
+    public static class InteractionDayStat {
+        private String date;
+        private Long impressions;
+        private Long clicks;
     }
 }
