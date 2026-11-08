@@ -112,14 +112,18 @@ const fetchData = async () => {
       priority: searchForm.priority,
       keyword: searchForm.keyword || undefined
     })
-    tableData.value = res.data.records
-    total.value = res.data.total
+    // 后端报修分页返回 list（举报接口返回 records），两者都兼容，避免表格误显示“暂无数据”
+    tableData.value = res.data.list || res.data.records || []
+    total.value = res.data.total || 0
   } catch (error) {
     console.error('获取报修列表失败', error)
   } finally {
     loading.value = false
   }
 }
+
+const formatTime = (value?: string | null) =>
+  value ? String(value).replace('T', ' ').slice(0, 16) : '—'
 
 const fetchStats = async () => {
   try {
@@ -360,8 +364,10 @@ onMounted(() => {
             <span>{{ row.assigneeName || '未分配' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" width="170" />
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column label="创建时间" width="140">
+          <template #default="{ row }">{{ formatTime(row.createTime) }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" link @click="handleViewDetail(row)">详情</el-button>
             <el-button size="small" type="success" link @click="handleOpenStatusUpdate(row)">更新状态</el-button>
@@ -406,6 +412,15 @@ onMounted(() => {
             </el-descriptions-item>
             <el-descriptions-item label="满意度" v-if="currentDetail.satisfaction">
               <el-rate v-model="currentDetail.satisfaction" disabled />
+            </el-descriptions-item>
+            <el-descriptions-item v-if="currentDetail.resolveTime" label="解决时间">
+              {{ formatTime(currentDetail.resolveTime) }}
+            </el-descriptions-item>
+            <el-descriptions-item v-if="currentDetail.closeTime" label="关闭时间">
+              {{ formatTime(currentDetail.closeTime) }}
+            </el-descriptions-item>
+            <el-descriptions-item v-if="currentDetail.satisfactionComment" label="用户评价" :span="2">
+              {{ currentDetail.satisfactionComment }}
             </el-descriptions-item>
             <el-descriptions-item label="问题描述" :span="2">
               <div class="description-content">{{ currentDetail.description }}</div>

@@ -131,6 +131,22 @@ const openTarget = (row: UserReport) => {
   }
 }
 
+/** 举报详情弹窗：列表行已包含全部字段，直接展示，不再单独请求 */
+const detailVisible = ref(false)
+const detailRow = ref<UserReport | null>(null)
+
+const openDetail = (row: UserReport) => {
+  detailRow.value = row
+  detailVisible.value = true
+}
+
+/** 详情里直接进入处理流程，避免来回找行 */
+const openHandleFromDetail = () => {
+  if (!detailRow.value) return
+  detailVisible.value = false
+  openHandle(detailRow.value)
+}
+
 const dialogVisible = ref(false)
 const submitting = ref(false)
 const current = ref<UserReport | null>(null)
@@ -306,9 +322,10 @@ onMounted(() => {
         <el-table-column label="时间" width="150">
           <template #default="{ row }">{{ formatTime(row.createTime) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openHandle(row)">处理</el-button>
+            <el-button link type="primary" @click="openDetail(row)">详情</el-button>
+            <el-button link type="warning" @click="openHandle(row)">处理</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -325,6 +342,71 @@ onMounted(() => {
         />
       </div>
     </el-card>
+
+    <el-dialog v-model="detailVisible" title="举报详情" width="680px" top="6vh">
+      <template v-if="detailRow">
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="编号">{{ detailRow.id }}</el-descriptions-item>
+          <el-descriptions-item label="状态">
+            <el-tag :type="statusMap[detailRow.status]?.type as any" size="small">
+              {{ statusMap[detailRow.status]?.text || detailRow.status }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="举报对象">
+            <el-button link type="primary" @click="openTarget(detailRow)">
+              {{ targetTypeMap[detailRow.targetType] || detailRow.targetType }} #{{ detailRow.targetId }}
+            </el-button>
+          </el-descriptions-item>
+          <el-descriptions-item label="来源">
+            <el-tag v-if="detailRow.aiFlag === 1" type="danger" size="small">AI 风控</el-tag>
+            <el-tag v-else size="small">用户举报</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="举报人">
+            {{ detailRow.reporterId === 0 ? '系统 / AI' : `用户 #${detailRow.reporterId}` }}
+          </el-descriptions-item>
+          <el-descriptions-item label="举报时间">
+            {{ formatTime(detailRow.createTime) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="原因类型">
+            {{ reasonMap[detailRow.reasonType] || detailRow.reasonType }}
+          </el-descriptions-item>
+          <el-descriptions-item label="AI 风险">
+            <el-tooltip
+              v-if="detailRow.aiRiskLevel"
+              :content="detailRow.aiReason || '无说明'"
+              placement="top"
+            >
+              <el-tag :type="riskMap[detailRow.aiRiskLevel]?.type as any" size="small">
+                {{ riskMap[detailRow.aiRiskLevel]?.text || detailRow.aiRiskLevel }}
+              </el-tag>
+            </el-tooltip>
+            <span v-else>—</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="举报说明" :span="2">
+            <div class="detail-text">{{ detailRow.reason || '未填写' }}</div>
+          </el-descriptions-item>
+          <el-descriptions-item v-if="detailRow.evidence" label="证据材料" :span="2">
+            <div class="detail-text">{{ detailRow.evidence }}</div>
+          </el-descriptions-item>
+          <el-descriptions-item v-if="detailRow.aiReason" label="AI 判定" :span="2">
+            <div class="detail-text">{{ detailRow.aiReason }}</div>
+          </el-descriptions-item>
+          <el-descriptions-item label="处理人">
+            {{ detailRow.handlerId ? `管理员 #${detailRow.handlerId}` : '未处理' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="处理时间">
+            {{ formatTime(detailRow.handledAt) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="处理说明" :span="2">
+            <div class="detail-text">{{ detailRow.handleNote || '—' }}</div>
+          </el-descriptions-item>
+        </el-descriptions>
+      </template>
+      <template #footer>
+        <el-button @click="detailVisible = false">关闭</el-button>
+        <el-button type="primary" @click="openHandleFromDetail">去处理</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="dialogVisible" title="处理举报" width="520px">
       <div v-if="current" class="handle-target">
@@ -435,5 +517,10 @@ onMounted(() => {
   margin-top: 4px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
+}
+
+.detail-text {
+  white-space: pre-wrap;
+  line-height: 1.7;
 }
 </style>
