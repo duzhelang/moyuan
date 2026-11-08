@@ -1,6 +1,6 @@
 -- ============================================================
--- 版本：v3.8（全量合并版）
--- 日期：2026-11-08
+-- 版本：v3.9（全量合并版）
+-- 日期：2026-11-09
 -- 说明：全量合并所有表结构和初始数据，删除过渡迁移脚本
 --       所有建表使用 IF NOT EXISTS，数据使用 INSERT IGNORE
 --       v3.3：poem 表新增 author 列；新增 20 首外文诗词初始数据
@@ -24,6 +24,9 @@
 --       v3.8：新增 recommendation_interaction 推荐线上曝光/点击互动表（线上 CTR 统计）；
 --             追加举报 3 条、报修 3 条、通知 2 条演示种子数据（均带「【示例数据】」前缀）；
 --             建表总数 45 张。
+--       v3.9：新增 dynasty_alias 朝代别名表（上游「唐代/宋代」等写法归一）；
+--             poem 表新增 import_note 收录备注列；
+--             存量修复见 migration-20261109-dynasty-alias-backfill.sql；建表总数 46 张。
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS `moyuan` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -44,6 +47,46 @@ CREATE TABLE IF NOT EXISTS `dynasty` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_dynasty_name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='朝代表';
+
+-- ============================================================
+-- 1b. 朝代别名表（上游/人工常见写法归一，供 DynastyNameResolver 读取）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `dynasty_alias` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `alias` VARCHAR(32) NOT NULL COMMENT '上游/人工常见写法',
+  `dynasty_id` BIGINT NOT NULL COMMENT '归一到的朝代 id',
+  `remark` VARCHAR(120) DEFAULT NULL COMMENT '备注',
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_alias` (`alias`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='朝代名称别名（上游写法归一）';
+
+-- 别名种子：上游/人工常见写法 → 朝代 id（与 dynasty 自增顺序一致）
+INSERT IGNORE INTO `dynasty_alias` (`alias`, `dynasty_id`, `remark`) VALUES
+  ('先秦', 1, NULL), ('先秦时期', 1, NULL), ('上古', 1, NULL),
+  ('春秋', 1, NULL), ('战国', 1, NULL), ('春秋战国', 1, '并入先秦'),
+  ('周', 1, '并入先秦'), ('西周', 1, NULL), ('东周', 1, NULL),
+  ('秦', 2, NULL), ('秦代', 2, NULL),
+  ('汉', 3, NULL), ('汉代', 3, NULL), ('西汉', 3, NULL), ('东汉', 3, NULL), ('两汉', 3, NULL),
+  ('三国', 4, NULL), ('晋', 4, NULL), ('西晋', 4, NULL), ('东晋', 4, NULL),
+  ('魏晋', 4, NULL), ('南北朝', 4, NULL), ('魏晋南北朝', 4, NULL), ('魏晋南北朝时期', 4, NULL),
+  ('隋', 5, NULL), ('隋代', 5, NULL),
+  ('唐', 6, NULL), ('唐代', 6, '上游今日诗词写法'), ('初唐', 6, NULL), ('盛唐', 6, NULL),
+  ('中唐', 6, NULL), ('晚唐', 6, NULL), ('唐末', 6, '跨代取前朝'),
+  ('五代', 7, NULL), ('五代十国', 7, NULL), ('五代时期', 7, NULL), ('南唐', 7, NULL),
+  ('宋', 8, NULL), ('宋代', 8, '上游今日诗词写法'), ('北宋', 8, NULL), ('南宋', 8, NULL), ('两宋', 8, NULL),
+  ('元', 9, NULL), ('元代', 9, NULL), ('元末', 9, '跨代取前朝'),
+  ('明', 10, NULL), ('明代', 10, NULL),
+  ('清', 11, NULL), ('清代', 11, NULL),
+  ('民国', 12, NULL), ('民国时期', 12, NULL), ('近代', 12, NULL), ('近现代', 12, '跨代取前朝'),
+  ('现代', 13, NULL), ('当代', 13, NULL), ('现当代', 13, NULL);
+
+-- 外国朝代在历史库为 120、新建库为 14，按名称对齐，避免硬编码
+INSERT IGNORE INTO `dynasty_alias` (`alias`, `dynasty_id`)
+SELECT t.`alias`, d.`id`
+FROM (SELECT '外国' AS `alias` UNION ALL SELECT '海外' UNION ALL SELECT '国外') t
+JOIN `dynasty` d ON d.`name` = '外国';
 
 -- ============================================================
 -- 2. 诗人表
@@ -118,6 +161,7 @@ CREATE TABLE IF NOT EXISTS `poem` (
   `audit_status` TINYINT NOT NULL DEFAULT 1 COMMENT '审核状态：0-待审核，1-已通过，2-已拒绝',
   `audit_time` DATETIME DEFAULT NULL COMMENT '审核时间',
   `audit_reason` VARCHAR(500) DEFAULT NULL COMMENT '审核备注',
+  `import_note` VARCHAR(255) DEFAULT NULL COMMENT '收录备注：朝代未识别等',
   `avg_score` DECIMAL(3,1) DEFAULT NULL COMMENT '平均评分',
   `rating_count` INT NOT NULL DEFAULT 0 COMMENT '评分数量',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
