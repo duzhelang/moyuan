@@ -246,6 +246,7 @@ onMounted(() => {
               <span>来源：{{ row.source || '-' }}</span>
               <span>原创：{{ row.isOriginal === 1 ? '是' : '否' }}</span>
               <span v-if="row.auditReason">审核备注：{{ row.auditReason }}</span>
+              <span v-if="row.importNote" class="note-warn">收录备注：{{ row.importNote }}</span>
             </div>
           </div>
         </template>
@@ -253,7 +254,12 @@ onMounted(() => {
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="title" label="标题" min-width="180" show-overflow-tooltip />
       <el-table-column prop="poetName" label="作者" width="100" />
-      <el-table-column prop="dynastyName" label="朝代" width="80" />
+      <el-table-column label="朝代" width="90">
+        <template #default="{ row }">
+          <span v-if="row.dynastyName">{{ row.dynastyName }}</span>
+          <el-tag v-else type="warning" size="small" effect="plain">未填</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="poemType" label="类型" width="80">
         <template #default="{ row }">
           {{ row.poemType === 'modern' ? '现代诗' : '古体' }}
@@ -348,6 +354,11 @@ onMounted(() => {
 
 .muted {
   color: var(--adm-text-faint);
+}
+
+/* 收录环节的异常备注（如朝代未识别），审核时要能一眼看到 */
+.note-warn {
+  color: #b45309;
 }
 
 /* 展开行：审核时能直接读正文，不用再跳到前台 */

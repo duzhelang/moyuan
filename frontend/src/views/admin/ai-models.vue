@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -22,6 +22,7 @@ import {
 
 const activeTab = ref('models')
 const route = useRoute()
+const router = useRouter()
 const models = ref<AiModelConfig[]>([])
 const moduleConfigs = ref<AiModuleConfig[]>([])
 const providers = ref<{ value: string; label: string }[]>([])
@@ -266,12 +267,30 @@ async function handleSaveModuleConfig() {
 }
 
 onMounted(() => {
-  if (route.query.tab === 'rag') {
-    activeTab.value = 'rag'
-  }
+  activeTab.value = route.query.tab === 'rag' ? 'rag' : 'models'
   loadModels()
   loadProviders()
   loadModuleConfigs()
+})
+
+// 侧边栏「AI模型管理 / 知识问答（本地模型）」切换时，按 query 还原当前视图
+watch(
+  () => route.query.tab,
+  (tab) => {
+    activeTab.value = tab === 'rag' ? 'rag' : 'models'
+  }
+)
+
+// 页面内切换标签时同步 query，保证侧边栏高亮、面包屑与标签页名称一致
+watch(activeTab, (tab) => {
+  const current = route.query.tab
+  if (tab === 'rag' && current !== 'rag') {
+    router.replace({ path: route.path, query: { ...route.query, tab: 'rag' } })
+  } else if (tab !== 'rag' && current === 'rag') {
+    const query = { ...route.query }
+    delete query.tab
+    router.replace({ path: route.path, query })
+  }
 })
 </script>
 
