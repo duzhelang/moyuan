@@ -63,6 +63,7 @@ export const adminMenus: AdminMenuGroup[] = [
     icon: 'Cpu',
     children: [
       { path: '/admin/ai-models', name: 'AdminAiModels', icon: 'Cpu', label: 'AI模型管理' },
+      { path: '/admin/rag-config', name: 'AdminRagConfig', icon: 'ChatDotRound', label: '知识问答（本地模型）' },
       { path: '/admin/ai-config', name: 'AdminAiConfig', icon: 'Setting', label: 'AI功能配置' }
     ]
   },

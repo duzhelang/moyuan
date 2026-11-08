@@ -44,6 +44,13 @@ const visibleMenus = computed(() => {
     .filter((group) => group.children.length > 0)
 })
 
+/** 知识问答配置复用 AI 模型管理页的 RAG 标签，按 query 定位侧边栏高亮项 */
+const activeMenu = computed(() =>
+  route.path === '/admin/ai-models' && route.query.tab === 'rag'
+    ? '/admin/rag-config'
+    : route.path
+)
+
 // 在父级 setup 阶段立即生效，保证子页面读取 CSS 变量时主题已就绪
 activate()
 
@@ -77,7 +84,7 @@ const goHome = () => {
           <h2 class="sidebar-title">{{ isReviewer ? '墨渊 · 审核工作台' : '墨渊后台' }}</h2>
         </div>
         <el-menu
-          :default-active="route.path"
+          :default-active="activeMenu"
           router
           class="sidebar-menu"
         >
@@ -166,7 +173,7 @@ const goHome = () => {
 }
 
 .sidebar-title {
-  color: var(--adm-sidebar-text);
+  color: var(--adm-sidebar-text, #e9ddc6);
   font-family: var(--adm-font-serif);
   font-size: 20px;
   font-weight: 600;
@@ -177,12 +184,17 @@ const goHome = () => {
 .sidebar-menu {
   border-right: none;
   background-color: transparent;
+  /* Element Plus 菜单在组件根上重新声明变量，这里显式覆盖，避免深色侧栏落到深色文字 */
+  --el-menu-bg-color: transparent;
+  --el-menu-text-color: var(--adm-sidebar-text, #e9ddc6);
+  --el-menu-active-color: var(--adm-sidebar-text, #e9ddc6);
+  --el-menu-hover-bg-color: var(--adm-sidebar-active-bg);
 
   :deep(.el-sub-menu) {
     .el-sub-menu__title {
       height: 56px;
       line-height: 56px;
-      color: var(--adm-sidebar-text);
+      color: var(--adm-sidebar-text, #e9ddc6);
 
       &:hover {
         background-color: var(--adm-sidebar-active-bg) !important;
@@ -196,7 +208,7 @@ const goHome = () => {
         height: 50px;
         line-height: 50px;
         padding-left: 56px !important;
-        color: var(--adm-sidebar-text);
+        color: var(--adm-sidebar-text, #e9ddc6);
 
         &:hover {
           background-color: var(--adm-sidebar-active-bg) !important;
@@ -204,7 +216,8 @@ const goHome = () => {
 
         &.is-active {
           background-color: var(--adm-sidebar-active-bg) !important;
-          color: var(--adm-primary) !important;
+          /* 深色侧栏上不能用主色文字，改用浅色侧栏文字，靠左侧金线做选中标识 */
+          color: var(--adm-sidebar-text, #e9ddc6) !important;
         }
       }
     }
@@ -213,7 +226,7 @@ const goHome = () => {
   :deep(.el-menu-item) {
     height: 56px;
     line-height: 56px;
-    color: var(--adm-sidebar-text);
+    color: var(--adm-sidebar-text, #e9ddc6);
 
     &:hover {
       background-color: var(--adm-sidebar-active-bg) !important;
@@ -221,7 +234,7 @@ const goHome = () => {
 
     &.is-active {
       background-color: var(--adm-sidebar-active-bg) !important;
-      color: var(--adm-primary) !important;
+      color: var(--adm-sidebar-text, #e9ddc6) !important;
     }
   }
 }

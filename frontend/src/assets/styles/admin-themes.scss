@@ -150,14 +150,14 @@ body.admin-theme-active[data-admin-theme='paper'] {
     $surface-muted: #f8f3e9,
     $text: #2b241c,
     $text-2: #4a3f32,
-    $text-muted: #7b6c5a,
-    $text-faint: #a89880,
+    $text-muted: #6a5b49,
+    $text-faint: #7f6e59,
     $border: rgba(120, 88, 48, 0.18),
     $border-soft: rgba(120, 88, 48, 0.09),
     $primary: #8a5a2b,
     $primary-soft: #efe3cf,
     $sidebar-bg: #2a211a,
-    $sidebar-text: #d9c9ae,
+    $sidebar-text: #f0e4cd,
     $sidebar-active-bg: rgba(201, 164, 92, 0.16),
     $shadow: 0 6px 20px rgba(90, 61, 36, 0.08),
     $ok: #5e7a5a,
@@ -187,14 +187,14 @@ body.admin-theme-active[data-admin-theme='night'] {
     $surface-muted: #1b242e,
     $text: #e7dfd0,
     $text-2: #cfc5b4,
-    $text-muted: #9c917f,
-    $text-faint: #6e665a,
+    $text-muted: #b3a791,
+    $text-faint: #8f8678,
     $border: rgba(201, 164, 92, 0.2),
     $border-soft: rgba(201, 164, 92, 0.1),
     $primary: #c9a45c,
     $primary-soft: #2a2418,
     $sidebar-bg: #0a1015,
-    $sidebar-text: #cdbfa6,
+    $sidebar-text: #e6dbc4,
     $sidebar-active-bg: rgba(201, 164, 92, 0.14),
     $shadow: 0 8px 28px rgba(0, 0, 0, 0.45),
     $ok: #7f9d7a,
@@ -224,14 +224,14 @@ body.admin-theme-active[data-admin-theme='ink'] {
     $surface-muted: #f7f8fa,
     $text: #1f2329,
     $text-2: #3a3f45,
-    $text-muted: #646a73,
-    $text-faint: #a2a6ad,
+    $text-muted: #5b6169,
+    $text-faint: #767c84,
     $border: rgba(31, 35, 41, 0.12),
     $border-soft: rgba(31, 35, 41, 0.07),
     $primary: #3a3f45,
     $primary-soft: #eceef1,
     $sidebar-bg: #23282e,
-    $sidebar-text: #d5d8dc,
+    $sidebar-text: #e8ebef,
     $sidebar-active-bg: rgba(255, 255, 255, 0.1),
     $shadow: 0 4px 16px rgba(31, 35, 41, 0.07),
     $ok: #5e7a5a,
@@ -324,6 +324,11 @@ body.admin-theme-active {
   }
 
   .sidebar-menu {
+    /* 变量必须落在菜单根节点上：组件自身声明的同名变量优先级高于 body */
+    --el-menu-bg-color: var(--adm-sidebar-bg);
+    --el-menu-text-color: var(--adm-sidebar-text);
+    --el-menu-active-color: var(--adm-sidebar-text);
+    --el-menu-hover-bg-color: var(--adm-sidebar-active-bg);
     background: var(--adm-sidebar-bg) !important;
 
     .el-sub-menu .el-menu {
@@ -332,7 +337,7 @@ body.admin-theme-active {
 
     .el-menu-item,
     .el-sub-menu__title {
-      color: var(--adm-sidebar-text) !important;
+      color: var(--adm-sidebar-text, #e9ddc6) !important;
 
       &:hover {
         background: var(--adm-sidebar-active-bg) !important;
@@ -340,7 +345,7 @@ body.admin-theme-active {
 
       &.is-active {
         background: var(--adm-sidebar-active-bg) !important;
-        color: var(--adm-sidebar-text) !important;
+        color: var(--adm-sidebar-text, #e9ddc6) !important;
 
         &::before {
           content: '';

@@ -111,6 +111,74 @@ export const readChartPalette = (): string[] => {
 }
 
 /**
+ * 统一图表主题：把轴、网格、图例、tooltip、渐变集中到一处，
+ * 三个后台页面不再各自复制一份配置，换主题时只需改这里。
+ */
+export const readChartTheme = () => {
+  const palette = readChartPalette()
+  const ink = readChartInk()
+  return {
+    palette,
+    ink,
+    tooltip: {
+      trigger: 'axis' as const,
+      backgroundColor: ink.surface,
+      borderColor: ink.border,
+      borderWidth: 1,
+      padding: [8, 12] as [number, number],
+      textStyle: { color: ink.regular, fontSize: 12 }
+    },
+    legend: {
+      top: 0,
+      right: 0,
+      itemWidth: 10,
+      itemHeight: 6,
+      itemGap: 12,
+      textStyle: { color: ink.muted, fontSize: 11 }
+    },
+    grid: { left: 2, right: 8, bottom: 2, top: 30, containLabel: true },
+    categoryAxis: {
+      axisLine: { lineStyle: { color: ink.border } },
+      axisTick: { show: false },
+      axisLabel: { color: ink.muted, fontSize: 11 },
+      splitLine: { show: false }
+    },
+    valueAxis: {
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: ink.muted, fontSize: 11 },
+      splitLine: { lineStyle: { color: ink.grid, type: 'dashed' as const } }
+    },
+    /** 面积渐变：8 位十六进制叠加透明度，ECharts 可直接识别 */
+    areaGradient: (hex: string) => ({
+      color: {
+        type: 'linear',
+        x: 0,
+        y: 0,
+        x2: 0,
+        y2: 1,
+        colorStops: [
+          { offset: 0, color: `${hex}2e` },
+          { offset: 1, color: `${hex}05` }
+        ]
+      }
+    }),
+    /** 柱状渐变：上浓下淡 */
+    barGradient: (hex: string) => ({
+      type: 'linear',
+      x: 0,
+      y: 0,
+      x2: 0,
+      y2: 1,
+      colorStops: [
+        { offset: 0, color: hex },
+        { offset: 1, color: `${hex}2e` }
+      ]
+    })
+  }
+}
+
+/**
  * 图表文字/线条取色：坐标轴刻度、网格、图例、tooltip 背景。
  * 这些必须走主题 token，否则深色主题下刻度会糊在背景里。
  */
