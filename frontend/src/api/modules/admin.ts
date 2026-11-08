@@ -106,13 +106,76 @@ export function getAdminStats() {
   return request.get<Record<string, number>>('/admin/stats')
 }
 
-export function getAdminStatsTrend() {
+/** 用户结构与活跃留存（角色分布 / 7d·30d 活跃 / 回访率） */
+export interface UserStructureRole {
+  key: string
+  label: string
+  value: number
+}
+
+export interface UserStructure {
+  totalUsers: number
+  newUsers7d: number
+  roles: UserStructureRole[]
+  active7d: number
+  active30d: number
+  eligible7d: number
+  eligible30d: number
+  retention7d: number
+  retention30d: number
+  silent30d: number
+}
+
+export function getUserStructure() {
+  return request.get<UserStructure>('/admin/stats/user-structure')
+}
+
+/** 用户活跃热力图：星期 × 小时，值为访问请求数，users 为去重登录用户 */
+export interface UserHeatmapCell {
+  weekday: number
+  hour: number
+  requests: number
+  users: number
+}
+
+export interface UserHeatmap {
+  days: number
+  available: boolean
+  message?: string
+  maxRequests: number
+  cells: UserHeatmapCell[]
+}
+
+export function getUserHeatmap(days = 7) {
+  return request.get<UserHeatmap>('/admin/stats/user-heatmap', {
+    params: { days },
+    silent: true
+  })
+}
+
+export function getAdminStatsTrend(days = 7) {
   return request.get<{
     dates: string[]
     poems: number[]
     posts: number[]
     users: number[]
-  }>('/admin/stats/trend')
+  }>('/admin/stats/trend', { params: { days } })
+}
+
+/** 热门诗词：收藏 × 3 + 浏览，按近 N 天真实互动排序 */
+export interface HotPoem {
+  id: number
+  title: string
+  favorites: number
+  views: number
+  score: number
+}
+
+export function getHotPoems(days = 30, limit = 5) {
+  return request.get<HotPoem[]>('/admin/stats/hot-poems', {
+    params: { days, limit },
+    silent: true
+  })
 }
 
 export function getVisitStats() {
@@ -151,12 +214,113 @@ export function getSystemHealth() {
   return request.get<SystemHealth>('/admin/system/health', { silent: true })
 }
 
+/** 资源分布总览（内容 / AI / 存储 / 运行四域，后端 5 分钟缓存） */
+export interface ResourceItem {
+  key: string
+  label: string
+  value: number
+  unit: 'count' | 'bytes' | 'percent' | 'seconds'
+  group?: string
+}
+
+export interface ResourceGauge {
+  key: string
+  label: string
+  used: number
+  total: number
+  unit: 'bytes' | 'count'
+  status: 'up' | 'warn' | 'down'
+}
+
+export interface ResourceStatusNode {
+  key: string
+  label: string
+  status: 'up' | 'warn' | 'down'
+  latencyMs: number | null
+  message: string
+}
+
+export interface ResourceCorpusFile {
+  name: string
+  bytes: number
+  chunks: number
+}
+
+export interface ResourceIndexFile {
+  name: string
+  bytes: number
+}
+
+export interface ResourceRag {
+  ready: boolean
+  status: 'up' | 'warn' | 'down'
+  message: string
+  chunks: number
+  corpusFiles: number
+  corpusBytes: number
+  corpusWords: number
+  corpusDetails: ResourceCorpusFile[]
+  indexDetails: ResourceIndexFile[]
+  indexBytes: number
+  indexFiles: number
+  indexDim: number
+  builtAt: string
+  embed: string
+  embedLabel: string
+  generation: string
+  ollama: boolean
+  latencyMs: number | null
+}
+
+export interface ResourceOverview {
+  generatedAt: string
+  content: { items: ResourceItem[]; error?: string }
+  ai: {
+    ring: ResourceItem[]
+    items: ResourceItem[]
+    rag: ResourceRag
+    defaultModel: string
+    calls: { total24h: number; failed24h: number; failRate: number }
+    error?: string
+  }
+  storage: {
+    ring: ResourceItem[]
+    items: ResourceItem[]
+    rag: ResourceRag
+    mysqlLatencyMs: number
+    redisLatencyMs: number
+    error?: string
+  }
+  runtime: {
+    gauges: ResourceGauge[]
+    nodes: ResourceStatusNode[]
+    items: ResourceItem[]
+    error?: string
+  }
+}
+
+export function getResourceOverview() {
+  return request.get<ResourceOverview>('/admin/system/resource-overview', { silent: true })
+}
+
 /** 接口调用指标（错误率 / P95 / 慢接口） */
 export interface SystemMetricsSlowApi {
   path: string
   count: number
   avgMs: number
   maxMs: number
+}
+
+export interface SystemMetricsHourlyPoint {
+  label: string
+  count: number
+  errorCount: number
+  avgMs: number
+}
+
+export interface SystemMetricsStatusBucket {
+  name: string
+  count: number
 }
 
 export interface SystemMetrics {
@@ -169,6 +333,8 @@ export interface SystemMetrics {
   avgMs: number
   p95Ms: number | null
   slowTop: SystemMetricsSlowApi[]
+  hourly: SystemMetricsHourlyPoint[]
+  statusBuckets: SystemMetricsStatusBucket[]
 }
 
 export function getSystemMetrics(hours = 24) {
@@ -223,6 +389,13 @@ export interface AiModelRow {
   errorCount: number
 }
 
+export interface AiMetricsHourlyPoint {
+  label: string
+  count: number
+  errorCount: number
+  avgMs: number
+}
+
 export interface AiMetrics {
   windowHours: number
   available: boolean
@@ -236,6 +409,7 @@ export interface AiMetrics {
   streamCount: number
   byEndpoint: AiEndpointRow[]
   byModel: AiModelRow[]
+  hourly: AiMetricsHourlyPoint[]
 }
 
 export function getAiMetrics(hours = 24) {
@@ -255,6 +429,12 @@ export interface SecurityIpRow {
   count: number
 }
 
+export interface SecurityHourlyPoint {
+  label: string
+  count: number
+  loginFail: number
+}
+
 export interface SecurityMetrics {
   windowHours: number
   available: boolean
@@ -267,6 +447,7 @@ export interface SecurityMetrics {
   highRiskOps: number | null
   byType: SecurityTypeRow[]
   topIps: SecurityIpRow[]
+  hourly: SecurityHourlyPoint[]
 }
 
 export function getSecurityMetrics(hours = 24) {
@@ -393,7 +574,11 @@ export function getAuditStats() {
 }
 
 export function getAdminRepairs(params: { page?: number; size?: number; status?: number | null; category?: string; priority?: number | null; keyword?: string }) {
-  return request.get<{ records: any[]; total: number }>('/admin/repairs', { params })
+  // 后端报修分页返回 list（举报接口返回 records），两者都声明以兼容历史字段
+  return request.get<{ list?: any[]; records?: any[]; total: number; pageNum?: number; pageSize?: number }>(
+    '/admin/repairs',
+    { params }
+  )
 }
 
 export function getAdminRepairDetail(id: number) {

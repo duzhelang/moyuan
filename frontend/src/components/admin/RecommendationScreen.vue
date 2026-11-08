@@ -7,6 +7,8 @@ import { LineChart, BarChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import experiment from '@/data/recommend-experiment.json'
 import { MODEL_STRATEGY_LABELS, recommendApi, type RecommendLiveStats } from '@/api/modules/recommend'
+import { useAdminDemo } from '@/composables/useAdminDemo'
+import { buildDemoRecommendLiveStats } from '@/configs/admin/demoData'
 import { readChartPalette, useAdminTheme } from '@/composables/useAdminTheme'
 
 use([CanvasRenderer, LineChart, BarChart, GridComponent, LegendComponent, TooltipComponent])
@@ -81,6 +83,15 @@ const headSub = bestStrategy && baselineStrategy
 // 实时统计（缓存行/今日切换事件）：30 秒轮询，失败显示占位
 const LIVE_REFRESH_MS = 30_000
 const liveStats = ref<RecommendLiveStats | null>(null)
+const { demoMode } = useAdminDemo()
+
+/**
+ * 线上实时演示快照：只在演示模式下替换展示数据，
+ * 不写入后端、不覆盖 30 秒轮询拿到的真实结果，关闭开关立即恢复真实值。
+ */
+const demoLiveStats = buildDemoRecommendLiveStats()
+const viewLiveStats = computed(() => (demoMode.value ? demoLiveStats : liveStats.value))
+
 let liveTimer: ReturnType<typeof setInterval> | undefined
 
 const loadLiveStats = async () => {
@@ -101,9 +112,13 @@ interface MetaItem {
 
 const fmtCount = (value: number) => value.toLocaleString('zh-CN')
 
+const offlineMetaItems = computed<MetaItem[]>(() =>
+  kpis.map((k) => ({ label: k.label, value: fmtCount(k.value) }))
+)
+
 const metaItems = computed<MetaItem[]>(() => {
   const items: MetaItem[] = kpis.map(k => ({ label: k.label, value: fmtCount(k.value) }))
-  const live = liveStats.value
+  const live = viewLiveStats.value
   items.push({
     label: '缓存推荐行',
     value: live ? fmtCount(live.cacheRows) : '—',
@@ -120,8 +135,27 @@ const metaItems = computed<MetaItem[]>(() => {
       ? `累计 ${fmtCount(live.eventTotal)} 次${live.lastEventTime ? ` · 最近 ${live.lastEventTime.slice(11, 16)}` : ''}`
       : '实时数据不可用（接口失败或未登录管理员）'
   })
+  items.push({
+    label: '7 日曝光',
+    value: live ? fmtCount(live.onlineImpressions ?? 0) : '—',
+    live: Boolean(live),
+    title: live
+      ? `点击 ${fmtCount(live.onlineClicks ?? 0)} 次 · 覆盖 ${fmtCount(live.onlineUsers ?? 0)} 位用户`
+      : '线上埋点数据不可用'
+  })
+  items.push({
+    label: '线上 CTR',
+    value: live ? `${(live.onlineCtr ?? 0).toFixed(1)}%` : '—',
+    live: Boolean(live),
+    title: live
+      ? `曝光 ${fmtCount(live.onlineImpressions ?? 0)} · 点击 ${fmtCount(live.onlineClicks ?? 0)}`
+      : '线上埋点数据不可用'
+  })
   return items
 })
+
+/** 线上实时指标：仅保留接口返回的 live 项，避免把离线快照混进实时区 */
+const liveMetaItems = computed(() => metaItems.value.filter((item) => item.live))
 
 // 表格行 ↔ 图表柱双向联动：悬停任一方，其余策略同步淡出
 const activeKey = ref<string | null>(null)
@@ -211,7 +245,7 @@ const mainChartOption = computed(() => ({
         show: true,
         position: 'right',
         distance: 6,
-        color: '#9a6b2f',
+        color: ink.value.text,
         fontSize: 10,
         formatter: (params: { value: number }) => Number(params.value).toFixed(3)
       }
@@ -300,11 +334,11 @@ const STRATEGY_NAME: Record<string, string> = {
 
 const strategyName = (key: string | null) => (key ? STRATEGY_NAME[key] ?? key : '—')
 
-const liveTrend = computed(() => liveStats.value?.eventTrend ?? [])
-const liveByStrategy = computed(() => liveStats.value?.eventByStrategy ?? [])
+const liveTrend = computed(() => viewLiveStats.value?.eventTrend ?? [])
+const liveByStrategy = computed(() => viewLiveStats.value?.eventByStrategy ?? [])
 
 const pageSummary = computed(() => {
-  const pages = liveStats.value?.eventByPage ?? []
+  const pages = viewLiveStats.value?.eventByPage ?? []
   if (!pages.length) return '暂无'
   return pages.slice(0, 2).map(p => `${p.name} ${p.count}`).join(' · ')
 })
@@ -328,14 +362,14 @@ const liveTrendOption = computed(() => ({
     data: liveTrend.value.map(item => item.date),
     axisLine: { show: false },
     axisTick: { show: false },
-    axisLabel: { color: 'rgba(90, 61, 36, 0.55)', fontSize: 10 }
+    axisLabel: { color: ink.value.muted, fontSize: 10 }
   },
   yAxis: {
     type: 'value',
     minInterval: 1,
     axisLine: { show: false },
     axisTick: { show: false },
-    axisLabel: { color: 'rgba(90, 61, 36, 0.55)', fontSize: 10 },
+    axisLabel: { color: ink.value.muted, fontSize: 10 },
     splitLine: { lineStyle: { color: ink.value.border } }
   },
   series: [
@@ -368,7 +402,7 @@ const liveStrategyOption = computed(() => ({
     minInterval: 1,
     axisLine: { show: false },
     axisTick: { show: false },
-    axisLabel: { color: 'rgba(90, 61, 36, 0.55)', fontSize: 10 },
+    axisLabel: { color: ink.value.muted, fontSize: 10 },
     splitLine: { lineStyle: { color: ink.value.border } }
   },
   yAxis: {
@@ -394,6 +428,60 @@ const liveStrategyOption = computed(() => ({
         formatter: (params: { value: number }) => `${params.value}`
       },
       data: liveByStrategy.value.map(item => item.count)
+    }
+  ]
+}))
+
+const onlineTrend = computed(() => viewLiveStats.value?.onlineTrend ?? [])
+const onlineByStrategy = computed(() => viewLiveStats.value?.onlineByStrategy ?? [])
+
+// 线上效果：曝光与点击双柱，CTR 以文字摘要呈现（点击量通常远小于曝光，单独折线会被压平）
+const onlineTrendOption = computed(() => ({
+  backgroundColor: 'transparent',
+  animationDuration: 520,
+  grid: { left: 6, right: 16, top: 26, bottom: 2, containLabel: true },
+  tooltip: {
+    ...tooltipStyle.value,
+    trigger: 'axis',
+    valueFormatter: (value: number) => `${value} 次`
+  },
+  legend: {
+    data: ['曝光', '点击'],
+    top: 0,
+    right: 0,
+    itemWidth: 10,
+    itemHeight: 6,
+    textStyle: { color: ink.value.muted, fontSize: 10 }
+  },
+  xAxis: {
+    type: 'category',
+    data: onlineTrend.value.map(item => item.date),
+    axisLine: { show: false },
+    axisTick: { show: false },
+    axisLabel: { color: ink.value.muted, fontSize: 10 }
+  },
+  yAxis: {
+    type: 'value',
+    minInterval: 1,
+    axisLine: { show: false },
+    axisTick: { show: false },
+    axisLabel: { color: ink.value.muted, fontSize: 10 },
+    splitLine: { lineStyle: { color: ink.value.border } }
+  },
+  series: [
+    {
+      name: '曝光',
+      type: 'bar',
+      barWidth: 8,
+      itemStyle: { color: GOLD, borderRadius: [3, 3, 0, 0] },
+      data: onlineTrend.value.map(item => item.impressions)
+    },
+    {
+      name: '点击',
+      type: 'bar',
+      barWidth: 8,
+      itemStyle: { color: COPPER, borderRadius: [3, 3, 0, 0] },
+      data: onlineTrend.value.map(item => item.clicks)
     }
   ]
 }))
@@ -431,7 +519,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section ref="panelRef" class="data-screen">
+  <section ref="panelRef" class="data-screen" :class="{ 'is-fullscreen': isFullscreen }">
     <span class="screen-glow" aria-hidden="true"></span>
 
     <header class="screen-head">
@@ -442,8 +530,11 @@ onBeforeUnmount(() => {
       </div>
       <div class="head-side">
         <div class="head-meta">
-          <span>数据截至 {{ experiment.updatedAt }}</span>
+          <span class="mode-badge offline">离线快照</span>
+          <span class="mode-badge live">实时 30s</span>
+          <span v-if="demoMode" class="mode-badge demo">线上演示</span>
           <i class="meta-dot"></i>
+          <span>数据截至 {{ experiment.updatedAt }}</span>
           <span>{{ experiment.modelVersion }}</span>
         </div>
         <button class="fs-btn" type="button" @click="toggleFullscreen">
@@ -453,16 +544,18 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <div class="screen-meta">
-      <span
-        v-for="item in metaItems"
-        :key="item.label"
-        class="meta-item"
-        :class="{ 'meta-live': item.live }"
-        :title="item.title"
-      >
-        <i v-if="item.live" class="live-dot" aria-hidden="true"></i><b>{{ item.value }}</b>{{ item.label }}
-      </span>
+    <div class="section-head">
+      <span class="section-title">离线评估</span>
+      <span class="section-note">静态快照 · 重新导出 JSON 后更新</span>
+    </div>
+
+    <div class="meta-group">
+      <span class="meta-group-label">实验规模</span>
+      <div class="screen-meta">
+        <span v-for="item in offlineMetaItems" :key="item.label" class="meta-item">
+          <b>{{ item.value }}</b>{{ item.label }}
+        </span>
+      </div>
     </div>
 
     <div class="screen-grid">
@@ -561,14 +654,39 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
+    <div class="section-head live-section">
+      <span class="section-title">线上实时</span>
+      <span class="section-note">
+        {{
+          demoMode
+            ? '演示数据 · 仅前端展示，关闭顶部开关立即恢复接口返回的真实样本'
+            : '30 秒自动刷新 · 与离线快照口径不同，请勿混读'
+        }}
+      </span>
+    </div>
+
+    <div class="meta-group live-group">
+      <span class="meta-group-label">实时状态</span>
+      <div class="screen-meta">
+        <span
+          v-for="item in liveMetaItems"
+          :key="item.label"
+          class="meta-item meta-live"
+          :title="item.title"
+        >
+          <i class="live-dot" aria-hidden="true"></i><b>{{ item.value }}</b>{{ item.label }}
+        </span>
+      </div>
+    </div>
+
     <div class="screen-grid screen-grid-live">
       <div class="pane">
         <div class="pane-head">
           <span class="pane-title">近 7 天策略切换</span>
-          <span class="pane-note">30 秒自动刷新 · 今日 {{ liveStats?.eventToday ?? 0 }} 次</span>
+          <span class="pane-note">30 秒自动刷新 · 今日 {{ viewLiveStats?.eventToday ?? 0 }} 次</span>
         </div>
         <v-chart class="chart chart-live" :option="liveTrendOption" autoresize />
-        <p v-if="!liveStats?.eventTotal" class="live-empty">暂无切换事件，前台切换推荐策略后自动累计</p>
+        <p v-if="!viewLiveStats?.eventTotal" class="live-empty">暂无切换事件，前台切换推荐策略后自动累计</p>
       </div>
       <div class="pane">
         <div class="pane-head">
@@ -576,7 +694,49 @@ onBeforeUnmount(() => {
           <span class="pane-note">来源页面 {{ pageSummary }}</span>
         </div>
         <v-chart class="chart chart-live" :option="liveStrategyOption" autoresize />
-        <p v-if="!liveStats?.eventTotal" class="live-empty">暂无数据</p>
+        <p v-if="!viewLiveStats?.eventTotal" class="live-empty">暂无数据</p>
+      </div>
+    </div>
+
+    <div class="screen-grid screen-grid-live">
+      <div class="pane">
+        <div class="pane-head">
+          <span class="pane-title">线上曝光与点击 · 近 7 天</span>
+          <span class="pane-note">
+            曝光 {{ fmtCount(viewLiveStats?.onlineImpressions ?? 0) }} · 点击
+            {{ fmtCount(viewLiveStats?.onlineClicks ?? 0) }} · CTR
+            {{ (viewLiveStats?.onlineCtr ?? 0).toFixed(1) }}%
+          </span>
+        </div>
+        <v-chart class="chart chart-live" :option="onlineTrendOption" autoresize />
+        <p v-if="!(viewLiveStats?.onlineImpressions)" class="live-empty">
+          暂无曝光数据，登录用户打开首页推荐面板后自动累计
+        </p>
+      </div>
+      <div class="pane">
+        <div class="pane-head">
+          <span class="pane-title">分策略线上效果</span>
+          <span class="pane-note">覆盖 {{ fmtCount(viewLiveStats?.onlineUsers ?? 0) }} 位用户</span>
+        </div>
+        <div class="metric-table live-table online-table">
+          <div class="mt-row online-row online-head">
+            <span>策略</span>
+            <span>曝光</span>
+            <span>点击</span>
+            <span>CTR</span>
+          </div>
+          <div
+            v-for="row in onlineByStrategy"
+            :key="row.strategy"
+            class="mt-row online-row online-row-item"
+          >
+            <span>{{ strategyName(row.strategy) }}</span>
+            <span>{{ fmtCount(row.impressions) }}</span>
+            <span>{{ fmtCount(row.clicks) }}</span>
+            <span>{{ row.ctr.toFixed(1) }}%</span>
+          </div>
+          <p v-if="!onlineByStrategy.length" class="live-empty">暂无线上数据</p>
+        </div>
       </div>
     </div>
 
@@ -585,7 +745,7 @@ onBeforeUnmount(() => {
         <div class="pane-head">
           <span class="pane-title">模型与缓存状态</span>
           <span class="pane-note">
-            古典池 {{ liveStats?.poolSize ?? '—' }} 首 · 缓存 {{ fmtCount(liveStats?.cacheRows ?? 0) }} 行
+            古典池 {{ viewLiveStats?.poolSize ?? '—' }} 首 · 缓存 {{ fmtCount(viewLiveStats?.cacheRows ?? 0) }} 行
           </span>
         </div>
         <div class="metric-table live-table">
@@ -597,7 +757,7 @@ onBeforeUnmount(() => {
             <span>NDCG@10</span>
             <span>状态</span>
           </div>
-          <div v-for="m in (liveStats?.models ?? [])" :key="m.strategy" class="mt-row lm-row">
+          <div v-for="m in (viewLiveStats?.models ?? [])" :key="m.strategy" class="mt-row lm-row">
             <span class="mt-name">{{ MODEL_STRATEGY_LABELS[m.strategy] || m.strategy }}</span>
             <span>{{ m.version }}</span>
             <span>{{ fmtCount(m.cacheUsers) }}</span>
@@ -605,24 +765,24 @@ onBeforeUnmount(() => {
             <span>{{ m.metrics?.ndcg10 != null ? m.metrics.ndcg10.toFixed(4) : '—' }}</span>
             <span>{{ m.status === 1 ? '上线' : '下线' }}</span>
           </div>
-          <p v-if="!liveStats?.models?.length" class="live-empty">暂无上线模型</p>
+          <p v-if="!viewLiveStats?.models?.length" class="live-empty">暂无上线模型</p>
         </div>
       </div>
       <div class="pane">
         <div class="pane-head">
           <span class="pane-title">最近切换事件</span>
           <span class="pane-note">
-            覆盖 {{ fmtCount(liveStats?.cacheUsers ?? 0) }} 位用户 · 累计 {{ fmtCount(liveStats?.eventTotal ?? 0) }} 次
+            覆盖 {{ fmtCount(viewLiveStats?.cacheUsers ?? 0) }} 位用户 · 累计 {{ fmtCount(viewLiveStats?.eventTotal ?? 0) }} 次
           </span>
         </div>
         <div class="event-list">
-          <div v-for="(e, idx) in (liveStats?.recentEvents ?? [])" :key="idx" class="event-row">
+          <div v-for="(e, idx) in (viewLiveStats?.recentEvents ?? [])" :key="idx" class="event-row">
             <span class="ev-time">{{ formatEventTime(e.createTime) }}</span>
             <span class="ev-user">用户 {{ e.userId }}</span>
             <span class="ev-flow">{{ strategyName(e.fromStrategy) }} → {{ strategyName(e.toStrategy) }}</span>
             <span class="ev-page">{{ e.page }}</span>
           </div>
-          <p v-if="!liveStats?.recentEvents?.length" class="live-empty">暂无事件</p>
+          <p v-if="!viewLiveStats?.recentEvents?.length" class="live-empty">暂无事件</p>
         </div>
       </div>
     </div>
@@ -773,6 +933,90 @@ onBeforeUnmount(() => {
   height: 4px;
   border-radius: 50%;
   background: var(--adm-text-faint);
+}
+
+.mode-badge {
+  padding: 1px 8px;
+  border-radius: 9px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  border: 1px solid var(--adm-border-soft);
+}
+
+.mode-badge.offline {
+  color: var(--adm-text-muted);
+  background: var(--adm-surface-muted);
+}
+
+.mode-badge.live {
+  color: var(--adm-ok);
+  background: color-mix(in srgb, var(--adm-ok) 12%, transparent);
+  border-color: color-mix(in srgb, var(--adm-ok) 24%, transparent);
+}
+
+.mode-badge.demo {
+  color: var(--adm-warn);
+  background: color-mix(in srgb, var(--adm-warn) 12%, transparent);
+  border-color: color-mix(in srgb, var(--adm-warn) 28%, transparent);
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--adm-border-soft);
+}
+
+.section-title {
+  font-family: $font-family-seal;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--adm-text);
+}
+
+.section-note {
+  font-size: 11px;
+  color: var(--adm-text-faint);
+}
+
+.live-section {
+  margin-top: 24px;
+}
+
+.meta-group {
+  margin-top: 10px;
+}
+
+.meta-group-label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--adm-text-faint);
+  text-transform: uppercase;
+}
+
+.meta-group .screen-meta {
+  margin-top: 6px;
+}
+
+.live-group .meta-item b {
+  color: var(--adm-ok);
+}
+
+.is-fullscreen {
+  .head-title {
+    font-size: 30px;
+  }
+
+  .head-sub {
+    font-size: 14px;
+  }
+
+  .screen-grid {
+    grid-template-columns: 1.5fr 1fr;
+  }
 }
 
 .fs-btn {
@@ -948,6 +1192,19 @@ onBeforeUnmount(() => {
 
   .lm-row {
     font-size: 11px;
+  }
+}
+
+.online-table {
+  .online-row {
+    grid-template-columns: 1.1fr 1fr 1fr 0.8fr;
+    font-size: 11px;
+  }
+
+  .online-head {
+    border-top: 0 !important;
+    color: var(--adm-text-faint);
+    letter-spacing: 0.5px;
   }
 }
 

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute } from 'vue-router'
 import { searchPoemsWithRecommend } from '@/api/modules/external-poetry'
 import type { PoemSearchResult } from '@/api/modules/external-poetry'
+import { recommendApi } from '@/api/modules/recommend'
 import type { StrategyKey } from '@/api/modules/recommend'
 import { useUserStore } from '@/stores/user'
 import { useRecommendStrategy } from '@/composables/useRecommendStrategy'
@@ -84,6 +85,47 @@ const showRecommendedPoems = async () => {
   if (recommendedPoems.value.length === 0 && !recommendLoading.value) {
     await loadRecommendations()
   }
+}
+
+// ==================== 推荐线上效果埋点（曝光 / 点击） ====================
+const interactionBatchId = ref('')
+let lastImpressionKey = ''
+
+const newBatchId = () =>
+  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+
+/** 推荐列表变化时记录一次曝光；同一批次同一列表不重复上报 */
+const recordImpressions = () => {
+  if (!userStore.isLoggedIn || poemSearchMode.value !== 'recommend') return
+  const items = recommendedPoems.value
+  if (!items.length) return
+  const key = `${currentStrategy.value}:${items.map((item) => item.id).join(',')}`
+  if (key === lastImpressionKey) return
+  lastImpressionKey = key
+  interactionBatchId.value = newBatchId()
+  recommendApi.recordInteractions({
+    page: 'home',
+    strategy: currentStrategy.value,
+    batchId: interactionBatchId.value,
+    eventType: 'impression',
+    itemIds: items.map((item) => item.id)
+  })
+}
+
+watch([recommendedPoems, poemSearchMode, currentStrategy], recordImpressions, { flush: 'post' })
+
+/** 点击推荐卡片：仅在有曝光批次时记录点击，保证 CTR 不超过 100% */
+const openRecommendedPoem = (poem: { id: number }) => {
+  if (userStore.isLoggedIn && poemSearchMode.value === 'recommend' && interactionBatchId.value) {
+    recommendApi.recordInteractions({
+      page: 'home',
+      strategy: currentStrategy.value,
+      batchId: interactionBatchId.value,
+      eventType: 'click',
+      itemIds: [poem.id]
+    })
+  }
+  openPoemDetail(poem)
 }
 
 // 「为您推荐」推荐依据：登录用户走用户画像匹配 + 兴趣标签建模，未登录回退全站热度排序
@@ -278,7 +320,7 @@ const clearPoemSearch = () => {
               :top-k="6"
               @retry="retryRecommendation"
               @switch-rule="backToRuleStrategy"
-              @open="openPoemDetail"
+              @open="openRecommendedPoem"
             />
           </template>
         </div>

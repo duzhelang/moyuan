@@ -1,6 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import VChart from 'vue-echarts'
+import { use } from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
+import { BarChart, LineChart, PieChart } from 'echarts/charts'
+import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import {
   getAiMetrics,
   getRecentEvents,
@@ -15,7 +20,17 @@ import type {
   SystemHealthNode,
   SystemMetrics
 } from '@/api/modules/admin'
+import AdminEmptyState from '@/components/admin/AdminEmptyState.vue'
+import { readChartTheme, useAdminTheme } from '@/composables/useAdminTheme'
 import type { StatusLevel } from '@/types/admin-dashboard'
+
+use([CanvasRenderer, LineChart, BarChart, PieChart, GridComponent, TooltipComponent, LegendComponent])
+
+const { resolvedTheme } = useAdminTheme()
+const chartTheme = computed(() => {
+  void resolvedTheme.value
+  return readChartTheme()
+})
 
 interface MonitorRow {
   label: string
@@ -37,6 +52,27 @@ interface MonitorGroup {
 
 const route = useRoute()
 
+/** 监控时间窗：6 / 24 小时，接口与按小时序列共用 */
+const hours = ref<6 | 24>(24)
+const autoRefresh = ref(true)
+const lastUpdated = ref('—')
+/** 趋势区当前指标：接口 / AI / 安全 */
+const trendTab = ref<'api' | 'ai' | 'security'>('api')
+
+/** 趋势图实例：点击图例会隐藏系列，需要「恢复原图」一键重置 */
+const trendChartRef = ref<unknown>(null)
+
+const resetTrend = () => {
+  // 恢复默认的接口视图，再把被点掉的图例全部选回来
+  trendTab.value = 'api'
+  nextTick(() => {
+    const chart = trendChartRef.value as {
+      dispatchAction?: (action: { type: string }) => void
+    } | null
+    chart?.dispatchAction?.({ type: 'legendAllSelect' })
+  })
+}
+
 const activeTab = computed(() => String(route.query.tab || ''))
 
 const isActive = (key: string) => activeTab.value === key
@@ -57,7 +93,7 @@ const metrics = ref<SystemMetrics | null>(null)
 
 const loadMetrics = async () => {
   try {
-    const res = await getSystemMetrics(24)
+    const res = await getSystemMetrics(hours.value)
     metrics.value = res.data || null
   } catch (error) {
     console.error('获取接口指标失败', error)
@@ -102,7 +138,7 @@ const aiMetrics = ref<AiMetrics | null>(null)
 
 const loadAiMetrics = async () => {
   try {
-    const res = await getAiMetrics(24)
+    const res = await getAiMetrics(hours.value)
     aiMetrics.value = res.data || null
   } catch (error) {
     console.error('获取 AI 指标失败', error)
@@ -158,7 +194,7 @@ const securityMetrics = ref<SecurityMetrics | null>(null)
 
 const loadSecurityMetrics = async () => {
   try {
-    const res = await getSecurityMetrics(24)
+    const res = await getSecurityMetrics(hours.value)
     securityMetrics.value = res.data || null
   } catch (error) {
     console.error('获取安全指标失败', error)
@@ -390,6 +426,210 @@ const scoreboard = computed(() => {
   ]
 })
 
+// ==================== 性能概览与趋势 ====================
+/** 概览事实：成功率 / 错误率 / 请求量 / 平均耗时 / P95 */
+const performanceFacts = computed(() => {
+  const m = metrics.value
+  const ok = !!m && m.available && m.total > 0
+  return [
+    {
+      key: 'success',
+      label: '成功率',
+      value: ok && m ? ((1 - m.errorRate) * 100).toFixed(2) + '%' : '—',
+      status: (ok && m && m.errorRate >= 0.01 ? 'warn' : 'ok') as StatusLevel
+    },
+    {
+      key: 'error',
+      label: '错误率',
+      value: ok && m ? (m.errorRate * 100).toFixed(2) + '%' : '—',
+      status: (ok && m && m.errorRate >= 0.01 ? 'warn' : 'ok') as StatusLevel
+    },
+    { key: 'total', label: '请求总量', value: ok && m ? String(m.total) : '—', status: 'ok' as StatusLevel },
+    { key: 'avg', label: '平均耗时', value: ok && m ? m.avgMs + ' ms' : '—', status: 'ok' as StatusLevel },
+    {
+      key: 'p95',
+      label: 'P95 耗时',
+      value: ok && m && m.p95Ms != null ? m.p95Ms + ' ms' : '—',
+      status: (ok && m && (m.p95Ms || 0) > 500 ? 'warn' : 'ok') as StatusLevel
+    }
+  ]
+})
+
+/** 慢接口排行：用同组最大值归一化，右端显示耗时；显示名去掉公共 /api/ 前缀省宽度 */
+const slowTop = computed(() => {
+  const rows = metrics.value?.slowTop || []
+  const max = Math.max(1, ...rows.map((row) => row.avgMs))
+  return rows.map((row) => ({
+    ...row,
+    label: row.path.replace(/^\/api\//, ''),
+    ratio: Math.max(4, Math.round((row.avgMs / max) * 100))
+  }))
+})
+
+const statusTotal = computed(() =>
+  (metrics.value?.statusBuckets || []).reduce((sum, bucket) => sum + bucket.count, 0)
+)
+
+/** 请求状态分布环图 */
+const statusOption = computed(() => {
+  const theme = chartTheme.value
+  const buckets = (metrics.value?.statusBuckets || []).filter((bucket) => bucket.count > 0)
+  return {
+    tooltip: { ...theme.tooltip, trigger: 'item' as const },
+    legend: {
+      ...theme.legend,
+      top: 'middle',
+      right: 0,
+      orient: 'vertical' as const
+    },
+    title: {
+      text: String(statusTotal.value),
+      subtext: `${hours.value} 小时请求`,
+      left: '30%',
+      top: '40%',
+      textAlign: 'center' as const,
+      textStyle: {
+        color: theme.ink.text,
+        fontSize: 17,
+        fontWeight: 600,
+        fontFamily: 'var(--adm-font-serif)'
+      },
+      subtextStyle: { color: theme.ink.muted, fontSize: 10, lineHeight: 16 }
+    },
+    series: [
+      {
+        type: 'pie',
+        radius: ['48%', '70%'],
+        center: ['30%', '50%'],
+        avoidLabelOverlap: false,
+        itemStyle: { borderRadius: 4, borderColor: theme.ink.surface, borderWidth: 2 },
+        label: { show: false },
+        emphasis: {
+          label: {
+            show: true,
+            fontSize: 11,
+            fontWeight: 'bold',
+            color: theme.ink.text,
+            formatter: '{b}\n{d}%'
+          }
+        },
+        labelLine: { show: false },
+        data: buckets.map((bucket, index) => ({
+          name: bucket.name,
+          value: bucket.count,
+          itemStyle: { color: theme.palette[index % theme.palette.length] }
+        }))
+      }
+    ]
+  }
+})
+
+/** 当前趋势指标的数据源 */
+const trendPoints = computed(() => {
+  if (trendTab.value === 'ai') {
+    const rows = aiMetrics.value?.hourly || []
+    return {
+      labels: rows.map((row) => row.label),
+      count: rows.map((row) => row.count),
+      avg: rows.map((row) => row.avgMs),
+      loginFail: [] as number[]
+    }
+  }
+  if (trendTab.value === 'security') {
+    const rows = securityMetrics.value?.hourly || []
+    return {
+      labels: rows.map((row) => row.label),
+      count: rows.map((row) => row.count),
+      avg: [] as number[],
+      loginFail: rows.map((row) => row.loginFail)
+    }
+  }
+  const rows = metrics.value?.hourly || []
+  return {
+    labels: rows.map((row) => row.label),
+    count: rows.map((row) => row.count),
+    avg: rows.map((row) => row.avgMs),
+    loginFail: [] as number[]
+  }
+})
+
+const trendHasData = computed(() => trendPoints.value.labels.length > 0)
+
+/** 响应趋势：柱=请求/调用次数，线=平均耗时；安全页签则柱=事件、线=登录失败 */
+const trendOption = computed(() => {
+  const theme = chartTheme.value
+  const data = trendPoints.value
+  const isSecurity = trendTab.value === 'security'
+  return {
+    tooltip: theme.tooltip,
+    legend: {
+      ...theme.legend,
+      // 留出右侧安全距离，避免图例文字贴边被裁
+      right: 16,
+      top: 2,
+      // 保留图例点击切换；误点隐藏系列后可用右上角「恢复原图」重置
+      data: isSecurity ? ['事件数', '登录失败'] : ['请求/调用次数', '平均耗时']
+    },
+    grid: { ...theme.grid, right: 56, top: 42 },
+    xAxis: {
+      type: 'category',
+      data: data.labels,
+      ...theme.categoryAxis
+    },
+    yAxis: isSecurity
+      ? [{ type: 'value', name: '次', ...theme.valueAxis }]
+      : [
+          { type: 'value', name: '次', ...theme.valueAxis },
+          {
+            type: 'value',
+            name: 'ms',
+            ...theme.valueAxis,
+            splitLine: { show: false }
+          }
+        ],
+    series: isSecurity
+      ? [
+          {
+            name: '事件数',
+            type: 'bar',
+            data: data.count,
+            barMaxWidth: 14,
+            itemStyle: { color: theme.barGradient(theme.palette[3]), borderRadius: [3, 3, 0, 0] }
+          },
+          {
+            name: '登录失败',
+            type: 'line',
+            smooth: true,
+            // 只有一个小时桶时，没有数据点标记的折线不可见
+            showSymbol: data.labels.length <= 1,
+            data: data.loginFail,
+            color: theme.palette[0],
+            lineStyle: { width: 1.6, type: 'dashed' }
+          }
+        ]
+      : [
+          {
+            name: '请求/调用次数',
+            type: 'bar',
+            data: data.count,
+            barMaxWidth: 14,
+            itemStyle: { color: theme.barGradient(theme.palette[0]), borderRadius: [3, 3, 0, 0] }
+          },
+          {
+            name: '平均耗时',
+            type: 'line',
+            yAxisIndex: 1,
+            smooth: true,
+            // 只有一个小时桶时，没有数据点标记的折线不可见
+            showSymbol: data.labels.length <= 1,
+            data: data.avg,
+            color: theme.palette[2],
+            lineStyle: { width: 1.8 }
+          }
+        ]
+  }
+})
+
 // ==================== 最近异常事件 ====================
 const recentEvents = ref<RecentEvent[]>([])
 const eventLoading = ref(true)
@@ -426,22 +666,44 @@ const levelOf = (status: string): StatusLevel =>
 
 let timer: ReturnType<typeof setInterval> | undefined
 
-const loadAll = () => {
-  loadHealth()
+const stopTimer = () => {
+  if (timer) {
+    clearInterval(timer)
+    timer = undefined
+  }
+}
+
+const startTimer = () => {
+  stopTimer()
+  if (autoRefresh.value) timer = setInterval(loadAll, 30_000)
+}
+
+const loadAll = async () => {
+  await Promise.allSettled([
+    loadHealth(),
+    loadMetrics(),
+    loadAiMetrics(),
+    loadSecurityMetrics(),
+    loadRecentEvents()
+  ])
+  lastUpdated.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+}
+
+// 切换时间窗只重新拉取指标类接口，health / 事件时间轴保持实时
+watch(hours, () => {
   loadMetrics()
   loadAiMetrics()
   loadSecurityMetrics()
-  loadRecentEvents()
-}
+})
+
+watch(autoRefresh, startTimer)
 
 onMounted(() => {
   loadAll()
-  timer = setInterval(loadAll, 30_000)
+  startTimer()
 })
 
-onUnmounted(() => {
-  if (timer) clearInterval(timer)
-})
+onUnmounted(stopTimer)
 </script>
 
 <template>
@@ -454,8 +716,16 @@ onUnmounted(() => {
         </p>
       </div>
       <div class="mon-live">
-        <span class="live-badge"><i class="live-dot"></i>30 秒刷新</span>
-        <span v-if="checkedAt" class="mon-checked">探活于 {{ checkedAt }}</span>
+        <span class="live-badge" :class="{ paused: !autoRefresh }">
+          <i class="live-dot"></i>{{ autoRefresh ? '30 秒刷新' : '已暂停' }}
+        </span>
+        <div class="range-switch" role="group" aria-label="监控时间范围">
+          <button class="range-btn" :class="{ active: hours === 6 }" @click="hours = 6">6 小时</button>
+          <button class="range-btn" :class="{ active: hours === 24 }" @click="hours = 24">24 小时</button>
+        </div>
+        <el-switch v-model="autoRefresh" size="small" active-text="自动" />
+        <el-button size="small" text @click="loadAll">刷新</el-button>
+        <span v-if="lastUpdated !== '—'" class="mon-checked">更新于 {{ lastUpdated }}</span>
       </div>
     </header>
 
@@ -475,6 +745,84 @@ onUnmounted(() => {
         <div class="score-unit">{{ item.unit }}</div>
         <div class="score-foot">{{ item.note }}</div>
       </router-link>
+    </section>
+
+    <section class="panel perf-panel">
+      <div class="panel-head">
+        <span class="panel-title">性能概览 · 近 {{ hours }} 小时</span>
+        <span class="panel-note">数据来自 api_request_metric / ai_call_log / security_event</span>
+      </div>
+
+      <div class="perf-grid">
+        <div class="perf-facts">
+          <div
+            v-for="fact in performanceFacts"
+            :key="fact.key"
+            class="perf-fact"
+            :class="fact.status"
+          >
+            <span class="pf-label">{{ fact.label }}</span>
+            <b class="pf-value">{{ fact.value }}</b>
+          </div>
+        </div>
+
+        <div class="perf-donut">
+          <v-chart v-if="statusTotal > 0" class="donut-chart" :option="statusOption" autoresize />
+          <AdminEmptyState v-else title="暂无请求分布" note="产生接口请求后自动统计" />
+        </div>
+
+        <div class="perf-slow">
+          <div class="slow-head">慢接口 TOP</div>
+          <div v-if="slowTop.length" class="slow-list">
+            <el-tooltip
+              v-for="row in slowTop"
+              :key="row.path"
+              :content="`${row.path} · ${row.count} 次 · 最大 ${row.maxMs} ms`"
+              placement="top"
+            >
+              <div class="slow-item">
+                <div class="slow-row">
+                  <span class="slow-name" :title="row.path">{{ row.label }}</span>
+                  <span class="slow-val">{{ row.avgMs }} ms</span>
+                </div>
+                <span class="slow-bar"><i :style="{ width: row.ratio + '%' }"></i></span>
+              </div>
+            </el-tooltip>
+          </div>
+          <AdminEmptyState v-else title="暂无慢接口" note="近窗口内没有可统计的接口样本" />
+        </div>
+      </div>
+    </section>
+
+    <section class="panel perf-trend-panel">
+      <div class="panel-head">
+        <span class="panel-title">响应趋势 · 近 {{ hours }} 小时</span>
+        <div class="trend-tabs">
+          <button class="range-btn" :class="{ active: trendTab === 'api' }" @click="trendTab = 'api'">接口</button>
+          <button class="range-btn" :class="{ active: trendTab === 'ai' }" @click="trendTab = 'ai'">AI</button>
+          <button class="range-btn" :class="{ active: trendTab === 'security' }" @click="trendTab = 'security'">安全</button>
+          <button
+            class="reset-btn"
+            type="button"
+            title="重置为接口视图，并恢复被图例隐藏的曲线"
+            @click="resetTrend"
+          >
+            恢复原图
+          </button>
+        </div>
+      </div>
+      <v-chart
+        v-if="trendHasData"
+        ref="trendChartRef"
+        class="perf-trend-chart"
+        :option="trendOption"
+        autoresize
+      />
+      <AdminEmptyState
+        v-else
+        title="暂无按小时数据"
+        note="产生接口请求、AI 调用或安全事件后，这里会出现真实曲线。"
+      />
     </section>
 
     <section v-loading="healthLoading" class="panel probe-panel">
@@ -644,6 +992,204 @@ onUnmounted(() => {
   font-size: 12px;
   color: var(--adm-text-faint);
   font-variant-numeric: tabular-nums;
+}
+
+.live-badge.paused {
+  color: var(--adm-text-muted);
+  background: var(--adm-surface-muted);
+
+  .live-dot {
+    animation: none;
+  }
+}
+
+.range-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--adm-border-soft);
+  border-radius: 12px;
+  background: var(--adm-surface-muted);
+}
+
+.range-btn {
+  padding: 2px 9px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--adm-text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+
+  &:hover {
+    color: var(--adm-primary);
+  }
+
+  &.active {
+    color: var(--adm-on-primary);
+    background: var(--adm-primary);
+  }
+}
+
+.reset-btn {
+  margin-left: 4px;
+  padding: 2px 9px;
+  border: 1px solid var(--adm-border-soft);
+  border-radius: 9px;
+  background: var(--adm-surface-muted);
+  color: var(--adm-text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+
+  &:hover {
+    color: var(--adm-primary);
+    border-color: color-mix(in srgb, var(--adm-primary) 36%, var(--adm-border-soft));
+  }
+}
+
+// ---------------- 性能概览 ----------------
+.perf-panel,
+.perf-trend-panel {
+  margin-top: 14px;
+}
+
+.perf-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(190px, 0.8fr) minmax(0, 1.15fr);
+  gap: 18px;
+  padding: 0 18px 16px;
+  align-items: stretch;
+
+  @media (max-width: 1200px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.perf-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  align-content: start;
+}
+
+.perf-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--adm-border-soft);
+  border-radius: 8px;
+  background: var(--adm-surface-muted);
+
+  &.warn .pf-value {
+    color: var(--adm-warn);
+  }
+}
+
+.pf-label {
+  font-size: 11px;
+  color: var(--adm-text-faint);
+}
+
+.pf-value {
+  font-family: var(--adm-font-serif);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--adm-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.perf-donut {
+  min-height: 150px;
+  display: grid;
+  place-items: center;
+}
+
+.donut-chart {
+  width: 100%;
+  height: 160px;
+}
+
+.perf-slow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 150px;
+}
+
+.slow-head {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: var(--adm-text-faint);
+}
+
+.slow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.slow-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.slow-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+}
+
+.slow-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--adm-text-2);
+}
+
+.slow-bar {
+  width: 100%;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--adm-surface-muted);
+  overflow: hidden;
+
+  i {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--adm-primary) 55%, transparent),
+      var(--adm-primary)
+    );
+  }
+}
+
+.slow-val {
+  flex-shrink: 0;
+  color: var(--adm-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.perf-trend-chart {
+  width: 100%;
+  height: 252px;
+  padding: 0 14px 12px;
+}
+
+.trend-tabs {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
 }
 
 // ---------------- 通用面板 ----------------

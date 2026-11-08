@@ -75,6 +75,25 @@ export interface RecommendLiveStats {
   eventByStrategy: { name: string; count: number }[]
   eventByPage: { name: string; count: number }[]
   recentEvents: LiveEventItem[]
+  onlineImpressions: number
+  onlineClicks: number
+  onlineCtr: number
+  onlineUsers: number
+  onlineByStrategy: OnlineStrategyStat[]
+  onlineTrend: OnlineDayStat[]
+}
+
+export interface OnlineStrategyStat {
+  strategy: string
+  impressions: number
+  clicks: number
+  ctr: number
+}
+
+export interface OnlineDayStat {
+  date: string
+  impressions: number
+  clicks: number
 }
 
 export interface LiveModelStat {
@@ -158,6 +177,18 @@ export const recommendApi = {
   /** 策略切换埋点（JWT；上报失败静默，不阻塞交互） */
   recordEvent(payload: { page: string; from: StrategyKey; to: StrategyKey }) {
     return request.post('/recommend/events', payload, { silent: true }).catch(() => undefined)
+  },
+  /** 线上曝光/点击埋点（JWT；一次上报一批作品，失败静默） */
+  recordInteractions(payload: {
+    page: string
+    strategy: StrategyKey
+    batchId: string
+    eventType: 'impression' | 'click'
+    itemIds: number[]
+  }) {
+    return request
+      .post('/recommend/interactions', payload, { silent: true })
+      .catch(() => undefined)
   },
   /** 管理端指标屏实时统计（管理员 JWT） */
   liveStats(signal?: AbortSignal) {
