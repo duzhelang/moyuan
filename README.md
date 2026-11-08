@@ -1086,7 +1086,7 @@ A: 管理员可以在后台管理页面配置 AI 模型：
 - ✅ 举报/报修新增演示种子数据：3 条举报（含 1 条 AI 风控、1 条已采纳）、3 条报修（待处理/处理中/已解决）、2 条站内通知，均带「【示例数据】」前缀
 - ✅ 用户分析新增「用户结构 · 活跃与回访」：角色分布、近 7/30 日活跃、7/30 日回访率、沉默用户
 - ✅ 推荐补线上效果：新增 `recommendation_interaction` 曝光/点击表与 `POST /api/recommend/interactions` 埋点，后台展示近 7 天曝光、点击、CTR、分策略效果与每日趋势；首页推荐面板自动上报曝光与点击
-- ✅ 建表总数 44→46，`init.sql` 升级 v3.9（新增 recommendation_interaction、dynasty_alias 两表与 poem.import_note 收录备注列，存量修复见 migration-20261109-dynasty-alias-backfill.sql）
+- ✅ 建表总数 44→46，`init.sql` 升级 v3.9（新增 recommendation_interaction、dynasty_alias 两表与 poem.import_note 收录备注列，存量数据修复已在开发库执行完成）
 
 ### v1.17.0 (2026-11-08)
 - ✅ 后台控制台「内容结构 · 资源分布占比」升级为「资源分布」四域面板：内容资源 / AI 资源 / 存储资源 / 运行资源

@@ -26,7 +26,7 @@
 --             建表总数 45 张。
 --       v3.9：新增 dynasty_alias 朝代别名表（上游「唐代/宋代」等写法归一）；
 --             poem 表新增 import_note 收录备注列；
---             存量修复见 migration-20261109-dynasty-alias-backfill.sql；建表总数 46 张。
+--             存量数据归一与空壳诗人合并已在开发库执行完成（一次性修复，不随仓库保留）；建表总数 46 张。
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS `moyuan` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
