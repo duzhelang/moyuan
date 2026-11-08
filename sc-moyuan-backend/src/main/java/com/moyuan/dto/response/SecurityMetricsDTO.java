@@ -42,6 +42,9 @@ public class SecurityMetricsDTO {
     /** 登录失败 TOP IP */
     private List<IpRow> topIps = new ArrayList<>();
 
+    /** 按时间桶聚合的安全事件数，供趋势图 */
+    private List<HourlyPoint> hourly = new ArrayList<>();
+
     @Data
     public static class TypeRow {
         private String type;
@@ -52,5 +55,12 @@ public class SecurityMetricsDTO {
     public static class IpRow {
         private String ip;
         private long count;
+    }
+
+    @Data
+    public static class HourlyPoint {
+        private String label;
+        private long count;
+        private long loginFail;
     }
 }

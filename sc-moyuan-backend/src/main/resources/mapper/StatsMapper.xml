@@ -32,4 +32,28 @@
         GROUP BY DATE_FORMAT(create_time, '%m-%d')
     </select>
 
+    <select id="selectHotPoems" resultType="java.util.Map">
+        SELECT
+            p.id AS id,
+            p.title AS title,
+            COALESCE(f.c, 0) AS favorites,
+            COALESCE(h.c, 0) AS views,
+            COALESCE(f.c, 0) * 3 + COALESCE(h.c, 0) AS score
+        FROM poem p
+        JOIN (
+            SELECT target_id, COUNT(*) AS c
+            FROM user_favorite
+            WHERE target_type = 1 AND create_time >= DATE_SUB(NOW(), INTERVAL #{days} DAY)
+            GROUP BY target_id
+        ) f ON f.target_id = p.id
+        LEFT JOIN (
+            SELECT target_id, COUNT(*) AS c
+            FROM user_history
+            WHERE target_type = 1 AND create_time >= DATE_SUB(NOW(), INTERVAL #{days} DAY)
+            GROUP BY target_id
+        ) h ON h.target_id = p.id
+        ORDER BY score DESC
+        LIMIT #{limit}
+    </select>
+
 </mapper>

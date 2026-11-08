@@ -55,6 +55,7 @@ public class AdminController {
     private final PoetSuggestionService poetSuggestionService;
     private final RepairOrderService repairOrderService;
     private final AuditPipelineService auditPipelineService;
+    private final UserAnalyticsService userAnalyticsService;
 
     // ========== 统计数据 ==========
 
@@ -83,6 +84,17 @@ public class AdminController {
         } catch (Exception e) {
             log.error("获取统计数据失败", e);
             return R.error("获取统计数据失败");
+        }
+    }
+
+    @Operation(summary = "用户结构与活跃留存")
+    @GetMapping("/stats/user-structure")
+    public R<Map<String, Object>> getUserStructure() {
+        try {
+            return R.success(userAnalyticsService.structure());
+        } catch (Exception e) {
+            log.error("获取用户结构指标失败", e);
+            return R.error("获取用户结构指标失败");
         }
     }
 
@@ -196,18 +208,44 @@ public class AdminController {
         return r;
     }
 
+    @Operation(summary = "用户活跃热力图（星期 × 小时）")
+    @GetMapping("/stats/user-heatmap")
+    public R<Map<String, Object>> getUserHeatmap(@RequestParam(defaultValue = "7") int days) {
+        try {
+            return R.success(userAnalyticsService.activityHeatmap(days));
+        } catch (Exception e) {
+            log.error("获取用户活跃热力图失败", e);
+            return R.error("获取用户活跃热力图失败");
+        }
+    }
+
+    @Operation(summary = "热门诗词排行（收藏 × 3 + 浏览）")
+    @GetMapping("/stats/hot-poems")
+    public R<List<Map<String, Object>>> getHotPoems(
+            @RequestParam(defaultValue = "30") int days,
+            @RequestParam(defaultValue = "5") int limit) {
+        try {
+            int window = days <= 0 ? 30 : Math.min(days, 365);
+            int size = Math.max(1, Math.min(limit, 10));
+            return R.success(statsMapper.selectHotPoems(window, size));
+        } catch (Exception e) {
+            log.error("获取热门诗词排行失败", e);
+            return R.error("获取热门诗词排行失败");
+        }
+    }
+
     @Operation(summary = "获取统计趋势")
     @GetMapping("/stats/trend")
-    public R<Map<String, Object>> getStatsTrend() {
+    public R<Map<String, Object>> getStatsTrend(@RequestParam(defaultValue = "7") int days) {
         try {
-            int days = 7;
+            int window = days <= 0 ? 7 : Math.min(days, 90);
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd");
 
-            List<String> dates = IntStream.rangeClosed(0, days - 1)
-                    .mapToObj(i -> LocalDate.now().minusDays(days - 1 - i).format(formatter))
+            List<String> dates = IntStream.rangeClosed(0, window - 1)
+                    .mapToObj(i -> LocalDate.now().minusDays(window - 1 - i).format(formatter))
                     .toList();
 
-            List<StatsTrendDTO> trendData = statsMapper.selectStatsTrend(days);
+            List<StatsTrendDTO> trendData = statsMapper.selectStatsTrend(window);
 
             Map<String, Map<String, Long>> grouped = trendData.stream()
                     .collect(Collectors.groupingBy(

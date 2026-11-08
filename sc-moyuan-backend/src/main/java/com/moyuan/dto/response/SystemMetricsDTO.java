@@ -33,11 +33,32 @@ public class SystemMetricsDTO {
 
     private List<SlowApi> slowTop = new ArrayList<>();
 
+    /** 按时间桶聚合的请求量 / 错误数 / 平均耗时，供 24 小时趋势图 */
+    private List<HourlyPoint> hourly = new ArrayList<>();
+
+    /** 按状态码区间聚合的请求分布（2xx/3xx/4xx/5xx） */
+    private List<StatusBucket> statusBuckets = new ArrayList<>();
+
     @Data
     public static class SlowApi {
         private String path;
         private long count;
         private long avgMs;
         private long maxMs;
+    }
+
+    @Data
+    public static class HourlyPoint {
+        /** 时间桶标签，如 11-08 14:00 */
+        private String label;
+        private long count;
+        private long errorCount;
+        private long avgMs;
+    }
+
+    @Data
+    public static class StatusBucket {
+        private String name;
+        private long count;
     }
 }

@@ -39,6 +39,9 @@ public class AiMetricsDTO {
 
     private List<ModelRow> byModel = new ArrayList<>();
 
+    /** 按时间桶聚合的调用量 / 失败数 / 平均耗时，供趋势图 */
+    private List<HourlyPoint> hourly = new ArrayList<>();
+
     @Data
     public static class EndpointRow {
         private String endpoint;
@@ -52,5 +55,13 @@ public class AiMetricsDTO {
         private String model;
         private long count;
         private long errorCount;
+    }
+
+    @Data
+    public static class HourlyPoint {
+        private String label;
+        private long count;
+        private long errorCount;
+        private long avgMs;
     }
 }

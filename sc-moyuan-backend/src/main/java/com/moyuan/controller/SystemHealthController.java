@@ -13,6 +13,7 @@ import com.moyuan.service.ApiMetricService;
 import com.moyuan.service.SearchMetricService;
 import com.moyuan.service.SecurityMetricService;
 import com.moyuan.service.RecentEventService;
+import com.moyuan.service.ResourceOverviewService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -66,6 +67,7 @@ public class SystemHealthController {
     private final AiMetricService aiMetricService;
     private final SecurityMetricService securityMetricService;
     private final RecentEventService recentEventService;
+    private final ResourceOverviewService resourceOverviewService;
 
     @Value("${moyuan.health.rag-url:http://127.0.0.1:8010/rag/health}")
     private String ragHealthUrl;
@@ -144,6 +146,12 @@ public class SystemHealthController {
     @GetMapping("/recent-events")
     public R<List<Map<String, Object>>> recentEvents(@RequestParam(defaultValue = "12") int limit) {
         return R.success(recentEventService.recent(limit));
+    }
+
+    @Operation(summary = "项目资源总览（内容 / AI / 存储 / 运行四域，60 秒缓存）")
+    @GetMapping("/resource-overview")
+    public R<Map<String, Object>> resourceOverview() {
+        return R.success(resourceOverviewService.overview());
     }
 
     // ==================== 各节点探测 ====================

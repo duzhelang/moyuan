@@ -100,6 +100,24 @@ public class AiMetricService {
                         return row;
                     }, from));
 
+            String bucketExpr = window <= 6
+                    ? "DATE_FORMAT(create_time, '%H:00')"
+                    : "DATE_FORMAT(create_time, '%m-%d %H:00')";
+            dto.setHourly(jdbcTemplate.query(
+                    "SELECT " + bucketExpr + " AS b, COUNT(*) AS c, "
+                            + "SUM(CASE WHEN status <> 'success' THEN 1 ELSE 0 END) AS e, "
+                            + "AVG(duration_ms) AS avg_ms "
+                            + "FROM " + TABLE + " WHERE create_time >= ? "
+                            + "GROUP BY b ORDER BY MIN(create_time)",
+                    (rs, rowNum) -> {
+                        AiMetricsDTO.HourlyPoint point = new AiMetricsDTO.HourlyPoint();
+                        point.setLabel(rs.getString("b"));
+                        point.setCount(rs.getLong("c"));
+                        point.setErrorCount(rs.getLong("e"));
+                        point.setAvgMs(Math.round(rs.getDouble("avg_ms")));
+                        return point;
+                    }, from));
+
             return dto;
         } catch (DataAccessException e) {
             log.warn("AI 调用指标查询失败（表未迁移或数据库异常）: {}", e.getMessage());

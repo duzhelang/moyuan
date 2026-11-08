@@ -78,6 +78,54 @@ public class ApiMetricService {
                         return api;
                     }, from);
             dto.setSlowTop(slow);
+
+            // 时间桶序列：6 小时内按小时展示，超过 6 小时带日期前缀，避免跨天重复
+            String bucketExpr = window <= 6
+                    ? "DATE_FORMAT(create_time, '%H:00')"
+                    : "DATE_FORMAT(create_time, '%m-%d %H:00')";
+            dto.setHourly(jdbcTemplate.query(
+                    "SELECT " + bucketExpr + " AS b, COUNT(*) AS c, "
+                            + "SUM(CASE WHEN status_code >= 500 THEN 1 ELSE 0 END) AS e, "
+                            + "AVG(duration_ms) AS avg_ms "
+                            + "FROM " + TABLE + " WHERE create_time >= ? "
+                            + "GROUP BY b ORDER BY MIN(create_time)",
+                    (rs, rowNum) -> {
+                        SystemMetricsDTO.HourlyPoint point = new SystemMetricsDTO.HourlyPoint();
+                        point.setLabel(rs.getString("b"));
+                        point.setCount(rs.getLong("c"));
+                        point.setErrorCount(rs.getLong("e"));
+                        point.setAvgMs(Math.round(rs.getDouble("avg_ms")));
+                        return point;
+                    }, from));
+
+            // 状态码区间分布：2xx 成功 / 3xx 跳转 / 4xx 客户端错误 / 5xx 服务端错误
+            long[] buckets = new long[4];
+            jdbcTemplate.query(
+                    "SELECT status_code, COUNT(*) AS c FROM " + TABLE
+                            + " WHERE create_time >= ? GROUP BY status_code",
+                    rs -> {
+                        int code = rs.getInt("status_code");
+                        long c = rs.getLong("c");
+                        if (code >= 500) {
+                            buckets[3] += c;
+                        } else if (code >= 400) {
+                            buckets[2] += c;
+                        } else if (code >= 300) {
+                            buckets[1] += c;
+                        } else {
+                            buckets[0] += c;
+                        }
+                    }, from);
+            String[] bucketNames = {"2xx 成功", "3xx 跳转", "4xx 客户端错误", "5xx 服务端错误"};
+            List<SystemMetricsDTO.StatusBucket> statusBuckets = new java.util.ArrayList<>();
+            for (int i = 0; i < bucketNames.length; i++) {
+                SystemMetricsDTO.StatusBucket bucket = new SystemMetricsDTO.StatusBucket();
+                bucket.setName(bucketNames[i]);
+                bucket.setCount(buckets[i]);
+                statusBuckets.add(bucket);
+            }
+            dto.setStatusBuckets(statusBuckets);
+
             return dto;
         } catch (DataAccessException e) {
             log.warn("接口指标查询失败（表未迁移或数据库异常）: {}", e.getMessage());
