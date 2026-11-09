@@ -457,8 +457,16 @@ watch(() => store.currentKey, () => {
             :disabled="loading"
             @keydown="handleKeydown"
           ></textarea>
-          <button class="send-btn" :disabled="loading || !inputText.trim()" @click="handleSend">
-            <span v-if="loading" class="send-loading"></span>
+          <button
+            class="send-btn"
+            :class="{ stopping: loading }"
+            :title="loading ? '停止生成' : '发送'"
+            :disabled="!loading && !inputText.trim()"
+            @click="loading ? store.stop() : handleSend()"
+          >
+            <svg v-if="loading" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
             <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
             </svg>
@@ -853,19 +861,8 @@ watch(() => store.currentKey, () => {
   cursor: not-allowed;
 }
 
-.send-loading {
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: ai-spin 0.8s linear infinite;
-}
-
-@keyframes ai-spin {
-  to {
-    transform: rotate(360deg);
-  }
+.send-btn.stopping {
+  background: linear-gradient(135deg, #9d3b2b, #c65b3c);
 }
 
 .ai-chat-mini {

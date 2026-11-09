@@ -47,16 +47,14 @@ export function buildPoetPrompt(userMessage: string, options: PromptOptions): st
 }
 
 /**
- * 全站 AI 小窗（诗词助理）的提示词拼装
+ * 构建全站 AI 小窗（诗词助理）的系统设定
  * 复用后台「AI 模块配置」中维护的 promptTemplate，并按页面上下文替换变量
  *
- * @param userMessage 用户问题
  * @param ctx 页面上下文（诗人 / 诗词）
  * @param config 模块配置，为空时使用内置兜底模板
  * @param isFirst 是否为该页首次提问（影响回答长度）
  */
-export function buildPoetryPrompt(
-  userMessage: string,
+export function buildPoetrySystemPrompt(
   ctx: AiContext | null,
   config: AiModuleConfig | null,
   isFirst = false
@@ -98,7 +96,7 @@ export function buildPoetryPrompt(
     }
   }
 
-  return `【系统设定】${systemConstraint}\n\n【用户问题】${userMessage}`
+  return systemConstraint
 }
 
 /**

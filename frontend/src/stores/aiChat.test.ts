@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
 const chatMock = vi.fn()
+const chatStreamMock = vi.fn()
 const getAiModuleConfigMock = vi.fn()
 const getSystemKnowledgeListMock = vi.fn()
 const ragAvailableMock = vi.fn()
@@ -9,6 +10,7 @@ const askRagStreamMock = vi.fn()
 
 vi.mock('@/api/modules/ai', () => ({
   chat: (...args: unknown[]) => chatMock(...args),
+  chatStream: (...args: unknown[]) => chatStreamMock(...args),
   getAiModuleConfig: (...args: unknown[]) => getAiModuleConfigMock(...args)
 }))
 
@@ -53,6 +55,12 @@ function bootstrap() {
   localStorage.setItem('token', 'fake-token')
   setActivePinia(createPinia())
   chatMock.mockReset().mockResolvedValue({ data: { reply: '模拟回答' } })
+  chatStreamMock.mockReset().mockImplementation(
+    async (_payload: unknown, handlers?: { onDelta?: (delta: string) => void }) => {
+      handlers?.onDelta?.('模拟回答')
+      return '模拟回答'
+    }
+  )
   getAiModuleConfigMock.mockReset().mockResolvedValue({ data: { moduleCode: 'chat', maxLength: 200, firstResponseLength: 100, promptTemplate: '' } })
   getSystemKnowledgeListMock.mockReset().mockResolvedValue({ data: [KNOWLEDGE_ROW] })
   // 默认关闭 RAG，保持原有「前端检索 + system_chat」链路的断言
@@ -182,17 +190,51 @@ describe('aiChat store', () => {
     expect(last.content).toBe('模拟回答')
   })
 
-  it('诗词内容提问走当前页面画像的模块码', async () => {
+  it('诗词内容提问走流式接口与当前页面画像的模块码', async () => {
     const store = useAiChatStore()
     store.syncRoute('/poem/9')
     store.setContext({ type: 'poem', id: 9, name: '静夜思', author: '李白', content: '床前明月光' })
     await store.send('这首诗的作者是谁')
 
-    expect(chatMock).toHaveBeenCalledTimes(1)
-    const payload = chatMock.mock.calls[0][0] as { message: string; moduleCode: string }
+    expect(chatStreamMock).toHaveBeenCalledTimes(1)
+    const payload = chatStreamMock.mock.calls[0][0] as {
+      messages: Array<{ role: string; content: string }>
+      moduleCode: string
+    }
     expect(payload.moduleCode).toBe('chat')
-    expect(payload.message).toContain('静夜思')
+    // 系统设定以 system 角色下发，用户问题单独作为 user 消息
+    expect(payload.messages[0].role).toBe('system')
+    expect(payload.messages[0].content).toContain('静夜思')
+    expect(payload.messages[1]).toEqual({ role: 'user', content: '这首诗的作者是谁' })
     expect(store.messages[0].content).toBe('这首诗的作者是谁')
+  })
+
+  it('停止生成会中断流式请求并保留已输出内容', async () => {
+    chatStreamMock.mockImplementation(
+      (_payload: unknown, handlers?: { onDelta?: (delta: string) => void; signal?: AbortSignal }) => {
+        handlers?.onDelta?.('已输出的部分')
+        return new Promise<string>((_resolve, reject) => {
+          handlers?.signal?.addEventListener('abort', () => reject(new Error('aborted')))
+        })
+      }
+    )
+
+    const store = useAiChatStore()
+    store.syncRoute('/poem/9')
+    const task = store.send('这首诗的作者是谁')
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(store.loading).toBe(true)
+    store.stop()
+
+    expect(store.loading).toBe(false)
+    const handlers = chatStreamMock.mock.calls[0][1] as { signal: AbortSignal }
+    expect(handlers.signal.aborted).toBe(true)
+
+    await task
+    const last = store.messages[store.messages.length - 1]
+    expect(last.role).toBe('assistant')
+    expect(last.content).toBe('已输出的部分')
   })
 
   it('诗词详情页首次打开自动发送预设问题', async () => {
@@ -203,7 +245,7 @@ describe('aiChat store', () => {
     expect(store.messages[0].content).toBe('请简要介绍一下这首诗')
     // 预设问题是异步发出的：需等待「取模块配置 → 调模型」整条链路落定
     await new Promise(resolve => setTimeout(resolve, 0))
-    expect(chatMock).toHaveBeenCalled()
+    expect(chatStreamMock).toHaveBeenCalled()
   })
 
   it('未登录时提示登录且不发起请求', async () => {
@@ -215,6 +257,7 @@ describe('aiChat store', () => {
 
     expect(store.loginPromptVisible).toBe(true)
     expect(chatMock).not.toHaveBeenCalled()
+    expect(chatStreamMock).not.toHaveBeenCalled()
   })
 
   it('诗人详情页的预设问题等上下文注入后再发送', async () => {
@@ -251,6 +294,7 @@ describe('aiChat store', () => {
     expect(store.messages.filter(item => item.role === 'user').length).toBe(0)
     expect(store.messages.filter(item => item.role === 'assistant').length).toBe(1)
     expect(chatMock).not.toHaveBeenCalled()
+    expect(chatStreamMock).not.toHaveBeenCalled()
 
     store.confirmSwitchAndSend()
     await new Promise(resolve => setTimeout(resolve, 0))
@@ -258,7 +302,7 @@ describe('aiChat store', () => {
     expect(store.activeAssistant).toBe('poetry')
     expect(store.pendingSwitch).toBeNull()
     expect(store.messages[0].content).toBe('这首诗的作者是谁')
-    expect(chatMock).toHaveBeenCalled()
+    expect(chatStreamMock).toHaveBeenCalled()
   })
 
   it('网页用法助理同一问题二次提问命中缓存，不重复调用模型', async () => {

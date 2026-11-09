@@ -112,6 +112,8 @@ export interface RagStreamMeta {
 export interface RagStreamHandlers {
   onMeta?: (meta: RagStreamMeta) => void
   onDelta?: (text: string) => void
+  /** 用于「停止生成」 */
+  signal?: AbortSignal
 }
 
 export interface RagStreamResult {
@@ -135,7 +137,8 @@ export async function askRagStream(
   const response = await fetch('/rag/ask/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-    body: JSON.stringify({ question })
+    body: JSON.stringify({ question }),
+    signal: handlers.signal
   })
 
   if (!response.ok) {

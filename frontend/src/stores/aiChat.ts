@@ -6,7 +6,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import { useUserStore } from './user'
-import { chat as chatApi, getAiModuleConfig } from '@/api/modules/ai'
+import { chat as chatApi, chatStream, getAiModuleConfig } from '@/api/modules/ai'
 import type { AiModuleConfig } from '@/api/modules/ai'
 import { askRagStream, ragAvailable } from '@/api/modules/rag'
 import { getSystemKnowledgeList } from '@/api/modules/systemKnowledge'
@@ -19,7 +19,7 @@ import {
 } from '@/configs/ai-chat/pageProfiles'
 import type { AssistantId } from '@/configs/ai-chat/assistants'
 import { getAssistant } from '@/configs/ai-chat/assistants'
-import { buildPoetryPrompt, buildSystemPrompt } from '@/utils/ai-prompt'
+import { buildPoetrySystemPrompt, buildSystemPrompt } from '@/utils/ai-prompt'
 import {
   KNOWLEDGE_FALLBACK,
   buildKnowledgeContext,
@@ -95,6 +95,8 @@ export const useAiChatStore = defineStore('aiChat', () => {
   const sizeByProfile = ref<Record<string, { w: number; h: number }>>({})
   const presetSentByKey = ref<Record<string, boolean>>({})
   const loadingByKey = ref<Record<string, boolean>>({})
+  /** 各会话分区当前流式请求的取消控制器，供「停止生成」使用 */
+  const abortControllers = new Map<string, AbortController>()
   /** 越界提问：等用户确认是否切换助理 */
   const pendingSwitch = ref<PendingSwitch | null>(null)
   /** 本次进入该路由后是否被用户手动关闭 */
@@ -275,6 +277,8 @@ export const useAiChatStore = defineStore('aiChat', () => {
     detached.value = false
     // 关闭即结束本次会话：清空当前页面两个助理的消息，保留页面上下文
     sessionSeq.value++
+    abortControllers.forEach(controller => controller.abort())
+    abortControllers.clear()
     clearProfileMessages()
   }
 
@@ -536,12 +540,16 @@ export const useAiChatStore = defineStore('aiChat', () => {
 
   /**
    * RAG 知识问答（SSE 流式）：服务可用时优先走 FastAPI，增量文本交给 onDelta 渲染
-   * 服务未启动、拒答或生成失败时返回 null，由调用方回退原前端检索链路
+   * 服务未启动、拒答、生成失败或被用户停止时返回 null（停止时向上抛出，由发送方忽略）
    */
-  async function answerByRag(text: string, onDelta?: (partial: string) => void): Promise<string | null> {
+  async function answerByRag(
+    text: string,
+    onDelta?: (partial: string) => void,
+    signal?: AbortSignal
+  ): Promise<string | null> {
     try {
       if (!(await ragAvailable())) return null
-      const res = await askRagStream(text, { onDelta })
+      const res = await askRagStream(text, { onDelta, signal })
       if (res.refused || !res.answer.trim()) return null
       const answer = res.answer.trim()
       const cites = Array.from(
@@ -549,13 +557,19 @@ export const useAiChatStore = defineStore('aiChat', () => {
       ).slice(0, 3)
       return cites.length ? `${answer}\n\n（来源：${cites.join('；')}）` : answer
     } catch (e) {
+      // 用户主动停止：不再回退非流式链路，直接交给发送方收尾
+      if (signal?.aborted) throw e
       console.warn('RAG 问答失败，回退本地知识库链路', e)
       return null
     }
   }
 
   /** 系统用法链路：缓存 → FAQ 直答 → RAG 问答 → 检索注入 → 兜底不给结论 */
-  async function answerBySystem(text: string, onDelta?: (partial: string) => void): Promise<string> {
+  async function answerBySystem(
+    text: string,
+    onDelta?: (partial: string) => void,
+    signal?: AbortSignal
+  ): Promise<string> {
     await loadKnowledge()
     const version = knowledgeVersion.value
     const cached = readAnswerCache(text, 'system', version)
@@ -569,8 +583,10 @@ export const useAiChatStore = defineStore('aiChat', () => {
     }
 
     // 优先使用 RAG 服务（混合检索 + 本地模型流式生成），失败则继续走原来的前端检索链路
-    const ragAnswer = await answerByRag(text, onDelta)
+    const ragAnswer = await answerByRag(text, onDelta, signal)
     if (ragAnswer) return ragAnswer
+    // 用户已停止：不再发起非流式兜底请求
+    if (signal?.aborted) return ''
 
     const picked = searchEntries(text, knowledgeEntries.value, 3)
     const material = picked.length ? picked : pickCategoryEntries(text, knowledgeEntries.value, 6)
@@ -588,16 +604,28 @@ export const useAiChatStore = defineStore('aiChat', () => {
     return reply
   }
 
-  /** 诗词链路：按页面画像的模块码与上下文拼装 prompt */
-  async function answerByPoetry(text: string): Promise<string> {
+  /** 诗词链路：按页面画像的模块码与上下文拼装 system + user，走 SSE 流式输出 */
+  async function answerByPoetry(
+    text: string,
+    onDelta?: (partial: string) => void,
+    signal?: AbortSignal
+  ): Promise<string> {
     const moduleCode = profile.value.moduleCode
     const config = await loadModuleConfig(moduleCode)
     const key = currentMessageKey.value
     const userCount = (messagesByKey.value[key] || []).filter(item => item.role === 'user').length
     const isFirst = userCount <= 1
-    const prompt = buildPoetryPrompt(text, context.value, config, isFirst)
-    const res = await chatApi({ message: prompt, moduleCode })
-    return res.data?.reply || '抱歉，暂时无法回答'
+    const reply = await chatStream(
+      {
+        messages: [
+          { role: 'system', content: buildPoetrySystemPrompt(context.value, config, isFirst) },
+          { role: 'user', content: text }
+        ],
+        moduleCode
+      },
+      { onDelta, signal }
+    )
+    return reply.trim() || '抱歉，暂时无法回答'
   }
 
   /* ---------------- 发送 ---------------- */
@@ -636,27 +664,31 @@ export const useAiChatStore = defineStore('aiChat', () => {
     persist()
 
     const seq = sessionSeq.value
-    // RAG 流式增量：首个 delta 到达时插入 assistant 占位消息，后续原地追加
+    // 流式增量：首个 delta 到达时插入 assistant 占位消息，后续原地追加
     let streamText = ''
-    let streamMessage: AiMessage | null = null
+    let streamInserted = false
+    const streamMessage: AiMessage = { role: 'assistant', content: '', ts: Date.now(), assistant }
+    const controller = new AbortController()
+    abortControllers.set(key, controller)
     const onDelta = (partial: string) => {
       // 用户已关闭小窗（会话作废），不再写入
       if (seq !== sessionSeq.value) return
       streamText += partial
-      if (!streamMessage) {
-        streamMessage = { role: 'assistant', content: streamText, ts: Date.now(), assistant }
+      streamMessage.content = streamText
+      if (!streamInserted) {
         pushMessage(key, streamMessage)
-      } else {
-        streamMessage.content = streamText
+        streamInserted = true
       }
     }
 
     try {
       const reply =
-        assistant === 'system' ? await answerBySystem(text, onDelta) : await answerByPoetry(text)
-      // 期间用户关闭了小窗（会话已清空），丢弃这条过期回答
-      if (seq === sessionSeq.value) {
-        if (streamMessage) {
+        assistant === 'system'
+          ? await answerBySystem(text, onDelta, controller.signal)
+          : await answerByPoetry(text, onDelta, controller.signal)
+      // 期间用户关闭了小窗（会话已清空）或主动停止，丢弃这条过期回答
+      if (seq === sessionSeq.value && !controller.signal.aborted) {
+        if (streamInserted) {
           // 已有流式占位：用最终答案覆盖（补上来源），不重复插入
           streamMessage.content = reply
           streamMessage.note = note
@@ -665,12 +697,36 @@ export const useAiChatStore = defineStore('aiChat', () => {
         }
       }
     } catch (e) {
-      console.warn('AI 小窗回答失败', e)
-      if (seq === sessionSeq.value) pushAssistant('AI 服务暂时不可用，请稍后重试', assistant)
+      // 用户主动停止：保留已输出的部分内容，不追加错误提示
+      if (!controller.signal.aborted) {
+        console.warn('AI 小窗回答失败', e)
+        if (seq === sessionSeq.value) {
+          if (streamInserted) {
+            // 流式中断：保留已输出的部分内容，未输出时才展示错误提示
+            if (!streamText.trim()) streamMessage.content = 'AI 服务暂时不可用，请稍后重试'
+          } else {
+            pushAssistant('AI 服务暂时不可用，请稍后重试', assistant)
+          }
+        }
+      }
     } finally {
-      loadingByKey.value[key] = false
+      // 仅当本次请求仍是该分区的最新请求时才收尾，避免「停止后立即再发」被旧请求清掉 loading
+      const active = abortControllers.get(key)
+      if (active === controller) abortControllers.delete(key)
+      if (active === controller || !active) loadingByKey.value[key] = false
       persist()
     }
+  }
+
+  /** 停止当前分区的流式生成：保留已输出的部分内容 */
+  function stop() {
+    const key = currentMessageKey.value
+    const controller = abortControllers.get(key)
+    if (!controller) return
+    abortControllers.delete(key)
+    controller.abort()
+    loadingByKey.value[key] = false
+    persist()
   }
 
   /** 确认切换到目标助理并发送等待中的提问 */
@@ -748,6 +804,7 @@ export const useAiChatStore = defineStore('aiChat', () => {
     resetPos,
     refreshViewport,
     ensurePreset,
+    stop,
     clearCurrentMessages,
     loadKnowledge,
     send,
